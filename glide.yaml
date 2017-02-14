@@ -1,0 +1,38 @@
+package: github.com/rackn/rocket-skates
+import:
+- package: gopkg.in/mgo.v2
+  version: v2
+  repo: https://github.com/go-mgo/mgo
+  subpackages:
+    - bson
+- package: github.com/VictorLowther/jsonpatch
+- package: github.com/digitalrebar/digitalrebar
+  subpackages:
+  - go/common/client
+  - go/common/service
+  - go/common/store
+  - go/common/version
+  - go/rebar-api/api
+- package: github.com/dre1080/recover
+- package: github.com/go-openapi/errors
+- package: github.com/go-openapi/loads
+- package: github.com/go-openapi/runtime
+  subpackages:
+  - client
+  - flagext
+  - middleware
+  - security
+- package: github.com/go-openapi/spec
+- package: github.com/go-openapi/strfmt
+- package: github.com/go-openapi/swag
+- package: github.com/go-openapi/validate
+- package: github.com/hashicorp/consul
+  subpackages:
+  - api
+- package: github.com/jessevdk/go-flags
+- package: github.com/pin/tftp
+- package: github.com/satori/go.uuid
+- package: github.com/tylerb/graceful
+- package: golang.org/x/net
+  subpackages:
+  - context
