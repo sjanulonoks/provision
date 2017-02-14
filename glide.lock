@@ -1,5 +1,5 @@
 hash: 48617641d24d6e021ed9ad20385d70f6a1435775d4d2d4f54fef354c65e8bce0
-updated: 2017-02-14T15:54:05.429506354-06:00
+updated: 2017-02-14T16:51:02.277763817-06:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: fdf19785fd3558d619ef81212f5edf1d6c2a5911
@@ -23,7 +23,7 @@ imports:
   - ocsp/config
   - signer
 - name: github.com/digitalrebar/digitalrebar
-  version: 1c83221380f81d45b759028abe1c0572904e7da1
+  version: 57a725f267d1721e68a93179404b2859c14ba600
   subpackages:
   - go/common/cert
   - go/common/client
