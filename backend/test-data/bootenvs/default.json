@@ -1,0 +1,13 @@
+{
+    "Name":"default",
+    "OS": {},
+    "Templates": [
+        {
+            "Name": "default",
+            "Path": "foo/bar",
+            "ID": "default"
+        }
+    ]
+}
+        
+    

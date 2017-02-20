@@ -29,6 +29,7 @@ type DataTracker struct {
 	FileURL                 string
 	CommandURL              string
 	DefaultBootEnv          string
+	UnknownBootEnv          string
 	RebarClient             *api.Client
 	backends                map[string]store.SimpleStore
 	backendMux              sync.Mutex

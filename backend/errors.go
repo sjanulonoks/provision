@@ -57,7 +57,7 @@ func (e *Error) Errorf(s string, args ...interface{}) {
 	if e.Messages == nil {
 		e.Messages = []string{}
 	}
-	e.Messages = append(e.Messages, fmt.Sprintf(s, args))
+	e.Messages = append(e.Messages, fmt.Sprintf(s, args...))
 }
 
 func (e *Error) Error() string {
