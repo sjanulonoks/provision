@@ -79,10 +79,12 @@ func (t *Template) List() []*Template {
 }
 
 // Parse checks to make sure the template contents are valid according to text/template.
-func (t *Template) Parse() (err error) {
+func (t *Template) Parse() error {
+	e := &Error{Code: 422, Type: ValidationError, o: t}
 	parsedTmpl, err := template.New(t.ID).Parse(t.Contents)
 	if err != nil {
-		return err
+		e.Errorf("%v", err)
+		return e
 	}
 	t.parsedTmpl = parsedTmpl.Option("missingkey=error")
 	return nil
@@ -109,17 +111,17 @@ func (t *Template) OnChange(oldThing store.KeySaver) error {
 }
 
 func (t *Template) BeforeDelete() error {
-	var err error
+	e := &Error{Code: 409, Type: StillInUseError, o: t}
 	bootenv := t.p.NewBootEnv()
 	bootEnvs := bootenv.List()
 	for _, bootEnv := range bootEnvs {
 		for _, tmpl := range bootEnv.Templates {
 			if tmpl.ID == t.ID {
-				return fmt.Errorf("template: %s is in use by bootenv %s (template %s", t.ID, bootEnv.Name, tmpl.Name)
+				e.Errorf("In use by bootenv %s (as %s)", bootEnv.Name, tmpl.Name)
 			}
 		}
 	}
-	return err
+	return e.OrNil()
 }
 
 // Render executes the template with params writing the results to dest

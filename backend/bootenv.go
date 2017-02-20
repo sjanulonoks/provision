@@ -207,8 +207,7 @@ func (b *BootEnv) Key() string {
 }
 
 func (b *BootEnv) New() store.KeySaver {
-	res := &BootEnv{Name: b.Name, p: b.p}
-	return store.KeySaver(res)
+	return &BootEnv{Name: b.Name, p: b.p}
 }
 
 func (b *BootEnv) explodeIso() error {
@@ -429,7 +428,7 @@ func (b *BootEnv) RebuildRebarData() {
 
 	deployment := &api.Deployment{}
 	if err := b.p.RebarClient.Fetch(deployment, "system"); err != nil {
-		b.p.Logger.Printf("Failed to lload system deployment: %v", err)
+		b.p.Logger.Printf("Failed to load system deployment: %v", err)
 		return
 	}
 
