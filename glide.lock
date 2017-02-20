@@ -1,12 +1,12 @@
-hash: 48617641d24d6e021ed9ad20385d70f6a1435775d4d2d4f54fef354c65e8bce0
-updated: 2017-02-14T16:51:02.277763817-06:00
+hash: e2827f6d9a787f3a06a0442324edc1860cc817c985b4e08f974b43dec202ca52
+updated: 2017-02-20T14:28:07.633106127-06:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: fdf19785fd3558d619ef81212f5edf1d6c2a5911
 - name: github.com/boltdb/bolt
-  version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
+  version: e9cf4fae01b5a8ff89d0ec6b32f0d9c9f79aefdd
 - name: github.com/cloudflare/cfssl
-  version: 2eb352cc142c856572fec47594c59025bef11743
+  version: 2294778cce8f195e8969d9f7f0addd3ee81b5611
   subpackages:
   - api
   - api/client
@@ -23,7 +23,7 @@ imports:
   - ocsp/config
   - signer
 - name: github.com/digitalrebar/digitalrebar
-  version: 57a725f267d1721e68a93179404b2859c14ba600
+  version: 38e4337079895a4064d93a7d9dcdfa3613005611
   subpackages:
   - go/common/cert
   - go/common/client
@@ -38,10 +38,12 @@ imports:
   version: 0dadbb0345b35ec7ef35e228dabb8de89a65bf52
 - name: github.com/dre1080/recover
   version: 1c296bbb3227134aca59bf2e3dc4c0893eee62fa
+- name: github.com/elithrar/simple-scrypt
+  version: 2325946f714c95de4a6088202c402fbdfa64163b
 - name: github.com/facebookgo/stack
   version: 751773369052141c013c6e827a71e8f35c07879c
 - name: github.com/fatih/color
-  version: 5ec5d9d3c2cf82e9688b34e9bc27a94d616a7193
+  version: 7824417a424b65227be8ac9b14d545a7f3e6c3f0
 - name: github.com/go-openapi/analysis
   version: d5a75b7d751ca3f11ad5d93cfe97405f2c3f6a47
 - name: github.com/go-openapi/errors
@@ -77,29 +79,35 @@ imports:
 - name: github.com/guregu/null
   version: 41961cea0328defc5f95c1c473f89ebf0d1813f6
 - name: github.com/hashicorp/consul
-  version: 17db4a572287f2b0cf93e47339a17db522f12d45
+  version: 65b7ed462cc574d57dc6dcc9bca74676089f7fee
   subpackages:
   - api
 - name: github.com/hashicorp/go-cleanhttp
-  version: ad28ea4487f05916463e2423a55166280e8254b5
+  version: 3573b8b52aa7b37b9358d966a898feb387f62437
 - name: github.com/hashicorp/serf
-  version: d3a67ab21bc8a4643fa53a3633f2d951dd50c6ca
+  version: 050c56d31a1ff2ebc50e3f4810fdff7e7563f6c8
   subpackages:
   - coordinate
 - name: github.com/jessevdk/go-flags
   version: 460c7bb0abd6e927f2767cadc91aa6ef776a98b4
+- name: github.com/krolaw/dhcp4
+  version: f61f734b73027e29f7fa2ed623f2ed85a7ef08fa
 - name: github.com/mailru/easyjson
-  version: 99e922cf9de1bc0ab38310c277cff32c2147e747
+  version: d89c33ca38a143e5190297c6252fcc75f01694ed
   subpackages:
   - buffer
   - jlexer
   - jwriter
 - name: github.com/mattn/go-colorable
   version: 5411d3eea5978e6cdc258b30de592b60df6aba96
+  repo: https://github.com/mattn/go-colorable
 - name: github.com/mattn/go-isatty
-  version: 30a891c33c7cde7b02a981314b4228ec99380cca
+  version: dda3de49cbfcec471bd7a70e6cc01fcc3ff90109
+  repo: https://github.com/mattn/go-isatty
 - name: github.com/mitchellh/mapstructure
-  version: bfdb1a85537d60bc7e954e600c250219ea497417
+  version: db1efb556f84b25a0a13a04aad883943538ad2e0
+- name: github.com/pborman/uuid
+  version: 1b00554d822231195d1babd97ff4a781231955c9
 - name: github.com/pin/tftp
   version: 9ea92f6b1029bc1bf3072bba195c84bb9b0370e3
   subpackages:
@@ -109,7 +117,7 @@ imports:
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
 - name: github.com/satori/go.uuid
-  version: 879c5887cd475cd7864858769793b2ceb0d44feb
+  version: b061729afc07e77a8aa4fad0a2fd840958f1942a
 - name: github.com/tylerb/graceful
   version: 4654dfbb6ad53cb5e27f37d99b02e16c1872fbbb
 - name: github.com/VictorLowther/jsonpatch
@@ -117,29 +125,34 @@ imports:
   subpackages:
   - utils
 - name: golang.org/x/crypto
-  version: 1f22c0103821b9390939b6776727195525381532
+  version: 9a6f0a01987842989747adff311d80750ba25530
   subpackages:
   - curve25519
   - nacl/box
   - nacl/secretbox
+  - pbkdf2
   - pkcs12
   - pkcs12/internal/rc2
   - poly1305
   - salsa20/salsa
+  - scrypt
 - name: golang.org/x/net
   version: 3f122ce3dbbe488b7e6a8bdb26f41edec852a40b
   subpackages:
+  - bpf
   - context
   - context/ctxhttp
   - html
   - html/atom
   - idna
+  - internal/iana
+  - ipv4
 - name: golang.org/x/sys
-  version: 478fcf54317e52ab69f40bb4c7a1520288d7f7ea
+  version: e24f485414aeafb646f6fca458b0bf869c0880a1
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 06d6eba81293389cafdff7fca90d75592194b2d9
+  version: 85c29909967d7f171f821e7a42e7b7af76fb9598
   subpackages:
   - transform
   - unicode/norm
@@ -151,5 +164,6 @@ imports:
   - bson
   - internal/json
 - name: gopkg.in/yaml.v2
-  version: a5b47d31c556af34a302ce5d659e6fea44d90de0
+  version: a3f3340b5840cee44f372bddb5880fcbc419b46a
+  repo: https://github.com/go-yaml/yaml
 testImports: []
