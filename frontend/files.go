@@ -13,7 +13,7 @@ import (
 	"github.com/rackn/rocket-skates/backend"
 )
 
-func (f *Frontend) InitFileAPI() {
+func (f *Frontend) InitFileApi() {
 
 	f.MgmtApi.GET(f.BasePath+"/files",
 		func(c *gin.Context) {

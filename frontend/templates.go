@@ -1,78 +1,80 @@
 package frontend
 
 import (
+	"fmt"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
 )
 
-func initTemplateRoutes(dt *backend.DataTracker) {
-	mgmtApi.GET(basePath+"/templates",
+func (f *Frontend) InitTemplateApi() {
+	f.MgmtApi.GET(f.BasePath+"/templates",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, dt.AsTemplates(dt.FetchAll(dt.NewTemplate())))
+			c.JSON(http.StatusOK, backend.AsTemplates(f.DataTracker.FetchAll(f.DataTracker.NewTemplate())))
 		})
-	mgmtApi.POST(basePath+"/templates",
+	f.MgmtApi.POST(f.BasePath+"/templates",
 		func(c *gin.Context) {
-			b := dt.NewTemplate()
+			b := f.DataTracker.NewTemplate()
 			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, NewError(err.Error()))
+				c.JSON(http.StatusBadRequest,
+					backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 			}
-			ok, err := dt.Create(b)
+			nb, err := f.DataTracker.Create(b)
 			if err != nil {
-				c.JSON(http.StatusBadRequest, NewError(err.Error()))
+				c.JSON(http.StatusBadRequest, err)
 			} else {
-				c.JSON(http.StatusCreated, b)
+				c.JSON(http.StatusCreated, nb)
 			}
 		})
-	mgmtApi.GET(basePath+"/templates/:name",
+	// GREG: add streaming create.	f.MgmtApi.POST("/templates/:uuid", createTemplate)
+	f.MgmtApi.GET(f.BasePath+"/templates/:id",
 		func(c *gin.Context) {
-			res, ok := dt.FetchOne(dt.NewTemplate(), c.Param(`name`))
+			res, ok := f.DataTracker.FetchOne(f.DataTracker.NewTemplate(), c.Param(`id`))
 			if ok {
-				c.JSON(http.StatusOK, dt.AsTemplate(res))
+				c.JSON(http.StatusOK, backend.AsTemplate(res))
 			} else {
-				c.JSON(http.StatusNotFound, err)
+				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound,
+					fmt.Sprintf("templates: Not found: %v", c.Param(`id`))))
 			}
 		})
-	mgmtApi.PATCH(basePath+"/templates/:name",
+	f.MgmtApi.PATCH(f.BasePath+"/templates/:id",
 		func(c *gin.Context) {
-			//			updateThing(c, &Template{Name: c.Param(`name`)}, &Template{})
+			//			updateThing(c, &Template{ID: c.Param(`id`)}, &Template{})
 		})
-	mgmtApi.PUT(basePath+"/templates/:name",
+	f.MgmtApi.PUT(f.BasePath+"/templates/:id",
 		func(c *gin.Context) {
-			b := dt.NewTemplate()
+			b := f.DataTracker.NewTemplate()
 			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, NewError(err.Error()))
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 			}
-			if b.Name != c.Param(`name`) {
-				c.JSON(http.StatusBadRequest, NewError(err.Error()))
+			if b.ID != c.Param(`id`) {
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest,
+					fmt.Sprintf("templates: Can not change id: %v -> %v", c.Param(`id`), b.ID)))
 			}
-			ok, err := dt.Update(b)
-			if !ok && err != nil {
-				c.JSON(http.StatusNotFound, err)
-			} else if !ok {
-				c.JSON(http.StatusNotFound, err)
+			nb, err := f.DataTracker.Update(b)
+			if err != nil {
+				c.JSON(http.StatusNotFound, err) // GREG: Code
 			} else {
-				c.JSON(http.StatusOK, b)
+				c.JSON(http.StatusOK, nb)
 			}
 		})
-	mgmtApi.DELETE(basePath+"/templates/:name",
+	f.MgmtApi.DELETE(f.BasePath+"/templates/:id",
 		func(c *gin.Context) {
-			b := dt.NewTemplate()
-			b.Name = c.Param(`name`)
-			ok, err := dt.Remove(b)
-			if !ok && err != nil {
-				c.JSON(http.StatusNotFound, err)
-			} else if !ok {
-				c.JSON(http.StatusNotFound, err)
+			b := f.DataTracker.NewTemplate()
+			b.ID = c.Param(`id`)
+			_, err := f.DataTracker.Remove(b)
+			if err != nil {
+				c.JSON(http.StatusNotFound, err) // GREG: Code
 			} else {
-				c.JSON(http.StatusNoContent)
+				c.JSON(http.StatusNoContent, nil)
 			}
 		})
 }
 
 /*
 func BootenvPatch(params templates.PatchBootenvParams, p *models.Principal) middleware.Responder {
-	newThing := NewBootenv(params.Name)
+	newThing := NewBootenv(params.ID)
 	patch, _ := json.Marshal(params.Body)
 	item, err := patchThing(newThing, patch)
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 	"github.com/rackn/rocket-skates/backend"
 )
 
-func (f *Frontend) InitIsoAPI() {
+func (f *Frontend) InitIsoApi() {
 	f.MgmtApi.GET("/isos",
 		func(c *gin.Context) {
 			listIsos(c, f.FileRoot)
@@ -23,7 +23,7 @@ func (f *Frontend) InitIsoAPI() {
 		})
 	f.MgmtApi.POST("/isos/:name",
 		func(c *gin.Context) {
-			uploadIso(c, f.FileRoot, c.Param(`name`))
+			uploadIso(c, f.FileRoot, c.Param(`name`), f.DataTracker)
 		})
 	f.MgmtApi.DELETE("/isos/:name",
 		func(c *gin.Context) {
@@ -53,26 +53,18 @@ func getIso(c *gin.Context, fileRoot, name string) {
 	c.File(isoName)
 }
 
-func reloadBootenvsForIso(name string) {
-	env := &BootEnv{}
-	envs, err := store.List(env)
-	if err != nil {
-		return
-	}
-	for _, blob := range envs {
-		env, ok := blob.(*BootEnv)
-		if !ok {
-			continue
-		}
+func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
+	for _, blob := range dt.FetchAll(dt.NewBootEnv()) {
+		env := backend.AsBootEnv(blob)
 		if env.Available || env.OS.IsoFile != name {
 			continue
 		}
 		env.Available = true
-		store.Update(env)
+		dt.Update(env)
 	}
 }
 
-func uploadIso(c *gin.Context, fileRoot, name string) {
+func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 	if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
 		c.JSON(http.StatusUnsupportedMediaType,
 			backend.NewError("API ERROR", http.StatusUnsupportedMediaType,
@@ -113,7 +105,7 @@ func uploadIso(c *gin.Context, fileRoot, name string) {
 		Name string
 		Size int64
 	}{name, copied}
-	go reloadBootenvsForIso(name)
+	go reloadBootenvsForIso(dt, name)
 	c.JSON(http.StatusCreated, res)
 }
 

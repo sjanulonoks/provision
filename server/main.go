@@ -124,8 +124,6 @@ func main() {
 		}
 	}
 
-	provisionerURL := fmt.Sprintf("http://%s:%d", c_opts.OurAddress, c_opts.StaticPort)
-
 	var backendStore store.SimpleStore
 	switch c_opts.BackEndType {
 	case "consul":
@@ -150,12 +148,9 @@ func main() {
 		logger.Fatalf("Error using backing store %s: %v", c_opts.BackEndType, err)
 	}
 
-	backend, err := backend.NewBackend(backendStore, true, true)
-	if err != nil {
-		logger.Fatal(err)
-	}
+	dt := backend.NewDataTracker(backendStore, true, true)
 
-	mgmtApi, err := frontend.NewFrontend(backend)
+	fe, err := frontend.NewFrontend(dt, "/api/v3", c_opts.FileRoot)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -165,18 +160,18 @@ func main() {
 		log.Fatalf("Error creating trusted server: %v", err)
 	}
 	s.Addr = fmt.Sprintf(":%d", c_opts.ApiPort)
-	s.Handler = mgmtApi
+	s.Handler = fe.MgmtApi
 
 	go func() {
 		if err = s.ListenAndServeTLS("", ""); err != nil {
 			log.Fatalf("Error running API service: %v", err)
 		}
 	}()
-	if err = frontend.serveTftp(fmt.Sprintf(":%d", c_opts.TftpPort)); err != nil {
+	if err = frontend.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), c_opts.FileRoot); err != nil {
 		log.Fatalf("Error starting TFTP server: %v", err)
 	}
 	// Static file server must always be last, as all our health checks key off of it.
-	if err = frontend.serveStatic(fmt.Sprintf(":%d", c_opts.StaticPort), fileRoot); err != nil {
+	if err = frontend.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), c_opts.FileRoot); err != nil {
 		log.Fatalf("Error starting static file server: %v", err)
 	}
 }

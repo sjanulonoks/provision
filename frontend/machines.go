@@ -1,71 +1,72 @@
 package frontend
 
 import (
+	"fmt"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
 )
 
-func initMachineRoutes(dt *backend.DataTracker) {
-	mgmtApi.GET(basePath+"/machines",
+func (f *Frontend) InitMachineApi() {
+	f.MgmtApi.GET(f.BasePath+"/machines",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, dt.AsMachines(dt.FetchAll(dt.NewMachine())))
+			c.JSON(http.StatusOK, backend.AsMachines(f.DataTracker.FetchAll(f.DataTracker.NewMachine())))
 		})
-	mgmtApi.POST(basePath+"/machines",
+	f.MgmtApi.POST(f.BasePath+"/machines",
 		func(c *gin.Context) {
-			b := dt.NewMachine()
+			b := f.DataTracker.NewMachine()
 			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, NewError(err.Error()))
+				c.JSON(http.StatusBadRequest,
+					backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 			}
-			ok, err := dt.Create(b)
+			nb, err := f.DataTracker.Create(b)
 			if err != nil {
-				c.JSON(http.StatusBadRequest, NewError(err.Error()))
+				c.JSON(http.StatusBadRequest, err)
 			} else {
-				c.JSON(http.StatusCreated, b)
+				c.JSON(http.StatusCreated, nb)
 			}
 		})
-	mgmtApi.GET(basePath+"/machines/:name",
+	f.MgmtApi.GET(f.BasePath+"/machines/:name",
 		func(c *gin.Context) {
-			res, ok := dt.FetchOne(dt.NewMachine(), c.Param(`name`))
+			res, ok := f.DataTracker.FetchOne(f.DataTracker.NewMachine(), c.Param(`name`))
 			if ok {
-				c.JSON(http.StatusOK, dt.AsMachine(res))
+				c.JSON(http.StatusOK, backend.AsMachine(res))
 			} else {
-				c.JSON(http.StatusNotFound, err)
+				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound,
+					fmt.Sprintf("machines: Not Found: %v", c.Param(`name`))))
 			}
 		})
-	mgmtApi.PATCH(basePath+"/machines/:name",
+	f.MgmtApi.PATCH(f.BasePath+"/machines/:name",
 		func(c *gin.Context) {
 			//			updateThing(c, &Machine{Name: c.Param(`name`)}, &Machine{})
 		})
-	mgmtApi.PUT(basePath+"/machines/:name",
+	f.MgmtApi.PUT(f.BasePath+"/machines/:name",
 		func(c *gin.Context) {
-			b := dt.NewMachine()
+			b := f.DataTracker.NewMachine()
 			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, NewError(err.Error()))
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 			}
 			if b.Name != c.Param(`name`) {
-				c.JSON(http.StatusBadRequest, NewError(err.Error()))
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest,
+					fmt.Sprintf("machines: Can not change name: %v -> %v", c.Param(`name`), b.Name)))
 			}
-			ok, err := dt.Update(b)
-			if !ok && err != nil {
-				c.JSON(http.StatusNotFound, err)
-			} else if !ok {
-				c.JSON(http.StatusNotFound, err)
+			nb, err := f.DataTracker.Update(b)
+			if err != nil {
+				c.JSON(http.StatusNotFound, err) // GREG: COde
 			} else {
-				c.JSON(http.StatusOK, b)
+				c.JSON(http.StatusOK, nb)
 			}
 		})
-	mgmtApi.DELETE(basePath+"/machines/:name",
+	f.MgmtApi.DELETE(f.BasePath+"/machines/:name",
 		func(c *gin.Context) {
-			b := dt.NewMachine()
+			b := f.DataTracker.NewMachine()
 			b.Name = c.Param(`name`)
-			ok, err := dt.Remove(b)
-			if !ok && err != nil {
-				c.JSON(http.StatusNotFound, err)
-			} else if !ok {
-				c.JSON(http.StatusNotFound, err)
+			_, err := f.DataTracker.Remove(b)
+			if err != nil {
+				c.JSON(http.StatusNotFound, err) // GREG: Code
 			} else {
-				c.JSON(http.StatusNoContent)
+				c.JSON(http.StatusNoContent, nil)
 			}
 		})
 }

@@ -18,11 +18,11 @@ func (f *Frontend) InitBootEnvApi() {
 			if err := c.Bind(b); err != nil {
 				c.JSON(http.StatusBadRequest, err)
 			}
-			ok, err := f.DataTracker.Create(b)
+			nb, err := f.DataTracker.Create(b)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, err)
 			} else {
-				c.JSON(http.StatusCreated, b)
+				c.JSON(http.StatusCreated, nb)
 			}
 		})
 	f.MgmtApi.GET(f.BasePath+"/bootenvs/:name",
