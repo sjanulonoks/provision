@@ -10,7 +10,7 @@ import (
 )
 
 // RenderTemplate is the result of rendering a BootEnv template
-type RenderedTemplate struct {
+type renderedTemplate struct {
 	// Path is the absolute path that the Template will be rendered to.
 	Path string
 	// Template is the template that will rendered
@@ -19,18 +19,18 @@ type RenderedTemplate struct {
 	Vars *RenderData
 }
 
-func (r *RenderedTemplate) MkdirAll() error {
+func (r *renderedTemplate) mkdirAll() error {
 	return os.MkdirAll(path.Dir(r.Path), 0755)
 }
 
-func (r *RenderedTemplate) Write(e *Error) {
+func (r *renderedTemplate) write(e *Error) {
 	tmplDest, err := os.Create(r.Path)
 	if err != nil {
 		e.Errorf("Unable to create file %s: %v", r.Path, err)
 		return
 	}
 	defer tmplDest.Close()
-	if err := r.Template.Render(tmplDest, r.Vars); err != nil {
+	if err := r.Template.render(tmplDest, r.Vars); err != nil {
 		os.Remove(r.Path)
 		e.Errorf("Error rendering template %s: %v", r.Template.Key(), err)
 		return
@@ -38,7 +38,7 @@ func (r *RenderedTemplate) Write(e *Error) {
 	tmplDest.Sync()
 }
 
-func (r *RenderedTemplate) Remove(e *Error) {
+func (r *renderedTemplate) remove(e *Error) {
 	if r.Path != "" {
 		if err := os.Remove(r.Path); err != nil {
 			e.Errorf("%v", err)
@@ -51,7 +51,7 @@ func (r *RenderedTemplate) Remove(e *Error) {
 type RenderData struct {
 	Machine           *Machine // The Machine that the template is being rendered for.
 	Env               *BootEnv // The boot environment that provided the template.
-	renderedTemplates []RenderedTemplate
+	renderedTemplates []renderedTemplate
 	p                 *DataTracker
 }
 
@@ -116,11 +116,11 @@ func (r *RenderData) render(e *Error) {
 		e.Errorf("missing required machine params for %s:\n %v", r.Machine.Name, missingParams)
 		return
 	}
-	r.renderedTemplates = make([]RenderedTemplate, len(r.Env.Templates))
+	r.renderedTemplates = make([]renderedTemplate, len(r.Env.Templates))
 
 	for i := range r.Env.Templates {
 		ti := &r.Env.Templates[i]
-		rt := RenderedTemplate{}
+		rt := renderedTemplate{}
 		tmpl, found := ti.contents(r.p)
 		if !found {
 			e.Errorf("Template does not exist: %s", ti.ID)
@@ -141,24 +141,24 @@ func (r *RenderData) render(e *Error) {
 	}
 }
 
-func (r *RenderData) MkPaths(e *Error) {
+func (r *RenderData) mkPaths(e *Error) {
 	for _, rt := range r.renderedTemplates {
 		if rt.Path != "" {
-			if err := rt.MkdirAll(); err != nil {
+			if err := rt.mkdirAll(); err != nil {
 				e.Errorf("%v", err)
 			}
 		}
 	}
 }
 
-func (r *RenderData) Remove(e *Error) {
+func (r *RenderData) remove(e *Error) {
 	for _, rt := range r.renderedTemplates {
-		rt.Remove(e)
+		rt.remove(e)
 	}
 }
 
-func (r *RenderData) Write(e *Error) {
+func (r *RenderData) write(e *Error) {
 	for _, rt := range r.renderedTemplates {
-		rt.Write(e)
+		rt.write(e)
 	}
 }

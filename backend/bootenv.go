@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"html/template"
 	"io"
 	"io/ioutil"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
@@ -368,14 +368,14 @@ func (b *BootEnv) List() []*BootEnv {
 }
 
 func (b *BootEnv) AfterSave() {
-	b.RebuildRebarData()
+	b.rebuildRebarData()
 }
 
 func (b *BootEnv) AfterDelete() {
-	b.RebuildRebarData()
+	b.rebuildRebarData()
 }
 
-func (b *BootEnv) RebuildRebarData() {
+func (b *BootEnv) rebuildRebarData() {
 	var err error
 	if b.p.RebarClient == nil {
 		return

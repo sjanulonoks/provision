@@ -104,7 +104,7 @@ func (n *Machine) BeforeSave() error {
 	} else {
 		n.toRender = &RenderData{Machine: n, Env: AsBootEnv(b), p: n.p}
 		n.toRender.render(e)
-		n.toRender.MkPaths(e)
+		n.toRender.mkPaths(e)
 	}
 	return e.OrNil()
 }
@@ -127,11 +127,11 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 func (n *Machine) AfterSave() {
 	e := &Error{}
 	if n.toRemove != nil {
-		n.toRemove.Remove(e)
+		n.toRemove.remove(e)
 		n.toRemove = nil
 	}
 	if n.toRender != nil {
-		n.toRender.Write(e)
+		n.toRender.write(e)
 		n.toRender = nil
 	}
 	if e.containsError {
@@ -154,7 +154,7 @@ func (n *Machine) BeforeDelete() error {
 func (n *Machine) AfterDelete() {
 	e := &Error{}
 	if n.toRemove != nil {
-		n.toRemove.Remove(e)
+		n.toRemove.remove(e)
 		n.toRemove = nil
 	}
 	if e.containsError {
