@@ -38,7 +38,14 @@ type TemplateInfo struct {
 	// required: true
 	ID       string
 	pathTmpl *template.Template
-	contents *Template
+}
+
+func (t *TemplateInfo) contents(dt *DataTracker) (*Template, bool) {
+	res, found := dt.fetchOne(dt.NewTemplate(), t.ID)
+	if found {
+		return AsTemplate(res), found
+	}
+	return nil, found
 }
 
 // OsInfo holds information about the operating system this BootEnv maps to.
@@ -159,17 +166,6 @@ func (b *BootEnv) parseTemplates(e *Error) {
 		} else {
 			ti.pathTmpl = pathTmpl.Option("missingkey=error")
 		}
-		if ti.contents == nil {
-			tmpl, found := b.p.FetchOne(b.p.NewTemplate(), ti.ID)
-			if !found {
-				e.Errorf("Error loading template %s for %s: %v",
-					ti.ID,
-					ti.Name,
-					err)
-			}
-			ti.contents = AsTemplate(tmpl)
-		}
-
 	}
 	if b.BootParams != "" {
 		tmpl, err := template.New("machine").Parse(b.BootParams)
@@ -278,6 +274,12 @@ func (b *BootEnv) OnChange(oldThing store.KeySaver) error {
 
 func (b *BootEnv) BeforeSave() error {
 	e := &Error{o: b}
+	// If our basic templates do not parse, it is game over for us
+	b.parseTemplates(e)
+	if e.containsError {
+		return e
+	}
+	// Otherwise, these are errors that we accept the bootenv, but flag as needs fixing.
 	seenPxeLinux := false
 	seenELilo := false
 	seenIPXE := false

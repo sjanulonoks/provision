@@ -11,7 +11,7 @@ func TestUserStuff(t *testing.T) {
 	dt := mkDT(bs)
 	u := dt.NewUser()
 	u.Name = "test user"
-	saved, err := dt.Create(u)
+	saved, err := dt.create(u)
 	if !saved {
 		t.Errorf("Unable to create test user: %v", err)
 	} else {

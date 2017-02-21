@@ -27,15 +27,18 @@ type Machine struct {
 	Uuid uuid.UUID
 	// The IPv4 address of the machine.  Specifically, the one
 	// that should be used for PXE purposes
-	// required: true
 	// swagger:strfmt ipv4
 	Address net.IP
 	// The boot environment that the machine should boot into.
-	BootEnv        string
-	Params         map[string]interface{} // Any additional parameters that may be needed for template expansion.
-	p              *DataTracker
-	currentBootEnv *BootEnv
-	oldBootEnv     *BootEnv
+	BootEnv string
+	Params  map[string]interface{} // Any additional parameters that may be needed for template expansion.
+	// Errors keeps hold of any errors that happen while writing out rendered templates
+	Errors []string
+	p      *DataTracker
+
+	// used during AfterSave() and AfterRemove() to handle boot environment changes.
+	toRemove *RenderData
+	toRender *RenderData
 }
 
 func (n *Machine) Backend() store.SimpleStore {
@@ -95,27 +98,68 @@ func (n *Machine) BeforeSave() error {
 		n.BootEnv = n.p.DefaultBootEnv
 	}
 	validateMaybeZeroIP4(e, n.Address)
-	b, found := n.p.FetchOne(n.p.NewBootEnv(), n.BootEnv)
+	b, found := n.p.fetchOne(n.p.NewBootEnv(), n.BootEnv)
 	if !found {
 		e.Errorf("Machine %s has BootEnv %s, which is not present in the DataTracker", n.Uuid, n.BootEnv)
 	} else {
-		n.currentBootEnv = AsBootEnv(b)
+		n.toRender = &RenderData{Machine: n, Env: AsBootEnv(b), p: n.p}
+		n.toRender.render(e)
+		n.toRender.MkPaths(e)
 	}
 	return e.OrNil()
 }
 
 func (n *Machine) OnChange(oldThing store.KeySaver) error {
+	e := &Error{Code: 422, Type: ValidationError, o: n}
 	old := AsMachine(oldThing)
 	if !uuid.Equal(old.Uuid, n.Uuid) {
-		return fmt.Errorf("machine: Cannot change machine UUID %s", old.Uuid)
-	} else if old.Name != n.Name {
-		return fmt.Errorf("machine: Cannot change name of machine %s", old.Name)
+		e.Errorf("machine: Cannot change machine UUID %s", old.Uuid)
+		return e
 	}
-	be, found := n.p.FetchOne(n.p.NewBootEnv(), old.BootEnv)
+	be, found := n.p.fetchOne(n.p.NewBootEnv(), old.BootEnv)
 	if found {
-		n.oldBootEnv = AsBootEnv(be)
+		n.toRemove = &RenderData{Machine: n, Env: AsBootEnv(be), p: n.p}
+		n.toRemove.render(e)
 	}
-	return nil
+	return e.OrNil()
+}
+
+func (n *Machine) AfterSave() {
+	e := &Error{}
+	if n.toRemove != nil {
+		n.toRemove.Remove(e)
+		n.toRemove = nil
+	}
+	if n.toRender != nil {
+		n.toRender.Write(e)
+		n.toRender = nil
+	}
+	if e.containsError {
+		n.Errors = e.Messages
+	}
+}
+
+func (n *Machine) BeforeDelete() error {
+	e := &Error{Code: 422, Type: ValidationError, o: n}
+	b, found := n.p.fetchOne(n.p.NewBootEnv(), n.BootEnv)
+	if !found {
+		e.Errorf("Unable to find boot environment %s", n.BootEnv)
+		return e
+	}
+	n.toRemove = &RenderData{Machine: n, Env: AsBootEnv(b), p: n.p}
+	n.toRemove.render(e)
+	return e.OrNil()
+}
+
+func (n *Machine) AfterDelete() {
+	e := &Error{}
+	if n.toRemove != nil {
+		n.toRemove.Remove(e)
+		n.toRemove = nil
+	}
+	if e.containsError {
+		n.Errors = e.Messages
+	}
 }
 
 func (b *Machine) List() []*Machine {

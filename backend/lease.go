@@ -49,7 +49,7 @@ func (l *Lease) New() store.KeySaver {
 }
 
 func (l *Lease) List() []*Lease {
-	return AsLeases(l.p.FetchAll(l))
+	return AsLeases(l.p.fetchAll(l))
 }
 
 func (p *DataTracker) NewLease() *Lease {
