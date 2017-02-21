@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -133,9 +134,37 @@ func (p *DataTracker) getBackend(t store.KeySaver) store.SimpleStore {
 	return res
 }
 
-// FetchAll returns all of the cached objects of a given type.  It
-// should be used instead of store.List.
-func (p *DataTracker) FetchAll(ref store.KeySaver) []store.KeySaver {
+func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
+	var res store.KeySaver
+	switch ref.(type) {
+	case *Machine:
+		res = p.NewMachine()
+	case *User:
+		res = p.NewUser()
+	case *Template:
+		res = p.NewTemplate()
+	case *BootEnv:
+		res = p.NewBootEnv()
+	case *Lease:
+		res = p.NewLease()
+	case *Reservation:
+		res = p.NewReservation()
+	case *Subnet:
+		res = p.NewSubnet()
+	default:
+		panic("Unknown type of KeySaver passed to Clone")
+	}
+	buf, err := json.Marshal(ref)
+	if err != nil {
+		panic(err.Error())
+	}
+	if err := json.Unmarshal(buf, &res); err != nil {
+		panic(err.Error())
+	}
+	return res
+}
+
+func (p *DataTracker) fetchAll(ref store.KeySaver) []store.KeySaver {
 	prefix := ref.Prefix()
 	p.objTypeMux.Lock()
 	instances := p.objs[prefix]
@@ -149,9 +178,17 @@ func (p *DataTracker) FetchAll(ref store.KeySaver) []store.KeySaver {
 	return res
 }
 
-// FetchOne returns a specific instance from the cached objects of
-// that type.  It should be used instead of store.Load.
-func (p *DataTracker) FetchOne(ref store.KeySaver, key string) (store.KeySaver, bool) {
+// FetchAll returns all of the cached objects of a given type.  It
+// should be used instead of store.List.
+func (p *DataTracker) FetchAll(ref store.KeySaver) []store.KeySaver {
+	res := p.fetchAll(ref)
+	for i := range res {
+		res[i] = p.Clone(res[i])
+	}
+	return res
+}
+
+func (p *DataTracker) fetchOne(ref store.KeySaver, key string) (store.KeySaver, bool) {
 	prefix := ref.Prefix()
 	p.objTypeMux.Lock()
 	p.objs[prefix].Lock()
@@ -161,9 +198,17 @@ func (p *DataTracker) FetchOne(ref store.KeySaver, key string) (store.KeySaver, 
 	return res, ok
 }
 
-// Create creates a new thing, caching it locally iff the create
-// succeeds.  It should be used instead of store.Create
-func (p *DataTracker) Create(ref store.KeySaver) (bool, error) {
+// FetchOne returns a specific instance from the cached objects of
+// that type.  It should be used instead of store.Load.
+func (p *DataTracker) FetchOne(ref store.KeySaver, key string) (store.KeySaver, bool) {
+	res, found := p.fetchOne(ref, key)
+	if !found {
+		return nil, found
+	}
+	return p.Clone(res), found
+}
+
+func (p *DataTracker) create(ref store.KeySaver) (bool, error) {
 	prefix := ref.Prefix()
 	p.objTypeMux.Lock()
 	p.objs[prefix].Lock()
@@ -181,10 +226,17 @@ func (p *DataTracker) Create(ref store.KeySaver) (bool, error) {
 	return saved, err
 }
 
-// Remove removes the thing from the backing store.  If the remove
-// succeeds, it will also be removed from the local cache.  It should
-// be used instead of store.Remove
-func (p *DataTracker) Remove(ref store.KeySaver) (bool, error) {
+// Create creates a new thing, caching it locally iff the create
+// succeeds.  It should be used instead of store.Create
+func (p *DataTracker) Create(ref store.KeySaver) (store.KeySaver, error) {
+	created, err := p.create(ref)
+	if created {
+		return p.Clone(ref), err
+	}
+	return ref, err
+}
+
+func (p *DataTracker) remove(ref store.KeySaver) (bool, error) {
 	prefix := ref.Prefix()
 	p.objTypeMux.Lock()
 	p.objs[prefix].Lock()
@@ -202,10 +254,18 @@ func (p *DataTracker) Remove(ref store.KeySaver) (bool, error) {
 	return removed, err
 }
 
-// Update updates the passed thing, and updates the local cache iff
-// the update succeeds.  It should be used in preference to
-// store.Update
-func (p *DataTracker) Update(ref store.KeySaver) (bool, error) {
+// Remove removes the thing from the backing store.  If the remove
+// succeeds, it will also be removed from the local cache.  It should
+// be used instead of store.Remove
+func (p *DataTracker) Remove(ref store.KeySaver) (store.KeySaver, error) {
+	removed, err := p.remove(ref)
+	if !removed {
+		return p.Clone(ref), err
+	}
+	return ref, err
+}
+
+func (p *DataTracker) update(ref store.KeySaver) (bool, error) {
 	prefix := ref.Prefix()
 	p.objTypeMux.Lock()
 	p.objs[prefix].Lock()
@@ -220,9 +280,18 @@ func (p *DataTracker) Update(ref store.KeySaver) (bool, error) {
 	return ok, err
 }
 
-// Save saves the passed thing, updating the local cache iff the save
-// succeeds.  It should be used instead of store.Save
-func (p *DataTracker) Save(ref store.KeySaver) (bool, error) {
+// Update updates the passed thing, and updates the local cache iff
+// the update succeeds.  It should be used in preference to
+// store.Update
+func (p *DataTracker) Update(ref store.KeySaver) (store.KeySaver, error) {
+	updated, err := p.update(ref)
+	if updated {
+		return p.Clone(ref), err
+	}
+	return ref, err
+}
+
+func (p *DataTracker) save(ref store.KeySaver) (bool, error) {
 	prefix := ref.Prefix()
 	p.objTypeMux.Lock()
 	p.objs[prefix].Lock()
@@ -235,4 +304,14 @@ func (p *DataTracker) Save(ref store.KeySaver) (bool, error) {
 		instances.d[key] = ref
 	}
 	return ok, err
+}
+
+// Save saves the passed thing, updating the local cache iff the save
+// succeeds.  It should be used instead of store.Save
+func (p *DataTracker) Save(ref store.KeySaver) (store.KeySaver, error) {
+	saved, err := p.save(ref)
+	if saved {
+		return p.Clone(ref), err
+	}
+	return ref, err
 }

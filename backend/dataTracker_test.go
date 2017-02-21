@@ -44,7 +44,7 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 	if err := dec.Decode(&res); err != nil {
 		return false, err
 	}
-	return dt.Create(res)
+	return dt.create(res)
 }
 
 func mkDT(bs store.SimpleStore) *DataTracker {
@@ -93,19 +93,19 @@ func TestBackingStorePersistence(t *testing.T) {
 		var items []store.KeySaver
 		switch ot {
 		case "users":
-			items = dt.FetchAll(dt.NewUser())
+			items = dt.fetchAll(dt.NewUser())
 		case "templates":
-			items = dt.FetchAll(dt.NewTemplate())
+			items = dt.fetchAll(dt.NewTemplate())
 		case "bootenvs":
-			items = dt.FetchAll(dt.NewBootEnv())
+			items = dt.fetchAll(dt.NewBootEnv())
 		case "machines":
-			items = dt.FetchAll(dt.NewMachine())
+			items = dt.fetchAll(dt.NewMachine())
 		case "leases":
-			items = dt.FetchAll(dt.NewLease())
+			items = dt.fetchAll(dt.NewLease())
 		case "reservations":
-			items = dt.FetchAll(dt.NewReservation())
+			items = dt.fetchAll(dt.NewReservation())
 		case "subnets":
-			items = dt.FetchAll(dt.NewSubnet())
+			items = dt.fetchAll(dt.NewSubnet())
 		}
 		if len(items) != 1 {
 			t.Errorf("Expected to find 1 %s, instead found %d", ot, len(items))
