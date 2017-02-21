@@ -3,44 +3,10 @@ package backend
 import (
 	"fmt"
 	"io"
-	"os"
-	"path"
 	"text/template"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
-
-// RenderTemplate is the result of rendering a BootEnv template
-type RenderedTemplate struct {
-	// Path is the absolute path that the Template will be rendered to.
-	Path string
-	// Template is the template that will rendered
-	Template *Template
-	// Vars holds the variables that will be used during template expansion.
-	Vars *RenderData
-}
-
-func (r *RenderedTemplate) MkdirAll() error {
-	return os.MkdirAll(path.Dir(r.Path), 0755)
-}
-
-func (r *RenderedTemplate) Write() error {
-	tmplDest, err := os.Create(r.Path)
-	if err != nil {
-		return fmt.Errorf("Unable to create file %s: %v", r.Path, err)
-	}
-	defer tmplDest.Close()
-	if err := r.Template.Render(tmplDest, r.Vars); err != nil {
-		r.Remove()
-		return fmt.Errorf("Error rendering template %s: %v", r.Template.Key(), err)
-	}
-	tmplDest.Sync()
-	return nil
-}
-
-func (r *RenderedTemplate) Remove() error {
-	return os.Remove(r.Path)
-}
 
 // Template represents a template that will be associated with a boot environment.
 // swwagger:model

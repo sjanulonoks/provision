@@ -4,15 +4,55 @@ import (
 	"bytes"
 	"fmt"
 	"net/url"
+	"os"
+	"path"
 	"path/filepath"
 )
+
+// RenderTemplate is the result of rendering a BootEnv template
+type RenderedTemplate struct {
+	// Path is the absolute path that the Template will be rendered to.
+	Path string
+	// Template is the template that will rendered
+	Template *Template
+	// Vars holds the variables that will be used during template expansion.
+	Vars *RenderData
+}
+
+func (r *RenderedTemplate) MkdirAll() error {
+	return os.MkdirAll(path.Dir(r.Path), 0755)
+}
+
+func (r *RenderedTemplate) Write(e *Error) {
+	tmplDest, err := os.Create(r.Path)
+	if err != nil {
+		e.Errorf("Unable to create file %s: %v", r.Path, err)
+		return
+	}
+	defer tmplDest.Close()
+	if err := r.Template.Render(tmplDest, r.Vars); err != nil {
+		os.Remove(r.Path)
+		e.Errorf("Error rendering template %s: %v", r.Template.Key(), err)
+		return
+	}
+	tmplDest.Sync()
+}
+
+func (r *RenderedTemplate) Remove(e *Error) {
+	if r.Path != "" {
+		if err := os.Remove(r.Path); err != nil {
+			e.Errorf("%v", err)
+		}
+	}
+}
 
 // RenderData is the struct that is passed to templates as a source of
 // parameters and useful methods.
 type RenderData struct {
-	Machine *Machine // The Machine that the template is being rendered for.
-	Env     *BootEnv // The boot environment that provided the template.
-	p       *DataTracker
+	Machine           *Machine // The Machine that the template is being rendered for.
+	Env               *BootEnv // The boot environment that provided the template.
+	renderedTemplates []RenderedTemplate
+	p                 *DataTracker
 }
 
 func (r *RenderData) DataTrackerAddress() string {
@@ -65,7 +105,7 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 	return res, nil
 }
 
-func (r *RenderData) render(e *Error) []RenderedTemplate {
+func (r *RenderData) render(e *Error) {
 	var missingParams []string
 	for _, param := range r.Env.RequiredParams {
 		if _, ok := r.Machine.Params[param]; !ok {
@@ -74,13 +114,18 @@ func (r *RenderData) render(e *Error) []RenderedTemplate {
 	}
 	if len(missingParams) > 0 {
 		e.Errorf("missing required machine params for %s:\n %v", r.Machine.Name, missingParams)
-		return nil
+		return
 	}
-	res := make([]RenderedTemplate, len(r.Env.Templates))
+	r.renderedTemplates = make([]RenderedTemplate, len(r.Env.Templates))
 
 	for i := range r.Env.Templates {
 		ti := &r.Env.Templates[i]
 		rt := RenderedTemplate{}
+		tmpl, found := ti.contents(r.p)
+		if !found {
+			e.Errorf("Template does not exist: %s", ti.ID)
+			continue
+		}
 		// first, render the path
 		buf := &bytes.Buffer{}
 		if err := ti.pathTmpl.Execute(buf, r); err != nil {
@@ -91,8 +136,29 @@ func (r *RenderData) render(e *Error) []RenderedTemplate {
 		} else {
 			rt.Path = filepath.Join(r.p.FileRoot, buf.String())
 		}
-		rt.Template = ti.contents
-		res[i] = rt
+		rt.Template = tmpl
+		r.renderedTemplates[i] = rt
 	}
-	return res
+}
+
+func (r *RenderData) MkPaths(e *Error) {
+	for _, rt := range r.renderedTemplates {
+		if rt.Path != "" {
+			if err := rt.MkdirAll(); err != nil {
+				e.Errorf("%v", err)
+			}
+		}
+	}
+}
+
+func (r *RenderData) Remove(e *Error) {
+	for _, rt := range r.renderedTemplates {
+		rt.Remove(e)
+	}
+}
+
+func (r *RenderData) Write(e *Error) {
+	for _, rt := range r.renderedTemplates {
+		rt.Write(e)
+	}
 }
