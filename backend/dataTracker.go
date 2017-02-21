@@ -110,7 +110,6 @@ func (p *DataTracker) ExtractAssets() error {
 		}
 		destFile := path.Join(p.FileRoot, dest, path.Join(strings.Split(src, "/")[1:]...))
 		destDir := path.Dir(destFile)
-		log.Print(destFile)
 		if err := os.MkdirAll(destDir, 0755); err != nil {
 			return err
 		}
