@@ -67,15 +67,6 @@ func (t *Template) BeforeSave() error {
 	return e.OrNil()
 }
 
-func (t *Template) OnChange(oldThing store.KeySaver) error {
-	e := &Error{Code: 422, Type: ValidationError, o: t}
-	old := AsTemplate(oldThing)
-	if old.ID != t.ID {
-		e.Errorf("Cannot change ID of %s", t.ID)
-	}
-	return e.OrNil()
-}
-
 func (t *Template) BootEnvs() []*BootEnv {
 	return AsBootEnvs(t.p.FetchAll(t.p.NewBootEnv()))
 }
