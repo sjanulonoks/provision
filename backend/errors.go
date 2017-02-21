@@ -48,6 +48,10 @@ type Error struct {
 	containsError bool
 }
 
+func NewError(t string, code int, m string) *Error {
+	return &Error{Type: t, Code: code, Messages: []string{m}}
+}
+
 func (e *Error) Errorf(s string, args ...interface{}) {
 	e.containsError = true
 	if e.o != nil {
