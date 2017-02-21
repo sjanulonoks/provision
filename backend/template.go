@@ -45,7 +45,7 @@ func (t *Template) List() []*Template {
 }
 
 // Parse checks to make sure the template contents are valid according to text/template.
-func (t *Template) Parse() error {
+func (t *Template) parse() error {
 	e := &Error{Code: 422, Type: ValidationError, o: t}
 	parsedTmpl, err := template.New(t.ID).Parse(t.Contents)
 	if err != nil {
@@ -61,7 +61,7 @@ func (t *Template) BeforeSave() error {
 	if t.ID == "" {
 		e.Errorf("Template must have an ID")
 	}
-	if err := t.Parse(); err != nil {
+	if err := t.parse(); err != nil {
 		e.Errorf("Parse error: %v", err)
 	}
 	return e.OrNil()
@@ -76,11 +76,13 @@ func (t *Template) OnChange(oldThing store.KeySaver) error {
 	return e.OrNil()
 }
 
+func (t *Template) BootEnvs() []*BootEnv {
+	return AsBootEnvs(t.p.FetchAll(t.p.NewBootEnv()))
+}
+
 func (t *Template) BeforeDelete() error {
 	e := &Error{Code: 409, Type: StillInUseError, o: t}
-	bootenv := t.p.NewBootEnv()
-	bootEnvs := bootenv.List()
-	for _, bootEnv := range bootEnvs {
+	for _, bootEnv := range t.BootEnvs() {
 		for _, tmpl := range bootEnv.Templates {
 			if tmpl.ID == t.ID {
 				e.Errorf("In use by bootenv %s (as %s)", bootEnv.Name, tmpl.Name)
@@ -91,9 +93,9 @@ func (t *Template) BeforeDelete() error {
 }
 
 // Render executes the template with params writing the results to dest
-func (t *Template) Render(dest io.Writer, params interface{}) error {
+func (t *Template) render(dest io.Writer, params interface{}) error {
 	if t.parsedTmpl == nil {
-		if err := t.Parse(); err != nil {
+		if err := t.parse(); err != nil {
 			return fmt.Errorf("template: %s does not compile: %v", t.ID, err)
 		}
 	}
