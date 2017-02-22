@@ -21,8 +21,7 @@ install:
 script:
 - go generate server/main.go
 - go build -o rocket-skates server/*
-- cd frontend && go test -v -covermode=count -coverprofile=../coverage.out && cd -
-- cd backend && go test -v -covermode=count -coverprofile=../coverage.out && cd -
+- ./test.sh
 
 after_success:
 - bash <(curl -s https://codecov.io/bash) -t 6259c706-5c1d-471f-b62b-4f908ea1801d
