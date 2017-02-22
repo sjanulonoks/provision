@@ -1,17 +1,16 @@
-// Package Rocket Skates Server
+// Package main Rocket Skates Server
 //
-// the purpose of this application is to provide an application
-// that is using plain go code to define an API
+// An RestFUL API-driven Provisioner and DHCP server
 //
 // Terms Of Service:
 //
-// there are no TOS at this moment, use at your own risk we take no responsibility
+// There are no TOS at this moment, use at your own risk we take no responsibility
 //
 //     Schemes: https
-//     Host: localhost
+//     Host: 127.0.0.1:8092
 //     BasePath: /api/v3
 //     Version: 0.1.0
-//     License: APL http://opensource.org/licenses/MIT
+//     License: APL https://raw.githubusercontent.com/digitalrebar/digitalrebar/master/LICENSE.md
 //     Contact: Greg Althaus<greg@rackn.com> http://rackn.com
 //
 //     Consumes:
