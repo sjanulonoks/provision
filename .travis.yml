@@ -7,7 +7,14 @@ go:
 
 before_install:
 - go get -u github.com/jteeuwen/go-bindata/...
-- glide i
+- mkdir $HOME/bin
+- export PATH=$PATH:$HOME/bin
+- latestv=$(curl -s https://api.github.com/repos/go-swagger/go-swagger/releases/latest | jq -r .tag_name)
+- curl -o $HOME/bin/swagger -L'#' https://github.com/go-swagger/go-swagger/releases/download/$latestv/swagger_$(echo `uname`|tr '[:upper:]' '[:lower:]')_amd64
+- chmod +x $HOME/bin/swagger
+- go get -v github.com/Masterminds/glide
+- cd $GOPATH/src/github.com/Masterminds/glide && git checkout tags/0.12.1 && go install && cd -
+- glide install
 - go generate server/main.go
 - go build -o rocket-skates server/*
 
