@@ -29,9 +29,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
-	"github.com/digitalrebar/digitalrebar/go/common/cert"
 	"github.com/digitalrebar/digitalrebar/go/common/client"
 	"github.com/digitalrebar/digitalrebar/go/common/service"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
@@ -42,25 +42,37 @@ import (
 	"github.com/rackn/rocket-skates/frontend"
 )
 
-var c_opts struct {
-	VersionFlag    bool   `long:"version" description:"Print Version and exit"`
-	BackEndType    string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"consul"`
-	DataRoot       string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar/provisioner/boot-info"`
-	StaticPort     int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
-	TftpPort       int    `long:"tftp-port" description:"Port for the TFTP server to listen on" default:"69"`
-	ApiPort        int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
-	FileRoot       string `long:"file-root" description:"Root of filesystem we should manage" default:"/tftpboot"`
-	OurAddress     string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
-	CommandURL     string `long:"endpoint" description:"DigitalRebar Endpoint" env:"EXTERNAL_REBAR_ENDPOINT"`
-	RegisterConsul bool   `long:"register-consul" description:"Register services with Consul"`
+type ProgOpts struct {
+	VersionFlag bool `long:"version" description:"Print Version and exit"`
+
+	BackEndType string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"consul"`
+	DataRoot    string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar/provisioner/boot-info"`
+
+	OurAddress string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
+	StaticPort int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
+	TftpPort   int    `long:"tftp-port" description:"Port for the TFTP server to listen on" default:"69"`
+	ApiPort    int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
+
+	FileRoot string `long:"file-root" description:"Root of filesystem we should manage" default:"/tftpboot"`
+
+	DisableProvisioner bool   `long:"disable-provisioner" description:"Disable provisioner"`
+	DisableDHCP        bool   `long:"disable-dhcp" description:"Disable DHCP"`
+	CommandURL         string `long:"endpoint" description:"DigitalRebar Endpoint" env:"EXTERNAL_REBAR_ENDPOINT"`
+	DefaultBootEnv     string `long:"default-boot-env" description:"The default bootenv for the nodes"`
+	UnknownBootEnv     string `long:"unknown-boot-env" description:"The unknown bootenv for the system"`
+
+	TlsKeyFile  string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
+	TlsCertFile string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
+
+	RegisterConsul bool `long:"register-consul" description:"Register services with Consul"`
 }
 
-var logger *log.Logger
+var c_opts ProgOpts
 
 func main() {
 	var err error
 
-	logger = log.New(os.Stderr, "provisioner-mgmt", log.LstdFlags|log.Lmicroseconds|log.LUTC)
+	logger := log.New(os.Stderr, "provisioner-mgmt", log.LstdFlags|log.Lmicroseconds|log.LUTC)
 
 	parser := flags.NewParser(&c_opts, flags.Default)
 	if _, err = parser.Parse(); err != nil {
@@ -149,22 +161,25 @@ func main() {
 		logger.Fatalf("Error using backing store %s: %v", c_opts.BackEndType, err)
 	}
 
-	dt := backend.NewDataTracker(backendStore, true, true)
+	dt := backend.NewDataTracker(backendStore,
+		!c_opts.DisableProvisioner,
+		!c_opts.DisableDHCP,
+		c_opts.FileRoot,
+		c_opts.CommandURL,
+		c_opts.DefaultBootEnv,
+		c_opts.UnknownBootEnv,
+		fmt.Sprintf("http://%s:%d/", c_opts.OurAddress, c_opts.StaticPort),
+		c_opts.OurAddress,
+		logger)
 
-	fe, err := frontend.NewFrontend(dt, "/api/v3", c_opts.FileRoot)
-	if err != nil {
-		logger.Fatal(err)
-	}
+	fe := frontend.NewFrontend(dt, c_opts.FileRoot)
 
-	s, err := cert.Server("internal", "provisioner-mgmt-service")
-	if err != nil {
-		log.Fatalf("Error creating trusted server: %v", err)
+	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
+		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)
 	}
-	s.Addr = fmt.Sprintf(":%d", c_opts.ApiPort)
-	s.Handler = fe.MgmtApi
 
 	go func() {
-		if err = s.ListenAndServeTLS("", ""); err != nil {
+		if err = http.ListenAndServeTLS(fmt.Sprintf(":%d", c_opts.ApiPort), c_opts.TlsCertFile, c_opts.TlsKeyFile, fe.MgmtApi); err != nil {
 			log.Fatalf("Error running API service: %v", err)
 		}
 	}()

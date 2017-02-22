@@ -56,7 +56,7 @@ type RenderData struct {
 }
 
 func (r *RenderData) DataTrackerAddress() string {
-	return r.p.Address.String()
+	return r.p.OurAddress
 }
 
 func (r *RenderData) DataTrackerURL() string {
