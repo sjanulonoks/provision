@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
 	"github.com/rackn/rocket-skates/embedded"
@@ -42,7 +43,8 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, fileRoot string) (
 	})
 
 	// Server Swagger UI.
-	mgmtApi.Static("/swagger-ui", "./swagger-ui/dist")
+	mgmtApi.StaticFS("/swagger-ui",
+		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "assets/swagger-ui"})
 
 	return
 }

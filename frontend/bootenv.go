@@ -8,10 +8,42 @@ import (
 )
 
 func (f *Frontend) InitBootEnvApi() {
+	// swagger:route GET /bootenvs BootEnvs listBootEnvs
+	//
+	// Lists BootEnvs filtered by some parameters.
+	//
+	// This will show all BootEnvs by default.
+	//
+	//     Consumes:
+	//     - application/json
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Responses:
+	//       default: ErrorResponse
+	//       200: BootEnvsResponse
+	//       401: ErrorResponse
 	f.ApiGroup.GET("/bootenvs",
 		func(c *gin.Context) {
 			c.JSON(http.StatusOK, backend.AsBootEnvs(f.DataTracker.FetchAll(f.DataTracker.NewBootEnv())))
 		})
+
+	// swagger:route POST /bootenvs BootEnvs createBootEnvs
+	//
+	// Create a BootEnv
+	//
+	//     Consumes:
+	//     - application/json
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Responses:
+	//       default: ErrorResponse
+	//       201: BootEnvResponse
+	//       400: ErrorResponse
+	//       401: ErrorResponse
 	f.ApiGroup.POST("/bootenvs",
 		func(c *gin.Context) {
 			b := f.DataTracker.NewBootEnv()
@@ -25,6 +57,7 @@ func (f *Frontend) InitBootEnvApi() {
 				c.JSON(http.StatusCreated, nb)
 			}
 		})
+
 	f.ApiGroup.GET("/bootenvs/:name",
 		func(c *gin.Context) {
 			res, ok := f.DataTracker.FetchOne(f.DataTracker.NewBootEnv(), c.Param(`name`))
