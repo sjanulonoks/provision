@@ -24,7 +24,7 @@
 package main
 
 //go:generate swagger generate spec -o ../embedded/assets/swagger.json
-//go:generate go-bindata -prefix ../embedded/assets -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
+//go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 
 import (
 	"fmt"
@@ -172,7 +172,7 @@ func main() {
 		c_opts.OurAddress,
 		logger)
 
-	fe := frontend.NewFrontend(dt, c_opts.FileRoot)
+	fe := frontend.NewFrontend(dt, logger, c_opts.FileRoot)
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)
