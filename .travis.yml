@@ -13,13 +13,14 @@ before_install:
 - curl -o $HOME/bin/swagger -L'#' https://github.com/go-swagger/go-swagger/releases/download/$latestv/swagger_$(echo `uname`|tr '[:upper:]' '[:lower:]')_amd64
 - chmod +x $HOME/bin/swagger
 - go get -v github.com/Masterminds/glide
-- cd $GOPATH/src/github.com/Masterminds/glide && git checkout tags/0.12.1 && go install && cd -
+- cd $GOPATH/src/github.com/Masterminds/glide && git checkout tags/v0.12.3 && go install && cd -
 - glide install
-- go generate server/main.go
-- go build -o rocket-skates server/*
 
 script:
-- go test -v -covermode=count -coverprofile=coverage.out
+- go generate server/main.go
+- go build -o rocket-skates server/*
+- cd frontend && go test -v -covermode=count -coverprofile=../coverage.out && cd -
+- cd backend && go test -v -covermode=count -coverprofile=../coverage.out && cd -
 
 after_success:
 - bash <(curl -s https://codecov.io/bash) -t 6259c706-5c1d-471f-b62b-4f908ea1801d
