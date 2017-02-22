@@ -174,6 +174,9 @@ func main() {
 		fmt.Sprintf("http://%s:%d/", c_opts.OurAddress, c_opts.StaticPort),
 		c_opts.OurAddress,
 		logger)
+	if err := dt.ExtractAssets(); err != nil {
+		logger.Fatalf("Unable to extract assets: %v", err)
+	}
 
 	fe := frontend.NewFrontend(dt, logger, c_opts.FileRoot)
 
