@@ -13,19 +13,19 @@ import (
 )
 
 func (f *Frontend) InitIsoApi() {
-	f.MgmtApi.GET("/isos",
+	f.ApiGroup.GET("/isos",
 		func(c *gin.Context) {
 			listIsos(c, f.FileRoot)
 		})
-	f.MgmtApi.GET("/isos/:name",
+	f.ApiGroup.GET("/isos/:name",
 		func(c *gin.Context) {
 			getIso(c, f.FileRoot, c.Param(`name`))
 		})
-	f.MgmtApi.POST("/isos/:name",
+	f.ApiGroup.POST("/isos/:name",
 		func(c *gin.Context) {
 			uploadIso(c, f.FileRoot, c.Param(`name`), f.DataTracker)
 		})
-	f.MgmtApi.DELETE("/isos/:name",
+	f.ApiGroup.DELETE("/isos/:name",
 		func(c *gin.Context) {
 			deleteIso(c, f.FileRoot, c.Param(`name`))
 		})

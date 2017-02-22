@@ -9,11 +9,11 @@ import (
 )
 
 func (f *Frontend) InitMachineApi() {
-	f.MgmtApi.GET(f.BasePath+"/machines",
+	f.ApiGroup.GET("/machines",
 		func(c *gin.Context) {
 			c.JSON(http.StatusOK, backend.AsMachines(f.DataTracker.FetchAll(f.DataTracker.NewMachine())))
 		})
-	f.MgmtApi.POST(f.BasePath+"/machines",
+	f.ApiGroup.POST("/machines",
 		func(c *gin.Context) {
 			b := f.DataTracker.NewMachine()
 			if err := c.Bind(b); err != nil {
@@ -27,7 +27,7 @@ func (f *Frontend) InitMachineApi() {
 				c.JSON(http.StatusCreated, nb)
 			}
 		})
-	f.MgmtApi.GET(f.BasePath+"/machines/:name",
+	f.ApiGroup.GET("/machines/:name",
 		func(c *gin.Context) {
 			res, ok := f.DataTracker.FetchOne(f.DataTracker.NewMachine(), c.Param(`name`))
 			if ok {
@@ -37,11 +37,11 @@ func (f *Frontend) InitMachineApi() {
 					fmt.Sprintf("machines: Not Found: %v", c.Param(`name`))))
 			}
 		})
-	f.MgmtApi.PATCH(f.BasePath+"/machines/:name",
+	f.ApiGroup.PATCH("/machines/:name",
 		func(c *gin.Context) {
 			//			updateThing(c, &Machine{Name: c.Param(`name`)}, &Machine{})
 		})
-	f.MgmtApi.PUT(f.BasePath+"/machines/:name",
+	f.ApiGroup.PUT("/machines/:name",
 		func(c *gin.Context) {
 			b := f.DataTracker.NewMachine()
 			if err := c.Bind(b); err != nil {
@@ -58,7 +58,7 @@ func (f *Frontend) InitMachineApi() {
 				c.JSON(http.StatusOK, nb)
 			}
 		})
-	f.MgmtApi.DELETE(f.BasePath+"/machines/:name",
+	f.ApiGroup.DELETE("/machines/:name",
 		func(c *gin.Context) {
 			b := f.DataTracker.NewMachine()
 			b.Name = c.Param(`name`)

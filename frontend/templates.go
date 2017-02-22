@@ -9,11 +9,11 @@ import (
 )
 
 func (f *Frontend) InitTemplateApi() {
-	f.MgmtApi.GET(f.BasePath+"/templates",
+	f.ApiGroup.GET("/templates",
 		func(c *gin.Context) {
 			c.JSON(http.StatusOK, backend.AsTemplates(f.DataTracker.FetchAll(f.DataTracker.NewTemplate())))
 		})
-	f.MgmtApi.POST(f.BasePath+"/templates",
+	f.ApiGroup.POST("/templates",
 		func(c *gin.Context) {
 			b := f.DataTracker.NewTemplate()
 			if err := c.Bind(b); err != nil {
@@ -27,8 +27,8 @@ func (f *Frontend) InitTemplateApi() {
 				c.JSON(http.StatusCreated, nb)
 			}
 		})
-	// GREG: add streaming create.	f.MgmtApi.POST("/templates/:uuid", createTemplate)
-	f.MgmtApi.GET(f.BasePath+"/templates/:id",
+	// GREG: add streaming create.	f.ApiGroup.POST("/templates/:uuid", createTemplate)
+	f.ApiGroup.GET("/templates/:id",
 		func(c *gin.Context) {
 			res, ok := f.DataTracker.FetchOne(f.DataTracker.NewTemplate(), c.Param(`id`))
 			if ok {
@@ -38,11 +38,11 @@ func (f *Frontend) InitTemplateApi() {
 					fmt.Sprintf("templates: Not found: %v", c.Param(`id`))))
 			}
 		})
-	f.MgmtApi.PATCH(f.BasePath+"/templates/:id",
+	f.ApiGroup.PATCH("/templates/:id",
 		func(c *gin.Context) {
 			//			updateThing(c, &Template{ID: c.Param(`id`)}, &Template{})
 		})
-	f.MgmtApi.PUT(f.BasePath+"/templates/:id",
+	f.ApiGroup.PUT("/templates/:id",
 		func(c *gin.Context) {
 			b := f.DataTracker.NewTemplate()
 			if err := c.Bind(b); err != nil {
@@ -59,7 +59,7 @@ func (f *Frontend) InitTemplateApi() {
 				c.JSON(http.StatusOK, nb)
 			}
 		})
-	f.MgmtApi.DELETE(f.BasePath+"/templates/:id",
+	f.ApiGroup.DELETE("/templates/:id",
 		func(c *gin.Context) {
 			b := f.DataTracker.NewTemplate()
 			b.ID = c.Param(`id`)

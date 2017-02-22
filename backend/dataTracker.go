@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
 	"os"
 	"path"
 	"strings"
@@ -23,19 +22,23 @@ type keySavers struct {
 
 // DataTracker represents everything there is to know about acting as a provisioner.
 type DataTracker struct {
-	useProvisioner, useDHCP bool
-	Logger                  *log.Logger
-	Address                 net.IP
-	FileRoot                string
-	FileURL                 string
-	CommandURL              string
-	DefaultBootEnv          string
-	UnknownBootEnv          string
-	RebarClient             *api.Client
-	backends                map[string]store.SimpleStore
-	backendMux              sync.Mutex
-	objs                    map[string]*keySavers
-	objTypeMux              sync.Mutex
+	useProvisioner bool
+	useDHCP        bool
+	FileRoot       string
+	CommandURL     string
+	DefaultBootEnv string
+	UnknownBootEnv string
+	OurAddress     string
+
+	FileURL string
+
+	Logger *log.Logger
+
+	RebarClient *api.Client
+	backends    map[string]store.SimpleStore
+	backendMux  sync.Mutex
+	objs        map[string]*keySavers
+	objTypeMux  sync.Mutex
 }
 
 func (p *DataTracker) makeBackends(backend store.SimpleStore, objs []store.KeySaver) {
@@ -69,12 +72,24 @@ func (p *DataTracker) loadData(refObjs []store.KeySaver) error {
 }
 
 // Create a new DataTracker that will use passed store to save all operational data
-func NewDataTracker(backend store.SimpleStore, useProvisioner, useDHCP bool) *DataTracker {
+func NewDataTracker(backend store.SimpleStore,
+	useProvisioner, useDHCP bool,
+	fileRoot, commandURL, dbe, ube, furl, addr string,
+	logger *log.Logger) *DataTracker {
+
 	res := &DataTracker{
 		useDHCP:        useDHCP,
 		useProvisioner: useProvisioner,
-		backends:       map[string]store.SimpleStore{},
-		backendMux:     sync.Mutex{},
+		FileRoot:       fileRoot,
+		CommandURL:     commandURL,
+		DefaultBootEnv: dbe,
+		UnknownBootEnv: ube,
+		FileURL:        furl,
+		OurAddress:     addr,
+		Logger:         logger,
+
+		backends:   map[string]store.SimpleStore{},
+		backendMux: sync.Mutex{},
 	}
 	objs := []store.KeySaver{&Machine{p: res}, &User{p: res}}
 

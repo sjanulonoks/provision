@@ -15,19 +15,19 @@ import (
 
 func (f *Frontend) InitFileApi() {
 
-	f.MgmtApi.GET(f.BasePath+"/files",
+	f.ApiGroup.GET("/files",
 		func(c *gin.Context) {
 			listFiles(c, f.FileRoot)
 		})
-	f.MgmtApi.GET(f.BasePath+"/files/*name",
+	f.ApiGroup.GET("/files/*name",
 		func(c *gin.Context) {
 			getFile(c, f.FileRoot, c.Param(`name`))
 		})
-	f.MgmtApi.POST(f.BasePath+"/files/*name",
+	f.ApiGroup.POST("/files/*name",
 		func(c *gin.Context) {
 			uploadFile(c, f.FileRoot, c.Param(`name`))
 		})
-	f.MgmtApi.DELETE(f.BasePath+"/files/*name",
+	f.ApiGroup.DELETE("/files/*name",
 		func(c *gin.Context) {
 			deleteFile(c, f.FileRoot, c.Param(`name`))
 		})

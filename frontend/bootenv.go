@@ -8,11 +8,11 @@ import (
 )
 
 func (f *Frontend) InitBootEnvApi() {
-	f.MgmtApi.GET(f.BasePath+"/bootenvs",
+	f.ApiGroup.GET("/bootenvs",
 		func(c *gin.Context) {
 			c.JSON(http.StatusOK, backend.AsBootEnvs(f.DataTracker.FetchAll(f.DataTracker.NewBootEnv())))
 		})
-	f.MgmtApi.POST(f.BasePath+"/bootenvs",
+	f.ApiGroup.POST("/bootenvs",
 		func(c *gin.Context) {
 			b := f.DataTracker.NewBootEnv()
 			if err := c.Bind(b); err != nil {
@@ -25,7 +25,7 @@ func (f *Frontend) InitBootEnvApi() {
 				c.JSON(http.StatusCreated, nb)
 			}
 		})
-	f.MgmtApi.GET(f.BasePath+"/bootenvs/:name",
+	f.ApiGroup.GET("/bootenvs/:name",
 		func(c *gin.Context) {
 			res, ok := f.DataTracker.FetchOne(f.DataTracker.NewBootEnv(), c.Param(`name`))
 			if ok {
@@ -34,11 +34,11 @@ func (f *Frontend) InitBootEnvApi() {
 				c.JSON(http.StatusNotFound, nil) // GREG: Fix
 			}
 		})
-	f.MgmtApi.PATCH(f.BasePath+"/bootenvs/:name",
+	f.ApiGroup.PATCH("/bootenvs/:name",
 		func(c *gin.Context) {
 			//			updateThing(c, &BootEnv{Name: c.Param(`name`)}, &BootEnv{})
 		})
-	f.MgmtApi.PUT(f.BasePath+"/bootenvs/:name",
+	f.ApiGroup.PUT("/bootenvs/:name",
 		func(c *gin.Context) {
 			b := f.DataTracker.NewBootEnv()
 			if err := c.Bind(b); err != nil {
@@ -54,7 +54,7 @@ func (f *Frontend) InitBootEnvApi() {
 				c.JSON(http.StatusOK, nb)
 			}
 		})
-	f.MgmtApi.DELETE(f.BasePath+"/bootenvs/:name",
+	f.ApiGroup.DELETE("/bootenvs/:name",
 		func(c *gin.Context) {
 			b := f.DataTracker.NewBootEnv()
 			b.Name = c.Param(`name`)

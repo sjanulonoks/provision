@@ -6,17 +6,18 @@ import (
 )
 
 type Frontend struct {
-	BasePath    string
 	FileRoot    string
 	MgmtApi     *gin.Engine
+	ApiGroup    *gin.RouterGroup
 	DataTracker *backend.DataTracker
 }
 
-func NewFrontend(dt *backend.DataTracker, basePath, fileRoot string) (me *Frontend, err error) {
+func NewFrontend(dt *backend.DataTracker, fileRoot string) (me *Frontend) {
 	mgmtApi := gin.Default()
 
-	err = nil
-	me = &Frontend{BasePath: basePath, FileRoot: fileRoot, MgmtApi: mgmtApi, DataTracker: dt}
+	apiGroup := mgmtApi.Group("/api/v3")
+
+	me = &Frontend{FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, DataTracker: dt}
 
 	me.InitBootEnvApi()
 	me.InitIsoApi()
