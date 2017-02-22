@@ -22,6 +22,10 @@
 // swagger:meta
 package main
 
+//
+// Yes - Twice - once to get the basic pieces in place to let swagger run, then the final parts
+//
+//go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 //go:generate swagger generate spec -o ../embedded/assets/swagger.json
 //go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 
