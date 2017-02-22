@@ -21,9 +21,10 @@
 //     - application/json
 //
 // swagger:meta
-package server
+package main
 
-//go:generate swagger generate spec
+//go:generate swagger generate spec -o ../embedded/assets/swagger.json
+//go:generate go-bindata -prefix ../embedded/assets -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 
 import (
 	"fmt"
