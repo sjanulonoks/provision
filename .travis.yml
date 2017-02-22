@@ -1,21 +1,22 @@
 language: go
+
 sudo: false
+
 go:
-  - 1.7
+- 1.7
 
 before_install:
-  - go get stuff
+- go get -u github.com/jteeuwen/go-bindata/...
+- glide i
+- go generate server/main.go
+- go build -o rocket-skates server/*
 
 script:
-  - go test -v -covermode=count -coverprofile=coverage.out
+- go test -v -covermode=count -coverprofile=coverage.out
 
 after_success:
-  - bash <(curl -s https://codecov.io/bash) -t 6259c706-5c1d-471f-b62b-4f908ea1801d
+- bash <(curl -s https://codecov.io/bash) -t 6259c706-5c1d-471f-b62b-4f908ea1801d
 
 notifications:
-  webhooks:
-    urls:
-      - https://webhooks.gitter.im/e/7f95bf605c4d356372f4
-    on_success: change  # options: [always|never|change] default: always
-    on_failure: always  # options: [always|never|change] default: always
-    on_start: false     # default: false
+  slack:
+    secure: ExrgH66IShxfqL0xdb8K+EPu43FclXOQF5N2oCjh0X0IOrRABoi4oqdtRyCX7A00jLDFdXeCX3fefeJ35UTEFw78OMlGisDZddtGp5G+SMvz4xgdFqmBJxBD1d8Ao+XSl6UcSYtYtX5eTS0JNwVYQRjGIf0yi5nSD+KNxeN+PXEB+odHNL4Xfvc1rC6qUpLhHdT55WoXE/pV3p+cmQRc/+GK3+qioMoHWqe2BtWzNJFkAQ3MXm9fE7pHqWDzKX2RxSPIoiHXkA4Qqwx+bagMAgaynJSASnH3TpFSFAxBxwDMTvdaKVECEH15iiQBcHFs1luTZgqo72pMkFnUruqYJrBKoiLcZcDPrpeZ4rHdCL6B66iMZ+WWoFNvkcMRWk5kK8ivRnyxaljNQd1WasiH6SnDELgINCMgZO8fvWYE+wJx1XhYZfSx1J26mFyGYcaJZQdB2E6SNUX3KBanJFcprCnVTfBbAvu7CV4Mfba0LtwERc/V1wos8DfNQ0NqO7Il0Bhu0u1PwfRKjy7VighN8m8/XPgHXpStDanDHAbxGfgRCYuk8zdoZGmcIcgutrlScv1cN6r0Y0y3PuaIEAI8w95vuiMxDQXO8AUoi6pon457cQKJ+ptwIti344btL7EgQoY90lhrpQO5+Fjc4q0nckOYtruVDt3RBsokdS1Jf2s=
