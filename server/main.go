@@ -44,15 +44,15 @@ import (
 type ProgOpts struct {
 	VersionFlag bool `long:"version" description:"Print Version and exit"`
 
-	BackEndType string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"consul"`
-	DataRoot    string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar/provisioner/boot-info"`
+	BackEndType string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"directory"`
+	DataRoot    string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
 
 	OurAddress string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
 	StaticPort int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
 	TftpPort   int    `long:"tftp-port" description:"Port for the TFTP server to listen on" default:"69"`
 	ApiPort    int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
 
-	FileRoot string `long:"file-root" description:"Root of filesystem we should manage" default:"/tftpboot"`
+	FileRoot string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
 
 	DisableProvisioner bool   `long:"disable-provisioner" description:"Disable provisioner"`
 	DisableDHCP        bool   `long:"disable-dhcp" description:"Disable DHCP"`
