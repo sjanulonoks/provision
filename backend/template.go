@@ -8,15 +8,20 @@ import (
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
-// Template represents a template that will be associated with a boot environment.
-// swwagger:model
+// Template represents a template that will be associated with a boot
+// environment.
+//
+// swagger:model
 type Template struct {
 	// ID is a unique identifier for this template.
+	//
 	// required: true
 	ID string
 	// A description of this template
 	Description string
-	// Contents is the raw template.
+	// Contents is the raw template.  It must be a valid template
+	// according to text/template.
+	//
 	// required: true
 	Contents   string
 	parsedTmpl *template.Template

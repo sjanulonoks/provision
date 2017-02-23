@@ -6,7 +6,22 @@ import (
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
-func TestUserStuff(t *testing.T) {
+func TestUserCrud(t *testing.T) {
+	bs := store.NewSimpleMemoryStore()
+	dt := mkDT(bs)
+	tests := []crudTest{
+		{"Create empty user", dt.create, &User{p: dt}, false},
+		{"Create new user with name", dt.create, &User{p: dt, Name: "Test User"}, true},
+		{"Create Duplicate User", dt.create, &User{p: dt, Name: "Test User"}, false},
+		{"Delete User", dt.remove, &User{p: dt, Name: "Test User"}, true},
+		{"Delete Nonexistent User", dt.remove, &User{p: dt, Name: "Test User"}, false},
+	}
+	for _, test := range tests {
+		test.Test(t)
+	}
+}
+
+func TestUserPassword(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
 	u := dt.NewUser()
