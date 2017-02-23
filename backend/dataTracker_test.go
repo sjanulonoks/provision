@@ -68,7 +68,7 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 }
 
 func mkDT(bs store.SimpleStore) *DataTracker {
-	dt := NewDataTracker(bs, true, true, tmpDir, "CURL", "local", "local", "FURL", "127.0.0.1", log.New(os.Stdout, "dt", 0))
+	dt := NewDataTracker(bs, true, true, tmpDir, "CURL", "default", "default", "FURL", "127.0.0.1", log.New(os.Stdout, "dt", 0))
 	if err := dt.ExtractAssets(); err != nil {
 		log.Printf("Unable to extract assets: %v", err)
 		os.Exit(1)
