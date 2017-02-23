@@ -26,8 +26,9 @@ func TestMachineCrud(t *testing.T) {
 		{"Create another known-good bootenv", dt.create, &BootEnv{p: dt, Name: "new", Templates: []TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "default"}}}, true},
 		{"Update node with different bootenv", dt.update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "new"}, true},
 		{"Update node with different bootenv", dt.update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "unavailable"}, false},
+		{"Remove machine that does not exist", dt.remove, &Machine{p: dt, Uuid: uuid.NewRandom()}, false},
+		{"Remove machine that does exist", dt.remove, &Machine{p: dt, Uuid: okUUID, BootEnv: "new"}, true},
 	}
-
 	for _, test := range tests {
 		test.Test(t)
 	}
