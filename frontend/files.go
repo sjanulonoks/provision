@@ -22,11 +22,23 @@ type FilesResponse struct {
 	Body FilePaths
 }
 
+// XXX: One day resolve the binary blob appropriately:
+// {
+//   "name": "BinaryData",
+//   "in": "body",
+//   "required": true,
+//   "schema": {
+//     "type": "string",
+//     "format": "byte"
+//   }
+// }
+//
+
 // FileResponse returned on a successful GET of a file
 // swagger:response
 type FileResponse struct {
 	// in: body
-	Body []byte
+	Body interface{}
 }
 
 type FileInfo struct {
@@ -57,7 +69,7 @@ type FilePathPathParameter struct {
 // swagger:parameters uploadFile
 type FileData struct {
 	// in: body
-	Body []byte
+	Body interface{}
 }
 
 func (f *Frontend) InitFileApi() {
@@ -110,6 +122,7 @@ func (f *Frontend) InitFileApi() {
 	f.ApiGroup.GET("/files/*path",
 		func(c *gin.Context) {
 			fileName := path.Join(f.FileRoot, `files`, path.Clean(c.Param(`path`)))
+			c.Writer.Header().Set("Content-Type", "application/octet-stream")
 			c.File(fileName)
 		})
 
