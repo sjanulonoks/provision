@@ -86,6 +86,19 @@ func (n *Machine) New() store.KeySaver {
 	return store.KeySaver(res)
 }
 
+func (n *Machine) OnCreate() error {
+	e := &Error{Code: 409, Type: ValidationError, o: n}
+	// We do not allow duplicate machine names
+	machines := AsMachines(n.p.unlockedFetchAll(n.Prefix()))
+	for _, m := range machines {
+		if m.Name == n.Name {
+			e.Errorf("Machine %s is already named %s", m.UUID(), n.Name)
+			return e
+		}
+	}
+	return nil
+}
+
 func (n *Machine) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: n}
 	if n.Uuid == nil {
@@ -100,11 +113,16 @@ func (n *Machine) BeforeSave() error {
 	validateMaybeZeroIP4(e, n.Address)
 	b, found := n.p.fetchOne(n.p.NewBootEnv(), n.BootEnv)
 	if !found {
-		e.Errorf("Machine %s has BootEnv %s, which is not present in the DataTracker", n.Uuid, n.BootEnv)
+		e.Errorf("Machine %s has BootEnv %s, which is not present in the DataTracker", n.UUID(), n.BootEnv)
 	} else {
-		n.toRender = &RenderData{Machine: n, Env: AsBootEnv(b), p: n.p}
-		n.toRender.render(e)
-		n.toRender.mkPaths(e)
+		env := AsBootEnv(b)
+		if !env.Available {
+			e.Errorf("Machine %s wants BootEnv %s, which is not available", n.UUID(), n.BootEnv)
+		} else {
+			n.toRender = &RenderData{Machine: n, Env: env, p: n.p}
+			n.toRender.render(e)
+			n.toRender.mkPaths(e)
+		}
 	}
 	return e.OrNil()
 }
@@ -112,10 +130,6 @@ func (n *Machine) BeforeSave() error {
 func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	e := &Error{Code: 422, Type: ValidationError, o: n}
 	old := AsMachine(oldThing)
-	if !uuid.Equal(old.Uuid, n.Uuid) {
-		e.Errorf("machine: Cannot change machine UUID %s", old.Uuid)
-		return e
-	}
 	be, found := n.p.fetchOne(n.p.NewBootEnv(), old.BootEnv)
 	if found {
 		n.toRemove = &RenderData{Machine: n, Env: AsBootEnv(be), p: n.p}

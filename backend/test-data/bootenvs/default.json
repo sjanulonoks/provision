@@ -3,7 +3,7 @@
     "OS": {},
     "Templates": [
         {
-            "Name": "default",
+            "Name": "ipxe",
             "Path": "foo/bar",
             "ID": "default"
         }

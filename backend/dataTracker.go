@@ -20,7 +20,7 @@ type keySavers struct {
 	d map[string]store.KeySaver
 }
 
-// DataTracker represents everything there is to know about acting as a provisioner.
+// DataTracker represents everything there is to know about acting as a dataTracker.
 type DataTracker struct {
 	useProvisioner bool
 	useDHCP        bool
@@ -48,7 +48,7 @@ func (p *DataTracker) makeBackends(backend store.SimpleStore, objs []store.KeySa
 		prefix := o.Prefix()
 		bk, err := backend.Sub(prefix)
 		if err != nil {
-			p.Logger.Fatalf("provisioner: Error creating substore %s: %v", prefix, err)
+			p.Logger.Fatalf("dataTracker: Error creating substore %s: %v", prefix, err)
 		}
 		p.backends[prefix] = bk
 	}
@@ -104,7 +104,7 @@ func NewDataTracker(backend store.SimpleStore,
 	return res
 }
 
-// ExtractAssets is responsible for saving all the assets we need to act as a provisioner.
+// ExtractAssets is responsible for saving all the assets we need to act as a dataTracker.
 func (p *DataTracker) ExtractAssets() error {
 	if !p.useProvisioner {
 		return nil
@@ -179,6 +179,20 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 	return res
 }
 
+// unlockedFetchAll gets all the objects with a given prefix without
+// taking any locks.  It should only be called in hooks that need to
+// check for object uniqueness based on something besides a Key()
+func (p *DataTracker) unlockedFetchAll(prefix string) []store.KeySaver {
+	instances := p.objs[prefix]
+	res := make([]store.KeySaver, 0, len(instances.d))
+	for _, v := range instances.d {
+		res = append(res, v)
+	}
+	return res
+}
+
+// fetchAll returns all the instances we know about, It differs from FetchAll in that
+// it does not make a copy of the thing.
 func (p *DataTracker) fetchAll(ref store.KeySaver) []store.KeySaver {
 	prefix := ref.Prefix()
 	p.objTypeMux.Lock()
@@ -197,10 +211,11 @@ func (p *DataTracker) fetchAll(ref store.KeySaver) []store.KeySaver {
 // should be used instead of store.List.
 func (p *DataTracker) FetchAll(ref store.KeySaver) []store.KeySaver {
 	res := p.fetchAll(ref)
+	ret := make([]store.KeySaver, len(res))
 	for i := range res {
-		res[i] = p.Clone(res[i])
+		ret[i] = p.Clone(res[i])
 	}
-	return res
+	return ret
 }
 
 func (p *DataTracker) fetchOne(ref store.KeySaver, key string) (store.KeySaver, bool) {
@@ -225,14 +240,18 @@ func (p *DataTracker) FetchOne(ref store.KeySaver, key string) (store.KeySaver, 
 
 func (p *DataTracker) create(ref store.KeySaver) (bool, error) {
 	prefix := ref.Prefix()
+
+	key := ref.Key()
+	if key == "" {
+		return false, fmt.Errorf("dataTracker create %s: Empty key not allowed", prefix)
+	}
 	p.objTypeMux.Lock()
 	p.objs[prefix].Lock()
 	instances := p.objs[prefix]
 	p.objTypeMux.Unlock()
 	defer instances.Unlock()
-	key := ref.Key()
 	if _, ok := instances.d[key]; ok {
-		return false, fmt.Errorf("provisioner create %s: %s already exists", prefix, key)
+		return false, fmt.Errorf("dataTracker create %s: %s already exists", prefix, key)
 	}
 	saved, err := store.Create(ref)
 	if saved {
@@ -260,7 +279,7 @@ func (p *DataTracker) remove(ref store.KeySaver) (bool, error) {
 	defer instances.Unlock()
 	key := ref.Key()
 	if _, ok := instances.d[key]; !ok {
-		return false, fmt.Errorf("provisioner remove %s: %s does not exist", prefix, key)
+		return false, fmt.Errorf("dataTracker remove %s: %s does not exist", prefix, key)
 	}
 	removed, err := store.Remove(ref)
 	if removed {

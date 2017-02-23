@@ -2,6 +2,7 @@ package backend
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -15,6 +16,25 @@ var (
 	backingStore store.SimpleStore
 	tmpDir       string
 )
+
+type crudTest struct {
+	name string
+	op   func(store.KeySaver) (bool, error)
+	t    store.KeySaver
+	pass bool
+}
+
+func (test *crudTest) Test(t *testing.T) {
+	passed, err := test.op(test.t)
+	msg := fmt.Sprintf("%s: wanted to pass: %v, passed: %v", test.name, test.pass, passed)
+	if passed == test.pass {
+		t.Log(msg)
+		t.Logf("   err: %v", err)
+	} else {
+		t.Error(msg)
+		t.Errorf("   err: %v", err)
+	}
+}
 
 func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 	buf, err := os.Open(p)

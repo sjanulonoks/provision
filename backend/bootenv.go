@@ -21,6 +21,7 @@ import (
 
 // TemplateInfo holds information on the templates in the boot
 // environment that will be expanded into files.
+//
 // swagger:model
 type TemplateInfo struct {
 	// Name of the template
@@ -48,8 +49,9 @@ func (t *TemplateInfo) contents(dt *DataTracker) (*Template, bool) {
 	return nil, found
 }
 
-// OsInfo holds information about the operating system this BootEnv maps to.
-// Most of this information is optional for now.
+// OsInfo holds information about the operating system this BootEnv
+// maps to.  Most of this information is optional for now.
+//
 // swagger:model
 type OsInfo struct {
 	// The name of the OS this BootEnv has.
@@ -75,6 +77,7 @@ type OsInfo struct {
 
 // BootEnv encapsulates the machine-agnostic information needed by the
 // provisioner to set up a boot environment.
+//
 // swagger:model
 type BootEnv struct {
 	// The name of the boot environment.
@@ -156,23 +159,42 @@ func (b *BootEnv) parseTemplates(e *Error) {
 	b.OS.InstallUrl = b.p.FileURL + "/" + path.Join(b.OS.Name, "install")
 	for i := range b.Templates {
 		ti := &b.Templates[i]
-		pathTmpl, err := template.New(ti.Name).Parse(ti.Path)
-		if err != nil {
-			e.Errorf("Error compiling path template %s (%s): %v",
-				ti.Name,
-				ti.Path,
-				err)
-			continue
-		} else {
-			ti.pathTmpl = pathTmpl.Option("missingkey=error")
+		if ti.Name == "" {
+			e.Errorf("Templates[%d] has no Name", i)
 		}
+		if ti.Path == "" {
+			e.Errorf("Templates[%d] has no Path", i)
+		} else {
+			pathTmpl, err := template.New(ti.Name).Parse(ti.Path)
+			if err != nil {
+				e.Errorf("Error compiling path template %s (%s): %v",
+					ti.Name,
+					ti.Path,
+					err)
+				continue
+			} else {
+				ti.pathTmpl = pathTmpl.Option("missingkey=error")
+			}
+		}
+		if ti.ID == "" {
+			e.Errorf("Templates[%d] has no ID", i)
+		} else {
+			tmpl := b.p.NewTemplate()
+			if _, found := b.p.fetchOne(tmpl, ti.ID); !found {
+				e.Errorf("Templates[%d] wants Template %s, which does not exist",
+					i,
+					ti.ID)
+			}
+		}
+
 	}
 	if b.BootParams != "" {
 		tmpl, err := template.New("machine").Parse(b.BootParams)
 		if err != nil {
 			e.Errorf("Error compiling boot parameter template: %v", err)
+		} else {
+			b.bootParamsTmpl = tmpl.Option("missingkey=error")
 		}
-		b.bootParamsTmpl = tmpl.Option("missingkey=error")
 	}
 	return
 }
@@ -261,25 +283,17 @@ func (b *BootEnv) explodeIso() error {
 	return nil
 }
 
-func (b *BootEnv) OnChange(oldThing store.KeySaver) error {
-	e := &Error{o: b}
-	old := AsBootEnv(oldThing)
-	if old.Name != b.Name {
-		e.Errorf("bootenv: Cannot change name of bootenv %s", old.Name)
-		return e
-	}
-	b.Errors = e.Messages
-	return nil
-}
-
 func (b *BootEnv) BeforeSave() error {
-	e := &Error{o: b}
+	e := &Error{Code: 422, Type: ValidationError, o: b}
 	// If our basic templates do not parse, it is game over for us
 	b.parseTemplates(e)
 	if e.containsError {
 		return e
 	}
-	// Otherwise, these are errors that we accept the bootenv, but flag as needs fixing.
+	// Otherwise, we will save the BootEnv, but record
+	// the list of errors and mark it as not available.
+	//
+	// First, we have to have an iPXE template, or a PXELinux and eLILO template, or all three.
 	seenPxeLinux := false
 	seenELilo := false
 	seenIPXE := false
@@ -293,24 +307,21 @@ func (b *BootEnv) BeforeSave() error {
 		if template.Name == "ipxe" {
 			seenIPXE = true
 		}
-		if template.Name == "" ||
-			template.Path == "" ||
-			template.ID == "" {
-			e.Errorf("bootenv: Illegal template: %+v", template)
-		}
 	}
 	if !seenIPXE {
 		if !(seenPxeLinux && seenELilo) {
 			e.Errorf("bootenv: Missing elilo or pxelinux template")
 		}
 	}
-	// Make sure the ISO is exploded
+	// Make sure the ISO for this bootenv has been exploded locally so that
+	// the boot env can use its contents.
 	if b.OS.IsoFile != "" {
 		b.p.Logger.Printf("Exploding ISO for %s\n", b.OS.Name)
 		if err := b.explodeIso(); err != nil {
 			e.Errorf("bootenv: Unable to expand ISO %s: %v", b.OS.IsoFile, err)
 		}
 	}
+	// If we have a non-empty Kernel, make sure it points at something kernel-ish.
 	if b.Kernel != "" {
 		kPath := b.PathFor("disk", b.Kernel)
 		kernelStat, err := os.Stat(kPath)
@@ -326,6 +337,7 @@ func (b *BootEnv) BeforeSave() error {
 				kPath)
 		}
 	}
+	// Ditto for all the initrds.
 	if len(b.Initrds) > 0 {
 		for _, initrd := range b.Initrds {
 			iPath := b.PathFor("disk", initrd)
