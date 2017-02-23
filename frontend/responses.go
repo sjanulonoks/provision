@@ -2,20 +2,6 @@ package frontend
 
 import "github.com/rackn/rocket-skates/backend"
 
-// BootEnvResponse returned on a successful GET, PUT, PATCH, or POST of a single bootenv
-// swagger:response
-type BootEnvResponse struct {
-	// in: body
-	Body *backend.BootEnv
-}
-
-// BootEnvsResponse returned on a successful GET of all the bootenvs
-// swagger:response
-type BootEnvsResponse struct {
-	//in: body
-	Body []*backend.BootEnv
-}
-
 // LeaseResponse return on a successful GET, PUT, PATCH or POST of a single Lease
 // swagger:response
 type LeaseResponse struct {
