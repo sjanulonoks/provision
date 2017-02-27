@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 
@@ -15,9 +16,36 @@ import (
 	"github.com/rackn/rocket-skates/embedded"
 )
 
-type keySavers struct {
+type dtobjs struct {
 	sync.Mutex
-	d map[string]store.KeySaver
+	d []store.KeySaver
+}
+
+func (dt *dtobjs) sort() {
+	sort.Slice(dt.d, func(i, j int) bool { return dt.d[i].Key() < dt.d[j].Key() })
+}
+
+func (dt *dtobjs) find(key string) (int, bool) {
+	idx := sort.Search(len(dt.d), func(i int) bool { return dt.d[i].Key() >= key })
+	return idx, idx < len(dt.d) && dt.d[idx].Key() == key
+}
+
+func (dt *dtobjs) add(obj store.KeySaver) {
+	// This could be smarter and avoid sorting, but I really don't care
+	// right now.
+	dt.d = append(dt.d, obj)
+	dt.sort()
+}
+
+func (dt *dtobjs) remove(idx int) {
+	// This could also try harder to avoid copies, but I am not worrying for now.
+	neu := make([]store.KeySaver, 0, len(dt.d)-1)
+	for i := range dt.d {
+		if i != idx {
+			neu = append(neu, dt.d[i])
+		}
+	}
+	dt.d = neu
 }
 
 // DataTracker represents everything there is to know about acting as a dataTracker.
@@ -35,15 +63,21 @@ type DataTracker struct {
 	Logger *log.Logger
 
 	RebarClient *api.Client
-	backends    map[string]store.SimpleStore
-	backendMux  sync.Mutex
-	objs        map[string]*keySavers
-	objTypeMux  sync.Mutex
+	// Note the lack of mutexes for these maps.
+	// We shouls be able to get away with not locking them
+	// by only ever writing to them at DataTracker create time,
+	// and only ever reading from them afterwards.
+	backends map[string]store.SimpleStore
+	objs     map[string]*dtobjs
+}
+
+func (p *DataTracker) lockFor(prefix string) *dtobjs {
+	res := p.objs[prefix]
+	res.Lock()
+	return res
 }
 
 func (p *DataTracker) makeBackends(backend store.SimpleStore, objs []store.KeySaver) {
-	p.backendMux.Lock()
-	defer p.backendMux.Unlock()
 	for _, o := range objs {
 		prefix := o.Prefix()
 		bk, err := backend.Sub(prefix)
@@ -55,18 +89,15 @@ func (p *DataTracker) makeBackends(backend store.SimpleStore, objs []store.KeySa
 }
 
 func (p *DataTracker) loadData(refObjs []store.KeySaver) error {
-	p.objs = map[string]*keySavers{}
+	p.objs = map[string]*dtobjs{}
 	for _, refObj := range refObjs {
 		prefix := refObj.Prefix()
-		instances := &keySavers{d: map[string]store.KeySaver{}}
 		objs, err := store.List(refObj)
 		if err != nil {
 			return err
 		}
-		for _, obj := range objs {
-			instances.d[obj.Key()] = obj
-		}
-		p.objs[prefix] = instances
+		p.objs[prefix] = &dtobjs{d: objs}
+		p.objs[prefix].sort()
 	}
 	return nil
 }
@@ -88,8 +119,7 @@ func NewDataTracker(backend store.SimpleStore,
 		OurAddress:     addr,
 		Logger:         logger,
 
-		backends:   map[string]store.SimpleStore{},
-		backendMux: sync.Mutex{},
+		backends: map[string]store.SimpleStore{},
 	}
 	objs := []store.KeySaver{&Machine{p: res}, &User{p: res}}
 
@@ -140,8 +170,6 @@ func (p *DataTracker) ExtractAssets() error {
 }
 
 func (p *DataTracker) getBackend(t store.KeySaver) store.SimpleStore {
-	p.backendMux.Lock()
-	defer p.backendMux.Unlock()
 	res, ok := p.backends[t.Prefix()]
 	if !ok {
 		p.Logger.Fatalf("%s: No registered storage backend!", t.Prefix())
@@ -183,49 +211,45 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 // taking any locks.  It should only be called in hooks that need to
 // check for object uniqueness based on something besides a Key()
 func (p *DataTracker) unlockedFetchAll(prefix string) []store.KeySaver {
-	instances := p.objs[prefix]
-	res := make([]store.KeySaver, 0, len(instances.d))
-	for _, v := range instances.d {
-		res = append(res, v)
-	}
-	return res
+	return p.objs[prefix].d
 }
 
 // fetchAll returns all the instances we know about, It differs from FetchAll in that
 // it does not make a copy of the thing.
 func (p *DataTracker) fetchAll(ref store.KeySaver) []store.KeySaver {
 	prefix := ref.Prefix()
-	p.objTypeMux.Lock()
-	instances := p.objs[prefix]
-	instances.Lock()
-	p.objTypeMux.Unlock()
-	res := make([]store.KeySaver, 0, len(instances.d))
-	for _, v := range instances.d {
-		res = append(res, v)
-	}
-	instances.Unlock()
-	return res
+	res := p.lockFor(prefix)
+	defer res.Unlock()
+	return res.d
 }
 
 // FetchAll returns all of the cached objects of a given type.  It
 // should be used instead of store.List.
 func (p *DataTracker) FetchAll(ref store.KeySaver) []store.KeySaver {
-	res := p.fetchAll(ref)
-	ret := make([]store.KeySaver, len(res))
-	for i := range res {
-		ret[i] = p.Clone(res[i])
+	prefix := ref.Prefix()
+	res := p.lockFor(prefix)
+	ret := make([]store.KeySaver, len(res.d))
+	for i := range res.d {
+		ret[i] = p.Clone(res.d[i])
 	}
+	res.Unlock()
 	return ret
+}
+
+func (p *DataTracker) lockedGet(prefix, key string) (*dtobjs, int, bool) {
+	mux := p.lockFor(prefix)
+	idx, found := mux.find(key)
+	return mux, idx, found
 }
 
 func (p *DataTracker) fetchOne(ref store.KeySaver, key string) (store.KeySaver, bool) {
 	prefix := ref.Prefix()
-	p.objTypeMux.Lock()
-	p.objs[prefix].Lock()
-	res, ok := p.objs[prefix].d[key]
-	p.objs[prefix].Unlock()
-	p.objTypeMux.Unlock()
-	return res, ok
+	mux, idx, found := p.lockedGet(prefix, key)
+	defer mux.Unlock()
+	if found {
+		return mux.d[idx], found
+	}
+	return nil, found
 }
 
 // FetchOne returns a specific instance from the cached objects of
@@ -240,22 +264,18 @@ func (p *DataTracker) FetchOne(ref store.KeySaver, key string) (store.KeySaver, 
 
 func (p *DataTracker) create(ref store.KeySaver) (bool, error) {
 	prefix := ref.Prefix()
-
 	key := ref.Key()
 	if key == "" {
 		return false, fmt.Errorf("dataTracker create %s: Empty key not allowed", prefix)
 	}
-	p.objTypeMux.Lock()
-	p.objs[prefix].Lock()
-	instances := p.objs[prefix]
-	p.objTypeMux.Unlock()
-	defer instances.Unlock()
-	if _, ok := instances.d[key]; ok {
+	mux, _, found := p.lockedGet(prefix, key)
+	defer mux.Unlock()
+	if found {
 		return false, fmt.Errorf("dataTracker create %s: %s already exists", prefix, key)
 	}
 	saved, err := store.Create(ref)
 	if saved {
-		instances.d[key] = ref
+		mux.add(ref)
 	}
 	return saved, err
 }
@@ -272,18 +292,15 @@ func (p *DataTracker) Create(ref store.KeySaver) (store.KeySaver, error) {
 
 func (p *DataTracker) remove(ref store.KeySaver) (bool, error) {
 	prefix := ref.Prefix()
-	p.objTypeMux.Lock()
-	p.objs[prefix].Lock()
-	instances := p.objs[prefix]
-	p.objTypeMux.Unlock()
-	defer instances.Unlock()
 	key := ref.Key()
-	if _, ok := instances.d[key]; !ok {
+	mux, idx, found := p.lockedGet(prefix, key)
+	defer mux.Unlock()
+	if !found {
 		return false, fmt.Errorf("dataTracker remove %s: %s does not exist", prefix, key)
 	}
 	removed, err := store.Remove(ref)
 	if removed {
-		delete(instances.d, key)
+		mux.remove(idx)
 	}
 	return removed, err
 }
@@ -301,15 +318,15 @@ func (p *DataTracker) Remove(ref store.KeySaver) (store.KeySaver, error) {
 
 func (p *DataTracker) update(ref store.KeySaver) (bool, error) {
 	prefix := ref.Prefix()
-	p.objTypeMux.Lock()
-	p.objs[prefix].Lock()
-	instances := p.objs[prefix]
-	p.objTypeMux.Unlock()
-	defer instances.Unlock()
 	key := ref.Key()
+	mux, idx, found := p.lockedGet(prefix, key)
+	defer mux.Unlock()
+	if !found {
+		return false, fmt.Errorf("dataTracker remove %s: %s does not exist", prefix, key)
+	}
 	ok, err := store.Update(ref)
 	if ok {
-		instances.d[key] = ref
+		mux.d[idx] = ref
 	}
 	return ok, err
 }
@@ -327,15 +344,17 @@ func (p *DataTracker) Update(ref store.KeySaver) (store.KeySaver, error) {
 
 func (p *DataTracker) save(ref store.KeySaver) (bool, error) {
 	prefix := ref.Prefix()
-	p.objTypeMux.Lock()
-	p.objs[prefix].Lock()
-	instances := p.objs[prefix]
-	p.objTypeMux.Unlock()
-	defer instances.Unlock()
 	key := ref.Key()
+	mux, idx, found := p.lockedGet(prefix, key)
+	defer mux.Unlock()
 	ok, err := store.Save(ref)
-	if ok {
-		instances.d[key] = ref
+	if !ok {
+		return ok, err
+	}
+	if found {
+		mux.d[idx] = ref
+	} else {
+		mux.add(ref)
 	}
 	return ok, err
 }

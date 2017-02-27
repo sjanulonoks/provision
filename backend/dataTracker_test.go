@@ -77,7 +77,7 @@ func mkDT(bs store.SimpleStore) *DataTracker {
 }
 
 func TestBackingStorePersistence(t *testing.T) {
-	bs, err := store.NewSimpleLocalStore(tmpDir)
+	bs, err := store.NewFileBackend(tmpDir)
 	if err != nil {
 		t.Errorf("Could not create boltdb: %v", err)
 		return
@@ -139,6 +139,6 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	ret := m.Run()
-	os.RemoveAll(tmpDir)
+	// os.RemoveAll(tmpDir)
 	os.Exit(ret)
 }
