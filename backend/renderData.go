@@ -55,11 +55,11 @@ type RenderData struct {
 	p                 *DataTracker
 }
 
-func (r *RenderData) DataTrackerAddress() string {
+func (r *RenderData) ProvisionerAddress() string {
 	return r.p.OurAddress
 }
 
-func (r *RenderData) DataTrackerURL() string {
+func (r *RenderData) ProvisionerURL() string {
 	return r.p.FileURL
 }
 

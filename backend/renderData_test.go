@@ -21,8 +21,8 @@ BootEnv:
 Name = {{.Env.Name}}
 
 RenderData:
-DataTrackerAddress = {{.DataTrackerAddress}}
-DataTrackerURL = {{.DataTrackerURL}}
+ProvisionerAddress = {{.ProvisionerAddress}}
+ProvisionerURL = {{.ProvisionerURL}}
 CommandURL = {{.CommandURL}}
 BootParams = {{.BootParams}}`
 	tmplDefaultRendered = `Machine: 
@@ -35,8 +35,8 @@ BootEnv:
 Name = default
 
 RenderData:
-DataTrackerAddress = 127.0.0.1
-DataTrackerURL = FURL
+ProvisionerAddress = 127.0.0.1
+ProvisionerURL = FURL
 CommandURL = CURL
 BootParams = default`
 	tmplNothing = `Nothing`
