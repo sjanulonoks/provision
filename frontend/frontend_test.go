@@ -16,7 +16,7 @@ import (
 type LocalDTI struct {
 	CreateValue store.KeySaver
 	CreateError error
-	UpdateValue bool
+	UpdateValue store.KeySaver
 	UpdateError error
 	SaveValue   store.KeySaver
 	SaveError   error
@@ -32,7 +32,7 @@ type LocalDTI struct {
 func (dt *LocalDTI) Create(store.KeySaver) (store.KeySaver, error) {
 	return dt.CreateValue, dt.CreateError
 }
-func (dt *LocalDTI) Update(store.KeySaver) (bool, error) {
+func (dt *LocalDTI) Update(store.KeySaver) (store.KeySaver, error) {
 	return dt.UpdateValue, dt.UpdateError
 }
 func (dt *LocalDTI) Remove(store.KeySaver) (store.KeySaver, error) {

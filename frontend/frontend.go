@@ -16,7 +16,7 @@ import (
 // frontend needs.
 type DTI interface {
 	Create(store.KeySaver) (store.KeySaver, error)
-	Update(store.KeySaver) (bool, error)
+	Update(store.KeySaver) (store.KeySaver, error)
 	Remove(store.KeySaver) (store.KeySaver, error)
 	Save(store.KeySaver) (store.KeySaver, error)
 	FetchOne(store.KeySaver, string) (store.KeySaver, bool)
