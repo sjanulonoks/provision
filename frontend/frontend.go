@@ -5,25 +5,41 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/digitalrebar/digitalrebar/go/common/store"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
 	"github.com/rackn/rocket-skates/embedded"
 )
 
-type Frontend struct {
-	FileRoot    string
-	MgmtApi     *gin.Engine
-	ApiGroup    *gin.RouterGroup
-	DataTracker *backend.DataTracker
+// This interface defines the pieces of the backend.DataTracker that the
+// frontend needs.
+type DTI interface {
+	Create(store.KeySaver) (store.KeySaver, error)
+	Update(store.KeySaver) (bool, error)
+	Remove(store.KeySaver) (store.KeySaver, error)
+	Save(store.KeySaver) (store.KeySaver, error)
+	FetchOne(store.KeySaver, string) (store.KeySaver, bool)
+	FetchAll(ref store.KeySaver) []store.KeySaver
+
+	NewBootEnv() *backend.BootEnv
+	NewMachine() *backend.Machine
+	NewTemplate() *backend.Template
 }
 
-func NewFrontend(dt *backend.DataTracker, logger *log.Logger, fileRoot string) (me *Frontend) {
+type Frontend struct {
+	FileRoot string
+	MgmtApi  *gin.Engine
+	ApiGroup *gin.RouterGroup
+	dt       DTI
+}
+
+func NewFrontend(dt DTI, logger *log.Logger, fileRoot string) (me *Frontend) {
 	mgmtApi := gin.Default()
 
 	apiGroup := mgmtApi.Group("/api/v3")
 
-	me = &Frontend{FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, DataTracker: dt}
+	me = &Frontend{FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt}
 
 	me.InitBootEnvApi()
 	me.InitIsoApi()

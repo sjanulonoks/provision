@@ -23,7 +23,7 @@ func (f *Frontend) InitIsoApi() {
 		})
 	f.ApiGroup.POST("/isos/:name",
 		func(c *gin.Context) {
-			uploadIso(c, f.FileRoot, c.Param(`name`), f.DataTracker)
+			uploadIso(c, f.FileRoot, c.Param(`name`), f.dt)
 		})
 	f.ApiGroup.DELETE("/isos/:name",
 		func(c *gin.Context) {
@@ -53,7 +53,7 @@ func getIso(c *gin.Context, fileRoot, name string) {
 	c.File(isoName)
 }
 
-func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
+func reloadBootenvsForIso(dt DTI, name string) {
 	for _, blob := range dt.FetchAll(dt.NewBootEnv()) {
 		env := backend.AsBootEnv(blob)
 		if env.Available || env.OS.IsoFile != name {
@@ -64,7 +64,7 @@ func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
 	}
 }
 
-func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
+func uploadIso(c *gin.Context, fileRoot, name string, dt DTI) {
 	if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
 		c.JSON(http.StatusUnsupportedMediaType,
 			backend.NewError("API ERROR", http.StatusUnsupportedMediaType,

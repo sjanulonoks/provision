@@ -11,16 +11,16 @@ import (
 func (f *Frontend) InitTemplateApi() {
 	f.ApiGroup.GET("/templates",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, backend.AsTemplates(f.DataTracker.FetchAll(f.DataTracker.NewTemplate())))
+			c.JSON(http.StatusOK, backend.AsTemplates(f.dt.FetchAll(f.dt.NewTemplate())))
 		})
 	f.ApiGroup.POST("/templates",
 		func(c *gin.Context) {
-			b := f.DataTracker.NewTemplate()
+			b := f.dt.NewTemplate()
 			if err := c.Bind(b); err != nil {
 				c.JSON(http.StatusBadRequest,
 					backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 			}
-			nb, err := f.DataTracker.Create(b)
+			nb, err := f.dt.Create(b)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, err)
 			} else {
@@ -30,7 +30,7 @@ func (f *Frontend) InitTemplateApi() {
 	// GREG: add streaming create.	f.ApiGroup.POST("/templates/:uuid", createTemplate)
 	f.ApiGroup.GET("/templates/:id",
 		func(c *gin.Context) {
-			res, ok := f.DataTracker.FetchOne(f.DataTracker.NewTemplate(), c.Param(`id`))
+			res, ok := f.dt.FetchOne(f.dt.NewTemplate(), c.Param(`id`))
 			if ok {
 				c.JSON(http.StatusOK, backend.AsTemplate(res))
 			} else {
@@ -44,7 +44,7 @@ func (f *Frontend) InitTemplateApi() {
 		})
 	f.ApiGroup.PUT("/templates/:id",
 		func(c *gin.Context) {
-			b := f.DataTracker.NewTemplate()
+			b := f.dt.NewTemplate()
 			if err := c.Bind(b); err != nil {
 				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 			}
@@ -52,7 +52,7 @@ func (f *Frontend) InitTemplateApi() {
 				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest,
 					fmt.Sprintf("templates: Can not change id: %v -> %v", c.Param(`id`), b.ID)))
 			}
-			nb, err := f.DataTracker.Update(b)
+			nb, err := f.dt.Update(b)
 			if err != nil {
 				c.JSON(http.StatusNotFound, err) // GREG: Code
 			} else {
@@ -61,9 +61,9 @@ func (f *Frontend) InitTemplateApi() {
 		})
 	f.ApiGroup.DELETE("/templates/:id",
 		func(c *gin.Context) {
-			b := f.DataTracker.NewTemplate()
+			b := f.dt.NewTemplate()
 			b.ID = c.Param(`id`)
-			_, err := f.DataTracker.Remove(b)
+			_, err := f.dt.Remove(b)
 			if err != nil {
 				c.JSON(http.StatusNotFound, err) // GREG: Code
 			} else {
