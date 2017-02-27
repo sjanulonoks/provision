@@ -137,6 +137,7 @@ func (r *RenderData) render(e *Error) {
 			rt.Path = filepath.Join(r.p.FileRoot, buf.String())
 		}
 		rt.Template = tmpl
+		rt.Vars = r
 		r.renderedTemplates[i] = rt
 	}
 }
