@@ -5,5 +5,6 @@
     "ActiveEnd": "192.168.124.101",
     "ActiveLeaseTime": 60,
     "ReservedLeaseTime": 7200,
-    "OnlyReservations": false
+    "OnlyReservations": false,
+    "Strategy": "macaddr"
 }

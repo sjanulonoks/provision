@@ -26,11 +26,11 @@ type Lease struct {
 	// required: true
 	// swagger:strfmt ipv4
 	Addr net.IP
-	// Mac is the hardware address of the device the lease is bound to.
+	// Token is the unique token for this lease based on the
+	// Strategy this lease used.
 	//
 	// required: true
-	// swagger:strfmt mac
-	Mac string
+	Token string
 	// Valid tracks whether the lease is valid
 	//
 	// required: true
@@ -95,9 +95,44 @@ func AsLeases(o []store.KeySaver) []*Lease {
 	return res
 }
 
+func (l *Lease) OnChange(oldThing store.KeySaver) error {
+	old := AsLease(oldThing)
+	e := &Error{Code: 422, Type: ValidationError, o: l}
+	if l.Token != old.Token {
+		e.Errorf("Token cannot change")
+	}
+	if l.Strategy != old.Strategy {
+		e.Errorf("Strategy cannot change")
+	}
+	return e.OrNil()
+}
+
 func (l *Lease) BeforeSave() error {
 	res := &Error{Code: 422, Type: ValidationError, o: l}
+	if l.Token == "" {
+		res.Errorf("Lease Token cannot be empty!")
+	}
+	if l.Strategy == "" {
+		res.Errorf("Lease Strategy cannot be empty!")
+	}
+	if l.ExpireTime.Before(time.Now()) {
+		l.Valid = false
+	}
+	leases := AsLeases(l.p.unlockedFetchAll("leases"))
+	for i := range leases {
+		if leases[i].Addr.Equal(l.Addr) {
+			continue
+		}
+		if leases[i].Token == l.Token &&
+			leases[i].Strategy == l.Strategy {
+			res.Errorf("Lease %s alreay has Strategy %s: Token %s", leases[i].Key(), l.Strategy, l.Token)
+			break
+		}
+	}
 	validateIP4(res, l.Addr)
-	validateMac(res, l.Mac)
 	return res.OrNil()
+}
+
+func (l *Lease) Expired() bool {
+	return l.ExpireTime.Before(time.Now())
 }

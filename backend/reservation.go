@@ -14,11 +14,10 @@ type Reservation struct {
 	// required: true
 	// swagger:strfmt ipv4
 	Addr net.IP
-	// Mac is the interface address to which Addr is permanently bound
+	// Token is the unique identifier that the strategy for this Reservation should use.
 	//
 	// required: true
-	// swagger:strfmt mac
-	Mac string
+	Token string
 	// NextServer is the address the server should contact next.
 	//
 	// required: false
@@ -70,13 +69,41 @@ func AsReservations(o []store.KeySaver) []*Reservation {
 	return res
 }
 
+func (r *Reservation) OnChange(oldThing store.KeySaver) error {
+	old := AsReservation(oldThing)
+	e := &Error{Code: 422, Type: ValidationError, o: r}
+	if r.Token != old.Token {
+		e.Errorf("Token cannot change")
+	}
+	if r.Strategy != old.Strategy {
+		e.Errorf("Strategy cannot change")
+	}
+	return e.OrNil()
+}
+
 func (r *Reservation) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: r}
 	validateIP4(e, r.Addr)
-	validateMac(e, r.Mac)
 	validateMaybeZeroIP4(e, r.NextServer)
 	if len(r.NextServer) == 0 || r.NextServer.IsUnspecified() {
 		r.NextServer = nil
+	}
+	if r.Token == "" {
+		e.Errorf("Reservation Token cannot be empty!")
+	}
+	if r.Strategy == "" {
+		e.Errorf("Reservation Strategy cannot be empty!")
+	}
+	reservations := AsReservations(r.p.unlockedFetchAll("reservations"))
+	for i := range reservations {
+		if reservations[i].Addr.Equal(r.Addr) {
+			continue
+		}
+		if reservations[i].Token == r.Token &&
+			reservations[i].Strategy == r.Strategy {
+			e.Errorf("Reservation %s alreay has Strategy %s: Token %s", reservations[i].Key(), r.Strategy, r.Token)
+			break
+		}
 	}
 	return e.OrNil()
 }
