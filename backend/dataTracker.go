@@ -214,13 +214,31 @@ func (p *DataTracker) unlockedFetchAll(prefix string) []store.KeySaver {
 	return p.objs[prefix].d
 }
 
+// filteredFetch returns all of the objects in one of our caches in
+// between the point where lower starts to match its Search and upper
+// starts to match its Search.
+func (p *DataTracker) filteredFetch(prefix string, lower, upper func(store.KeySaver) bool) []store.KeySaver {
+	mux := p.lockFor(prefix)
+	defer mux.Unlock()
+	i := sort.Search(len(mux.d), func(i int) bool { return lower(mux.d[i]) })
+	j := sort.Search(len(mux.d), func(i int) bool { return upper(mux.d[i]) })
+	if i == len(mux.d) {
+		return []store.KeySaver{}
+	}
+	res := make([]store.KeySaver, j-i)
+	copy(res, mux.d[i:])
+	return res
+}
+
 // fetchAll returns all the instances we know about, It differs from FetchAll in that
 // it does not make a copy of the thing.
 func (p *DataTracker) fetchAll(ref store.KeySaver) []store.KeySaver {
 	prefix := ref.Prefix()
-	res := p.lockFor(prefix)
-	defer res.Unlock()
-	return res.d
+	mux := p.lockFor(prefix)
+	defer mux.Unlock()
+	res := make([]store.KeySaver, len(mux.d))
+	copy(res, mux.d)
+	return res
 }
 
 // FetchAll returns all of the cached objects of a given type.  It

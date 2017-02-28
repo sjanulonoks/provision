@@ -7,6 +7,17 @@ import (
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
+var hexDigit = []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'}
+
+func hexaddr(addr net.IP) string {
+	b := addr.To4()
+	s := make([]byte, len(b)*2)
+	for i, tn := range b {
+		s[i*2], s[i*2+1] = hexDigit[tn>>4], hexDigit[tn&0xf]
+	}
+	return string(s)
+}
+
 // Lease models a DHCP Lease
 // swagger:model
 type Lease struct {
@@ -29,15 +40,31 @@ type Lease struct {
 	// required: true
 	// swagger:strfmt date-time
 	ExpireTime time.Time
-	p          *DataTracker
+	// Strategy is the leasing strategy that will be used determine what to use from
+	// the DHCP packet to handle lease management.
+	//
+	// required: true
+	Strategy string
+
+	p *DataTracker
 }
 
 func (l *Lease) Prefix() string {
 	return "leases"
 }
 
+func (l *Lease) subnet() *Subnet {
+	subnets := AsSubnets(l.p.fetchAll(l.p.NewSubnet()))
+	for i := range subnets {
+		if subnets[i].InSubnetRange(l.Addr) {
+			return subnets[i]
+		}
+	}
+	return nil
+}
+
 func (l *Lease) Key() string {
-	return l.Mac
+	return hexaddr(l.Addr)
 }
 
 func (l *Lease) Backend() store.SimpleStore {

@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"fmt"
 	"net"
 	"path"
 	"strings"
@@ -48,9 +47,7 @@ func (n *Machine) Backend() store.SimpleStore {
 // HexAddress returns Address in raw hexadecimal format, suitable for
 // pxelinux and elilo usage.
 func (n *Machine) HexAddress() string {
-	addr := n.Address.To4()
-	hexIP := []byte(addr)
-	return fmt.Sprintf("%02X%02X%02X%02X", hexIP[0], hexIP[1], hexIP[2], hexIP[3])
+	return hexaddr(n.Address)
 }
 
 func (n *Machine) ShortName() string {
