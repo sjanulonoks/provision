@@ -7,6 +7,17 @@ import (
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
+var hexDigit = []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'}
+
+func hexaddr(addr net.IP) string {
+	b := addr.To4()
+	s := make([]byte, len(b)*2)
+	for i, tn := range b {
+		s[i*2], s[i*2+1] = hexDigit[tn>>4], hexDigit[tn&0xf]
+	}
+	return string(s)
+}
+
 // Lease models a DHCP Lease
 // swagger:model
 type Lease struct {
@@ -15,11 +26,11 @@ type Lease struct {
 	// required: true
 	// swagger:strfmt ipv4
 	Addr net.IP
-	// Mac is the hardware address of the device the lease is bound to.
+	// Token is the unique token for this lease based on the
+	// Strategy this lease used.
 	//
 	// required: true
-	// swagger:strfmt mac
-	Mac string
+	Token string
 	// Valid tracks whether the lease is valid
 	//
 	// required: true
@@ -29,15 +40,31 @@ type Lease struct {
 	// required: true
 	// swagger:strfmt date-time
 	ExpireTime time.Time
-	p          *DataTracker
+	// Strategy is the leasing strategy that will be used determine what to use from
+	// the DHCP packet to handle lease management.
+	//
+	// required: true
+	Strategy string
+
+	p *DataTracker
 }
 
 func (l *Lease) Prefix() string {
 	return "leases"
 }
 
+func (l *Lease) subnet() *Subnet {
+	subnets := AsSubnets(l.p.fetchAll(l.p.NewSubnet()))
+	for i := range subnets {
+		if subnets[i].InSubnetRange(l.Addr) {
+			return subnets[i]
+		}
+	}
+	return nil
+}
+
 func (l *Lease) Key() string {
-	return l.Mac
+	return hexaddr(l.Addr)
 }
 
 func (l *Lease) Backend() store.SimpleStore {
@@ -68,9 +95,44 @@ func AsLeases(o []store.KeySaver) []*Lease {
 	return res
 }
 
+func (l *Lease) OnChange(oldThing store.KeySaver) error {
+	old := AsLease(oldThing)
+	e := &Error{Code: 422, Type: ValidationError, o: l}
+	if l.Token != old.Token {
+		e.Errorf("Token cannot change")
+	}
+	if l.Strategy != old.Strategy {
+		e.Errorf("Strategy cannot change")
+	}
+	return e.OrNil()
+}
+
 func (l *Lease) BeforeSave() error {
 	res := &Error{Code: 422, Type: ValidationError, o: l}
+	if l.Token == "" {
+		res.Errorf("Lease Token cannot be empty!")
+	}
+	if l.Strategy == "" {
+		res.Errorf("Lease Strategy cannot be empty!")
+	}
+	if l.ExpireTime.Before(time.Now()) {
+		l.Valid = false
+	}
+	leases := AsLeases(l.p.unlockedFetchAll("leases"))
+	for i := range leases {
+		if leases[i].Addr.Equal(l.Addr) {
+			continue
+		}
+		if leases[i].Token == l.Token &&
+			leases[i].Strategy == l.Strategy {
+			res.Errorf("Lease %s alreay has Strategy %s: Token %s", leases[i].Key(), l.Strategy, l.Token)
+			break
+		}
+	}
 	validateIP4(res, l.Addr)
-	validateMac(res, l.Mac)
 	return res.OrNil()
+}
+
+func (l *Lease) Expired() bool {
+	return l.ExpireTime.Before(time.Now())
 }

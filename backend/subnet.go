@@ -2,54 +2,70 @@ package backend
 
 import (
 	"bytes"
+	"math/big"
 	"net"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
 // Subnet represents a DHCP Subnet
+//
 // swagger:model
 type Subnet struct {
 	// Name is the name of the subnet.
 	// Subnet names must be unique
+	//
 	// required: true
 	Name string
 	// Subnet is the network address in CIDR form that all leases
 	// acquired in its range will use for options, lease times, and NextServer settings
 	// by default
+	//
 	// required: true
 	// pattern: ^([0-9]+\.){3}[0-9]+/[0-9]+$
 	Subnet string
 	// NextServer is the address of the next server
+	//
 	// swagger:strfmt ipv4
 	// required: true
 	NextServer net.IP
 	// ActiveStart is the first non-reserved IP address we will hand
 	// non-reserved leases from.
+	//
 	// swagger:strfmt ipv4
 	// required: true
 	ActiveStart net.IP
 	// ActiveEnd is the last non-reserved IP address we will hand
 	// non-reserved leases from.
+	//
 	// swagger:strfmt ipv4
 	// required: true
 	ActiveEnd net.IP
 	// ActiveLeaseTime is the default lease duration in seconds
 	// we will hand out to leases that do not have a reservation.
+	//
 	// required: true
 	ActiveLeaseTime int32
 	// ReservedLeasTime is the default lease time we will hand out
 	// to leases created from a reservation in our subnet.
+	//
 	// required: true
 	ReservedLeaseTime int32
 	// OnlyReservations indicates that we will only allow leases for which
 	// there is a preexisting reservation.
+	//
 	// required: true
 	OnlyReservations bool
 	// Options is the list of DHCP options that every lease in
 	// this subnet will get.
+	//
 	// required: true
-	Options        []DhcpOption
+	Options []DhcpOption
+	// Strategy is the leasing strategy that will be used determine what to use from
+	// the DHCP packet to handle lease management.
+	//
+	// required: true
+	Strategy       string
 	p              *DataTracker
 	subnet         *net.IPNet
 	nextLeasableIP net.IP
@@ -127,4 +143,51 @@ func (s *Subnet) BeforeSave() error {
 		e.Errorf("ReservedLeaseTime must be creater than or equal to 7200 seconds, not %d", s.ReservedLeaseTime)
 	}
 	return e.OrNil()
+}
+
+func (s *Subnet) sBounds() (func(store.KeySaver) bool, func(store.KeySaver) bool) {
+	first := big.NewInt(0)
+	mask := big.NewInt(0)
+	last := big.NewInt(0)
+	first.SetBytes([]byte(s.subnet.IP.Mask(s.subnet.Mask)))
+	mask.SetBytes(s.subnet.Mask)
+	mask.Not(mask)
+	last = last.Or(first, mask)
+	firstBytes := first.Bytes()
+	lastBytes := last.Bytes()
+	lower := func(store.KeySaver) bool {
+		return s.Key() >= hexaddr(net.IP(firstBytes))
+	}
+	upper := func(store.KeySaver) bool {
+		return s.Key() >= hexaddr(net.IP(lastBytes))
+	}
+	return lower, upper
+}
+
+func (s *Subnet) aBounds() (func(store.KeySaver) bool, func(store.KeySaver) bool) {
+	return func(store.KeySaver) bool {
+			return s.Key() >= hexaddr(s.ActiveStart)
+		},
+		func(store.KeySaver) bool {
+			return s.Key() >= hexaddr(s.ActiveEnd)
+		}
+}
+
+func (s *Subnet) leases() []*Lease {
+	lower, upper := s.sBounds()
+	return AsLeases(s.p.filteredFetch("leases", lower, upper))
+}
+
+func (s *Subnet) reservations() []*Reservation {
+	lower, upper := s.sBounds()
+	return AsReservations(s.p.filteredFetch("reservations", lower, upper))
+}
+
+func (s *Subnet) AfterLoad() error {
+	_, subnet, err := net.ParseCIDR(s.Subnet)
+	if err != nil {
+		return err
+	}
+	s.subnet = subnet
+	return nil
 }
