@@ -122,9 +122,13 @@ func (s *Subnet) BeforeSave() error {
 	_, subnet, err := net.ParseCIDR(s.Subnet)
 	if err != nil {
 		e.Errorf("Invalid subnet %s: %v", s.Subnet, err)
+		return e
 	} else {
 		s.subnet = subnet
 		validateIP4(e, subnet.IP)
+	}
+	if s.Strategy == "" {
+		e.Errorf("Stragegy must have a value")
 	}
 	if !s.OnlyReservations {
 		validateIP4(e, s.ActiveStart)
@@ -135,12 +139,31 @@ func (s *Subnet) BeforeSave() error {
 		if !subnet.Contains(s.ActiveEnd) {
 			e.Errorf("ActiveEnd %s not in subnet range %s", s.ActiveEnd, subnet)
 		}
+		startBytes := big.NewInt(0)
+		endBytes := big.NewInt(0)
+		startBytes.SetBytes(s.ActiveStart)
+		endBytes.SetBytes(s.ActiveEnd)
+		if startBytes.Cmp(endBytes) != -1 {
+			e.Errorf("ActiveStart must be less than ActiveEnd")
+		}
 		if s.ActiveLeaseTime < 60 {
 			e.Errorf("ActiveLeaseTime must be greater than or equal to 60 seconds, not %d", s.ActiveLeaseTime)
 		}
 	}
 	if s.ReservedLeaseTime < 7200 {
-		e.Errorf("ReservedLeaseTime must be creater than or equal to 7200 seconds, not %d", s.ReservedLeaseTime)
+		e.Errorf("ReservedLeaseTime must be greater than or equal to 7200 seconds, not %d", s.ReservedLeaseTime)
+	}
+	if e.containsError {
+		return e
+	}
+	subnets := AsSubnets(s.p.unlockedFetchAll("subnets"))
+	for i := range subnets {
+		if subnets[i].Name == s.Name {
+			continue
+		}
+		if subnets[i].InSubnetRange(s.subnet.IP) {
+			e.Errorf("Overlaps subnet %s", subnets[i].Name)
+		}
 	}
 	return e.OrNil()
 }
