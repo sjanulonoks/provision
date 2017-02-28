@@ -79,7 +79,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.GET("/bootenvs",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, backend.AsBootEnvs(f.DataTracker.FetchAll(f.DataTracker.NewBootEnv())))
+			c.JSON(http.StatusOK, backend.AsBootEnvs(f.dt.FetchAll(f.dt.NewBootEnv())))
 		})
 
 	// swagger:route POST /bootenvs BootEnvs createBootEnv
@@ -95,13 +95,14 @@ func (f *Frontend) InitBootEnvApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.POST("/bootenvs",
 		func(c *gin.Context) {
-			b := f.DataTracker.NewBootEnv()
+			b := f.dt.NewBootEnv()
 			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, err)
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				return
 			}
-			nb, err := f.DataTracker.Create(b)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, err)
+			nb, err2 := f.dt.Create(b)
+			if err2 != nil {
+				c.JSON(http.StatusBadRequest, err2)
 			} else {
 				c.JSON(http.StatusCreated, nb)
 			}
@@ -120,7 +121,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.GET("/bootenvs/:name",
 		func(c *gin.Context) {
-			res, ok := f.DataTracker.FetchOne(f.DataTracker.NewBootEnv(), c.Param(`name`))
+			res, ok := f.dt.FetchOne(f.dt.NewBootEnv(), c.Param(`name`))
 			if ok {
 				c.JSON(http.StatusOK, backend.AsBootEnv(res))
 			} else {
@@ -159,7 +160,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.PUT("/bootenvs/:name",
 		func(c *gin.Context) {
-			b := f.DataTracker.NewBootEnv()
+			b := f.dt.NewBootEnv()
 			if err := c.Bind(b); err != nil {
 				c.JSON(http.StatusBadRequest, err)
 			}
@@ -168,7 +169,7 @@ func (f *Frontend) InitBootEnvApi() {
 					backend.NewError("API ERROR", http.StatusBadRequest,
 						fmt.Sprintf("bootenv put: error can not change name: %v %v", c.Param(`name`), b.Name)))
 			}
-			nb, err := f.DataTracker.Update(b)
+			nb, err := f.dt.Update(b)
 			if err != nil {
 				c.JSON(http.StatusNotFound, err)
 			} else {
@@ -189,9 +190,9 @@ func (f *Frontend) InitBootEnvApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.DELETE("/bootenvs/:name",
 		func(c *gin.Context) {
-			b := f.DataTracker.NewBootEnv()
+			b := f.dt.NewBootEnv()
 			b.Name = c.Param(`name`)
-			nb, err := f.DataTracker.Remove(b)
+			nb, err := f.dt.Remove(b)
 			if err != nil {
 				c.JSON(http.StatusNotFound, err)
 			} else {

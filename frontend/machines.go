@@ -11,16 +11,16 @@ import (
 func (f *Frontend) InitMachineApi() {
 	f.ApiGroup.GET("/machines",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, backend.AsMachines(f.DataTracker.FetchAll(f.DataTracker.NewMachine())))
+			c.JSON(http.StatusOK, backend.AsMachines(f.dt.FetchAll(f.dt.NewMachine())))
 		})
 	f.ApiGroup.POST("/machines",
 		func(c *gin.Context) {
-			b := f.DataTracker.NewMachine()
+			b := f.dt.NewMachine()
 			if err := c.Bind(b); err != nil {
 				c.JSON(http.StatusBadRequest,
 					backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 			}
-			nb, err := f.DataTracker.Create(b)
+			nb, err := f.dt.Create(b)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, err)
 			} else {
@@ -29,7 +29,7 @@ func (f *Frontend) InitMachineApi() {
 		})
 	f.ApiGroup.GET("/machines/:name",
 		func(c *gin.Context) {
-			res, ok := f.DataTracker.FetchOne(f.DataTracker.NewMachine(), c.Param(`name`))
+			res, ok := f.dt.FetchOne(f.dt.NewMachine(), c.Param(`name`))
 			if ok {
 				c.JSON(http.StatusOK, backend.AsMachine(res))
 			} else {
@@ -43,7 +43,7 @@ func (f *Frontend) InitMachineApi() {
 		})
 	f.ApiGroup.PUT("/machines/:name",
 		func(c *gin.Context) {
-			b := f.DataTracker.NewMachine()
+			b := f.dt.NewMachine()
 			if err := c.Bind(b); err != nil {
 				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 			}
@@ -51,7 +51,7 @@ func (f *Frontend) InitMachineApi() {
 				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest,
 					fmt.Sprintf("machines: Can not change name: %v -> %v", c.Param(`name`), b.Name)))
 			}
-			nb, err := f.DataTracker.Update(b)
+			nb, err := f.dt.Update(b)
 			if err != nil {
 				c.JSON(http.StatusNotFound, err) // GREG: COde
 			} else {
@@ -60,9 +60,9 @@ func (f *Frontend) InitMachineApi() {
 		})
 	f.ApiGroup.DELETE("/machines/:name",
 		func(c *gin.Context) {
-			b := f.DataTracker.NewMachine()
+			b := f.dt.NewMachine()
 			b.Name = c.Param(`name`)
-			_, err := f.DataTracker.Remove(b)
+			_, err := f.dt.Remove(b)
 			if err != nil {
 				c.JSON(http.StatusNotFound, err) // GREG: Code
 			} else {
