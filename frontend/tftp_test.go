@@ -23,7 +23,7 @@ func TestTftpFiles(t *testing.T) {
 
 	hh = ServeTftp("1.1.1.1:11112", ".")
 	if hh != nil {
-		if hh.Error() != "listen udp 1.1.1.1:11112: bind: can't assign requested address" {
+		if !strings.Contains(hh.Error(), "listen udp 1.1.1.1:11112: bind: ") {
 			t.Errorf("Expected a different error: %v", hh.Error())
 		}
 	} else {
