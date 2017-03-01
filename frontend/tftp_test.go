@@ -88,6 +88,8 @@ func TestTftpFiles(t *testing.T) {
 			t.Errorf("tftpClient receive: Should return an error: %v", err)
 		}
 
+		os.MkdirAll("test-data", 0700)
+
 		f, err := os.Create("test-data/write-only.txt")
 		if err != nil {
 			t.Errorf("tftpClient create write-only file: Should not return an error: %v", err)
