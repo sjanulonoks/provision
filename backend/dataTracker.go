@@ -214,14 +214,16 @@ func (p *DataTracker) unlockedFetchAll(prefix string) []store.KeySaver {
 	return p.objs[prefix].d
 }
 
-// filteredFetch returns all of the objects in one of our caches in
+// fetchSome returns all of the objects in one of our caches in
 // between the point where lower starts to match its Search and upper
-// starts to match its Search.
-func (p *DataTracker) filteredFetch(prefix string, lower, upper func(store.KeySaver) bool) []store.KeySaver {
+// starts to match its Search.  The lower and upper parameters must be
+// functions that accept a Key() and return a yes or no decision about
+// whether that particular entry is in range.
+func (p *DataTracker) fetchSome(prefix string, lower, upper func(string) bool) []store.KeySaver {
 	mux := p.lockFor(prefix)
 	defer mux.Unlock()
-	i := sort.Search(len(mux.d), func(i int) bool { return lower(mux.d[i]) })
-	j := sort.Search(len(mux.d), func(i int) bool { return upper(mux.d[i]) })
+	i := sort.Search(len(mux.d), func(i int) bool { return lower(mux.d[i].Key()) })
+	j := sort.Search(len(mux.d), func(i int) bool { return upper(mux.d[i].Key()) })
 	if i == len(mux.d) {
 		return []store.KeySaver{}
 	}

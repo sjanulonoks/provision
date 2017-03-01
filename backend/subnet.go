@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"bytes"
 	"math/big"
 	"net"
 
@@ -67,8 +66,15 @@ type Subnet struct {
 	// required: true
 	Strategy       string
 	p              *DataTracker
-	subnet         *net.IPNet
 	nextLeasableIP net.IP
+}
+
+func (s *Subnet) subnet() *net.IPNet {
+	_, res, err := net.ParseCIDR(s.Subnet)
+	if err != nil {
+		panic(err.Error())
+	}
+	return res
 }
 
 func (s *Subnet) Prefix() string {
@@ -95,14 +101,50 @@ func (s *Subnet) List() []*Subnet {
 	return AsSubnets(s.p.FetchAll(s))
 }
 
+func (s *Subnet) sBounds() (func(string) bool, func(string) bool) {
+	sub := s.subnet()
+	first := big.NewInt(0)
+	mask := big.NewInt(0)
+	last := big.NewInt(0)
+	first.SetBytes([]byte(sub.IP.Mask(sub.Mask)))
+	notBits := make([]byte, len(sub.Mask))
+	for i, b := range sub.Mask {
+		notBits[i] = ^b
+	}
+	mask.SetBytes(notBits)
+	last.Or(first, mask)
+	firstBytes := first.Bytes()
+	lastBytes := last.Bytes()
+	// first "address" in this range is the network address, which cannot be handed out.
+	lower := func(key string) bool {
+		return key > hexaddr(net.IP(firstBytes))
+	}
+	// last "address" in this range is the broadcast address, which also cannot be handed out.
+	upper := func(key string) bool {
+		return key >= hexaddr(net.IP(lastBytes))
+	}
+	return lower, upper
+}
+
+func (s *Subnet) aBounds() (func(string) bool, func(string) bool) {
+	return func(key string) bool {
+			return key >= hexaddr(s.ActiveStart)
+		},
+		func(key string) bool {
+			return key > hexaddr(s.ActiveEnd)
+		}
+}
+
 func (s *Subnet) InSubnetRange(ip net.IP) bool {
-	return s.subnet.Contains(ip)
+	lower, upper := s.sBounds()
+	hex := hexaddr(ip)
+	return lower(hex) && !upper(hex)
 }
 
 func (s *Subnet) InActiveRange(ip net.IP) bool {
-	return !s.OnlyReservations &&
-		bytes.Compare(ip, s.ActiveStart) >= 0 &&
-		bytes.Compare(ip, s.ActiveEnd) <= 0
+	lower, upper := s.aBounds()
+	hex := hexaddr(ip)
+	return lower(hex) && !upper(hex)
 }
 
 func AsSubnet(o store.KeySaver) *Subnet {
@@ -124,11 +166,10 @@ func (s *Subnet) BeforeSave() error {
 		e.Errorf("Invalid subnet %s: %v", s.Subnet, err)
 		return e
 	} else {
-		s.subnet = subnet
 		validateIP4(e, subnet.IP)
 	}
 	if s.Strategy == "" {
-		e.Errorf("Stragegy must have a value")
+		e.Errorf("Strategy must have a value")
 	}
 	if !s.OnlyReservations {
 		validateIP4(e, s.ActiveStart)
@@ -161,56 +202,24 @@ func (s *Subnet) BeforeSave() error {
 		if subnets[i].Name == s.Name {
 			continue
 		}
-		if subnets[i].InSubnetRange(s.subnet.IP) {
+		if subnets[i].subnet().Contains(s.subnet().IP) {
 			e.Errorf("Overlaps subnet %s", subnets[i].Name)
 		}
 	}
 	return e.OrNil()
 }
 
-func (s *Subnet) sBounds() (func(store.KeySaver) bool, func(store.KeySaver) bool) {
-	first := big.NewInt(0)
-	mask := big.NewInt(0)
-	last := big.NewInt(0)
-	first.SetBytes([]byte(s.subnet.IP.Mask(s.subnet.Mask)))
-	mask.SetBytes(s.subnet.Mask)
-	mask.Not(mask)
-	last = last.Or(first, mask)
-	firstBytes := first.Bytes()
-	lastBytes := last.Bytes()
-	lower := func(store.KeySaver) bool {
-		return s.Key() >= hexaddr(net.IP(firstBytes))
-	}
-	upper := func(store.KeySaver) bool {
-		return s.Key() >= hexaddr(net.IP(lastBytes))
-	}
-	return lower, upper
-}
-
-func (s *Subnet) aBounds() (func(store.KeySaver) bool, func(store.KeySaver) bool) {
-	return func(store.KeySaver) bool {
-			return s.Key() >= hexaddr(s.ActiveStart)
-		},
-		func(store.KeySaver) bool {
-			return s.Key() >= hexaddr(s.ActiveEnd)
-		}
-}
-
 func (s *Subnet) leases() []*Lease {
 	lower, upper := s.sBounds()
-	return AsLeases(s.p.filteredFetch("leases", lower, upper))
+	return AsLeases(s.p.fetchSome("leases", lower, upper))
+}
+
+func (s *Subnet) activeLeases() []*Lease {
+	lower, upper := s.aBounds()
+	return AsLeases(s.p.fetchSome("leases", lower, upper))
 }
 
 func (s *Subnet) reservations() []*Reservation {
 	lower, upper := s.sBounds()
-	return AsReservations(s.p.filteredFetch("reservations", lower, upper))
-}
-
-func (s *Subnet) AfterLoad() error {
-	_, subnet, err := net.ParseCIDR(s.Subnet)
-	if err != nil {
-		return err
-	}
-	s.subnet = subnet
-	return nil
+	return AsReservations(s.p.fetchSome("reservations", lower, upper))
 }
