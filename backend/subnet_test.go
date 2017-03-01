@@ -36,17 +36,17 @@ func TestSubnetFinders(t *testing.T) {
 	expTime := time.Now().Add(10 * time.Hour)
 	objs := []crudTest{
 		{"Create subnet for testing finders", dt.create, &Subnet{p: dt, Name: "test", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "noop"}, true},
+		{"Create reservation 1 (below subnet range)", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.254"), Token: "lease1", Strategy: "noop"}, true},
+		{"Create reservation 2 (at start of subnet range)", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.1"), Token: "lease2", Strategy: "noop"}, true},
+		{"Create reservation 3 (at end of subnet range)", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.254"), Token: "lease5", Strategy: "noop"}, true},
+		{"Create reservation 4 (after end of subnet range)", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.125.1"), Token: "lease6", Strategy: "noop"}, true},
+		{"Create reservation 5 (towards middle of subnet)", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.17"), Token: "lease0", Strategy: "noop"}, true},
 		{"Create lease 1 (below subnet range)", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.123.254"), Token: "lease1", Strategy: "noop", ExpireTime: expTime}, true},
 		{"Create lease 2 (at start of subnet range)", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.1"), Token: "lease2", Strategy: "noop", ExpireTime: expTime}, true},
 		{"Create lease 3 (at start active range)", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.80"), Token: "lease3", Strategy: "noop", ExpireTime: expTime}, true},
 		{"Create lease 4 (in active range)", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.128"), Token: "lease4", Strategy: "noop", ExpireTime: expTime}, true},
 		{"Create lease 5 (at end of range)", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.254"), Token: "lease5", Strategy: "noop", ExpireTime: expTime}, true},
 		{"Create lease 6 (above subnet range)", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.125.1"), Token: "lease6", Strategy: "noop", ExpireTime: expTime}, true},
-		{"Create reservation 1 (below subnet range)", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.254"), Token: "lease1", Strategy: "noop"}, true},
-		{"Create reservation 2 (at start of subnet range)", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.1"), Token: "lease2", Strategy: "noop"}, true},
-		{"Create reservation 3 (at end of subnet range)", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.254"), Token: "lease5", Strategy: "noop"}, true},
-		{"Create reservation 4 (after end of subnet range)", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.125.1"), Token: "lease6", Strategy: "noop"}, true},
-		{"Create reservation 5 (towards middle of subnet)", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.17"), Token: "lease0", Strategy: "noop"}, true},
 	}
 	for _, test := range objs {
 		test.Test(t)

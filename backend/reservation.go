@@ -81,6 +81,23 @@ func (r *Reservation) OnChange(oldThing store.KeySaver) error {
 	return e.OrNil()
 }
 
+func (r *Reservation) OnCreate() error {
+	e := &Error{Code: 422, Type: ValidationError, o: r}
+	// Make sure we aren't creating a reservation for a network or
+	// a broadcast address in a subnet we know about
+	subnets := AsSubnets(r.p.fetchAll(r.p.NewSubnet()))
+	for i := range subnets {
+		if !subnets[i].subnet().Contains(r.Addr) {
+			continue
+		}
+		if !subnets[i].InSubnetRange(r.Addr) {
+			e.Errorf("Address %s is a network or broadcast address for subnet %s", r.Addr.String(), subnets[i].Name)
+		}
+		break
+	}
+	return e.OrNil()
+}
+
 func (r *Reservation) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: r}
 	validateIP4(e, r.Addr)

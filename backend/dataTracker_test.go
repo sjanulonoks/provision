@@ -87,9 +87,9 @@ func TestBackingStorePersistence(t *testing.T) {
 		"templates",
 		"bootenvs",
 		"machines",
-		"leases",
-		"reservations",
 		"subnets",
+		"reservations",
+		"leases",
 	}
 
 	for _, d := range explDirs {

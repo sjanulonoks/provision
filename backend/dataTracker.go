@@ -127,7 +127,7 @@ func NewDataTracker(backend store.SimpleStore,
 		objs = append(objs, &Template{p: res}, &BootEnv{p: res})
 	}
 	if useDHCP {
-		objs = append(objs, &Lease{p: res}, &Reservation{p: res}, &Subnet{p: res})
+		objs = append(objs, &Subnet{p: res}, &Reservation{p: res}, &Lease{p: res})
 	}
 	res.makeBackends(backend, objs)
 	res.loadData(objs)

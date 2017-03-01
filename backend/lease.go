@@ -56,11 +56,19 @@ func (l *Lease) Prefix() string {
 func (l *Lease) subnet() *Subnet {
 	subnets := AsSubnets(l.p.fetchAll(l.p.NewSubnet()))
 	for i := range subnets {
-		if subnets[i].InSubnetRange(l.Addr) {
+		if subnets[i].subnet().Contains(l.Addr) {
 			return subnets[i]
 		}
 	}
 	return nil
+}
+
+func (l *Lease) reservation() *Reservation {
+	r, ok := l.p.fetchOne(l.p.NewReservation(), hexaddr(l.Addr))
+	if !ok {
+		return nil
+	}
+	return AsReservation(r)
 }
 
 func (l *Lease) Key() string {
@@ -95,6 +103,45 @@ func AsLeases(o []store.KeySaver) []*Lease {
 	return res
 }
 
+func (l *Lease) OnCreate() error {
+	e := &Error{Code: 422, Type: ValidationError, o: l}
+	validateIP4(e, l.Addr)
+	if l.Token == "" {
+		e.Errorf("Lease Token cannot be empty!")
+	}
+	if l.Strategy == "" {
+		e.Errorf("Lease Strategy cannot be empty!")
+	}
+	// We can only create leases that have a Reservation or that are in
+	// the ActiveRange of a subnet.
+	if r := l.reservation(); r != nil {
+		return nil
+	}
+	if e.containsError {
+		return e
+	}
+	leases := AsLeases(l.p.unlockedFetchAll("leases"))
+	for i := range leases {
+		if leases[i].Addr.Equal(l.Addr) {
+			continue
+		}
+		if leases[i].Token == l.Token &&
+			leases[i].Strategy == l.Strategy {
+			e.Errorf("Lease %s alreay has Strategy %s: Token %s", leases[i].Key(), l.Strategy, l.Token)
+			break
+		}
+	}
+	if e.containsError {
+		return e
+	}
+	if s := l.subnet(); s == nil {
+		e.Errorf("Cannot create Lease without a reservation or a subnet")
+	} else if !s.InSubnetRange(l.Addr) {
+		e.Errorf("Address %s is a network or broadcast address for subnet %s", l.Addr.String(), s.Name)
+	}
+	return e.OrNil()
+}
+
 func (l *Lease) OnChange(oldThing store.KeySaver) error {
 	old := AsLease(oldThing)
 	e := &Error{Code: 422, Type: ValidationError, o: l}
@@ -108,29 +155,10 @@ func (l *Lease) OnChange(oldThing store.KeySaver) error {
 }
 
 func (l *Lease) BeforeSave() error {
-	res := &Error{Code: 422, Type: ValidationError, o: l}
-	if l.Token == "" {
-		res.Errorf("Lease Token cannot be empty!")
-	}
-	if l.Strategy == "" {
-		res.Errorf("Lease Strategy cannot be empty!")
-	}
 	if l.ExpireTime.Before(time.Now()) {
 		l.Valid = false
 	}
-	leases := AsLeases(l.p.unlockedFetchAll("leases"))
-	for i := range leases {
-		if leases[i].Addr.Equal(l.Addr) {
-			continue
-		}
-		if leases[i].Token == l.Token &&
-			leases[i].Strategy == l.Strategy {
-			res.Errorf("Lease %s alreay has Strategy %s: Token %s", leases[i].Key(), l.Strategy, l.Token)
-			break
-		}
-	}
-	validateIP4(res, l.Addr)
-	return res.OrNil()
+	return nil
 }
 
 func (l *Lease) Expired() bool {
