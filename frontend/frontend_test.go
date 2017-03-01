@@ -96,3 +96,21 @@ func (dt *LocalDTI) ValidateError(t *testing.T, ap string, mess string) {
 		t.Errorf("Error mess should be: %v, but is %v\n", mess, err.Messages[0])
 	}
 }
+
+func TestSwaggerPieces(t *testing.T) {
+	localDTI := testFrontend()
+
+	req, _ := http.NewRequest("GET", "/swagger.json", nil)
+	w := localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusOK)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	var swagger map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &swagger)
+	if len(swagger) == 0 {
+		t.Errorf("Response should not be an empty set, but got: %d\n", len(swagger))
+	}
+	s := swagger["swagger"].(string)
+	if s != "2.0" {
+		t.Errorf("Swagger version should be 2.0: %v\n", s)
+	}
+}
