@@ -24,7 +24,7 @@ func ServeTftp(listen, fileRoot string) error {
 	svr := tftp.NewServer(func(filename string, rf io.ReaderFrom) error {
 		p := filepath.Join(fileRoot, filename)
 		p = filepath.Clean(p)
-		if !strings.HasPrefix(p, fileRoot) {
+		if !strings.HasPrefix(p, fileRoot+string(filepath.Separator)) {
 			err := fmt.Errorf("Filename %s tries to escape root %s", filename, fileRoot)
 			log.Println(err)
 			return err
