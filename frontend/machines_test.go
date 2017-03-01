@@ -11,23 +11,23 @@ import (
 	"github.com/rackn/rocket-skates/backend"
 )
 
-func TestBootEnvList(t *testing.T) {
+func TestMachineList(t *testing.T) {
 	localDTI := testFrontend()
 
 	localDTI.ListValue = nil
-	req, _ := http.NewRequest("GET", "/api/v3/bootenvs", nil)
+	req, _ := http.NewRequest("GET", "/api/v3/machines", nil)
 	w := localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusOK)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 
-	var list []backend.BootEnv
+	var list []backend.Machine
 	json.Unmarshal(w.Body.Bytes(), &list)
 	if len(list) != 0 {
 		t.Errorf("Response should be an empty list, but got: %d\n", len(list))
 	}
 
-	localDTI.ListValue = []store.KeySaver{&backend.BootEnv{Name: "fred"}}
-	req, _ = http.NewRequest("GET", "/api/v3/bootenvs", nil)
+	localDTI.ListValue = []store.KeySaver{&backend.Machine{Name: "fred"}}
+	req, _ = http.NewRequest("GET", "/api/v3/machines", nil)
 	w = localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusOK)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
@@ -41,12 +41,12 @@ func TestBootEnvList(t *testing.T) {
 	}
 }
 
-func TestBootEnvPost(t *testing.T) {
+func TestMachinePost(t *testing.T) {
 	localDTI := testFrontend()
 
 	localDTI.CreateValue = nil
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
-	req, _ := http.NewRequest("POST", "/api/v3/bootenvs", nil)
+	req, _ := http.NewRequest("POST", "/api/v3/machines", nil)
 	req.Header.Set("Content-Type", "text/html")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
@@ -55,7 +55,7 @@ func TestBootEnvPost(t *testing.T) {
 
 	localDTI.CreateValue = nil
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
-	req, _ = http.NewRequest("POST", "/api/v3/bootenvs", strings.NewReader(""))
+	req, _ = http.NewRequest("POST", "/api/v3/machines", strings.NewReader(""))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
@@ -64,44 +64,44 @@ func TestBootEnvPost(t *testing.T) {
 
 	localDTI.CreateValue = nil
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
-	req, _ = http.NewRequest("POST", "/api/v3/bootenvs", strings.NewReader("asgasgd"))
+	req, _ = http.NewRequest("POST", "/api/v3/machines", strings.NewReader("asgasgd"))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "invalid character 'a' looking for beginning of value")
 
-	/* GREG: handle json failure? hard to do - send a machine instead of bootenv */
+	/* GREG: handle json failure? hard to do - send a machine instead of machine */
 
-	localDTI.CreateValue = &backend.BootEnv{Name: "fred", Kernel: "kfred"}
+	localDTI.CreateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.CreateError = fmt.Errorf("this is a test: bad fred")
 	v, _ := json.Marshal(localDTI.CreateValue)
-	req, _ = http.NewRequest("POST", "/api/v3/bootenvs", strings.NewReader(string(v)))
+	req, _ = http.NewRequest("POST", "/api/v3/machines", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.CreateValue = &backend.BootEnv{Name: "fred", Kernel: "kfred"}
+	localDTI.CreateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.CreateError = nil
 	v, _ = json.Marshal(localDTI.CreateValue)
-	req, _ = http.NewRequest("POST", "/api/v3/bootenvs", strings.NewReader(string(v)))
+	req, _ = http.NewRequest("POST", "/api/v3/machines", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w := localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusCreated)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 
-	var be backend.BootEnv
+	var be backend.Machine
 	json.Unmarshal(w.Body.Bytes(), &be)
 	if be.Name != "fred" {
-		t.Errorf("Returned BootEnv was not correct: %v %v\n", "fred", be.Name)
+		t.Errorf("Returned Machine was not correct: %v %v\n", "fred", be.Name)
 	}
 
-	localDTI.CreateValue = &backend.BootEnv{Name: "fred", Kernel: "kfred"}
+	localDTI.CreateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"test one"}}
 	v, _ = json.Marshal(localDTI.CreateValue)
-	req, _ = http.NewRequest("POST", "/api/v3/bootenvs", strings.NewReader(string(v)))
+	req, _ = http.NewRequest("POST", "/api/v3/machines", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w = localDTI.RunTest(req)
 	localDTI.ValidateCode(t, 23)
@@ -113,48 +113,48 @@ func TestBootEnvPost(t *testing.T) {
 	}
 }
 
-func TestBootEnvGet(t *testing.T) {
+func TestMachineGet(t *testing.T) {
 	localDTI := testFrontend()
 
 	localDTI.GetValue = nil
 	localDTI.GetBool = false
-	req, _ := http.NewRequest("GET", "/api/v3/bootenvs/fred", nil)
+	req, _ := http.NewRequest("GET", "/api/v3/machines/fred", nil)
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusNotFound)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "bootenv get: error not found: fred")
+	localDTI.ValidateError(t, "API_ERROR", "machine get: Not Found: fred")
 
-	localDTI.GetValue = &backend.BootEnv{Name: "fred", Kernel: "kfred"}
+	localDTI.GetValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.GetBool = true
-	req, _ = http.NewRequest("GET", "/api/v3/bootenvs/fred", nil)
+	req, _ = http.NewRequest("GET", "/api/v3/machines/fred", nil)
 	w := localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusOK)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	var be backend.BootEnv
+	var be backend.Machine
 	json.Unmarshal(w.Body.Bytes(), &be)
 	if be.Name != "fred" {
-		t.Errorf("Returned BootEnv was not correct: %v %v\n", "fred", be.Name)
+		t.Errorf("Returned Machine was not correct: %v %v\n", "fred", be.Name)
 	}
 }
 
-func TestBootEnvPatch(t *testing.T) {
+func TestMachinePatch(t *testing.T) {
 	localDTI := testFrontend()
 
 	localDTI.UpdateValue = nil
 	localDTI.UpdateError = nil
-	req, _ := http.NewRequest("PATCH", "/api/v3/bootenvs/fred", nil)
+	req, _ := http.NewRequest("PATCH", "/api/v3/machines/fred", nil)
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusNotImplemented)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "bootenv patch: NOT IMPLEMENTED")
+	localDTI.ValidateError(t, "API_ERROR", "machine patch: NOT IMPLEMENTED")
 }
 
-func TestBootEnvPut(t *testing.T) {
+func TestMachinePut(t *testing.T) {
 	localDTI := testFrontend()
 
 	localDTI.UpdateValue = nil
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
-	req, _ := http.NewRequest("PUT", "/api/v3/bootenvs/fred", nil)
+	req, _ := http.NewRequest("PUT", "/api/v3/machines/fred", nil)
 	req.Header.Set("Content-Type", "text/html")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
@@ -163,7 +163,7 @@ func TestBootEnvPut(t *testing.T) {
 
 	localDTI.UpdateValue = nil
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
-	req, _ = http.NewRequest("PUT", "/api/v3/bootenvs/fred", strings.NewReader(""))
+	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader(""))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
@@ -172,66 +172,66 @@ func TestBootEnvPut(t *testing.T) {
 
 	localDTI.UpdateValue = nil
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
-	req, _ = http.NewRequest("PUT", "/api/v3/bootenvs/fred", strings.NewReader("asgasgd"))
+	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader("asgasgd"))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "invalid character 'a' looking for beginning of value")
 
-	/* GREG: handle json failure? hard to do - send a machine instead of bootenv */
+	/* GREG: handle json failure? hard to do - send a machine instead of machine */
 
-	localDTI.UpdateValue = &backend.BootEnv{Name: "fred", Kernel: "kfred"}
+	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.UpdateError = fmt.Errorf("this is a test: bad fred")
 	v, _ := json.Marshal(localDTI.UpdateValue)
-	req, _ = http.NewRequest("PUT", "/api/v3/bootenvs/fred", strings.NewReader(string(v)))
+	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusNotFound)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.UpdateValue = &backend.BootEnv{Name: "kfred", Kernel: "kfred"}
+	localDTI.UpdateValue = &backend.Machine{Name: "kfred", BootEnv: "kfred"}
 	localDTI.UpdateError = nil
 	v, _ = json.Marshal(localDTI.UpdateValue)
-	req, _ = http.NewRequest("PUT", "/api/v3/bootenvs/fred", strings.NewReader(string(v)))
+	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "bootenv put: error can not change name: fred kfred")
+	localDTI.ValidateError(t, "API_ERROR", "machines put: Can not change name: fred -> kfred")
 
-	localDTI.UpdateValue = &backend.BootEnv{Name: "fred", Kernel: "kfred"}
+	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.UpdateError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"test one"}}
 	v, _ = json.Marshal(localDTI.UpdateValue)
-	req, _ = http.NewRequest("PUT", "/api/v3/bootenvs/fred", strings.NewReader(string(v)))
+	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, 23)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "test one")
 
-	localDTI.UpdateValue = &backend.BootEnv{Name: "fred", Kernel: "kfred"}
+	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.UpdateError = nil
 	v, _ = json.Marshal(localDTI.UpdateValue)
-	req, _ = http.NewRequest("PUT", "/api/v3/bootenvs/fred", strings.NewReader(string(v)))
+	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w := localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusOK)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	var be backend.BootEnv
+	var be backend.Machine
 	json.Unmarshal(w.Body.Bytes(), &be)
-	if be.Kernel != "kfred" {
-		t.Errorf("Returned BootEnv was not correct: %v %v\n", "kfred", be.Kernel)
+	if be.BootEnv != "kfred" {
+		t.Errorf("Returned Machine was not correct: %v %v\n", "kfred", be.BootEnv)
 	}
 }
 
-func TestBootEnvDelete(t *testing.T) {
+func TestMachineDelete(t *testing.T) {
 	localDTI := testFrontend()
 
 	localDTI.RemoveValue = nil
 	localDTI.RemoveError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"should get this one"}}
-	req, _ := http.NewRequest("DELETE", "/api/v3/bootenvs/fred", nil)
+	req, _ := http.NewRequest("DELETE", "/api/v3/machines/fred", nil)
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, 23)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
@@ -239,21 +239,21 @@ func TestBootEnvDelete(t *testing.T) {
 
 	localDTI.RemoveValue = nil
 	localDTI.RemoveError = fmt.Errorf("this is a test: bad fred")
-	req, _ = http.NewRequest("DELETE", "/api/v3/bootenvs/fred", nil)
+	req, _ = http.NewRequest("DELETE", "/api/v3/machines/fred", nil)
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusNotFound)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.RemoveValue = &backend.BootEnv{Name: "fred", Kernel: "kfred"}
+	localDTI.RemoveValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.RemoveError = nil
-	req, _ = http.NewRequest("DELETE", "/api/v3/bootenvs/fred", nil)
+	req, _ = http.NewRequest("DELETE", "/api/v3/machines/fred", nil)
 	w := localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusOK)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	var be backend.BootEnv
+	var be backend.Machine
 	json.Unmarshal(w.Body.Bytes(), &be)
-	if be.Kernel != "kfred" {
-		t.Errorf("Returned BootEnv was not correct: %v %v\n", "kfred", be.Kernel)
+	if be.BootEnv != "kfred" {
+		t.Errorf("Returned Machine was not correct: %v %v\n", "kfred", be.BootEnv)
 	}
 }

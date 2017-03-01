@@ -30,26 +30,6 @@ type BootEnvBodyParameter struct {
 	Body *backend.BootEnv
 }
 
-// operation represents a valid JSON Patch operation as defined by RFC 6902
-type JSONPatchOperation struct {
-	// All Operations must have an Op.
-	//
-	// required: true
-	// enum: add,remove,replace,move,copy,test
-	Op string `json:"op"`
-
-	// Path is a JSON Pointer as defined in RFC 6901
-	// required: true
-	Path string `json:"path"`
-
-	// From is a JSON pointer indicating where a value should be
-	// copied/moved from.  From is only used by copy and move operations.
-	From string `json:"from"`
-
-	// Value is the Value to be used for add, replace, and test operations.
-	Value interface{} `json:"value"`
-}
-
 // BootEnvPatchBodyParameter used to patch a BootEnv
 // swagger:parameters patchBootEnv
 type BootEnvPatchBodyParameter struct {
@@ -74,7 +54,6 @@ func (f *Frontend) InitBootEnvApi() {
 	// This will show all BootEnvs by default.
 	//
 	//     Responses:
-	//       default: ErrorResponse
 	//       200: BootEnvsResponse
 	//       401: ErrorResponse
 	f.ApiGroup.GET("/bootenvs",
@@ -89,20 +68,28 @@ func (f *Frontend) InitBootEnvApi() {
 	// Create a BootEnv from the provided object
 	//
 	//     Responses:
-	//       default: ErrorResponse
 	//       201: BootEnvResponse
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	f.ApiGroup.POST("/bootenvs",
 		func(c *gin.Context) {
+			if !testContentType(c, "application/json") {
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
+				return
+			}
 			b := f.dt.NewBootEnv()
 			if err := c.Bind(b); err != nil {
 				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				return
 			}
-			nb, err2 := f.dt.Create(b)
-			if err2 != nil {
-				c.JSON(http.StatusBadRequest, err2)
+			nb, err := f.dt.Create(b)
+			if err != nil {
+				ne, ok := err.(*backend.Error)
+				if ok {
+					c.JSON(ne.Code, ne)
+				} else {
+					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				}
 			} else {
 				c.JSON(http.StatusCreated, nb)
 			}
@@ -115,10 +102,9 @@ func (f *Frontend) InitBootEnvApi() {
 	// Get the BootEnv specified by {name} or return NotFound.
 	//
 	//     Responses:
-	//       default: ErrorResponse
 	//       200: BootEnvResponse
-	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       404: ErrorResponse
 	f.ApiGroup.GET("/bootenvs/:name",
 		func(c *gin.Context) {
 			res, ok := f.dt.FetchOne(f.dt.NewBootEnv(), c.Param(`name`))
@@ -126,7 +112,7 @@ func (f *Frontend) InitBootEnvApi() {
 				c.JSON(http.StatusOK, backend.AsBootEnv(res))
 			} else {
 				c.JSON(http.StatusNotFound,
-					backend.NewError("API ERROR", http.StatusNotFound,
+					backend.NewError("API_ERROR", http.StatusNotFound,
 						fmt.Sprintf("bootenv get: error not found: %v", c.Param(`name`))))
 			}
 		})
@@ -138,10 +124,10 @@ func (f *Frontend) InitBootEnvApi() {
 	// Update a BootEnv specified by {name} using a RFC6902 Patch structure
 	//
 	//     Responses:
-	//       default: ErrorResponse
 	//       200: BootEnvResponse
 	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       404: ErrorResponse
 	f.ApiGroup.PATCH("/bootenvs/:name",
 		func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "bootenv patch: NOT IMPLEMENTED"))
@@ -154,24 +140,35 @@ func (f *Frontend) InitBootEnvApi() {
 	// Update a BootEnv specified by {name} using a JSON BootEnv
 	//
 	//     Responses:
-	//       default: ErrorResponse
 	//       200: BootEnvResponse
 	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       404: ErrorResponse
 	f.ApiGroup.PUT("/bootenvs/:name",
 		func(c *gin.Context) {
+			if !testContentType(c, "application/json") {
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
+				return
+			}
 			b := f.dt.NewBootEnv()
 			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, err)
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				return
 			}
 			if b.Name != c.Param(`name`) {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API ERROR", http.StatusBadRequest,
+					backend.NewError("API_ERROR", http.StatusBadRequest,
 						fmt.Sprintf("bootenv put: error can not change name: %v %v", c.Param(`name`), b.Name)))
+				return
 			}
 			nb, err := f.dt.Update(b)
 			if err != nil {
-				c.JSON(http.StatusNotFound, err)
+				ne, ok := err.(*backend.Error)
+				if ok {
+					c.JSON(ne.Code, ne)
+				} else {
+					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				}
 			} else {
 				c.JSON(http.StatusOK, nb)
 			}
@@ -184,17 +181,21 @@ func (f *Frontend) InitBootEnvApi() {
 	// Delete a BootEnv specified by {name}
 	//
 	//     Responses:
-	//       default: ErrorResponse
 	//       200: BootEnvResponse
-	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/bootenvs/:name",
 		func(c *gin.Context) {
 			b := f.dt.NewBootEnv()
 			b.Name = c.Param(`name`)
 			nb, err := f.dt.Remove(b)
 			if err != nil {
-				c.JSON(http.StatusNotFound, err)
+				ne, ok := err.(*backend.Error)
+				if ok {
+					c.JSON(ne.Code, ne)
+				} else {
+					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				}
 			} else {
 				c.JSON(http.StatusOK, nb)
 			}

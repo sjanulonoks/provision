@@ -8,26 +8,106 @@ import (
 	"github.com/rackn/rocket-skates/backend"
 )
 
+// TemplateResponse return on a successful GET, PUT, PATCH or POST of a single Template
+// swagger:response
+type TemplateResponse struct {
+	//in: body
+	Body *backend.Template
+}
+
+// TemplatesResponse return on a successful GET of all templates
+// swagger:response
+type TemplatesResponse struct {
+	//in: body
+	Body []*backend.Template
+}
+
+// TemplateBodyParameter used to inject a Template
+// swagger:parameters createTemplates putTemplate
+type TemplateBodyParameter struct {
+	// in: body
+	// required: true
+	Body *backend.Template
+}
+
+// TemplatePatchBodyParameter used to patch a Template
+// swagger:parameters patchTemplate
+type TemplatePatchBodyParameter struct {
+	// in: body
+	// required: true
+	Body []JSONPatchOperation
+}
+
+// TemplatePathParameter used to name a Template in the path
+// swagger:parameters putTemplates getTemplate putTemplate patchTemplate deleteTemplate
+type TemplatePathParameter struct {
+	// in: path
+	// required: true
+	Name string
+}
+
 func (f *Frontend) InitTemplateApi() {
+	// swagger:route GET /templates Templates listTemplates
+	//
+	// Lists Templates filtered by some parameters.
+	//
+	// This will show all Templates by default.
+	//
+	//     Responses:
+	//       200: TemplatesResponse
+	//       401: ErrorResponse
 	f.ApiGroup.GET("/templates",
 		func(c *gin.Context) {
 			c.JSON(http.StatusOK, backend.AsTemplates(f.dt.FetchAll(f.dt.NewTemplate())))
 		})
+
+	// swagger:route POST /templates Templates createTemplate
+	//
+	// Create a Template
+	//
+	// Create a Template from the provided object
+	//
+	//     Responses:
+	//       201: TemplateResponse
+	//       400: ErrorResponse
+	//       401: ErrorResponse
 	f.ApiGroup.POST("/templates",
 		func(c *gin.Context) {
+			if !testContentType(c, "application/json") {
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
+				return
+			}
 			b := f.dt.NewTemplate()
 			if err := c.Bind(b); err != nil {
 				c.JSON(http.StatusBadRequest,
 					backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				return
 			}
 			nb, err := f.dt.Create(b)
 			if err != nil {
-				c.JSON(http.StatusBadRequest, err)
+				ne, ok := err.(*backend.Error)
+				if ok {
+					c.JSON(ne.Code, ne)
+				} else {
+					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				}
 			} else {
 				c.JSON(http.StatusCreated, nb)
 			}
 		})
+
 	// GREG: add streaming create.	f.ApiGroup.POST("/templates/:uuid", createTemplate)
+
+	// swagger:route GET /templates/{name} Templates getTemplate
+	//
+	// Get a Template
+	//
+	// Get the Template specified by {name} or return NotFound.
+	//
+	//     Responses:
+	//       200: TemplateResponse
+	//       401: ErrorResponse
+	//       404: ErrorResponse
 	f.ApiGroup.GET("/templates/:id",
 		func(c *gin.Context) {
 			res, ok := f.dt.FetchOne(f.dt.NewTemplate(), c.Param(`id`))
@@ -35,62 +115,90 @@ func (f *Frontend) InitTemplateApi() {
 				c.JSON(http.StatusOK, backend.AsTemplate(res))
 			} else {
 				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound,
-					fmt.Sprintf("templates: Not found: %v", c.Param(`id`))))
+					fmt.Sprintf("templates get: Not Found: %v", c.Param(`id`))))
 			}
 		})
+
+	// swagger:route PATCH /templates/{name} Templates patchTemplate
+	//
+	// Patch a Template
+	//
+	// Update a Template specified by {name} using a RFC6902 Patch structure
+	//
+	//     Responses:
+	//       200: TemplateResponse
+	//       400: ErrorResponse
+	//       401: ErrorResponse
+	//       404: ErrorResponse
 	f.ApiGroup.PATCH("/templates/:id",
 		func(c *gin.Context) {
-			//			updateThing(c, &Template{ID: c.Param(`id`)}, &Template{})
+			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "template patch: NOT IMPLEMENTED"))
 		})
+
+	// swagger:route PUT /templates/{name} Templates putTemplate
+	//
+	// Put a Template
+	//
+	// Update a Template specified by {name} using a JSON Template
+	//
+	//     Responses:
+	//       200: TemplateResponse
+	//       400: ErrorResponse
+	//       401: ErrorResponse
+	//       404: ErrorResponse
 	f.ApiGroup.PUT("/templates/:id",
 		func(c *gin.Context) {
+			if !testContentType(c, "application/json") {
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
+				return
+			}
 			b := f.dt.NewTemplate()
 			if err := c.Bind(b); err != nil {
 				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				return
 			}
 			if b.ID != c.Param(`id`) {
 				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest,
-					fmt.Sprintf("templates: Can not change id: %v -> %v", c.Param(`id`), b.ID)))
+					fmt.Sprintf("templates put: Can not change id: %v -> %v", c.Param(`id`), b.ID)))
+				return
 			}
 			nb, err := f.dt.Update(b)
 			if err != nil {
-				c.JSON(http.StatusNotFound, err) // GREG: Code
+				ne, ok := err.(*backend.Error)
+				if ok {
+					c.JSON(ne.Code, ne)
+				} else {
+					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				}
 			} else {
 				c.JSON(http.StatusOK, nb)
 			}
 		})
+
+	// swagger:route DELETE /templates/{name} Templates deleteTemplate
+	//
+	// Delete a Template
+	//
+	// Delete a Template specified by {name}
+	//
+	//     Responses:
+	//       200: TemplateResponse
+	//       401: ErrorResponse
+	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/templates/:id",
 		func(c *gin.Context) {
 			b := f.dt.NewTemplate()
 			b.ID = c.Param(`id`)
-			_, err := f.dt.Remove(b)
+			nb, err := f.dt.Remove(b)
 			if err != nil {
-				c.JSON(http.StatusNotFound, err) // GREG: Code
+				ne, ok := err.(*backend.Error)
+				if ok {
+					c.JSON(ne.Code, ne)
+				} else {
+					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				}
 			} else {
-				c.JSON(http.StatusNoContent, nil)
+				c.JSON(http.StatusOK, nb)
 			}
 		})
 }
-
-/*
-func BootenvPatch(params templates.PatchBootenvParams, p *models.Principal) middleware.Responder {
-	newThing := NewBootenv(params.ID)
-	patch, _ := json.Marshal(params.Body)
-	item, err := patchThing(newThing, patch)
-	if err != nil {
-		if err.Code == http.StatusNotFound {
-			return templates.NewPatchBootenvNotFound().WithPayload(err)
-		}
-		if err.Code == http.StatusConflict {
-			return templates.NewPatchBootenvConflict().WithPayload(err)
-		}
-		return templates.NewPatchBootenvExpectationFailed().WithPayload(err)
-	}
-	original, ok := item.(models.BootenvOutput)
-	if !ok {
-		e := NewError(http.StatusInternalServerError, "Could not marshal bootenv")
-		return templates.NewPatchBootenvInternalServerError().WithPayload(e)
-	}
-	return templates.NewPatchBootenvOK().WithPayload(&original)
-}
-*/
