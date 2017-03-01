@@ -16,20 +16,6 @@ type LeasesResponse struct {
 	Body []*backend.Lease
 }
 
-// MachineResponse return on a successful GET, PUT, PATCH or POST of a single Machine
-// swagger:response
-type MachineResponse struct {
-	//in: body
-	Body *backend.Machine
-}
-
-// MachinesResponse return on a successful GET of all Machines
-// swagger:response
-type MachinesResponse struct {
-	//in: body
-	Body []*backend.Machine
-}
-
 // ReservationResponse return on a successful GET, PUT, PATCH or POST of a single Reservation
 // swagger:response
 type ReservationResponse struct {
@@ -56,20 +42,6 @@ type SubnetResponse struct {
 type SubnetsResponse struct {
 	//in: body
 	Body []*backend.Subnet
-}
-
-// TemplateResponse return on a successful GET, PUT, PATCH or POST of a single Template
-// swagger:response
-type TemplateResponse struct {
-	//in: body
-	Body *backend.Template
-}
-
-// TemplatesResponse return on a successful GET of all templates
-// swagger:response
-type TemplatesResponse struct {
-	//in: body
-	Body []*backend.Template
 }
 
 // UserResponse return on a successful GET, PUT, PATCH or POST of a single User
