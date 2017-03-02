@@ -30,6 +30,17 @@ func (dt *dtobjs) find(key string) (int, bool) {
 	return idx, idx < len(dt.d) && dt.d[idx].Key() == key
 }
 
+func (dt *dtobjs) subset(lower, upper func(string) bool) []store.KeySaver {
+	i := sort.Search(len(dt.d), func(i int) bool { return lower(dt.d[i].Key()) })
+	j := sort.Search(len(dt.d), func(i int) bool { return upper(dt.d[i].Key()) })
+	if i == len(dt.d) {
+		return []store.KeySaver{}
+	}
+	res := make([]store.KeySaver, j-i)
+	copy(res, dt.d[i:])
+	return res
+}
+
 func (dt *dtobjs) add(obj store.KeySaver) {
 	// This could be smarter and avoid sorting, but I really don't care
 	// right now.
@@ -222,14 +233,7 @@ func (p *DataTracker) unlockedFetchAll(prefix string) []store.KeySaver {
 func (p *DataTracker) fetchSome(prefix string, lower, upper func(string) bool) []store.KeySaver {
 	mux := p.lockFor(prefix)
 	defer mux.Unlock()
-	i := sort.Search(len(mux.d), func(i int) bool { return lower(mux.d[i].Key()) })
-	j := sort.Search(len(mux.d), func(i int) bool { return upper(mux.d[i].Key()) })
-	if i == len(mux.d) {
-		return []store.KeySaver{}
-	}
-	res := make([]store.KeySaver, j-i)
-	copy(res, mux.d[i:])
-	return res
+	return mux.subset(lower, upper)
 }
 
 // fetchAll returns all the instances we know about, It differs from FetchAll in that
