@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestStaticFiles(t *testing.T) {
@@ -19,6 +20,7 @@ func TestStaticFiles(t *testing.T) {
 	}
 
 	go ServeStatic(":32134", ".")
+	time.Sleep(2 * time.Second)
 
 	response, err := http.Get("http://127.0.0.1:32134/frontend.go")
 	if err != nil {
