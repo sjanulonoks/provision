@@ -7,9 +7,13 @@ import (
 	"time"
 )
 
+// LeaseNAK is the error that shall be returned when we cannot give a
+// system the IP address it requested.  If FindLease or
+// FindOrCreateLease return this as their error, then the DHCP
+// midlayer must NAK the request.
 type LeaseNAK error
 
-func findLease(leases, reservations *dtobjs, strat, token string, req net.IP) (lease *Lease, err error) {
+func _findLease(leases, reservations *dtobjs, strat, token string, req net.IP) (lease *Lease, err error) {
 	if req != nil && req.IsGlobalUnicast() {
 		hexreq := hexaddr(req.To4())
 		idx, found := leases.find(hexreq)
@@ -36,20 +40,16 @@ func findLease(leases, reservations *dtobjs, strat, token string, req net.IP) (l
 		}
 		if lease == nil {
 			// We did not find a lease for this system to renew.
-			return nil, nil
+			return
 		}
 	}
-	// Well, it is ours now.
-	lease.Strategy = strat
-	lease.Token = token
 	// This is the lease we want, but if there is a conflicting reservation we
 	// may force the client to give it up.
 	if ridx, rfound := reservations.find(lease.Key()); rfound {
 		reservation := AsReservation(reservations.d[ridx])
 		if reservation.Strategy != lease.Strategy ||
 			reservation.Token != lease.Token {
-			lease.Valid = false
-			lease.ExpireTime = time.Now()
+			lease.Invalidate()
 			err = LeaseNAK(fmt.Errorf("Reservation %s (%s:%s conflicts with %s:%s",
 				reservation.Addr,
 				reservation.Strategy,
@@ -59,29 +59,43 @@ func findLease(leases, reservations *dtobjs, strat, token string, req net.IP) (l
 			return
 		}
 	}
+	lease.Strategy = strat
+	lease.Token = token
+	lease.ExpireTime = time.Now().Add(2 * time.Second)
 	lease.p.Logger.Printf("Found our lease for strat: %s token %s, will use it", strat, token)
 	return
 }
 
-// FindLease finds an appropriate matching Lease.
-// If a non-nil lease is returned, it must be saved.
-// If a non-nil error is returned, the DHCP system myst NAK the response.
-// If both are nil, the DHCP system must not respond to the request.
-//
-// This function should be called in response to a DHCPREQUEST.
-func FindLease(dt *DataTracker, strat, token string, req net.IP) (*Lease, error) {
+func findLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, err error) {
 	leases := dt.lockFor("leases")
 	reservations := dt.lockFor("reservations")
 	defer leases.Unlock()
 	defer reservations.Unlock()
-	lease, err := findLease(leases, reservations, strat, token, req)
-	if err != nil {
-		return lease, err
-	}
-	if lease != nil {
-		lease.ExpireTime = time.Now().Add(2 * time.Second)
-		lease.Valid = true
+	lease, err = _findLease(leases, reservations, strat, token, req)
+	return
+}
 
+// FindLease finds an appropriate matching Lease.
+// If a non-nil error is returned, the DHCP system must NAK the response.
+// If lease and error are nil, the DHCP system must not respond to the request.
+// Otherwise, the lease will be returned with its ExpireTime updated and the Lease saved.
+//
+// This function should be called in response to a DHCPREQUEST.
+func FindLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, err error) {
+	lease, err = findLease(dt, strat, token, req)
+	if lease != nil && err == nil {
+		subnet := lease.Subnet()
+		reservation := lease.Reservation()
+		if subnet != nil {
+			lease.ExpireTime = time.Now().Add(subnet.LeaseTimeFor(lease.Addr))
+		} else if reservation != nil {
+			lease.ExpireTime = time.Now().Add(2 * time.Hour)
+		} else {
+			dt.remove(lease)
+			err = LeaseNAK(fmt.Errorf("Lease %s has no reservation or subnet, it is dead to us.", lease.Addr))
+			return
+		}
+		dt.save(lease)
 	}
 	return lease, err
 }
@@ -109,12 +123,12 @@ func findViaReservation(leases, reservations *dtobjs, strat, token string) (leas
 			lease.p.Logger.Printf("Reservation for %s has a lease, using it.", lease.Addr.String())
 			return
 		}
-		if !lease.Valid {
+		if lease.Expired() {
 			// The lease has expired.  Take it over
 			lease.p.Logger.Printf("Reservation for %s is taking over an expired lease", lease.Addr.String())
 			lease.Token = token
 			lease.Strategy = strat
-			return lease
+			return
 		}
 		// The lease has not expired, and it is not ours.
 		// We have no choice but to fall through to subnet code until
@@ -131,6 +145,7 @@ func findViaReservation(leases, reservations *dtobjs, strat, token string) (leas
 		Strategy: reservation.Strategy,
 		Token:    reservation.Token,
 	}
+	leases.add(lease)
 	return
 }
 
@@ -194,7 +209,7 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, v
 			return
 		}
 		lease = currLeases[i]
-		if !lease.Valid || lease.Expired() {
+		if lease.Expired() {
 			// There is a lease for this address, and it is expired.
 			// Take it over.
 			curr.Add(curr, one)
@@ -231,7 +246,7 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, v
 			return lease
 		}
 		lease = currLeases[i]
-		if !lease.Valid || lease.Expired() {
+		if lease.Expired() {
 			// There is a lease for this address, and it is expired.
 			// Take it over.
 			curr.Add(curr, one)
@@ -248,20 +263,14 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, v
 	return nil
 }
 
-// FindOrCreateLease will return a lease for the passed information, creating it if it can.
-// If a non-nil Lease is returned, the caller must save it, and the DHCP system can offer it.
-// If lease and err are nil, then the DHCP system should not reply to the request.
-//
-// This function should be called for DHCPDISCOVER.
-func FindOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) (lease *Lease) {
+func findOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *Lease {
 	leases := dt.lockFor("leases")
 	reservations := dt.lockFor("reservations")
 	subnets := dt.lockFor("subnets")
 	defer leases.Unlock()
 	defer reservations.Unlock()
 	defer subnets.Unlock()
-	var err error
-	lease, err = findLease(leases, reservations, strat, token, req)
+	lease, err := _findLease(leases, reservations, strat, token, req)
 	if lease == nil || err != nil {
 		lease = findViaReservation(leases, reservations, strat, token)
 	}
@@ -270,8 +279,20 @@ func FindOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) (l
 	}
 	if lease != nil {
 		lease.ExpireTime = time.Now().Add(2 * time.Second)
-		lease.Valid = true
-
 	}
-	return
+	return lease
+}
+
+// FindOrCreateLease will return a lease for the passed information, creating it if it can.
+// If a non-nil Lease is returned, it has been saved and the DHCP system can offer it.
+// If the returned lease is nil, then the DHCP system should not respond.
+//
+// This function should be called for DHCPDISCOVER.
+func FindOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *Lease {
+	lease := findOrCreateLease(dt, strat, token, req, via)
+	if lease != nil {
+		lease.ExpireTime = time.Now().Add(time.Minute)
+		dt.save(lease)
+	}
+	return lease
 }

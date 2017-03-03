@@ -3,6 +3,7 @@ package backend
 import (
 	"math/big"
 	"net"
+	"time"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
@@ -145,6 +146,16 @@ func (s *Subnet) InActiveRange(ip net.IP) bool {
 	lower, upper := s.aBounds()
 	hex := hexaddr(ip)
 	return lower(hex) && !upper(hex)
+}
+
+func (s *Subnet) LeaseTimeFor(ip net.IP) time.Duration {
+	if s.InActiveRange(ip) {
+		return time.Duration(s.ActiveLeaseTime) * time.Second
+	} else if s.InSubnetRange(ip) {
+		return time.Duration(s.ReservedLeaseTime) * time.Second
+	} else {
+		return 0
+	}
 }
 
 func AsSubnet(o store.KeySaver) *Subnet {
