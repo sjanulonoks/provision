@@ -38,7 +38,7 @@ func (r *Reservation) Prefix() string {
 }
 
 func (r *Reservation) Key() string {
-	return hexaddr(r.Addr)
+	return Hexaddr(r.Addr)
 }
 
 func (r *Reservation) Backend() store.SimpleStore {

@@ -15,7 +15,7 @@ type LeaseNAK error
 
 func _findLease(leases, reservations *dtobjs, strat, token string, req net.IP) (lease *Lease, err error) {
 	if req != nil && req.IsGlobalUnicast() {
-		hexreq := hexaddr(req.To4())
+		hexreq := Hexaddr(req.To4())
 		idx, found := leases.find(hexreq)
 		if !found {
 			err = LeaseNAK(fmt.Errorf("No lease for %s exists", hexreq))
@@ -190,7 +190,7 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, v
 	// First, check from nextLeasableIp to ActiveEnd
 	for curr.Cmp(end) != 1 {
 		addr := net.IP(curr.Bytes()).To4()
-		hex := hexaddr(addr)
+		hex := Hexaddr(addr)
 		if _, ok := reservedAddrs[hex]; ok {
 			curr.Add(curr, one)
 			continue
@@ -227,7 +227,7 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, v
 	curr.SetBytes(subnet.ActiveStart.To4())
 	for curr.Cmp(end) != 1 {
 		addr := net.IP(curr.Bytes()).To4()
-		hex := hexaddr(addr)
+		hex := Hexaddr(addr)
 		if _, ok := reservedAddrs[hex]; ok {
 			curr.Add(curr, one)
 			continue

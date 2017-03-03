@@ -9,7 +9,7 @@ import (
 
 var hexDigit = []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'}
 
-func hexaddr(addr net.IP) string {
+func Hexaddr(addr net.IP) string {
 	b := addr.To4()
 	s := make([]byte, len(b)*2)
 	for i, tn := range b {
@@ -60,7 +60,7 @@ func (l *Lease) Subnet() *Subnet {
 }
 
 func (l *Lease) Reservation() *Reservation {
-	r, ok := l.p.fetchOne(l.p.NewReservation(), hexaddr(l.Addr))
+	r, ok := l.p.fetchOne(l.p.NewReservation(), Hexaddr(l.Addr))
 	if !ok {
 		return nil
 	}
@@ -68,7 +68,7 @@ func (l *Lease) Reservation() *Reservation {
 }
 
 func (l *Lease) Key() string {
-	return hexaddr(l.Addr)
+	return Hexaddr(l.Addr)
 }
 
 func (l *Lease) Backend() store.SimpleStore {
