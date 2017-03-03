@@ -48,9 +48,13 @@ func (dt *LocalDTI) FetchAll(ref store.KeySaver) []store.KeySaver {
 	return dt.ListValue
 }
 
-func (dt *LocalDTI) NewBootEnv() *backend.BootEnv   { return &backend.BootEnv{} }
-func (dt *LocalDTI) NewMachine() *backend.Machine   { return &backend.Machine{} }
-func (dt *LocalDTI) NewTemplate() *backend.Template { return &backend.Template{} }
+func (dt *LocalDTI) NewBootEnv() *backend.BootEnv         { return &backend.BootEnv{} }
+func (dt *LocalDTI) NewMachine() *backend.Machine         { return &backend.Machine{} }
+func (dt *LocalDTI) NewTemplate() *backend.Template       { return &backend.Template{} }
+func (dt *LocalDTI) NewLease() *backend.Lease             { return &backend.Lease{} }
+func (dt *LocalDTI) NewReservation() *backend.Reservation { return &backend.Reservation{} }
+func (dt *LocalDTI) NewSubnet() *backend.Subnet           { return &backend.Subnet{} }
+func (dt *LocalDTI) NewUser() *backend.User               { return &backend.User{} }
 
 func testFrontend() *LocalDTI {
 	gin.SetMode(gin.ReleaseMode)

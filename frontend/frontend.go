@@ -13,6 +13,13 @@ import (
 	"github.com/rackn/rocket-skates/embedded"
 )
 
+// ErrorResponse is returned whenever an error occurs
+// swagger:response
+type ErrorResponse struct {
+	//in: body
+	Body backend.Error
+}
+
 // operation represents a valid JSON Patch operation as defined by RFC 6902
 type JSONPatchOperation struct {
 	// All Operations must have an Op.
@@ -46,6 +53,10 @@ type DTI interface {
 	NewBootEnv() *backend.BootEnv
 	NewMachine() *backend.Machine
 	NewTemplate() *backend.Template
+	NewLease() *backend.Lease
+	NewReservation() *backend.Reservation
+	NewSubnet() *backend.Subnet
+	NewUser() *backend.User
 }
 
 type Frontend struct {
@@ -67,6 +78,10 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot string) (me *Frontend) {
 	me.InitFileApi()
 	me.InitTemplateApi()
 	me.InitMachineApi()
+	me.InitLeaseApi()
+	me.InitReservationApi()
+	me.InitSubnetApi()
+	me.InitUserApi()
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("assets/swagger.json")

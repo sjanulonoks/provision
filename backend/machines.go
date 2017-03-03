@@ -47,7 +47,7 @@ func (n *Machine) Backend() store.SimpleStore {
 // HexAddress returns Address in raw hexadecimal format, suitable for
 // pxelinux and elilo usage.
 func (n *Machine) HexAddress() string {
-	return hexaddr(n.Address)
+	return Hexaddr(n.Address)
 }
 
 func (n *Machine) ShortName() string {

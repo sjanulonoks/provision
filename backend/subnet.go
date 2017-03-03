@@ -118,33 +118,33 @@ func (s *Subnet) sBounds() (func(string) bool, func(string) bool) {
 	lastBytes := last.Bytes()
 	// first "address" in this range is the network address, which cannot be handed out.
 	lower := func(key string) bool {
-		return key > hexaddr(net.IP(firstBytes))
+		return key > Hexaddr(net.IP(firstBytes))
 	}
 	// last "address" in this range is the broadcast address, which also cannot be handed out.
 	upper := func(key string) bool {
-		return key >= hexaddr(net.IP(lastBytes))
+		return key >= Hexaddr(net.IP(lastBytes))
 	}
 	return lower, upper
 }
 
 func (s *Subnet) aBounds() (func(string) bool, func(string) bool) {
 	return func(key string) bool {
-			return key >= hexaddr(s.ActiveStart)
+			return key >= Hexaddr(s.ActiveStart)
 		},
 		func(key string) bool {
-			return key > hexaddr(s.ActiveEnd)
+			return key > Hexaddr(s.ActiveEnd)
 		}
 }
 
 func (s *Subnet) InSubnetRange(ip net.IP) bool {
 	lower, upper := s.sBounds()
-	hex := hexaddr(ip)
+	hex := Hexaddr(ip)
 	return lower(hex) && !upper(hex)
 }
 
 func (s *Subnet) InActiveRange(ip net.IP) bool {
 	lower, upper := s.aBounds()
-	hex := hexaddr(ip)
+	hex := Hexaddr(ip)
 	return lower(hex) && !upper(hex)
 }
 
