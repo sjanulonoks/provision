@@ -23,7 +23,7 @@ type SubnetsResponse struct {
 }
 
 // SubnetBodyParameter used to inject a Subnet
-// swagger:parameters createSubnets putSubnet
+// swagger:parameters createSubnet putSubnet
 type SubnetBodyParameter struct {
 	// in: body
 	// required: true

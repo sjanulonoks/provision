@@ -24,7 +24,7 @@ type LeasesResponse struct {
 }
 
 // LeaseBodyParameter used to inject a Lease
-// swagger:parameters createLeases putLease
+// swagger:parameters createLease putLease
 type LeaseBodyParameter struct {
 	// in: body
 	// required: true

@@ -23,7 +23,7 @@ type BootEnvsResponse struct {
 }
 
 // BootEnvBodyParameter used to inject a BootEnv
-// swagger:parameters createBootEnvs putBootEnv
+// swagger:parameters createBootEnv putBootEnv
 type BootEnvBodyParameter struct {
 	// in: body
 	// required: true

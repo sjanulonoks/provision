@@ -24,7 +24,7 @@ type ReservationsResponse struct {
 }
 
 // ReservationBodyParameter used to inject a Reservation
-// swagger:parameters createReservations putReservation
+// swagger:parameters createReservation putReservation
 type ReservationBodyParameter struct {
 	// in: body
 	// required: true
