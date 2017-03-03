@@ -13,7 +13,7 @@ import (
 	dhcp "github.com/krolaw/dhcp4"
 )
 
-func convertByteToOptionValue(code dhcp.OptionCode, b []byte) string {
+func ConvertByteToOptionValue(code dhcp.OptionCode, b []byte) string {
 	switch code {
 	// Single IP-like address
 	case dhcp.OptionSubnetMask,
@@ -123,7 +123,7 @@ func convertByteToOptionValue(code dhcp.OptionCode, b []byte) string {
 	return ""
 }
 
-func convertOptionValueToByte(code dhcp.OptionCode, value string) ([]byte, error) {
+func ConvertOptionValueToByte(code dhcp.OptionCode, value string) ([]byte, error) {
 	switch code {
 	// Single IP-like address
 	case dhcp.OptionSubnetMask,
@@ -275,6 +275,6 @@ func (o *DhcpOption) RenderToDHCP(srcOpts map[int]string) (code dhcp.OptionCode,
 	if err := tmpl.Execute(buf, srcOpts); err != nil {
 		return code, nil, err
 	}
-	val, err = convertOptionValueToByte(code, buf.String())
+	val, err = ConvertOptionValueToByte(code, buf.String())
 	return code, val, err
 }
