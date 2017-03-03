@@ -23,7 +23,7 @@ type MachinesResponse struct {
 }
 
 // MachineBodyParameter used to inject a Machine
-// swagger:parameters createMachines putMachine
+// swagger:parameters createMachine putMachine
 type MachineBodyParameter struct {
 	// in: body
 	// required: true

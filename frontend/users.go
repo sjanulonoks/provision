@@ -23,7 +23,7 @@ type UsersResponse struct {
 }
 
 // UserBodyParameter used to inject a User
-// swagger:parameters createUsers putUser
+// swagger:parameters createUser putUser
 type UserBodyParameter struct {
 	// in: body
 	// required: true

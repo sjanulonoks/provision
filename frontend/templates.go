@@ -23,7 +23,7 @@ type TemplatesResponse struct {
 }
 
 // TemplateBodyParameter used to inject a Template
-// swagger:parameters createTemplates putTemplate
+// swagger:parameters createTemplate putTemplate
 type TemplateBodyParameter struct {
 	// in: body
 	// required: true
