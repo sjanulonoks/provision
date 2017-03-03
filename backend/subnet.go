@@ -68,13 +68,18 @@ type Subnet struct {
 	Strategy       string
 	p              *DataTracker
 	nextLeasableIP net.IP
+	sn             *net.IPNet
 }
 
 func (s *Subnet) subnet() *net.IPNet {
+	if s.sn != nil {
+		return s.sn
+	}
 	_, res, err := net.ParseCIDR(s.Subnet)
 	if err != nil {
 		panic(err.Error())
 	}
+	s.sn = res
 	return res
 }
 

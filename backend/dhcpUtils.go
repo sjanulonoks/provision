@@ -159,7 +159,7 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, v
 	var subnet *Subnet
 	for idx := range subnets.d {
 		subnet = AsSubnet(subnets.d[idx])
-		if subnet.subnet().Contains(via) {
+		if subnet.subnet().Contains(via) && subnet.Strategy == strat {
 			break
 		}
 		subnet = nil
