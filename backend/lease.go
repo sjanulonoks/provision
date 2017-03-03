@@ -31,10 +31,6 @@ type Lease struct {
 	//
 	// required: true
 	Token string
-	// Valid tracks whether the lease is valid
-	//
-	// required: true
-	Valid bool
 	// ExpireTime is the time at which the lease expires and is no longer valid
 	//
 	// required: true
@@ -53,7 +49,7 @@ func (l *Lease) Prefix() string {
 	return "leases"
 }
 
-func (l *Lease) subnet() *Subnet {
+func (l *Lease) Subnet() *Subnet {
 	subnets := AsSubnets(l.p.fetchAll(l.p.NewSubnet()))
 	for i := range subnets {
 		if subnets[i].subnet().Contains(l.Addr) {
@@ -63,7 +59,7 @@ func (l *Lease) subnet() *Subnet {
 	return nil
 }
 
-func (l *Lease) reservation() *Reservation {
+func (l *Lease) Reservation() *Reservation {
 	r, ok := l.p.fetchOne(l.p.NewReservation(), hexaddr(l.Addr))
 	if !ok {
 		return nil
@@ -114,7 +110,7 @@ func (l *Lease) OnCreate() error {
 	}
 	// We can only create leases that have a Reservation or that are in
 	// the ActiveRange of a subnet.
-	if r := l.reservation(); r != nil {
+	if r := l.Reservation(); r != nil {
 		return nil
 	}
 	if e.containsError {
@@ -134,7 +130,7 @@ func (l *Lease) OnCreate() error {
 	if e.containsError {
 		return e
 	}
-	if s := l.subnet(); s == nil {
+	if s := l.Subnet(); s == nil {
 		e.Errorf("Cannot create Lease without a reservation or a subnet")
 	} else if !s.InSubnetRange(l.Addr) {
 		e.Errorf("Address %s is a network or broadcast address for subnet %s", l.Addr.String(), s.Name)
@@ -154,13 +150,13 @@ func (l *Lease) OnChange(oldThing store.KeySaver) error {
 	return e.OrNil()
 }
 
-func (l *Lease) BeforeSave() error {
-	if l.ExpireTime.Before(time.Now()) {
-		l.Valid = false
-	}
-	return nil
-}
-
 func (l *Lease) Expired() bool {
 	return l.ExpireTime.Before(time.Now())
+}
+
+func (l *Lease) Invalidate() {
+	l.ExpireTime = time.Now().Add(2 * time.Second)
+	l.Token = ""
+	l.Strategy = ""
+	store.Save(l)
 }
