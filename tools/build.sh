@@ -54,5 +54,6 @@ go build -o rocket-skates server/*
 echo "To rebuild after changes:"
 echo " export GOPATH=$GOPATH"
 echo " export PATH=\$PATH:\$GOPATH/bin"
+echo " cd $GOPATH/src/github.com/rackn/rocket-skates"
 echo " go generate server/main.go"
 echo " go build -o rocket-skates server/*"
