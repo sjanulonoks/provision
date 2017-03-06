@@ -6,22 +6,19 @@ go:
 - 1.8
 
 before_install:
+- export PATH=$PATH:$GOPATH/bin
 - go get -u github.com/jteeuwen/go-bindata/...
-- mkdir $HOME/bin
-- export PATH=$PATH:$HOME/bin:$GOPATH/bin
-- latestv=$(curl -s https://api.github.com/repos/go-swagger/go-swagger/releases/latest | jq -r .tag_name)
-- curl -o $HOME/bin/swagger -L'#' https://github.com/go-swagger/go-swagger/releases/download/$latestv/swagger_$(echo `uname`|tr '[:upper:]' '[:lower:]')_amd64
-- chmod +x $HOME/bin/swagger
+- go get -u github.com/go-swagger/go-swagger/cmd/swagger
 - go get -v github.com/Masterminds/glide
 - cd $GOPATH/src/github.com/Masterminds/glide && git checkout tags/v0.12.3 && go install && cd -
 
 install:
 - glide install
-
-script:
 - go generate server/main.go
 - go build -o rocket-skates server/*
-- ./test.sh
+
+script:
+- ./tools/test.sh
 
 after_success:
 - bash <(curl -s https://codecov.io/bash) -t 6259c706-5c1d-471f-b62b-4f908ea1801d
