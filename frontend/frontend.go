@@ -98,6 +98,10 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot string) (me *Frontend) {
 	mgmtApi.StaticFS("/swagger-ui",
 		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "assets/swagger-ui"})
 
+	// Server UI.
+	mgmtApi.StaticFS("/ui",
+		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "assets/ui"})
+
 	return
 }
 
