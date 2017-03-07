@@ -281,6 +281,7 @@ func findOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *L
 	}
 	if lease != nil {
 		lease.ExpireTime = time.Now().Add(2 * time.Second)
+		lease.p = dt
 	}
 	return lease
 }

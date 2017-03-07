@@ -43,6 +43,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/rackn/rocket-skates/backend"
 	"github.com/rackn/rocket-skates/frontend"
+	"github.com/rackn/rocket-skates/midlayer"
 )
 
 type ProgOpts struct {
@@ -189,6 +190,9 @@ func main() {
 			log.Fatalf("Error running API service: %v", err)
 		}
 	}()
+	if err = midlayer.StartDhcpHandlers(dt, c_opts.OurAddress); err != nil {
+		log.Fatalf("Error starting DHCP server: %v", err)
+	}
 	if err = frontend.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), c_opts.FileRoot); err != nil {
 		log.Fatalf("Error starting TFTP server: %v", err)
 	}
