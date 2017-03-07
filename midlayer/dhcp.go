@@ -165,7 +165,11 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		for _, s := range h.strats {
 			lease, err = backend.FindLease(h.bk, s.Name, s.GenToken(p, options), req)
 			if err != nil {
-				h.Printf("%s: %s already leased: %s", xid(p), lease.Addr, err)
+				addr := "UNSET"
+				if lease != nil {
+					addr = lease.Addr.String()
+				}
+				h.Printf("%s: %s already leased: %s", xid(p), addr, err)
 				return h.nak(p)
 			}
 			if lease != nil {
