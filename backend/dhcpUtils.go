@@ -56,6 +56,7 @@ func _findLease(leases, reservations *dtobjs, strat, token string, req net.IP) (
 				reservation.Token,
 				lease.Strategy,
 				lease.Token))
+			lease = nil
 			return
 		}
 	}
@@ -93,6 +94,7 @@ func FindLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, 
 		} else {
 			dt.remove(lease)
 			err = LeaseNAK(fmt.Errorf("Lease %s has no reservation or subnet, it is dead to us.", lease.Addr))
+			lease = nil
 			return
 		}
 		dt.save(lease)
