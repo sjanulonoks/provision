@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"bytes"
+	"io/ioutil"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/gin-gonic/gin"
@@ -116,5 +118,22 @@ func TestSwaggerPieces(t *testing.T) {
 	s := swagger["swagger"].(string)
 	if s != "2.0" {
 		t.Errorf("Swagger version should be 2.0: %v\n", s)
+	}
+}
+
+
+func TestUIBase(t *testing.T) {
+	localDTI := testFrontend()
+
+	req, _ := http.NewRequest("GET", "/ui/", nil)
+	w := localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusOK)
+	localDTI.ValidateContentType(t, "text/html; charset=utf-8")
+	uibody, _ := ioutil.ReadAll(w.Body)
+	if len(uibody) == 0 {
+		t.Errorf("Response should not be an empty set, but got: %d\n", len(uibody))
+	}
+	if !bytes.Contains(uibody, []byte("<title>Rocket Skates</title>")) {
+		t.Errorf("Rocket Skates Title Missing %v\n", uibody)
 	}
 }
