@@ -294,6 +294,7 @@ func findOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *L
 func FindOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *Lease {
 	lease := findOrCreateLease(dt, strat, token, req, via)
 	if lease != nil {
+		lease.p = dt
 		lease.ExpireTime = time.Now().Add(time.Minute)
 		dt.save(lease)
 	}
