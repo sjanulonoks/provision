@@ -60,6 +60,7 @@ type ProgOpts struct {
 	ApiPort    int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
 
 	FileRoot string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
+	DevUI 	 string `long:"dev-ui" description:"Root of UI Pages for Development"`
 
 	DisableProvisioner bool   `long:"disable-provisioner" description:"Disable provisioner"`
 	DisableDHCP        bool   `long:"disable-dhcp" description:"Disable DHCP"`
@@ -236,7 +237,7 @@ func main() {
 
 	// Load additional config dirs. ???
 
-	fe := frontend.NewFrontend(dt, logger, c_opts.FileRoot)
+	fe := frontend.NewFrontend(dt, logger, c_opts.FileRoot, c_opts.DevUI)
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)
