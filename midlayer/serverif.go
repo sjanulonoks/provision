@@ -109,7 +109,6 @@ func ServeIf(conn net.PacketConn, handlers map[int]dhcp.Handler) error {
 
 // ListenAndServe listens on the UDP network address addr and then calls
 // Serve with handler to handle requests on incoming packets.
-// i.e. ListenAndServeIf("eth0",handler)
 func ListenAndServeIf(handlers map[int]dhcp.Handler) error {
 	l, err := net.ListenPacket("udp4", ":67")
 	if err != nil {
