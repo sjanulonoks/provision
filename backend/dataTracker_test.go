@@ -69,10 +69,6 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 
 func mkDT(bs store.SimpleStore) *DataTracker {
 	dt := NewDataTracker(bs, true, true, tmpDir, "CURL", "default", "default", "FURL", "127.0.0.1", log.New(os.Stdout, "dt", 0))
-	if err := dt.ExtractAssets(); err != nil {
-		log.Printf("Unable to extract assets: %v", err)
-		os.Exit(1)
-	}
 	return dt
 }
 
@@ -129,6 +125,46 @@ func TestBackingStorePersistence(t *testing.T) {
 			t.Logf("Found 1 %s, as expected", ot)
 		}
 	}
+}
+
+func TestExtractAssets(t *testing.T) {
+	bs, err := store.NewFileBackend(tmpDir)
+	if err != nil {
+		t.Errorf("Could not create boltdb: %v", err)
+		return
+	}
+	dt := mkDT(bs)
+	if err := dt.ExtractAssets(); err != nil {
+		t.Errorf("Could not extract assets: %v", err)
+		return
+	}
+
+	files := []string{
+		"explode_iso.sh",
+		"install-sledgehammer.sh",
+		"stage1-data/busybox",
+		"stage1-data/stage1_init",
+		"stage1-data/udhcpc_config",
+		"machines/start-up.sh",
+		"files/jq",
+		"bootia32.efi",
+		"bootia64.efi",
+		"esxi.0",
+		"ipxe.efi",
+		"ipxe.pxe",
+		"ldlinux.c32",
+		"libutil.c32",
+		"lpxelinux.0",
+		"pxechn.c32",
+		"wimboot-2.5.2.tar.bz2",
+	}
+
+	for _, f := range files {
+		if _, err := os.Stat(path.Join(tmpDir, f)); os.IsNotExist(err) {
+			t.Errorf("File %s does NOT exist, but should.", f)
+		}
+	}
+
 }
 
 // Load should only be used by tests, hence it living in a _test file.
