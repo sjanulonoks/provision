@@ -29,6 +29,7 @@ package main
 //go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -42,6 +43,7 @@ import (
 	consul "github.com/hashicorp/consul/api"
 	"github.com/jessevdk/go-flags"
 	"github.com/rackn/rocket-skates/backend"
+	"github.com/rackn/rocket-skates/embedded"
 	"github.com/rackn/rocket-skates/frontend"
 	"github.com/rackn/rocket-skates/midlayer"
 )
@@ -192,10 +194,45 @@ func main() {
 		cmd.Dir = c_opts.FileRoot
 		err := cmd.Run()
 		if err != nil {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 	}
+
 	// Load default templates and bootenvs
+	children, err := embedded.AssetDir("assets/templates")
+	for _, c := range children {
+		_, ok := dt.FetchOne(dt.NewTemplate(), c)
+		if !ok {
+			data, _ := embedded.Asset("assets/templates/" + c)
+			t := dt.NewTemplate()
+			t.Contents = string(data)
+			t.ID = c
+			_, err = dt.Create(t)
+			if err != nil {
+				logger.Fatal(err)
+			} else {
+				logger.Printf("Adding default template: %s\n", t.ID)
+			}
+		}
+	}
+	children, err = embedded.AssetDir("assets/bootenvs")
+	for _, c := range children {
+		data, _ := embedded.Asset("assets/bootenvs/" + c)
+		b := dt.NewBootEnv()
+		err = json.Unmarshal(data, b)
+		if err != nil {
+			logger.Fatal(err)
+		}
+		_, ok := dt.FetchOne(dt.NewBootEnv(), b.Name)
+		if !ok {
+			_, err = dt.Create(b)
+			if err != nil {
+				logger.Fatal(err)
+			} else {
+				logger.Printf("Adding default bootenv: %s\n", b.Name)
+			}
+		}
+	}
 
 	// Load additional config dirs. ???
 

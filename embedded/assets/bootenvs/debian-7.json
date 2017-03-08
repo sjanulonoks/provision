@@ -29,32 +29,32 @@
         {
             "Name": "pxelinux",
             "Path": "pxelinux.cfg/{{.Machine.HexAddress}}",
-            "UUID": "default-pxelinux.tmpl"
+            "ID": "default-pxelinux.tmpl"
         },
         {
             "Name": "elilo",
             "Path": "{{.Machine.HexAddress}}.conf",
-            "UUID": "default-elilo.tmpl"
+            "ID": "default-elilo.tmpl"
         },
         {
             "Name": "ipxe",
             "Path": "{{.Machine.Address}}.ipxe",
-            "UUID": "default-ipxe.tmpl"
+            "ID": "default-ipxe.tmpl"
         },
         {
             "Name": "seed",
             "Path": "{{.Machine.Path}}/seed",
-            "UUID": "net_seed.tmpl"
+            "ID": "net_seed.tmpl"
         },
         {
             "Name": "net-post-install.sh",
             "Path": "{{.Machine.Path}}/post-install.sh",
-            "UUID": "net-post-install.sh.tmpl"
+            "ID": "net-post-install.sh.tmpl"
         },
         {
             "Name": "rebar_join.sh",
             "Path": "{{.Machine.Path}}/rebar_join.sh",
-            "UUID": "rebar-join.sh.tmpl"
+            "ID": "rebar-join.sh.tmpl"
         }
     ]
 }

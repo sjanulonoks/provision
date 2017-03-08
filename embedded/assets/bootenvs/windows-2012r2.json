@@ -25,22 +25,22 @@
         {
             "Name": "pxelinux",
             "Path": "pxelinux.cfg/{{.Machine.HexAddress}}",
-            "UUID": "windows.pxelinux.tmpl"
+            "ID": "windows.pxelinux.tmpl"
         },
         {
             "Name": "ipxe",
             "Path": "{{.Machine.Address}}.ipxe",
-            "UUID": "windows.ipxe.tmpl"
+            "ID": "windows.ipxe.tmpl"
         },
         {
             "Name": "start-install",
             "Path": "{{.Machine.Path}}/stage1.ps1",
-            "UUID": "stage1.cmd.tmpl"
+            "ID": "stage1.cmd.tmpl"
         },
         {
             "Name": "unattend.xml",
             "Path": "{{.Machine.Path}}/unattend.xml",
-            "UUID": "2012r2-unattend.xml.tmpl"
+            "ID": "2012r2-unattend.xml.tmpl"
         }
     ]
 }
