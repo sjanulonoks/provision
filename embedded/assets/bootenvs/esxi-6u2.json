@@ -16,32 +16,32 @@
         {
             "Name": "pxelinux",
             "Path": "pxelinux.cfg/{{.Machine.HexAddress}}",
-            "UUID": "esxi-chain-pxelinux.tmpl"
+            "ID": "esxi-chain-pxelinux.tmpl"
         },
         {
             "Name": "elilo",
             "Path": "{{.Machine.HexAddress}}.conf",
-            "UUID": "default-elilo.tmpl"
+            "ID": "default-elilo.tmpl"
         },
         {
             "Name": "ipxe",
             "Path": "{{.Machine.Address}}.ipxe",
-            "UUID": "esxi-6u2.ipxe.cfg.tmpl"
+            "ID": "esxi-6u2.ipxe.cfg.tmpl"
         },
         {
             "Name": "pxelinux-chain",
             "Path": "{{.Env.PathFor \"tftp\" \"\"}}/pxelinux.cfg/{{.Machine.HexAddress}}",
-            "UUID": "esxi-pxelinux.tmpl"
+            "ID": "esxi-pxelinux.tmpl"
         },
         {
             "Name": "compute.ks",
             "Path": "{{.Machine.Path}}/compute.ks",
-            "UUID": "esxi-install.ks.tmpl"
+            "ID": "esxi-install.ks.tmpl"
         },
         {
             "Name": "boot.cfg",
             "Path": "{{.Env.PathFor \"tftp\" \"\"}}/{{.Machine.Path}}/boot.cfg",
-            "UUID": "esxi-6u2.boot.cfg.tmpl"
+            "ID": "esxi-6u2.boot.cfg.tmpl"
         }
     ]
 }

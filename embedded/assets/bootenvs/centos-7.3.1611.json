@@ -24,27 +24,27 @@
         {
             "Name": "pxelinux",
             "Path": "pxelinux.cfg/{{.Machine.HexAddress}}",
-            "UUID": "default-pxelinux.tmpl"
+            "ID": "default-pxelinux.tmpl"
         },
         {
             "Name": "elilo",
             "Path": "{{.Machine.HexAddress}}.conf",
-            "UUID": "default-elilo.tmpl"
+            "ID": "default-elilo.tmpl"
         },
         {
             "Name": "ipxe",
             "Path": "{{.Machine.Address}}.ipxe",
-            "UUID": "default-ipxe.tmpl"
+            "ID": "default-ipxe.tmpl"
         },
         {
             "Name": "compute.ks",
             "Path": "{{.Machine.Path}}/compute.ks",
-            "UUID": "centos-7.ks.tmpl"
+            "ID": "centos-7.ks.tmpl"
         },
         {
             "Name": "rebar_join.sh",
             "Path": "{{.Machine.Path}}/rebar_join.sh",
-            "UUID": "rebar-join.sh.tmpl"
+            "ID": "rebar-join.sh.tmpl"
         }
     ]
 }

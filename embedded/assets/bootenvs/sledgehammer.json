@@ -12,22 +12,22 @@
         {
             "Name": "pxelinux",
             "Path": "pxelinux.cfg/{{.Machine.HexAddress}}",
-            "UUID": "default-pxelinux.tmpl"
+            "ID": "default-pxelinux.tmpl"
         },
         {
             "Name": "elilo",
             "Path": "{{.Machine.HexAddress}}.conf",
-            "UUID": "default-elilo.tmpl"
+            "ID": "default-elilo.tmpl"
         },
         {
             "Name": "ipxe",
             "Path": "{{.Machine.Address}}.ipxe",
-            "UUID": "default-ipxe.tmpl"
+            "ID": "default-ipxe.tmpl"
         },
         {
             "Name": "control.sh",
             "Path": "{{.Machine.Path}}/control.sh",
-            "UUID": "sledgehammer-control.sh.tmpl"
+            "ID": "sledgehammer-control.sh.tmpl"
         }
     ]
 }
