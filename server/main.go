@@ -7,7 +7,6 @@
 // There are no TOS at this moment, use at your own risk we take no responsibility
 //
 //     Schemes: https
-//     Host: 127.0.0.1:8092
 //     BasePath: /api/v3
 //     Version: 0.1.0
 //     License: APL https://raw.githubusercontent.com/digitalrebar/digitalrebar/master/LICENSE.md
