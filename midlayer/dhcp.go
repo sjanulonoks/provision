@@ -154,7 +154,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 	case dhcp.Request:
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
-		if ok && server.Equal(h.ip) {
+		if ok && !server.Equal(h.ip) {
 			h.Printf("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
 			return nil
 		}
