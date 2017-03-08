@@ -3,8 +3,9 @@ package backend
 import (
 	"fmt"
 	"net"
-	"sort"
 	"time"
+
+	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
 // LeaseNAK is the error that shall be returned when we cannot give a
@@ -183,103 +184,22 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, r
 	}
 	currLeases := AsLeases(leases.subset(subnet.aBounds()))
 	currReservations := AsReservations(reservations.subset(subnet.aBounds()))
-	usedAddrs := map[string]bool{}
+	usedAddrs := map[string]store.KeySaver{}
 	for i := range currLeases {
 		// Leases get a false in the map.
-		usedAddrs[currLeases[i].Key()] = false
+		usedAddrs[currLeases[i].Key()] = currLeases[i]
 	}
 	for i := range currReservations {
 		// Reservations get true
-		usedAddrs[currReservations[i].Key()] = true
+		usedAddrs[currReservations[i].Key()] = currReservations[i]
 	}
-
-	// If we were passed a requested address, try to use it.
-	if req != nil && subnet.InActiveRange(req) {
-		hex := Hexaddr(req)
-		res, found := usedAddrs[hex]
-		if !found {
-			// It is not in usedAddrs, so there is no
-			// lease or reservation for it.  We can let the system use it.
-			lease := &Lease{
-				Addr:     req,
-				Token:    token,
-				Strategy: strat,
-			}
+	lease, _ := subnet.next(usedAddrs, token, req)
+	if lease != nil {
+		if _, found := leases.find(lease.Key()); !found {
 			leases.add(lease)
-			return lease
-		}
-		// To let the caller have their requested address:
-		//
-		// 1: The requested address must not have a
-		//    reservation.  If it does, then they will have
-		//    been granted the lease in findReservation if
-		//    they were allowed to have it.
-		//
-		// 2: Any lease that exists must either be for them be
-		//    expired. We know a lease must exist here because there
-		//    is no reservation (per the above).
-		if !res {
-			idx, haveLease := leases.find(hex)
-			if !haveLease {
-				// This should never happen
-				panic("Cannot happen")
-			}
-			lease := AsLease(leases.d[idx])
-			if lease.Token == token && lease.Strategy == strat {
-				// hey, we already have a lease.  How nice.
-				return lease
-			}
-			if lease.Expired() {
-				// We don't own this lease, but it is
-				// expired, so we can steal it.
-				lease.Token = token
-				lease.Strategy = strat
-				return lease
-			}
-			// The lease is active and not theirs.  The caller will
-			// not get the address they want.
 		}
 	}
-	// Either there was no requested address, or we think it is in use by someone
-	// else.  So, try to find a free address in the subnet to hand out to them.
-	addr, fallback := subnet.next(usedAddrs)
-	if addr != nil {
-		// Hooray, the caller is now the owner of a shiny maybe-used IP address.
-		lease := &Lease{
-			Addr:     addr,
-			Token:    token,
-			Strategy: strat,
-		}
-		leases.add(lease)
-		return lease
-	}
-	// There are no free addresses.
-	if !fallback {
-		// If the address picking strategy for this range says to not fall back,
-		// then the caller is not getting a response from us.
-		return nil
-	}
-	// Otherwise, we have one fallback strategy: pick the most
-	// expired lease and hand it out.  We may grow the ability to
-	// have other fallback strategies, but this is a good
-	// general-purpose strat for now.
-	sort.Slice(currLeases,
-		func(i, j int) bool {
-			return currLeases[i].ExpireTime.Before(currLeases[j].ExpireTime)
-		})
-	for _, lease := range currLeases {
-		if !lease.Expired() {
-			// If we got to a non-expired lease, we are done
-			break
-		}
-		if _, ok := reservations.find(lease.Key()); !ok {
-			// We found an expired lease that does not have a reservation, Use it.
-			lease.Token = token
-			lease.Strategy = strat
-			return lease
-		}
-	}
-	return nil
+	return lease
 }
 
 func findOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *Lease {
@@ -295,7 +215,6 @@ func findOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *L
 	}
 	if lease != nil {
 		lease.ExpireTime = time.Now().Add(2 * time.Second)
-		lease.p = dt
 	}
 	return lease
 }

@@ -150,3 +150,39 @@ func TestDHCPCreateReservationOnly(t *testing.T) {
 		obj.test(t, dt)
 	}
 }
+
+func TestDHCPCreateSubnet(t *testing.T) {
+	bs := store.NewSimpleMemoryStore()
+	dt := mkDT(bs)
+	// A subnet with 3 active addresses
+	startObjs := []crudTest{
+		{"Create valid Subnet", dt.create, &Subnet{p: dt, Name: "test", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.82"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true},
+	}
+	for _, obj := range startObjs {
+		obj.Test(t)
+	}
+	subnet := AsSubnet(dt.load("subnets", "test"))
+	subnet.Picker = "none"
+	// Even though there are no leases and no reservations, we should fail to create a lease.
+	noneTests := []ltc{
+		{"mac", "sub1", nil, nil, false, nil},                           // no via
+		{"mac2", "sub1", nil, net.ParseIP("192.168.124.1"), false, nil}, // wrong strategy
+		{"mac", "sub1", nil, net.ParseIP("192.168.124.1"), false, nil},
+		{"mac", "sub1", net.ParseIP("192.168.124.80"), net.ParseIP("192.168.124.1"), false, nil},
+	}
+	for _, obj := range noneTests {
+		obj.test(t, dt)
+	}
+
+	subnet.Picker = "next"
+	subnet.nextLeasableIP = net.ParseIP("192.168.124.81")
+	dt.save(subnet)
+	nextTests := []ltc{
+		{"mac", "sub1", net.ParseIP("192.168.124.81"), net.ParseIP("192.168.124.1"), true, net.ParseIP("192.168.124.81")},
+		{"mac", "sub2", nil, net.ParseIP("192.168.124.1"), true, net.ParseIP("192.168.124.82")},
+		{"mac", "sub3", nil, net.ParseIP("192.168.124.1"), true, net.ParseIP("192.168.124.80")},
+	}
+	for _, obj := range nextTests {
+		obj.test(t, dt)
+	}
+}

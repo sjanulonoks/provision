@@ -3,17 +3,81 @@ package backend
 import (
 	"math/big"
 	"net"
+	"sort"
 	"time"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
-func pickNone(s *Subnet, usedAddrs map[string]bool) (net.IP, bool) {
+type picker func(*Subnet, map[string]store.KeySaver, string, net.IP) (*Lease, bool)
+
+func pickNone(s *Subnet, usedAddrs map[string]store.KeySaver, token string, hint net.IP) (*Lease, bool) {
 	// There are no free addresses, and don't fall through to using the most expired one.
 	return nil, false
 }
 
-func pickNext(s *Subnet, usedAddrs map[string]bool) (net.IP, bool) {
+func pickMostExpired(s *Subnet, usedAddrs map[string]store.KeySaver, token string, hint net.IP) (*Lease, bool) {
+	currLeases := []*Lease{}
+	for _, obj := range usedAddrs {
+		lease, ok := obj.(*Lease)
+		if ok {
+			currLeases = append(currLeases, lease)
+		}
+	}
+	sort.Slice(currLeases,
+		func(i, j int) bool {
+			return currLeases[i].ExpireTime.Before(currLeases[j].ExpireTime)
+		})
+	for _, lease := range currLeases {
+		if !lease.Expired() {
+			// If we got to a non-expired lease, we are done
+			break
+		}
+		// Because if how usedAddrs is built, we are guaranteed that an expired
+		// lease here is not associated with a reservation.
+		lease.Token = token
+		lease.Strategy = s.Strategy
+		return lease, false
+	}
+	return nil, true
+}
+
+func pickHint(s *Subnet, usedAddrs map[string]store.KeySaver, token string, hint net.IP) (*Lease, bool) {
+	if hint != nil && s.InActiveRange(hint) {
+		hex := Hexaddr(hint)
+		res, found := usedAddrs[hex]
+		if !found {
+			lease := &Lease{
+				Addr:     hint,
+				Token:    token,
+				Strategy: s.Strategy,
+			}
+			return lease, false
+		}
+		switch res.(type) {
+		case *Reservation:
+			return nil, true
+		case *Lease:
+			lease := res.(*Lease)
+			if lease.Token == token && lease.Strategy == s.Strategy {
+				// hey, we already have a lease.  How nice.
+				return lease, false
+			}
+			if lease.Expired() {
+				// We don't own this lease, but it is
+				// expired, so we can steal it.
+				lease.Token = token
+				lease.Strategy = s.Strategy
+				return lease, false
+			}
+		default:
+			panic("Can't happen")
+		}
+	}
+	return nil, true
+}
+
+func pickNextFree(s *Subnet, usedAddrs map[string]store.KeySaver, token string, hint net.IP) (*Lease, bool) {
 	if s.nextLeasableIP == nil {
 		s.nextLeasableIP = net.IP(make([]byte, 4))
 		copy(s.nextLeasableIP, s.ActiveStart.To4())
@@ -22,31 +86,50 @@ func pickNext(s *Subnet, usedAddrs map[string]bool) (net.IP, bool) {
 	end := &big.Int{}
 	curr := &big.Int{}
 	end.SetBytes(s.ActiveEnd.To4())
-	curr.SetBytes(s.nextLeasableIP)
+	curr.SetBytes(s.nextLeasableIP.To4())
 	// First, check from nextLeasableIp to ActiveEnd
-	for curr.Cmp(end) != 1 {
+	for curr.Cmp(end) < 1 {
 		addr := net.IP(curr.Bytes()).To4()
 		hex := Hexaddr(addr)
 		curr.Add(curr, one)
 		if _, ok := usedAddrs[hex]; !ok {
-			s.nextLeasableIP = net.IP(curr.Bytes()).To4()
-			return addr, false
+			s.nextLeasableIP = addr
+			return &Lease{
+				Addr:     addr,
+				Token:    token,
+				Strategy: s.Strategy,
+			}, false
 		}
 	}
 	// Next, check from ActiveStart to nextLeasableIP
-	end.SetBytes(s.nextLeasableIP)
+	end.SetBytes(s.nextLeasableIP.To4())
 	curr.SetBytes(s.ActiveStart.To4())
-	for curr.Cmp(end) != 1 {
+	for curr.Cmp(end) < 1 {
 		addr := net.IP(curr.Bytes()).To4()
 		hex := Hexaddr(addr)
 		curr.Add(curr, one)
 		if _, ok := usedAddrs[hex]; !ok {
-			s.nextLeasableIP = net.IP(curr.Bytes()).To4()
-			return addr, false
+			s.nextLeasableIP = addr
+			return &Lease{
+				Addr:     addr,
+				Token:    token,
+				Strategy: s.Strategy,
+			}, false
 		}
 	}
 	// No free address, but we can use the most expired one.
 	return nil, true
+}
+
+func pickNext(s *Subnet, used map[string]store.KeySaver, tok string, hint net.IP) (*Lease, bool) {
+	pickers := []picker{pickHint, pickNextFree, pickMostExpired}
+	for i := range pickers {
+		l, f := pickers[i](s, used, tok, hint)
+		if !f {
+			return l, f
+		}
+	}
+	return nil, false
 }
 
 // Subnet represents a DHCP Subnet
@@ -283,12 +366,13 @@ func (s *Subnet) reservations() []*Reservation {
 	return AsReservations(s.p.fetchSome("reservations", lower, upper))
 }
 
-func (s *Subnet) next(used map[string]bool) (net.IP, bool) {
+func (s *Subnet) next(used map[string]store.KeySaver, token string, hint net.IP) (*Lease, bool) {
 	switch s.Picker {
-	case "nextFree", "":
-		return pickNext(s, used)
+	case "next", "":
+		return pickNext(s, used, token, hint)
 	case "none":
-		return pickNone(s, used)
+		return pickNone(s, used, token, hint)
+	default:
+		panic("unknown pick strategy")
 	}
-	return nil, false
 }
