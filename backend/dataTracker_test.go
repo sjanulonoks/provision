@@ -131,6 +131,16 @@ func TestBackingStorePersistence(t *testing.T) {
 	}
 }
 
+// Load should only be used by tests, hence it living in a _test file.
+func (p *DataTracker) load(prefix, key string) store.KeySaver {
+	objs, idx, found := p.lockedGet(prefix, key)
+	defer objs.Unlock()
+	if found {
+		return objs.d[idx]
+	}
+	return nil
+}
+
 func TestMain(m *testing.M) {
 	var err error
 	tmpDir, err = ioutil.TempDir("", "datatracker-")

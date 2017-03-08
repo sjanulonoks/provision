@@ -50,7 +50,7 @@ func (l *ltf) find(t *testing.T, dt *DataTracker) {
 	}
 }
 
-func TestDHCPFindLease(t *testing.T) {
+func TestDHCPRenew(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
 	startObjs := []crudTest{
@@ -84,5 +84,69 @@ func TestDHCPFindLease(t *testing.T) {
 		t.Errorf("Should have removed lease for %s:%s, as its backing reservation is gone!", l.Strategy, l.Token)
 	} else {
 		t.Logf("Removed lease that no longer has a Subnet or Reservation covering it: %v", err)
+	}
+}
+
+type ltc struct {
+	strat, token string
+	req, via     net.IP
+	created      bool
+	expected     net.IP
+}
+
+func (l *ltc) test(t *testing.T, dt *DataTracker) {
+	res := FindOrCreateLease(dt, l.strat, l.token, l.req, l.via)
+	if l.created {
+		if res == nil {
+			t.Errorf("Expected to create a lease with %s:%s, but did not!", l.strat, l.token)
+		} else if l.expected != nil && !res.Addr.Equal(l.expected) {
+			t.Errorf("Lease %s:%s got %s, expected %s", l.strat, l.token, res.Addr, l.expected)
+		} else {
+			t.Logf("Created lease %s:%s: %s", res.Strategy, res.Token, res.Addr)
+		}
+	} else {
+		if res != nil {
+			t.Errorf("Did not expect to create lease %s:%s: %s", l.strat, l.token, res.Addr)
+		} else {
+			t.Log("No lease created, as expected")
+		}
+	}
+}
+
+func TestDHCPCreateReservationOnly(t *testing.T) {
+	bs := store.NewSimpleMemoryStore()
+	dt := mkDT(bs)
+	startObjs := []crudTest{
+		{"Res1", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true},
+		{"Res2", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.10"), Token: "res2", Strategy: "mac"}, true},
+	}
+	for _, obj := range startObjs {
+		obj.Test(t)
+	}
+	createTests := []ltc{
+		{"mac", "res1", nil, nil, true, net.ParseIP("192.168.123.10")},
+		{"mac", "resn", net.ParseIP("192.168.123.10"), nil, false, nil},
+		{"mac", "res1", net.ParseIP("192.168.123.10"), nil, true, net.ParseIP("192.168.123.10")},
+		{"mac", "res1", net.ParseIP("192.168.123.11"), nil, false, nil},
+		{"mac", "res1", nil, nil, true, net.ParseIP("192.168.123.10")},
+		{"mac", "resn", nil, nil, false, nil},
+		{"mac", "res2", nil, nil, true, net.ParseIP("192.168.124.10")},
+	}
+	for _, obj := range createTests {
+		obj.test(t, dt)
+	}
+	// Expire one lease
+	lease := AsLease(dt.load("leases", Hexaddr(net.ParseIP("192.168.123.10"))))
+	lease.ExpireTime = time.Now().Add(-2 * time.Second)
+	lease.Token = "res3"
+	// Make another refer to a different Token
+	lease = AsLease(dt.load("leases", Hexaddr(net.ParseIP("192.168.124.10"))))
+	lease.Token = "resn"
+	renewTests := []ltc{
+		{"mac", "res1", nil, nil, true, net.ParseIP("192.168.123.10")},
+		{"mac", "res2", nil, nil, false, nil},
+	}
+	for _, obj := range renewTests {
+		obj.test(t, dt)
 	}
 }

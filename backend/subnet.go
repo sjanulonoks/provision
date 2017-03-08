@@ -8,6 +8,47 @@ import (
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
+func pickNone(s *Subnet, usedAddrs map[string]bool) (net.IP, bool) {
+	// There are no free addresses, and don't fall through to using the most expired one.
+	return nil, false
+}
+
+func pickNext(s *Subnet, usedAddrs map[string]bool) (net.IP, bool) {
+	if s.nextLeasableIP == nil {
+		s.nextLeasableIP = net.IP(make([]byte, 4))
+		copy(s.nextLeasableIP, s.ActiveStart.To4())
+	}
+	one := big.NewInt(1)
+	end := &big.Int{}
+	curr := &big.Int{}
+	end.SetBytes(s.ActiveEnd.To4())
+	curr.SetBytes(s.nextLeasableIP)
+	// First, check from nextLeasableIp to ActiveEnd
+	for curr.Cmp(end) != 1 {
+		addr := net.IP(curr.Bytes()).To4()
+		hex := Hexaddr(addr)
+		curr.Add(curr, one)
+		if _, ok := usedAddrs[hex]; !ok {
+			s.nextLeasableIP = net.IP(curr.Bytes()).To4()
+			return addr, false
+		}
+	}
+	// Next, check from ActiveStart to nextLeasableIP
+	end.SetBytes(s.nextLeasableIP)
+	curr.SetBytes(s.ActiveStart.To4())
+	for curr.Cmp(end) != 1 {
+		addr := net.IP(curr.Bytes()).To4()
+		hex := Hexaddr(addr)
+		curr.Add(curr, one)
+		if _, ok := usedAddrs[hex]; !ok {
+			s.nextLeasableIP = net.IP(curr.Bytes()).To4()
+			return addr, false
+		}
+	}
+	// No free address, but we can use the most expired one.
+	return nil, true
+}
+
 // Subnet represents a DHCP Subnet
 //
 // swagger:model
@@ -56,16 +97,18 @@ type Subnet struct {
 	//
 	// required: true
 	OnlyReservations bool
-	// Options is the list of DHCP options that every lease in
-	// this subnet will get.
-	//
-	// required: true
-	Options []DhcpOption
+	Options          []DhcpOption
 	// Strategy is the leasing strategy that will be used determine what to use from
 	// the DHCP packet to handle lease management.
 	//
 	// required: true
-	Strategy       string
+	Strategy string
+	// Picker is the method that will allocate IP addresses.
+	// Picker must be one of "none" or "next".  We may add more IP
+	// address allocation strategies in the future.
+	//
+	// required: true
+	Picker         string
 	p              *DataTracker
 	nextLeasableIP net.IP
 	sn             *net.IPNet
@@ -238,4 +281,14 @@ func (s *Subnet) activeLeases() []*Lease {
 func (s *Subnet) reservations() []*Reservation {
 	lower, upper := s.sBounds()
 	return AsReservations(s.p.fetchSome("reservations", lower, upper))
+}
+
+func (s *Subnet) next(used map[string]bool) (net.IP, bool) {
+	switch s.Picker {
+	case "nextFree", "":
+		return pickNext(s, used)
+	case "none":
+		return pickNone(s, used)
+	}
+	return nil, false
 }
