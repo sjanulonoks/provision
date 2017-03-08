@@ -105,7 +105,7 @@ func (p *DataTracker) loadData(refObjs []store.KeySaver) error {
 		prefix := refObj.Prefix()
 		objs, err := store.List(refObj)
 		if err != nil {
-			return err
+			p.Logger.Fatalf("dataTracker: Error loading data for %s: %v", prefix, err)
 		}
 		p.objs[prefix] = &dtobjs{d: objs}
 		p.objs[prefix].sort()
