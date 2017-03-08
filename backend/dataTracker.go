@@ -153,9 +153,41 @@ func (p *DataTracker) ExtractAssets() error {
 	if p.FileRoot == "" {
 		return fmt.Errorf("ExtractAssets called before FileRoot was set")
 	}
-	assets := map[string]string{
-		"assets/explode_iso.sh": "",
+
+	dirs := []string{"isos", "files", "machines", "pxelinux.cfg"}
+	for _, dest := range dirs {
+		destDir := path.Join(p.FileRoot, dest)
+		if err := os.MkdirAll(destDir, 0755); err != nil {
+			return err
+		}
 	}
+
+	assets := map[string]string{
+		// General ISO things
+		"assets/explode_iso.sh": "",
+
+		// Sledgehammer things
+		"assets/install-sledgehammer.sh": "",
+		"assets/provisioner/busybox":     "stage1-data",
+		"assets/stage1_init":             "stage1-data",
+		"assets/udhcpc_config":           "stage1-data",
+		"assets/start-up.sh":             "machines",
+		"assets/provisioner/jq":          "files",
+
+		// General Boot things
+		"assets/provisioner/bootia32.efi":          "",
+		"assets/provisioner/bootia64.efi":          "",
+		"assets/provisioner/bootx64.efi":           "",
+		"assets/provisioner/esxi.0":                "",
+		"assets/provisioner/ipxe.efi":              "",
+		"assets/provisioner/ipxe.pxe":              "",
+		"assets/provisioner/ldlinux.c32":           "",
+		"assets/provisioner/libutil.c32":           "",
+		"assets/provisioner/lpxelinux.0":           "",
+		"assets/provisioner/pxechn.c32":            "",
+		"assets/provisioner/wimboot-2.5.2.tar.bz2": "",
+	}
+
 	for src, dest := range assets {
 		buf, err := embedded.Asset(src)
 		if err != nil {
@@ -165,7 +197,8 @@ func (p *DataTracker) ExtractAssets() error {
 		if err != nil {
 			return fmt.Errorf("No mode info for embedded asset %s", src)
 		}
-		destFile := path.Join(p.FileRoot, dest, path.Join(strings.Split(src, "/")[1:]...))
+		parts := strings.Split(src, "/")
+		destFile := path.Join(p.FileRoot, dest, parts[len(parts)-1])
 		destDir := path.Dir(destFile)
 		if err := os.MkdirAll(destDir, 0755); err != nil {
 			return err

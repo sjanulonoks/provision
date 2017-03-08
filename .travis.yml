@@ -14,6 +14,7 @@ before_install:
 
 install:
 - glide install
+- ./tools/download-assets.sh
 - go generate server/main.go
 - go build -o rocket-skates server/*
 

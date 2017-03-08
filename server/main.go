@@ -33,6 +33,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 
 	"github.com/digitalrebar/digitalrebar/go/common/client"
 	"github.com/digitalrebar/digitalrebar/go/common/service"
@@ -63,6 +64,10 @@ type ProgOpts struct {
 	CommandURL         string `long:"endpoint" description:"DigitalRebar Endpoint" env:"EXTERNAL_REBAR_ENDPOINT"`
 	DefaultBootEnv     string `long:"default-boot-env" description:"The default bootenv for the nodes"`
 	UnknownBootEnv     string `long:"unknown-boot-env" description:"The unknown bootenv for the system"`
+
+	ExcludeDiscovery bool   `long:"exclude-discovery" description:"Should NOT download discovery image"`
+	SledgeHammerURL  string `long:"sledgehammer-url" description:"Sledgehammer download URL" default:"http://opencrowbar.s3-website-us-east-1.amazonaws.com/sledgehammer"`
+	SledgeHammerHash string `long:"sledgehammer-hash" description:"Sledgehammer Hash Identifier" default:"a42c8c66a60b77ca1c769b8dc7e712f6644579ed"`
 
 	TlsKeyFile  string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
 	TlsCertFile string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
@@ -174,9 +179,25 @@ func main() {
 		fmt.Sprintf("http://%s:%d/", c_opts.OurAddress, c_opts.StaticPort),
 		c_opts.OurAddress,
 		logger)
+
+	// We have a backend, now get default assets
+	logger.Printf("Extracting Default Assets\n")
 	if err := dt.ExtractAssets(); err != nil {
 		logger.Fatalf("Unable to extract assets: %v", err)
 	}
+	// Add discovery image pieces if not excluded
+	if !c_opts.ExcludeDiscovery {
+		logger.Printf("Installing Discovery Image - could take a long time\n")
+		cmd := exec.Command("./install-sledgehammer.sh", c_opts.SledgeHammerHash, c_opts.SledgeHammerURL)
+		cmd.Dir = c_opts.FileRoot
+		err := cmd.Run()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	// Load default templates and bootenvs
+
+	// Load additional config dirs. ???
 
 	fe := frontend.NewFrontend(dt, logger, c_opts.FileRoot)
 

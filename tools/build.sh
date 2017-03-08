@@ -46,6 +46,8 @@ cd $GOPATH/src/github.com/rackn/rocket-skates
 
 glide install
 
+./tools/download-assets.sh
+
 go generate server/main.go
 go build -o rocket-skates server/*
 
