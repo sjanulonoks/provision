@@ -102,14 +102,25 @@ func FindLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, 
 	return lease, err
 }
 
-func findViaReservation(leases, reservations *dtobjs, strat, token string) (lease *Lease) {
+func findViaReservation(leases, reservations *dtobjs, strat, token string, req net.IP) (lease *Lease) {
 	var reservation *Reservation
-	for idx := range reservations.d {
-		reservation = AsReservation(reservations.d[idx])
-		if reservation.Token == token && reservation.Strategy == strat {
-			break
+	if req != nil && req.IsGlobalUnicast() {
+		hex := Hexaddr(req)
+		idx, ok := reservations.find(hex)
+		if ok {
+			reservation = AsReservation(reservations.d[idx])
+			if reservation.Token != token || reservation.Strategy != strat {
+				reservation = nil
+			}
 		}
-		reservation = nil
+	} else {
+		for idx := range reservations.d {
+			reservation = AsReservation(reservations.d[idx])
+			if reservation.Token == token && reservation.Strategy == strat {
+				break
+			}
+			reservation = nil
+		}
 	}
 	if reservation == nil {
 		return
@@ -151,7 +162,7 @@ func findViaReservation(leases, reservations *dtobjs, strat, token string) (leas
 	return
 }
 
-func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, via net.IP) *Lease {
+func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, req, via net.IP) *Lease {
 	if via == nil || !via.IsGlobalUnicast() {
 		// Without a via address, we have no way to look up the appropriate subnet
 		// to try.  Since that is the case, return nothing.  The DHCP midlayer
@@ -172,17 +183,68 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, v
 	}
 	currLeases := AsLeases(leases.subset(subnet.aBounds()))
 	currReservations := AsReservations(reservations.subset(subnet.aBounds()))
-	usedAddrs := map[string]struct{}{}
-	for i := range currReservations {
-		usedAddrs[currReservations[i].Key()] = struct{}{}
-	}
+	usedAddrs := map[string]bool{}
 	for i := range currLeases {
-		usedAddrs[currLeases[i].Key()] = struct{}{}
+		// Leases get a false in the map.
+		usedAddrs[currLeases[i].Key()] = false
 	}
-	// First pass: try to find an actually free address.  This allows us to
-	// preserve expired leases as long as possible and reduce address churn.
+	for i := range currReservations {
+		// Reservations get true
+		usedAddrs[currReservations[i].Key()] = true
+	}
+
+	// If we were passed a requested address, try to use it.
+	if req != nil && subnet.InActiveRange(req) {
+		hex := Hexaddr(req)
+		res, found := usedAddrs[hex]
+		if !found {
+			// It is not in usedAddrs, so there is no
+			// lease or reservation for it.  We can let the system use it.
+			lease := &Lease{
+				Addr:     req,
+				Token:    token,
+				Strategy: strat,
+			}
+			leases.add(lease)
+			return lease
+		}
+		// To let the caller have their requested address:
+		//
+		// 1: The requested address must not have a
+		//    reservation.  If it does, then they will have
+		//    been granted the lease in findReservation if
+		//    they were allowed to have it.
+		//
+		// 2: Any lease that exists must either be for them be
+		//    expired. We know a lease must exist here because there
+		//    is no reservation (per the above).
+		if !res {
+			idx, haveLease := leases.find(hex)
+			if !haveLease {
+				// This should never happen
+				panic("Cannot happen")
+			}
+			lease := AsLease(leases.d[idx])
+			if lease.Token == token && lease.Strategy == strat {
+				// hey, we already have a lease.  How nice.
+				return lease
+			}
+			if lease.Expired() {
+				// We don't own this lease, but it is
+				// expired, so we can steal it.
+				lease.Token = token
+				lease.Strategy = strat
+				return lease
+			}
+			// The lease is active and not theirs.  The caller will
+			// not get the address they want.
+		}
+	}
+	// Either there was no requested address, or we think it is in use by someone
+	// else.  So, try to find a free address in the subnet to hand out to them.
 	addr, fallback := subnet.next(usedAddrs)
 	if addr != nil {
+		// Hooray, the caller is now the owner of a shiny maybe-used IP address.
 		lease := &Lease{
 			Addr:     addr,
 			Token:    token,
@@ -191,12 +253,20 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, v
 		leases.add(lease)
 		return lease
 	}
-	// If the picker for this subnet says to not fall back to the most expired lease, bail now.
+	// There are no free addresses.
 	if !fallback {
+		// If the address picking strategy for this range says to not fall back,
+		// then the caller is not getting a response from us.
 		return nil
 	}
-	// Otherwise, recycle the most expired lease.
-	sort.Slice(currLeases, func(i, j int) bool { return currLeases[i].ExpireTime.Before(currLeases[j].ExpireTime) })
+	// Otherwise, we have one fallback strategy: pick the most
+	// expired lease and hand it out.  We may grow the ability to
+	// have other fallback strategies, but this is a good
+	// general-purpose strat for now.
+	sort.Slice(currLeases,
+		func(i, j int) bool {
+			return currLeases[i].ExpireTime.Before(currLeases[j].ExpireTime)
+		})
 	for _, lease := range currLeases {
 		if !lease.Expired() {
 			// If we got to a non-expired lease, we are done
@@ -219,12 +289,9 @@ func findOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *L
 	defer leases.Unlock()
 	defer reservations.Unlock()
 	defer subnets.Unlock()
-	lease, err := _findLease(leases, reservations, strat, token, req)
-	if lease == nil || err != nil {
-		lease = findViaReservation(leases, reservations, strat, token)
-	}
+	lease := findViaReservation(leases, reservations, strat, token, req)
 	if lease == nil {
-		lease = findViaSubnet(leases, subnets, reservations, strat, token, via)
+		lease = findViaSubnet(leases, subnets, reservations, strat, token, req, via)
 	}
 	if lease != nil {
 		lease.ExpireTime = time.Now().Add(2 * time.Second)

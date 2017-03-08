@@ -8,12 +8,12 @@ import (
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
-func pickNone(s *Subnet, usedAddrs map[string]struct{}) (net.IP, bool) {
+func pickNone(s *Subnet, usedAddrs map[string]bool) (net.IP, bool) {
 	// There are no free addresses, and don't fall through to using the most expired one.
 	return nil, false
 }
 
-func pickNext(s *Subnet, usedAddrs map[string]struct{}) (net.IP, bool) {
+func pickNext(s *Subnet, usedAddrs map[string]bool) (net.IP, bool) {
 	if s.nextLeasableIP == nil {
 		s.nextLeasableIP = net.IP(make([]byte, 4))
 		copy(s.nextLeasableIP, s.ActiveStart.To4())
@@ -96,7 +96,8 @@ type Subnet struct {
 	// there is a preexisting reservation.
 	//
 	// required: true
-	Options []DhcpOption
+	OnlyReservations bool
+	Options          []DhcpOption
 	// Strategy is the leasing strategy that will be used determine what to use from
 	// the DHCP packet to handle lease management.
 	//
@@ -282,7 +283,7 @@ func (s *Subnet) reservations() []*Reservation {
 	return AsReservations(s.p.fetchSome("reservations", lower, upper))
 }
 
-func (s *Subnet) next(used map[string]struct{}) (net.IP, bool) {
+func (s *Subnet) next(used map[string]bool) (net.IP, bool) {
 	switch s.Picker {
 	case "nextFree", "":
 		return pickNext(s, used)
