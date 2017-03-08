@@ -2,8 +2,8 @@ package backend
 
 import (
 	"fmt"
-	"math/big"
 	"net"
+	"sort"
 	"time"
 )
 
@@ -151,12 +151,12 @@ func findViaReservation(leases, reservations *dtobjs, strat, token string) (leas
 	return
 }
 
-func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, via net.IP) (lease *Lease) {
+func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, via net.IP) *Lease {
 	if via == nil || !via.IsGlobalUnicast() {
 		// Without a via address, we have no way to look up the appropriate subnet
 		// to try.  Since that is the case, return nothing.  The DHCP midlayer
 		// should take that as a cue to not respond at all.
-		return
+		return nil
 	}
 	var subnet *Subnet
 	for idx := range subnets.d {
@@ -168,100 +168,47 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, v
 	}
 	if subnet == nil {
 		// There is no subnet that can handle this via.
-		return
-	}
-	if subnet.nextLeasableIP == nil {
-		subnet.nextLeasableIP = net.IP(make([]byte, 4))
-		copy(subnet.nextLeasableIP, subnet.ActiveStart.To4())
+		return nil
 	}
 	currLeases := AsLeases(leases.subset(subnet.aBounds()))
 	currReservations := AsReservations(reservations.subset(subnet.aBounds()))
-	reservedAddrs := map[string]struct{}{}
+	usedAddrs := map[string]struct{}{}
 	for i := range currReservations {
-		reservedAddrs[currReservations[i].Key()] = struct{}{}
+		usedAddrs[currReservations[i].Key()] = struct{}{}
 	}
-	leasedAddrs := map[string]int{}
 	for i := range currLeases {
-		leasedAddrs[currLeases[i].Key()] = i
+		usedAddrs[currLeases[i].Key()] = struct{}{}
 	}
-	one := big.NewInt(1)
-	end := &big.Int{}
-	curr := &big.Int{}
-	end.SetBytes(subnet.ActiveEnd.To4())
-	curr.SetBytes(subnet.nextLeasableIP)
-	// First, check from nextLeasableIp to ActiveEnd
-	for curr.Cmp(end) != 1 {
-		addr := net.IP(curr.Bytes()).To4()
-		hex := Hexaddr(addr)
-		if _, ok := reservedAddrs[hex]; ok {
-			curr.Add(curr, one)
-			continue
+	// First pass: try to find an actually free address.  This allows us to
+	// preserve expired leases as long as possible and reduce address churn.
+	addr, fallback := subnet.next(usedAddrs)
+	if addr != nil {
+		lease := &Lease{
+			Addr:     addr,
+			Token:    token,
+			Strategy: strat,
 		}
-		i, ok := leasedAddrs[hex]
-		if !ok {
-			// No lease exists for this address, and it is available.
-			curr.Add(curr, one)
-			subnet.nextLeasableIP = net.IP(curr.Bytes()).To4()
-			lease = &Lease{
-				Addr:     addr,
-				Token:    token,
-				Strategy: strat,
-			}
-			leases.add(lease)
-			return
+		leases.add(lease)
+		return lease
+	}
+	// If the picker for this subnet says to not fall back to the most expired lease, bail now.
+	if !fallback {
+		return nil
+	}
+	// Otherwise, recycle the most expired lease.
+	sort.Slice(currLeases, func(i, j int) bool { return currLeases[i].ExpireTime.Before(currLeases[j].ExpireTime) })
+	for _, lease := range currLeases {
+		if !lease.Expired() {
+			// If we got to a non-expired lease, we are done
+			break
 		}
-		lease = currLeases[i]
-		if lease.Expired() {
-			// There is a lease for this address, and it is expired.
-			// Take it over.
-			curr.Add(curr, one)
-			subnet.nextLeasableIP = net.IP(curr.Bytes()).To4()
-			lease.Addr = addr
+		if _, ok := reservations.find(lease.Key()); !ok {
+			// We found an expired lease that does not have a reservation, Use it.
 			lease.Token = token
 			lease.Strategy = strat
 			return lease
 		}
-		// No candidate found, continue to the next one.
-		curr.Add(curr, one)
 	}
-	// Next, check from ActiveStart to nextLeasableIP
-	end.SetBytes(subnet.nextLeasableIP)
-	curr.SetBytes(subnet.ActiveStart.To4())
-	for curr.Cmp(end) != 1 {
-		addr := net.IP(curr.Bytes()).To4()
-		hex := Hexaddr(addr)
-		if _, ok := reservedAddrs[hex]; ok {
-			curr.Add(curr, one)
-			continue
-		}
-		i, ok := leasedAddrs[hex]
-		if !ok {
-			// No lease exists for this address, and it is available.
-			curr.Add(curr, one)
-			subnet.nextLeasableIP = net.IP(curr.Bytes()).To4()
-			lease = &Lease{
-				Addr:     addr,
-				Token:    token,
-				Strategy: strat,
-			}
-			leases.add(lease)
-			return lease
-		}
-		lease = currLeases[i]
-		if lease.Expired() {
-			// There is a lease for this address, and it is expired.
-			// Take it over.
-			curr.Add(curr, one)
-			subnet.nextLeasableIP = net.IP(curr.Bytes()).To4()
-			lease.Addr = addr
-			lease.Token = token
-			lease.Strategy = strat
-			return lease
-		}
-		// No candidate found, continue to the next one.
-		curr.Add(curr, one)
-	}
-	// Sorry, the subnet is full. No lease for you.
 	return nil
 }
 
