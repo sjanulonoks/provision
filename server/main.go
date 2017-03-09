@@ -181,8 +181,8 @@ func main() {
 		c_opts.CommandURL,
 		c_opts.DefaultBootEnv,
 		c_opts.UnknownBootEnv,
-		fmt.Sprintf("http://%s:%d/", c_opts.OurAddress, c_opts.StaticPort),
-		fmt.Sprintf("https://%s:%d/", c_opts.OurAddress, c_opts.ApiPort),
+		fmt.Sprintf("http://%s:%d", c_opts.OurAddress, c_opts.StaticPort),
+		fmt.Sprintf("https://%s:%d", c_opts.OurAddress, c_opts.ApiPort),
 		c_opts.OurAddress,
 		logger)
 

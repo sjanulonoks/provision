@@ -162,6 +162,7 @@ if [[ -d $TFTPROOT/discovery && ! -L $TFTPROOT/discovery ]]; then
     rmdir "$TFTPROOT/discovery"
 fi
 [[ -L $TFTPROOT/discovery ]] || (cd "${TFTPROOT}"; ln -sf . discovery)
+[[ -L $TFTPROOT/nodes ]] || (cd "${TFTPROOT}"; ln -sf machines nodes)
 
 # Make it the discovery image
 (cd "$TFTPROOT"; rm initrd0.img stage*.img vmlinuz0) || :
