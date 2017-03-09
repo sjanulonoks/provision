@@ -27,6 +27,7 @@ package main
 //go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 //go:generate swagger generate spec -o ../embedded/assets/swagger.json
 //go:generate ../tools/build-all-license.sh .. embedded/assets/ALL-LICENSE
+//go:generate ../tools/build-all-license.sh .. ALL-LICENSE
 //go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 
 import (
