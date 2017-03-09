@@ -26,6 +26,7 @@ package main
 //
 //go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 //go:generate swagger generate spec -o ../embedded/assets/swagger.json
+//go:generate ../tools/build-all-license.sh .. embedded/assets/ALL-LICENSE
 //go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 
 import (
@@ -60,7 +61,7 @@ type ProgOpts struct {
 	ApiPort    int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
 
 	FileRoot string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
-	DevUI 	 string `long:"dev-ui" description:"Root of UI Pages for Development"`
+	DevUI    string `long:"dev-ui" description:"Root of UI Pages for Development"`
 
 	DisableProvisioner bool   `long:"disable-provisioner" description:"Disable provisioner"`
 	DisableDHCP        bool   `long:"disable-dhcp" description:"Disable DHCP"`

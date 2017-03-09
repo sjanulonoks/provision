@@ -163,6 +163,9 @@ func (p *DataTracker) ExtractAssets() error {
 	}
 
 	assets := map[string]string{
+		// General LICENSE thing
+		"assets/ALL-LICENSE": "",
+
 		// General ISO things
 		"assets/explode_iso.sh": "",
 

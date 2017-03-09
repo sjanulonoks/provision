@@ -140,6 +140,7 @@ func TestExtractAssets(t *testing.T) {
 	}
 
 	files := []string{
+		"ALL-LICENSE",
 		"explode_iso.sh",
 		"install-sledgehammer.sh",
 		"stage1-data/busybox",
