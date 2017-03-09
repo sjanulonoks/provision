@@ -26,7 +26,6 @@ func MacStrategy(p dhcp.Packet, options dhcp.Options) string {
 }
 
 type DhcpHandler struct {
-	intf   net.Interface
 	ip     net.IP
 	bk     *backend.DataTracker
 	strats []*Strategy
