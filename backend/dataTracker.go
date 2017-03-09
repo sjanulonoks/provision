@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"text/template"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/digitalrebar/go/rebar-api/api"
@@ -70,6 +72,7 @@ type DataTracker struct {
 	OurAddress     string
 
 	FileURL string
+	ApiURL  string
 
 	Logger *log.Logger
 
@@ -116,7 +119,7 @@ func (p *DataTracker) loadData(refObjs []store.KeySaver) error {
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.SimpleStore,
 	useProvisioner, useDHCP bool,
-	fileRoot, commandURL, dbe, ube, furl, addr string,
+	fileRoot, commandURL, dbe, ube, furl, aurl, addr string,
 	logger *log.Logger) *DataTracker {
 
 	res := &DataTracker{
@@ -127,6 +130,7 @@ func NewDataTracker(backend store.SimpleStore,
 		DefaultBootEnv: dbe,
 		UnknownBootEnv: ube,
 		FileURL:        furl,
+		ApiURL:         aurl,
 		OurAddress:     addr,
 		Logger:         logger,
 
@@ -176,6 +180,9 @@ func (p *DataTracker) ExtractAssets() error {
 		"assets/udhcpc_config":           "stage1-data",
 		"assets/start-up.sh":             "machines",
 		"assets/provisioner/jq":          "files",
+		"assets/default.ipxe.tmpl":       "",
+		"assets/elilo.conf.tmpl":         "",
+		"assets/default.tmpl":            "pxelinux.cfg",
 
 		// General Boot things
 		"assets/provisioner/bootia32.efi": "",
@@ -200,12 +207,39 @@ func (p *DataTracker) ExtractAssets() error {
 		if err != nil {
 			return fmt.Errorf("No mode info for embedded asset %s", src)
 		}
+
+		if strings.HasSuffix(src, ".tmpl") {
+			var doc bytes.Buffer
+
+			t, err := template.New("test").Parse(string(buf))
+			if err != nil {
+				return err
+			}
+
+			params := struct {
+				ProvIp      string
+				ProvFileURL string
+				ProvApiURL  string
+			}{
+				ProvIp:      p.OurAddress,
+				ProvFileURL: p.FileURL,
+				ProvApiURL:  p.ApiURL,
+			}
+			err = t.Execute(&doc, params)
+			if err != nil {
+				return err
+			}
+			buf = doc.Bytes()
+			src = strings.TrimSuffix(src, ".tmpl")
+		}
+
 		parts := strings.Split(src, "/")
 		destFile := path.Join(p.FileRoot, dest, parts[len(parts)-1])
 		destDir := path.Dir(destFile)
 		if err := os.MkdirAll(destDir, 0755); err != nil {
 			return err
 		}
+
 		if err := ioutil.WriteFile(destFile, buf, info.Mode()); err != nil {
 			return err
 		}
@@ -213,6 +247,7 @@ func (p *DataTracker) ExtractAssets() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
