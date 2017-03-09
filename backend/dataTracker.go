@@ -175,17 +175,17 @@ func (p *DataTracker) ExtractAssets() error {
 		"assets/provisioner/jq":          "files",
 
 		// General Boot things
-		"assets/provisioner/bootia32.efi":          "",
-		"assets/provisioner/bootia64.efi":          "",
-		"assets/provisioner/bootx64.efi":           "",
-		"assets/provisioner/esxi.0":                "",
-		"assets/provisioner/ipxe.efi":              "",
-		"assets/provisioner/ipxe.pxe":              "",
-		"assets/provisioner/ldlinux.c32":           "",
-		"assets/provisioner/libutil.c32":           "",
-		"assets/provisioner/lpxelinux.0":           "",
-		"assets/provisioner/pxechn.c32":            "",
-		"assets/provisioner/wimboot-2.5.2.tar.bz2": "",
+		"assets/provisioner/bootia32.efi": "",
+		"assets/provisioner/bootia64.efi": "",
+		"assets/provisioner/bootx64.efi":  "",
+		"assets/provisioner/esxi.0":       "",
+		"assets/provisioner/ipxe.efi":     "",
+		"assets/provisioner/ipxe.pxe":     "",
+		"assets/provisioner/ldlinux.c32":  "",
+		"assets/provisioner/libutil.c32":  "",
+		"assets/provisioner/lpxelinux.0":  "",
+		"assets/provisioner/pxechn.c32":   "",
+		"assets/provisioner/wimboot":      "",
 	}
 
 	for src, dest := range assets {

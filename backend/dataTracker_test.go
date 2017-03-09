@@ -156,7 +156,7 @@ func TestExtractAssets(t *testing.T) {
 		"libutil.c32",
 		"lpxelinux.0",
 		"pxechn.c32",
-		"wimboot-2.5.2.tar.bz2",
+		"wimboot",
 	}
 
 	for _, f := range files {

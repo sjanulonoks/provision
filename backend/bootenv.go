@@ -274,9 +274,9 @@ func (b *BootEnv) explodeIso() error {
 	}
 
 	// Call extract script
-	// /explode_iso.sh b.OS.Name isoPath path.Dir(canaryPath)
+	// /explode_iso.sh b.OS.Name fileRoot isoPath path.Dir(canaryPath)
 	cmdName := path.Join(b.p.FileRoot, "explode_iso.sh")
-	cmdArgs := []string{b.OS.Name, isoPath, path.Dir(canaryPath), b.OS.IsoSha256}
+	cmdArgs := []string{b.OS.Name, b.p.FileRoot, isoPath, path.Dir(canaryPath), b.OS.IsoSha256}
 	if _, err := exec.Command(cmdName, cmdArgs...).Output(); err != nil {
 		return fmt.Errorf("Explode ISO: Exec command failed for %s: %s\n", b.Name, err)
 	}
