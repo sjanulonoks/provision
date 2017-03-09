@@ -59,11 +59,15 @@ func (dt *LocalDTI) NewSubnet() *backend.Subnet           { return &backend.Subn
 func (dt *LocalDTI) NewUser() *backend.User               { return &backend.User{} }
 
 func testFrontend() *LocalDTI {
+	return testFrontendDev("")
+}
+
+func testFrontendDev(devUI string) *LocalDTI {
 	gin.SetMode(gin.ReleaseMode)
 
 	localDTI := &LocalDTI{}
 	logger := log.New(os.Stderr, "bootenv-test", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-	localDTI.f = NewFrontend(localDTI, logger, ".")
+	localDTI.f = NewFrontend(localDTI, logger, ".", devUI)
 
 	return localDTI
 }
@@ -134,6 +138,21 @@ func TestUIBase(t *testing.T) {
 		t.Errorf("Response should not be an empty set, but got: %d\n", len(uibody))
 	}
 	if !bytes.Contains(uibody, []byte("<title>Rocket Skates</title>")) {
+		t.Errorf("Rocket Skates Title Missing %v\n", uibody)
+	}
+}
+
+func TestUIDev(t *testing.T) {
+	localDTI := testFrontendDev("../test-data/ui")
+	req, _ := http.NewRequest("GET", "/ui/", nil)
+	w := localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusOK)
+	localDTI.ValidateContentType(t, "text/html; charset=utf-8")
+	uibody, _ := ioutil.ReadAll(w.Body)
+	if len(uibody) == 0 {
+		t.Errorf("Response should not be an empty set, but got: %d\n", len(uibody))
+	}
+	if !bytes.Contains(uibody, []byte("<title>Test Skates</title>")) {
 		t.Errorf("Rocket Skates Title Missing %v\n", uibody)
 	}
 }

@@ -66,7 +66,7 @@ type Frontend struct {
 	dt       DTI
 }
 
-func NewFrontend(dt DTI, logger *log.Logger, fileRoot string) (me *Frontend) {
+func NewFrontend(dt DTI, logger *log.Logger, fileRoot string, devUI string) (me *Frontend) {
 	mgmtApi := gin.Default()
 
 	apiGroup := mgmtApi.Group("/api/v3")
@@ -98,9 +98,14 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot string) (me *Frontend) {
 	mgmtApi.StaticFS("/swagger-ui",
 		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "assets/swagger-ui"})
 
-	// Server UI.
-	mgmtApi.StaticFS("/ui",
-		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "assets/ui"})
+	// Server UI with flag to run from local files instead of assets
+	if len(devUI) == 0 {
+		mgmtApi.StaticFS("/ui",
+			&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "assets/ui"})
+	} else {
+		logger.Printf("DEV: Running UI from %s\n", devUI)
+		mgmtApi.Static("/ui", devUI)
+	}
 
 	return
 }
