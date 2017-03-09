@@ -57,6 +57,8 @@ type DTI interface {
 	NewReservation() *backend.Reservation
 	NewSubnet() *backend.Subnet
 	NewUser() *backend.User
+
+	GetInterfaces() ([]*backend.Interface, error)
 }
 
 type Frontend struct {
@@ -66,7 +68,7 @@ type Frontend struct {
 	dt       DTI
 }
 
-func NewFrontend(dt DTI, logger *log.Logger, fileRoot string, devUI string) (me *Frontend) {
+func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Frontend) {
 	mgmtApi := gin.Default()
 
 	apiGroup := mgmtApi.Group("/api/v3")
@@ -82,6 +84,7 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot string, devUI string) (me 
 	me.InitReservationApi()
 	me.InitSubnetApi()
 	me.InitUserApi()
+	me.InitInterfaceApi()
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("assets/swagger.json")

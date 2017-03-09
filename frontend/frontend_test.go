@@ -1,14 +1,14 @@
 package frontend
 
 import (
+	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
-	"bytes"
-	"io/ioutil"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/gin-gonic/gin"
@@ -27,6 +27,8 @@ type LocalDTI struct {
 	ListValue   []store.KeySaver
 	GetValue    store.KeySaver
 	GetBool     bool
+	GIValue     []*backend.Interface
+	GIError     error
 	w           *httptest.ResponseRecorder
 	f           *Frontend
 }
@@ -48,6 +50,9 @@ func (dt *LocalDTI) FetchOne(store.KeySaver, string) (store.KeySaver, bool) {
 }
 func (dt *LocalDTI) FetchAll(ref store.KeySaver) []store.KeySaver {
 	return dt.ListValue
+}
+func (dt *LocalDTI) GetInterfaces() ([]*backend.Interface, error) {
+	return dt.GIValue, dt.GIError
 }
 
 func (dt *LocalDTI) NewBootEnv() *backend.BootEnv         { return &backend.BootEnv{} }
@@ -124,7 +129,6 @@ func TestSwaggerPieces(t *testing.T) {
 		t.Errorf("Swagger version should be 2.0: %v\n", s)
 	}
 }
-
 
 func TestUIBase(t *testing.T) {
 	localDTI := testFrontend()
