@@ -193,7 +193,7 @@ func main() {
 	}
 	// Add discovery image pieces if not excluded
 	if !c_opts.ExcludeDiscovery {
-		logger.Printf("Installing Discovery Image - could take a long time\n")
+		logger.Printf("Installing Discovery Image - could take a long time (restart with --exclude-discovery flag to skip)\n")
 		cmd := exec.Command("./install-sledgehammer.sh", c_opts.SledgeHammerHash, c_opts.SledgeHammerURL)
 		cmd.Dir = c_opts.FileRoot
 		err := cmd.Run()
