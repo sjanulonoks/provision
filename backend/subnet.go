@@ -243,6 +243,10 @@ func (s *Subnet) Backend() store.SimpleStore {
 	return s.p.getBackend(s)
 }
 
+func (s *Subnet) setDT(p *DataTracker) {
+	s.p = p
+}
+
 func (s *Subnet) New() store.KeySaver {
 	return &Subnet{p: s.p}
 }

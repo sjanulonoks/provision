@@ -197,7 +197,8 @@ func TestDHCPCreateSubnet(t *testing.T) {
 	expireTests := []ltc{
 		{"Refuse to create lease from requested addr due to conflicting reservation", "mac", "sub4", net.ParseIP("192.168.124.83"), net.ParseIP("192.168.124.1"), false, nil},
 		{"Take over 2 day expired lease using pickHint", "mac", "sub4", net.ParseIP("192.168.124.82"), net.ParseIP("192.168.124.1"), true, net.ParseIP("192.168.124.82")},
-		{"Refresh lease via pickHint", "mac", "sub4", net.ParseIP("192.168.124.82"), net.ParseIP("192.168.124.1"), true, net.ParseIP("192.168.124.82")},
+		{"Refresh lease with requested address", "mac", "sub4", net.ParseIP("192.168.124.82"), net.ParseIP("192.168.124.1"), true, net.ParseIP("192.168.124.82")},
+		{"Refresh lease without requested address", "mac", "sub4", nil, net.ParseIP("192.168.124.1"), true, net.ParseIP("192.168.124.82")},
 		{"Take over 2 hour expired lease via pickMostExpired", "mac", "sub5", nil, net.ParseIP("192.168.124.1"), true, net.ParseIP("192.168.124.80")},
 		{"Take over 2 second expired lease via pickMostExpired", "mac", "sub6", nil, net.ParseIP("192.168.124.1"), true, net.ParseIP("192.168.124.81")},
 		{"Fail to get lease due to address range exhaustion", "mac", "sub7", nil, net.ParseIP("192.168.124.1"), false, nil},

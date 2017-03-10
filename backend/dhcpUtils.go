@@ -163,7 +163,7 @@ func findViaReservation(leases, reservations *dtobjs, strat, token string, req n
 	return
 }
 
-func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, req, via net.IP) *Lease {
+func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, req, via net.IP) (lease *Lease) {
 	if via == nil || !via.IsGlobalUnicast() {
 		// Without a via address, we have no way to look up the appropriate subnet
 		// to try.  Since that is the case, return nothing.  The DHCP midlayer
@@ -186,14 +186,33 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, r
 	currReservations := AsReservations(reservations.subset(subnet.aBounds()))
 	usedAddrs := map[string]store.KeySaver{}
 	for i := range currLeases {
+		// While we are iterating over leases, see if we run across a candidate.
+		if currLeases[i].Strategy == strat && currLeases[i].Token == token &&
+			!currLeases[i].Expired() {
+			lease = currLeases[i]
+			if req != nil && !lease.Addr.Equal(req) {
+				lease = nil
+			}
+		}
 		// Leases get a false in the map.
 		usedAddrs[currLeases[i].Key()] = currLeases[i]
 	}
 	for i := range currReservations {
+		// While we are iterating over reservations, see if any candidate we found is still kosher.
+		if lease != nil &&
+			currReservations[i].Strategy == strat &&
+			currReservations[i].Token == token {
+			// If we have a matching reservation and we found a similar candidate,
+			// then the candidate cannot possibly be a lease we should use,
+			// because it would have been refreshed by the lease code.
+			lease = nil
+		}
 		// Reservations get true
 		usedAddrs[currReservations[i].Key()] = currReservations[i]
 	}
-	lease, _ := subnet.next(usedAddrs, token, req)
+	if lease == nil {
+		lease, _ = subnet.next(usedAddrs, token, req)
+	}
 	if lease != nil {
 		if _, found := leases.find(lease.Key()); !found {
 			leases.add(lease)
