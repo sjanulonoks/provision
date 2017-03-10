@@ -49,6 +49,10 @@ func (r *Reservation) New() store.KeySaver {
 	return &Reservation{p: r.p}
 }
 
+func (r *Reservation) setDT(p *DataTracker) {
+	r.p = p
+}
+
 func (p *DataTracker) NewReservation() *Reservation {
 	return &Reservation{p: p}
 }

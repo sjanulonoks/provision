@@ -83,6 +83,10 @@ func (n *Machine) New() store.KeySaver {
 	return store.KeySaver(res)
 }
 
+func (n *Machine) setDT(p *DataTracker) {
+	n.p = p
+}
+
 func (n *Machine) OnCreate() error {
 	e := &Error{Code: 409, Type: ValidationError, o: n}
 	// We do not allow duplicate machine names

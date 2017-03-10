@@ -79,6 +79,10 @@ func (l *Lease) New() store.KeySaver {
 	return &Lease{p: l.p}
 }
 
+func (l *Lease) setDT(p *DataTracker) {
+	l.p = p
+}
+
 func (l *Lease) List() []*Lease {
 	return AsLeases(l.p.fetchAll(l))
 }

@@ -33,6 +33,10 @@ func (u *User) New() store.KeySaver {
 	return &User{p: u.p}
 }
 
+func (u *User) setDT(p *DataTracker) {
+	u.p = p
+}
+
 func (u *User) CheckPassword(pass string) bool {
 	if err := sc.CompareHashAndPassword(u.PasswordHash, []byte(pass)); err == nil {
 		return true
