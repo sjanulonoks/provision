@@ -175,6 +175,9 @@ func (p *DataTracker) ExtractAssets() error {
 		// General LICENSE thing
 		"assets/ALL-LICENSE": "",
 
+		// CLI things
+		"assets/rscli": "files",
+
 		// General ISO things
 		"assets/explode_iso.sh": "",
 

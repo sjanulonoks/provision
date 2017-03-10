@@ -148,6 +148,7 @@ func TestExtractAssets(t *testing.T) {
 		"stage1-data/udhcpc_config",
 		"machines/start-up.sh",
 		"files/jq",
+		"files/rscli",
 		"bootia32.efi",
 		"bootia64.efi",
 		"esxi.0",
