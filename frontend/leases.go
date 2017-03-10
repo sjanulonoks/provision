@@ -45,7 +45,7 @@ type LeasePathParameter struct {
 	// in: path
 	// required: true
 	// swagger:strfmt ipv4
-	Address string
+	Address string `json:"address"`
 }
 
 func (f *Frontend) InitLeaseApi() {

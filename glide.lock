@@ -1,6 +1,8 @@
 hash: 8bf5eb57951a1f30ddcf774ec06ea31ed7565358d25f6b546b354a0d6dde77a6
-updated: 2017-02-22T11:06:41.304665065-06:00
+updated: 2017-03-10T14:35:11.202068145-06:00
 imports:
+- name: github.com/asaskevich/govalidator
+  version: fdf19785fd3558d619ef81212f5edf1d6c2a5911
 - name: github.com/boltdb/bolt
   version: e9cf4fae01b5a8ff89d0ec6b32f0d9c9f79aefdd
 - name: github.com/cloudflare/cfssl
@@ -41,6 +43,30 @@ imports:
   subpackages:
   - binding
   - render
+- name: github.com/go-openapi/analysis
+  version: d5a75b7d751ca3f11ad5d93cfe97405f2c3f6a47
+- name: github.com/go-openapi/errors
+  version: fc3f73a224499b047eda7191e5d22e1e9631e86f
+- name: github.com/go-openapi/jsonpointer
+  version: 779f45308c19820f1a69e9a4cd965f496e0da10f
+- name: github.com/go-openapi/jsonreference
+  version: 36d33bfe519efae5632669801b180bf1a245da3b
+- name: github.com/go-openapi/loads
+  version: 6bb6486231e079ea125c0f39994ed3d0c53399ed
+  subpackages:
+  - fmts
+- name: github.com/go-openapi/runtime
+  version: 76cda4f2f90d26d9b4fa56447e6c85cd7b60a371
+  subpackages:
+  - client
+- name: github.com/go-openapi/spec
+  version: 02fb9cd3430ed0581e0ceb4804d5d4b3cc702694
+- name: github.com/go-openapi/strfmt
+  version: bf5b18a89572c3ae2474b537f0c3d92bc78ababa
+- name: github.com/go-openapi/swag
+  version: d5f8ebc3b1c55a4cf6489eeae7354f338cfe299e
+- name: github.com/go-openapi/validate
+  version: 035dcd74f1f61e83debe1c22950dc53556e7e4b2
 - name: github.com/golang/protobuf
   version: 2402d76f3d41f928c7902a765dfc872356dd3aad
   subpackages:
@@ -57,20 +83,38 @@ imports:
   version: 050c56d31a1ff2ebc50e3f4810fdff7e7563f6c8
   subpackages:
   - coordinate
+- name: github.com/inconshreveable/mousetrap
+  version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/jessevdk/go-flags
   version: 460c7bb0abd6e927f2767cadc91aa6ef776a98b4
 - name: github.com/krolaw/dhcp4
   version: f61f734b73027e29f7fa2ed623f2ed85a7ef08fa
+- name: github.com/mailru/easyjson
+  version: d89c33ca38a143e5190297c6252fcc75f01694ed
+  subpackages:
+  - buffer
+  - jlexer
+  - jwriter
 - name: github.com/manucorporat/sse
   version: ee05b128a739a0fb76c7ebd3ae4810c1de808d6d
 - name: github.com/mattn/go-isatty
   version: dda3de49cbfcec471bd7a70e6cc01fcc3ff90109
+- name: github.com/mitchellh/mapstructure
+  version: bfdb1a85537d60bc7e954e600c250219ea497417
 - name: github.com/pborman/uuid
   version: 1b00554d822231195d1babd97ff4a781231955c9
 - name: github.com/pin/tftp
   version: 9ea92f6b1029bc1bf3072bba195c84bb9b0370e3
   subpackages:
   - netascii
+- name: github.com/PuerkitoBio/purell
+  version: 0bcb03f4b4d0a9428594752bd2a3b9aa0a9d4bd4
+- name: github.com/PuerkitoBio/urlesc
+  version: 5bd2802263f21d8788851d5305584c82a5c75d7e
+- name: github.com/spf13/cobra
+  version: 9495bc009a56819bdb0ddbc1a373e29c140bc674
+- name: github.com/spf13/pflag
+  version: 5ccb023bc27df288a957c5e994cd44fd19619465
 - name: github.com/tylerb/graceful
   version: 4654dfbb6ad53cb5e27f37d99b02e16c1872fbbb
 - name: github.com/VictorLowther/jsonpatch
@@ -93,14 +137,22 @@ imports:
   version: f315505cf3349909cdf013ea56690da34e96a451
   subpackages:
   - context
+  - context/ctxhttp
   - html
   - html/atom
+  - idna
   - internal/iana
   - ipv4
 - name: golang.org/x/sys
   version: e24f485414aeafb646f6fca458b0bf869c0880a1
   subpackages:
   - unix
+- name: golang.org/x/text
+  version: 85c29909967d7f171f821e7a42e7b7af76fb9598
+  subpackages:
+  - transform
+  - unicode/norm
+  - width
 - name: gopkg.in/go-playground/validator.v8
   version: c193cecd124b5cc722d7ee5538e945bdb3348435
 - name: gopkg.in/mgo.v2
@@ -108,6 +160,7 @@ imports:
   repo: https://github.com/go-mgo/mgo
   subpackages:
   - bson
+  - internal/json
 - name: gopkg.in/yaml.v2
   version: a3f3340b5840cee44f372bddb5880fcbc419b46a
   repo: https://github.com/go-yaml/yaml

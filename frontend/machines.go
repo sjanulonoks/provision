@@ -43,7 +43,7 @@ type MachinePatchBodyParameter struct {
 type MachinePathParameter struct {
 	// in: path
 	// required: true
-	Name string
+	Name string `json:"name"`
 }
 
 func (f *Frontend) InitMachineApi() {

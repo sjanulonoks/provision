@@ -43,7 +43,7 @@ type TemplatePatchBodyParameter struct {
 type TemplatePathParameter struct {
 	// in: path
 	// required: true
-	Name string
+	Name string `json:"name"`
 }
 
 func (f *Frontend) InitTemplateApi() {

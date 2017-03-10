@@ -29,6 +29,7 @@ package main
 //go:generate ../tools/build-all-license.sh .. embedded/assets/ALL-LICENSE
 //go:generate ../tools/build-all-license.sh .. ALL-LICENSE
 //go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
+//go:generate swagger generate client  -f ../embedded/assets/swagger.json -A RocketSkates --principal User -t ..
 
 import (
 	"encoding/json"

@@ -41,8 +41,8 @@ type IsoResponse struct {
 }
 
 type IsoInfo struct {
-	Path string
-	Size int64
+	Path string `json:"path"`
+	Size int64  `json:"size"`
 }
 
 // IsoInfoResponse returned on a successful upload of an iso
@@ -144,7 +144,7 @@ func (f *Frontend) InitIsoApi() {
 	// The iso will be removed from the {path} in /isos.
 	//
 	//     Responses:
-	//       204: {}
+	//       204: NoContentResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/isos/:name",

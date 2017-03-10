@@ -50,6 +50,7 @@ glide install
 
 go generate server/main.go
 go build -o rocket-skates server/*
+go build -o rscli cli/*
 
 ./tools/test.sh
 
@@ -59,3 +60,4 @@ echo " export PATH=\$PATH:\$GOPATH/bin"
 echo " cd $GOPATH/src/github.com/rackn/rocket-skates"
 echo " go generate server/main.go"
 echo " go build -o rocket-skates server/*"
+echo " go build -o rscli cli/*"

@@ -39,11 +39,11 @@ type UserPatchBodyParameter struct {
 }
 
 // UserPathParameter used to name a User in the path
-// swagger:parameters putUsers getUser putUser patchUser deleteUser
+// swagger:parameters getUser putUser patchUser deleteUser
 type UserPathParameter struct {
 	// in: path
 	// required: true
-	Name string
+	Name string `json:"name"`
 }
 
 func (f *Frontend) InitUserApi() {

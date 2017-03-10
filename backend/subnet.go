@@ -214,8 +214,8 @@ type Subnet struct {
 	// We will consider adding more address allocation strategies in the future.
 	//
 	// required: true
-	// default: ["hint","nextFree","mostExpired"]
-	Pickers        []string
+	Pickers []string
+
 	p              *DataTracker
 	nextLeasableIP net.IP
 	sn             *net.IPNet
