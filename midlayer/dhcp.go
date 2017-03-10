@@ -99,6 +99,35 @@ func (h *DhcpHandler) nak(p dhcp.Packet) dhcp.Packet {
 	return dhcp.ReplyPacket(p, dhcp.NAK, h.ip, nil, 0, nil)
 }
 
+const (
+	reqInit = iota
+	reqSelecting
+	reqInitReboot
+	reqRenewing
+)
+
+func reqAddr(p dhcp.Packet, msgType dhcp.MessageType, options dhcp.Options) (addr net.IP, state int) {
+	reqBytes, haveReq := options[dhcp.OptionRequestedIPAddress]
+	if haveReq {
+		addr = net.IP(reqBytes)
+	} else {
+		addr = p.CIAddr()
+	}
+	_, haveSI := options[dhcp.OptionServerIdentifier]
+	state = reqInit
+	switch msgType {
+	case dhcp.Request:
+		if haveSI {
+			state = reqSelecting
+		} else if haveReq {
+			state = reqInitReboot
+		} else {
+			state = reqRenewing
+		}
+	}
+	return
+}
+
 func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options dhcp.Options) (res dhcp.Packet) {
 	h.Printf("Recieved DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s chaddr %s",
 		msgType.String(),
@@ -112,10 +141,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 	if via == nil || via.IsUnspecified() {
 		via = h.ip
 	}
-	req := net.IP(options[dhcp.OptionRequestedIPAddress])
-	if req == nil || req.IsUnspecified() {
-		req = p.CIAddr()
-	}
+	req, reqState := reqAddr(p, msgType, options)
 	lease := h.bk.NewLease()
 	var err error
 	switch msgType {
@@ -164,11 +190,19 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		for _, s := range h.strats {
 			lease, err = backend.FindLease(h.bk, s.Name, s.GenToken(p, options), req)
 			if err != nil {
-				addr := "UNSET"
 				if lease != nil {
-					addr = lease.Addr.String()
+					h.Printf("%s: %s already leased to %s:%s: %s",
+						xid(p),
+						req,
+						lease.Strategy,
+						lease.Token,
+						err)
+				} else {
+					h.Printf("%s: %s is no longer able to be leased: %s",
+						xid(p),
+						req,
+						err)
 				}
-				h.Printf("%s: %s already leased: %s", xid(p), addr, err)
 				return h.nak(p)
 			}
 			if lease != nil {
@@ -176,8 +210,13 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 			}
 		}
 		if lease == nil {
-			h.Printf("%s: No lease for %s in database, NAK'ing", xid(p), req)
-			return h.nak(p)
+			if reqState == reqInitReboot {
+				h.Printf("%s: No lease for %s in database, client in INIT-REBOOT.  Ignoring request.", xid(p), req)
+				return nil
+			} else {
+				h.Printf("%s: No lease for %s in database, NAK'ing", xid(p), req)
+				return h.nak(p)
+			}
 		}
 		opts, duration, nextServer := h.buildOptions(p, lease)
 		reply := dhcp.ReplyPacket(p, dhcp.ACK,

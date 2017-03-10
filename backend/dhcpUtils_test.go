@@ -68,10 +68,7 @@ func TestDHCPRenew(t *testing.T) {
 	ltfs := []ltf{
 		{"Renew subnet lease using IP address", "mac", "subn1", net.ParseIP("192.168.124.80"), true, false},
 		{"Renew reservation lease using IP address", "mac", "res1", net.ParseIP("192.168.123.10"), true, false},
-		{"Renew subnet lease using strat/token", "mac", "subn1", nil, true, false},
-		{"Renew reservation lease using strat/token", "mac", "res1", nil, true, false},
 		{"Fail to renew unknown lease using IP address in subnet", "mac", "res1", net.ParseIP("192.168.124.90"), false, true},
-		{"Fail to renew completly unknown lease", "mac", "res5", nil, false, false},
 		{"Fail to renew known lease from wrong token", "mac", "subn8", net.ParseIP("192.168.124.80"), false, true},
 		{"Fail to renew known lease from wrong address", "mac", "subn2", net.ParseIP("192.168.124.81"), false, true},
 	}
