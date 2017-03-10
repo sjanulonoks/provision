@@ -228,6 +228,10 @@ func (b *BootEnv) New() store.KeySaver {
 	return &BootEnv{Name: b.Name, p: b.p}
 }
 
+func (b *BootEnv) setDT(p *DataTracker) {
+	b.p = p
+}
+
 func (b *BootEnv) explodeIso() error {
 	// Only explode install things
 	if !strings.HasSuffix(b.Name, "-install") {

@@ -50,6 +50,11 @@ func (dt *dtobjs) add(obj store.KeySaver) {
 	dt.sort()
 }
 
+type dtSetter interface {
+	store.KeySaver
+	setDT(*DataTracker)
+}
+
 func (dt *dtobjs) remove(idx int) {
 	// This could also try harder to avoid copies, but I am not worrying for now.
 	neu := make([]store.KeySaver, 0, len(dt.d)-1)
@@ -259,6 +264,12 @@ func (p *DataTracker) getBackend(t store.KeySaver) store.SimpleStore {
 	return res
 }
 
+func (p *DataTracker) setDT(s store.KeySaver) {
+	if tgt, ok := s.(dtSetter); ok {
+		tgt.setDT(p)
+	}
+}
+
 func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 	var res store.KeySaver
 	switch ref.(type) {
@@ -368,6 +379,7 @@ func (p *DataTracker) create(ref store.KeySaver) (bool, error) {
 	if found {
 		return false, fmt.Errorf("dataTracker create %s: %s already exists", prefix, key)
 	}
+	p.setDT(ref)
 	saved, err := store.Create(ref)
 	if saved {
 		mux.add(ref)
@@ -393,7 +405,7 @@ func (p *DataTracker) remove(ref store.KeySaver) (bool, error) {
 	if !found {
 		return false, fmt.Errorf("dataTracker remove %s: %s does not exist", prefix, key)
 	}
-	removed, err := store.Remove(ref)
+	removed, err := store.Remove(mux.d[idx])
 	if removed {
 		mux.remove(idx)
 	}
@@ -419,6 +431,7 @@ func (p *DataTracker) update(ref store.KeySaver) (bool, error) {
 	if !found {
 		return false, fmt.Errorf("dataTracker remove %s: %s does not exist", prefix, key)
 	}
+	p.setDT(ref)
 	ok, err := store.Update(ref)
 	if ok {
 		mux.d[idx] = ref
@@ -442,6 +455,7 @@ func (p *DataTracker) save(ref store.KeySaver) (bool, error) {
 	key := ref.Key()
 	mux, idx, found := p.lockedGet(prefix, key)
 	defer mux.Unlock()
+	p.setDT(ref)
 	ok, err := store.Save(ref)
 	if !ok {
 		return ok, err

@@ -45,6 +45,10 @@ func (t *Template) New() store.KeySaver {
 	return store.KeySaver(res)
 }
 
+func (t *Template) setDT(p *DataTracker) {
+	t.p = p
+}
+
 func (t *Template) List() []*Template {
 	return AsTemplates(t.p.FetchAll(t))
 }
