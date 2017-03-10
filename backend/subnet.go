@@ -1,12 +1,14 @@
 package backend
 
 import (
+	"encoding/binary"
 	"math/big"
 	"net"
 	"sort"
 	"time"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	dhcp "github.com/krolaw/dhcp4"
 )
 
 type picker func(*Subnet, map[string]store.KeySaver, string, net.IP) (*Lease, bool)
@@ -338,6 +340,30 @@ func (s *Subnet) BeforeSave() error {
 	}
 	if s.Strategy == "" {
 		e.Errorf("Strategy must have a value")
+	}
+
+	// Make sure that options have the netmask and broadcast options enabled
+	needMask := true
+	needBCast := true
+	for _, opt := range s.Options {
+		if opt.Code == dhcp.OptionBroadcastAddress {
+			needBCast = false
+		}
+		if opt.Code == dhcp.OptionSubnetMask {
+			needMask = false
+		}
+	}
+	if needMask || needBCast {
+		mask := net.IP([]byte(net.IP(subnet.Mask).To4()))
+		if needMask {
+			s.Options = append(s.Options, DhcpOption{dhcp.OptionSubnetMask, mask.String()})
+		}
+		if needBCast {
+			bcastBits := binary.BigEndian.Uint32(subnet.IP) | ^binary.BigEndian.Uint32(mask)
+			buf := make([]byte, 4)
+			binary.BigEndian.PutUint32(buf, bcastBits)
+			s.Options = append(s.Options, DhcpOption{dhcp.OptionBroadcastAddress, net.IP(buf).String()})
+		}
 	}
 
 	if !s.OnlyReservations {
