@@ -19,23 +19,7 @@ ip_re='([0-9a-f.:]+/[0-9]+)'
 host_re='rebar\.uuid=([^ ]+)'
 hostname_re='option host-name "([^"]+)'
 uuid_re='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
-install_key_re='rebar\.install\.key=([^ ]+)'
-rebar_re='rebar\.web=([^ ]+)'
 netname_re='"network":"([^ ]+)"'
-
-# Grab the boot parameters we should always be passed
-
-# install key first
-export REBAR_KEY="$(get_param "$install_key_re")"
-export REBAR_ENDPOINT="$(get_param "$rebar_re")"
-
-echo "export REBAR_KEY=\"$REBAR_KEY\"" >/etc/profile.d/rebar-key.sh
-echo "export REBAR_ENDPOINT=\"$REBAR_ENDPOINT\"" >> /etc/profile.d/rebar-key.sh
-# Provisioner and Rebar web endpoints next
-
-# Download the Rebar CLI
-(cd /usr/local/bin; curl -s -f -L -O  "$PROVISIONER_WEB/files/rebar"; chmod 755 rebar)
-export PATH=$PATH:/usr/local/bin
 
 # Assume nothing about the hostname.
 unset HOSTNAME
@@ -68,6 +52,7 @@ else
     if [[ $(ip -4 -o addr show dev $BOOTDEV) =~ $bootdev_ip_re ]]; then
         IP="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
     fi
+
     # Create a new node for us,
     # Add the default noderoles we will need, and
     # Let the annealer do its thing.
@@ -82,16 +67,7 @@ else
         exit 1
     }
     REBAR_UUID="$(rebar nodes show "$HOSTNAME" |jq -r '.uuid')"
-    # does the rebar-managed-role exist?
-    if ! grep -q rebar-managed-node < <(rebar nodes roles $REBAR_UUID); then
-        rebar nodes bind $REBAR_UUID to rebar-managed-node && \
-            rebar nodes commit $REBAR_UUID || {
-            echo "We could not commit the node!"
-            exit 1
-        }
-    else
-        echo "Node already committed, moving on"
-    fi
+
     dhclient -r && \
         rm /var/lib/dhclient/dhclient.leases && \
         sleep 5 && \
@@ -107,20 +83,6 @@ hostname "$HOSTNAME"
 
 # Force reliance on DNS
 echo '127.0.0.1 localhost' >/etc/hosts
-
-# Both of these are stupid hacks that should go away once providers manage aspects of networks
-control_ip=$(ip -o -4 addr show scope global dev "$BOOTDEV" |awk '{print $4}')
-rebar nodes set $REBAR_UUID attrib node-control-address to "{\"value\": \"${control_ip}\"}"
-rebar nodes set $REBAR_UUID attrib node-private-control-address to "{\"value\": \"${control_ip}\"}"
-
-# Always make sure we are marking the node not alive. It will comeback later.
-rebar nodes update $REBAR_UUID '{"alive": false, "bootenv": "sledgehammer"}'
-echo "Set node not alive - will be set in control.sh!"
-
-# Wait until the provisioner has noticed our state change
-while [[ $(rebar nodes get "$REBAR_UUID" attrib provisioner-active-bootstate |jq -r '.value') != sledgehammer ]]; do
-    sleep 1
-done
 
 control_sh_found=''
 for p in "$REBAR_UUID" "$HOSTNAME"; do

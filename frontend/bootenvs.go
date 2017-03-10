@@ -43,7 +43,7 @@ type BootEnvPatchBodyParameter struct {
 type BootEnvPathParameter struct {
 	// in: path
 	// required: true
-	Name string
+	Name string `json:"name"`
 }
 
 func (f *Frontend) InitBootEnvApi() {

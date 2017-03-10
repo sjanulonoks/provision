@@ -17,6 +17,7 @@ install:
 - ./tools/download-assets.sh
 - go generate server/main.go
 - go build -o rocket-skates server/*
+- go build -o rscli cli/*
 
 script:
 - ./tools/test.sh

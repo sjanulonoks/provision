@@ -211,7 +211,7 @@ func (f *Frontend) InitFileApi() {
 	// The file will be removed from the {path} in /files.
 	//
 	//     Responses:
-	//       204: {}
+	//       204: NoContentResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/files/*path",

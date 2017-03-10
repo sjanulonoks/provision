@@ -20,6 +20,12 @@ type ErrorResponse struct {
 	Body backend.Error
 }
 
+// NoContentResponse is returned for deletes
+// swagger:response
+type NoContentResponse struct {
+	//description: Nothing
+}
+
 // operation represents a valid JSON Patch operation as defined by RFC 6902
 type JSONPatchOperation struct {
 	// All Operations must have an Op.
