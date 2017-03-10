@@ -14,35 +14,25 @@ import (
 // midlayer must NAK the request.
 type LeaseNAK error
 
-func _findLease(leases, reservations *dtobjs, strat, token string, req net.IP) (lease *Lease, err error) {
-	if req != nil && req.IsGlobalUnicast() {
-		hexreq := Hexaddr(req.To4())
-		idx, found := leases.find(hexreq)
-		if !found {
-			err = LeaseNAK(fmt.Errorf("No lease for %s exists", hexreq))
-			return
-		}
-		// Found a lease that exists for the requested address.
-		lease = AsLease(leases.d[idx])
-		if !lease.Expired() && (lease.Token != token || lease.Strategy != strat) {
-			// And it belongs to someone else.  So sad, gotta NAK
-			err = LeaseNAK(fmt.Errorf("Lease for %s owned by %s:%s",
-				hexreq, lease.Strategy, lease.Token))
-			lease = nil
-			return
-		}
-	} else {
-		for i := range leases.d {
-			lease = AsLease(leases.d[i])
-			if lease.Token == token && lease.Strategy == strat {
-				break
-			}
-			lease = nil
-		}
-		if lease == nil {
-			// We did not find a lease for this system to renew.
-			return
-		}
+func findLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, err error) {
+	leases := dt.lockFor("leases")
+	reservations := dt.lockFor("reservations")
+	defer leases.Unlock()
+	defer reservations.Unlock()
+	hexreq := Hexaddr(req.To4())
+	idx, found := leases.find(hexreq)
+	if !found {
+		err = LeaseNAK(fmt.Errorf("No lease for %s exists", hexreq))
+		return
+	}
+	// Found a lease that exists for the requested address.
+	lease = AsLease(leases.d[idx])
+	if !lease.Expired() && (lease.Token != token || lease.Strategy != strat) {
+		// And it belongs to someone else.  So sad, gotta NAK
+		err = LeaseNAK(fmt.Errorf("Lease for %s owned by %s:%s",
+			hexreq, lease.Strategy, lease.Token))
+		lease = nil
+		return
 	}
 	// This is the lease we want, but if there is a conflicting reservation we
 	// may force the client to give it up.
@@ -65,15 +55,6 @@ func _findLease(leases, reservations *dtobjs, strat, token string, req net.IP) (
 	lease.Token = token
 	lease.ExpireTime = time.Now().Add(2 * time.Second)
 	lease.p.Logger.Printf("Found our lease for strat: %s token %s, will use it", strat, token)
-	return
-}
-
-func findLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, err error) {
-	leases := dt.lockFor("leases")
-	reservations := dt.lockFor("reservations")
-	defer leases.Unlock()
-	defer reservations.Unlock()
-	lease, err = _findLease(leases, reservations, strat, token, req)
 	return
 }
 
