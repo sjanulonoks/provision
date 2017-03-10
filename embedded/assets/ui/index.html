@@ -30,9 +30,16 @@
   <script type="text/javascript">
     $.getJSON( "../api/v3/interfaces", function( data ) {
         $.each( data, function( key, val ) {
-          $("tbody").append( "<tr id='" + data[key].Index + "'><td>" + data[key].Name + "</td><td>" + data[key].Addresses +"</td></tr>" );
+          $("tbody#interfaces").append( "<tr id='" + data[key].Index + "'><td>" + data[key].Name + "</td><td>" + data[key].Addresses +"</td></tr>" );
         });
      });
+
+    $.getJSON( "../api/v3/bootenvs", function( data ) {
+        $.each( data, function( key, val ) {
+          $("tbody#bootenvs").append( "<tr id='" + data[key].Name + "'><td>" + data[key].Name + "</td><td>" + data[key].Available +"</td><td><a href=`"+ data[key].OS.IsoUrl + "'>" + data[key].OS.IsoFile +"</a></td></tr>" );
+        });
+     });
+
   </script>
 </head>
 
@@ -43,11 +50,21 @@
 
   Rocket Skates UI work in progress...
 
+  <h2>Interfaces</h2>
   <table border="2" cellpadding="2">
     <thead>
       <tr><th>Interface</th><th>Address</th></tr>
     </thead>
-    <tbody>
+    <tbody id="interfaces">
+    </tbody>
+  </table>
+
+  <h2>Boot Environments</h2>
+  <table border="2" cellpadding="2">
+    <thead>
+      <tr><th>Environment</th><th>Active</th><th>Path</th></tr>
+    </thead>
+    <tbody id="bootenvs">
     </tbody>
   </table>
 
