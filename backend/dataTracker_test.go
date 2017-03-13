@@ -127,51 +127,6 @@ func TestBackingStorePersistence(t *testing.T) {
 	}
 }
 
-func TestExtractAssets(t *testing.T) {
-	bs, err := store.NewFileBackend(tmpDir)
-	if err != nil {
-		t.Errorf("Could not create boltdb: %v", err)
-		return
-	}
-	dt := mkDT(bs)
-	if err := dt.ExtractAssets(); err != nil {
-		t.Errorf("Could not extract assets: %v", err)
-		return
-	}
-
-	files := []string{
-		"ALL-LICENSE",
-		"explode_iso.sh",
-		"install-sledgehammer.sh",
-		"stage1-data/busybox",
-		"stage1-data/stage1_init",
-		"stage1-data/udhcpc_config",
-		"machines/start-up.sh",
-		"files/jq",
-		"files/rscli",
-		"bootia32.efi",
-		"bootia64.efi",
-		"esxi.0",
-		"ipxe.efi",
-		"ipxe.pxe",
-		"ldlinux.c32",
-		"libutil.c32",
-		"lpxelinux.0",
-		"pxechn.c32",
-		"wimboot",
-		"default.ipxe",
-		"elilo.conf",
-		"pxelinux.cfg/default",
-	}
-
-	for _, f := range files {
-		if _, err := os.Stat(path.Join(tmpDir, f)); os.IsNotExist(err) {
-			t.Errorf("File %s does NOT exist, but should.", f)
-		}
-	}
-
-}
-
 // Load should only be used by tests, hence it living in a _test file.
 func (p *DataTracker) load(prefix, key string) store.KeySaver {
 	objs, idx, found := p.lockedGet(prefix, key)
