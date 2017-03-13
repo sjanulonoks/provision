@@ -130,6 +130,14 @@ func TestSwaggerPieces(t *testing.T) {
 	}
 }
 
+func TestRoot(t *testing.T) {
+	localDTI := testFrontend()
+
+	req, _ := http.NewRequest("GET", "/", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, 302)
+}
+
 func TestUIBase(t *testing.T) {
 	localDTI := testFrontend()
 
