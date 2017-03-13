@@ -37,5 +37,5 @@ go generate server/assets.go
 go build -o rocket-skates server/*
 go build -o rscli cli/*
 
-./tools/test.sh
+echo "To run tests, run: tools/test.sh"
 echo "To rebuild after changes, rerun tools/build.sh"
