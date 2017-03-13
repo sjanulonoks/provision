@@ -88,7 +88,7 @@ var c_opts ProgOpts
 func main() {
 	var err error
 
-	logger := log.New(os.Stderr, "provisioner-mgmt", log.LstdFlags|log.Lmicroseconds|log.LUTC)
+	logger := log.New(os.Stderr, "rocket-skates ", log.LstdFlags|log.Lmicroseconds|log.LUTC)
 
 	parser := flags.NewParser(&c_opts, flags.Default)
 	if _, err = parser.Parse(); err != nil {
