@@ -29,21 +29,41 @@
 
   <script type="text/javascript">
     var subnets = {};
-    $.getJSON( "../api/v3/subnets", function( data ) {
-        $.each( data, function( key, val ) {
-          subnets[val.Name] = val
-        });
-     });
-
     $.getJSON( "../api/v3/interfaces", function( data ) {
         $.each( data, function( key, val ) {
-          if (!subnets[val.Name]) subnets[val.Name] = { 'Subnet':'not defined'};
-          $("tbody#interfaces").append( "<tr id='" + val.Index + "'><td>" 
-            + val.Name + "</td><td>" 
-            + val.Addresses + "  </td><td>" 
-            + subnets[val.Name].Subnet + "</td></tr>"
-          );
+          val.broadcast = true;
+          subnets[val.Name] = val;
         });
+
+        // add interfaces to subnets list
+        $.getJSON( "../api/v3/subnets", function( data ) {
+            $.each( data, function( key, val ) {
+              val.broadcast = (subnets[val.Name] != null);
+              subnets[val.Name] = val;
+            });
+
+            $.each( subnets, function( key, val ) {
+
+              if (val.Subnet) {
+                $("tbody#subnets").prepend( "<tr id='" + val.Name + "'><td>"
+                  + val.Name + "</td><td>" 
+                  + (val.broadcast ? 'broadcast' : 'relayed' ) + "</td><td>" 
+                  + val.Subnet + "  </td><td>" 
+                  + (val.OnlyReservations ? 'required' : 'optional') + "  </td><td>" 
+                  + val.ActiveLeaseTime + "</td><td>"
+                  + val.ReservedLeaseTime + "</td><td>"
+                  + val.ActiveStart + ' to ' + val.ActiveEnd + "</td></tr>"
+                );
+              } else {
+                $.each (val.Addresses, function (subkey, subval ) {
+                  $("tbody#subnets").append( "<tr id='" + val.Name + "'><td>"
+                    + "iface " + val.Name + "</td><td colspan='6'>" 
+                    + "ADD BROADCAST SUBNET > " + subval + "</td></tr>"
+                  );
+                })
+              };
+            });
+         });
      });
 
     $.getJSON( "../api/v3/bootenvs", function( data ) {
@@ -60,18 +80,54 @@
     <h1>Rocket Skates</h1>
   </div>
 
-  Rocket Skates UI work in progress...
+  <h2>Subnets (<a target="_new" href="http://rocket-skates.readthedocs.io/en/latest/doc/ui.html#subnets">UI Help</a> | <a target="_new" href="/swagger-ui/#/subnets">API Help</a>)</h2>
 
-  <h2>Interfaces</h2>
+  <table border="2" cellpadding="2">
+    <thead>
+      <tr>
+        <th>Name/NIC</th>
+        <th>Type</th>
+        <th>Subnet</th>
+        <th>Reservations</th>
+        <th>Active Lease Time</th>
+        <th>Reserved Lease Time</th>
+        <th>Range</th>
+      </tr>
+    </thead>
+    <tbody id="subnets">
+    </tbody>
+  </table>
+
+  <table>
+    <tr><th>Field</th><th>Value</th><th>Hint</th></tr>
+    <tr><td>Name:</td><td id=subnet_name>_</td><td>Unique ID or NIC</td></tr>
+    <tr><td>Subnet:</td><td id=subnet_subnet>_</td><td>CIDR for Subnet</td></tr>
+    <tr><td>Next Server:</td><td id=subnet_subnet>_</td><td>(optional)</td></tr>
+    <tr><td>Active Start IP:</td><td id=subnet_subnet>_</td><td></td></tr>
+    <tr><td>Active End IP:</td><td id=subnet_subnet>_</td><td></td></tr>
+    <tr><td>Active Lease Time:</td><td id=subnet_subnet>_</td><td></td></tr>
+    <tr><td>Reserved Lease Time:</td><td id=subnet_subnet>_</td><td></td></tr>
+    <tr><td>Only Reservations:</td><td id=subnet_subnet>_</td><td></td></tr>
+    <tr><td>Only Reservations:</td><td id=subnet_subnet>_</td><td></td></tr>
+    <tr><td>Option 67: Next Boot</td><td id=subnet_subnet>_</td><td></td></tr>
+    <tr><td>Option 6: DNS Server</td><td id=subnet_subnet>_</td><td></td></tr>
+    <tr><td>Option 15: Domain Name</td><td id=subnet_subnet>_</td><td></td></tr>
+    <tr><td>Option 3: Default Gateway</td><td id=subnet_subnet>_</td><td></td></tr>
+  </table>
+
+  [ADD / UPDATE BUTTON] [DELETE BUTTON]
+
+  <hr/>
+
   <table border="2" cellpadding="2">
     <thead>
       <tr><th>Interface</th><th>Address</th><th>Subnet</th></tr>
     </thead>
-    <tbody id="interfaces">
+    <tbody id="relayed">
     </tbody>
   </table>
 
-  <h2>Boot Environments</h2>
+  <h2>Boot Environments (<a target="_new" href="/swagger-ui/#/bootenvs">API Help</a>)</h2>
   <table border="2" cellpadding="2">
     <thead>
       <tr><th>Environment</th><th>Active</th><th>Path</th></tr>
@@ -84,3 +140,4 @@
   <div id="ui-container" class="swagger-ui-wrap"></div>
 </body>
 </html>
+o^o

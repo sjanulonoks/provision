@@ -10,8 +10,9 @@ import (
 
 func RunDhcpHandler(dhcpInfo *backend.DataTracker, ifs []*backend.Interface) {
 	handlers := make(map[int]dhcp.Handler, 0)
+	dhcpInfo.Logger.Println("DOCUMENTATION - http://rocket-skates.readthedocs.io/en/latest/doc/faq-troubleshooting.html")
 	for _, ii := range ifs {
-		log.Println("Starting on interface: ", ii.Name, " with server ip: ", ii.ActiveAddress)
+		dhcpInfo.Logger.Println("Starting on interface: ", ii.Name, " with server ip: ", ii.ActiveAddress)
 
 		serverIP, _, _ := net.ParseCIDR(ii.ActiveAddress)
 		serverIP = serverIP.To4()

@@ -31,6 +31,7 @@ package main
 //go:generate swagger generate client  -f ../embedded/assets/swagger.json -A RocketSkates --principal User -t ..
 //go:generate go build -o ../embedded/assets/rscli ../cli/...
 //go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
+//go:generate swagger generate client  -f ../embedded/assets/swagger.json -A RocketSkates --principal User -t ..
 
 import (
 	"encoding/json"

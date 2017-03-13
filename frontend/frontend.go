@@ -116,6 +116,11 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Fronte
 		mgmtApi.Static("/ui", devUI)
 	}
 
+	// root path, forward to UI
+	mgmtApi.GET("/", func(c *gin.Context) {
+		c.Redirect(302, "/ui/")
+	})
+
 	return
 }
 
