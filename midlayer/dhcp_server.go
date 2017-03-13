@@ -10,6 +10,7 @@ import (
 
 func RunDhcpHandler(dhcpInfo *backend.DataTracker, ifs []*backend.Interface) {
 	handlers := make(map[int]dhcp.Handler, 0)
+	log.Println("DOCUMENTATION http://rocket-skates.readthedocs.io/en/latest/doc/faq-troubleshooting.html")
 	for _, ii := range ifs {
 		log.Println("Starting on interface: ", ii.Name, " with server ip: ", ii.ActiveAddress)
 
