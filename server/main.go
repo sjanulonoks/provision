@@ -21,18 +21,6 @@
 // swagger:meta
 package main
 
-//
-// Yes - Twice - once to get the basic pieces in place to let swagger run, then the final parts
-//
-//go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
-//go:generate swagger generate spec -o ../embedded/assets/swagger.json
-//go:generate ../tools/build-all-license.sh .. embedded/assets/ALL-LICENSE
-//go:generate ../tools/build-all-license.sh .. ALL-LICENSE
-//go:generate swagger generate client  -f ../embedded/assets/swagger.json -A RocketSkates --principal User -t ..
-//go:generate go build -o ../embedded/assets/rscli ../cli/...
-//go:generate go-bindata -prefix ../embedded -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
-//go:generate swagger generate client  -f ../embedded/assets/swagger.json -A RocketSkates --principal User -t ..
-
 import (
 	"encoding/json"
 	"fmt"
@@ -190,12 +178,14 @@ func main() {
 		logger)
 
 	// We have a backend, now get default assets
-	logger.Printf("Extracting Default Assets\n")
-	if err := dt.ExtractAssets(); err != nil {
-		logger.Fatalf("Unable to extract assets: %v", err)
+	if !c_opts.DisableProvisioner {
+		logger.Printf("Extracting Default Assets\n")
+		if err := ExtractAssets(c_opts.FileRoot); err != nil {
+			logger.Fatalf("Unable to extract assets: %v", err)
+		}
 	}
 	// Add discovery image pieces if not excluded
-	if !c_opts.ExcludeDiscovery {
+	if !c_opts.ExcludeDiscovery && !c_opts.DisableProvisioner {
 		logger.Printf("Installing Discovery Image - could take a long time (restart with --exclude-discovery flag to skip)\n")
 		cmd := exec.Command("./install-sledgehammer.sh", c_opts.SledgeHammerHash, c_opts.SledgeHammerURL)
 		cmd.Dir = c_opts.FileRoot
@@ -206,11 +196,11 @@ func main() {
 	}
 
 	// Load default templates and bootenvs
-	children, err := embedded.AssetDir("assets/templates")
+	children, err := embedded.AssetDir("templates")
 	for _, c := range children {
 		_, ok := dt.FetchOne(dt.NewTemplate(), c)
 		if !ok {
-			data, _ := embedded.Asset("assets/templates/" + c)
+			data, _ := embedded.Asset("templates/" + c)
 			t := dt.NewTemplate()
 			t.Contents = string(data)
 			t.ID = c
@@ -222,9 +212,9 @@ func main() {
 			}
 		}
 	}
-	children, err = embedded.AssetDir("assets/bootenvs")
+	children, err = embedded.AssetDir("bootenvs")
 	for _, c := range children {
-		data, _ := embedded.Asset("assets/bootenvs/" + c)
+		data, _ := embedded.Asset("bootenvs/" + c)
 		b := dt.NewBootEnv()
 		err = json.Unmarshal(data, b)
 		if err != nil {

@@ -93,7 +93,7 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Fronte
 	me.InitInterfaceApi()
 
 	// Swagger.json serve
-	buf, err := embedded.Asset("assets/swagger.json")
+	buf, err := embedded.Asset("swagger.json")
 	if err != nil {
 		logger.Fatalf("Failed to load swagger.json asset")
 	}
@@ -105,12 +105,12 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Fronte
 
 	// Server Swagger UI.
 	mgmtApi.StaticFS("/swagger-ui",
-		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "assets/swagger-ui"})
+		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "swagger-ui"})
 
 	// Server UI with flag to run from local files instead of assets
 	if len(devUI) == 0 {
 		mgmtApi.StaticFS("/ui",
-			&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "assets/ui"})
+			&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "ui"})
 	} else {
 		logger.Printf("DEV: Running UI from %s\n", devUI)
 		mgmtApi.Static("/ui", devUI)

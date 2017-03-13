@@ -33,9 +33,7 @@ for tool in go-bindata swagger glide; do
 done
 
 glide install
-tools/download-assets.sh
-
-go generate server/main.go
+go generate server/assets.go
 go build -o rocket-skates server/*
 go build -o rscli cli/*
 

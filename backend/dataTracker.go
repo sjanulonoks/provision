@@ -1,21 +1,14 @@
 package backend
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"os"
-	"path"
 	"sort"
-	"strings"
 	"sync"
-	"text/template"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/digitalrebar/go/rebar-api/api"
-	"github.com/rackn/rocket-skates/embedded"
 )
 
 type dtobjs struct {
@@ -152,111 +145,6 @@ func NewDataTracker(backend store.SimpleStore,
 	res.makeBackends(backend, objs)
 	res.loadData(objs)
 	return res
-}
-
-// ExtractAssets is responsible for saving all the assets we need to act as a dataTracker.
-func (p *DataTracker) ExtractAssets() error {
-	if !p.useProvisioner {
-		return nil
-	}
-	if p.FileRoot == "" {
-		return fmt.Errorf("ExtractAssets called before FileRoot was set")
-	}
-
-	dirs := []string{"isos", "files", "machines", "pxelinux.cfg"}
-	for _, dest := range dirs {
-		destDir := path.Join(p.FileRoot, dest)
-		if err := os.MkdirAll(destDir, 0755); err != nil {
-			return err
-		}
-	}
-
-	assets := map[string]string{
-		// General LICENSE thing
-		"assets/ALL-LICENSE": "",
-
-		// CLI things
-		"assets/rscli": "files",
-
-		// General ISO things
-		"assets/explode_iso.sh": "",
-
-		// Sledgehammer things
-		"assets/install-sledgehammer.sh": "",
-		"assets/provisioner/busybox":     "stage1-data",
-		"assets/stage1_init":             "stage1-data",
-		"assets/udhcpc_config":           "stage1-data",
-		"assets/start-up.sh":             "machines",
-		"assets/provisioner/jq":          "files",
-		"assets/default.ipxe.tmpl":       "",
-		"assets/elilo.conf.tmpl":         "",
-		"assets/default.tmpl":            "pxelinux.cfg",
-
-		// General Boot things
-		"assets/provisioner/bootia32.efi": "",
-		"assets/provisioner/bootia64.efi": "",
-		"assets/provisioner/bootx64.efi":  "",
-		"assets/provisioner/esxi.0":       "",
-		"assets/provisioner/ipxe.efi":     "",
-		"assets/provisioner/ipxe.pxe":     "",
-		"assets/provisioner/ldlinux.c32":  "",
-		"assets/provisioner/libutil.c32":  "",
-		"assets/provisioner/lpxelinux.0":  "",
-		"assets/provisioner/pxechn.c32":   "",
-		"assets/provisioner/wimboot":      "",
-	}
-
-	for src, dest := range assets {
-		buf, err := embedded.Asset(src)
-		if err != nil {
-			return fmt.Errorf("No such embedded asset %s", src)
-		}
-		info, err := embedded.AssetInfo(src)
-		if err != nil {
-			return fmt.Errorf("No mode info for embedded asset %s", src)
-		}
-
-		if strings.HasSuffix(src, ".tmpl") {
-			var doc bytes.Buffer
-
-			t, err := template.New("test").Parse(string(buf))
-			if err != nil {
-				return err
-			}
-
-			params := struct {
-				ProvIp      string
-				ProvFileURL string
-				ProvApiURL  string
-			}{
-				ProvIp:      p.OurAddress,
-				ProvFileURL: p.FileURL,
-				ProvApiURL:  p.ApiURL,
-			}
-			err = t.Execute(&doc, params)
-			if err != nil {
-				return err
-			}
-			buf = doc.Bytes()
-			src = strings.TrimSuffix(src, ".tmpl")
-		}
-
-		parts := strings.Split(src, "/")
-		destFile := path.Join(p.FileRoot, dest, parts[len(parts)-1])
-		destDir := path.Dir(destFile)
-		if err := os.MkdirAll(destDir, 0755); err != nil {
-			return err
-		}
-
-		if err := ioutil.WriteFile(destFile, buf, info.Mode()); err != nil {
-			return err
-		}
-		if err := os.Chtimes(destFile, info.ModTime(), info.ModTime()); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (p *DataTracker) getBackend(t store.KeySaver) store.SimpleStore {
