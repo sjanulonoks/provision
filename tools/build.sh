@@ -3,6 +3,8 @@
 [[ $GOPATH ]] || export GOPATH="$HOME/go"
 fgrep -q "$GOPATH/bin" <<< "$PATH" || export PATH="$PATH:$GOPATH/bin"
 
+[[ -d "$GOPATH/src/github.com/rackn/rocket-skates" ]] || go get github.com/rackn/rocket-skates
+
 cd "$GOPATH/src/github.com/rackn/rocket-skates"
 if ! which go &>/dev/null; then
         echo "Must have go installed"
