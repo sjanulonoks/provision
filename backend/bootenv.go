@@ -199,7 +199,7 @@ func (b *BootEnv) parseTemplates(e *Error) {
 	return
 }
 
-func (b *BootEnv) AfterLoad() error {
+func (b *BootEnv) OnLoad() error {
 	e := &Error{o: b}
 	b.parseTemplates(e)
 	b.Errors = e.Messages
