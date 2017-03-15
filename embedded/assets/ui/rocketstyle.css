@@ -10,15 +10,22 @@ a:not(#logo) {
   color: #547f00 !important;
 }
 
-.input-table td:first-child {
-  font-weight: bold;
-  margin-right: 5px;
-  text-align: right;
+.updating-content {
+  pointer-events: none;
+  opacity: 0.6;
 }
 
 .input-table td {
   border-bottom: none !important;
   padding: 3px !important;
+}
+
+.input-table .expand {
+  cursor: pointer;
+  display: flex;
+  font-size: 15px;
+  justify-content: center;
+  margin: 0;
 }
 
 .interface-pair {
