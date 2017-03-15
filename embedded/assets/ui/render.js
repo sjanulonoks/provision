@@ -35,6 +35,9 @@ class Subnet extends React.Component {
     var val = event.target.value;
     if(event.target.type === "number" && val && typeof val !== 'undefined')
       val = parseInt(val);
+    if(event.target.type === "select-one") {
+      val = val === "true";
+    }
     this.setState({
       [event.target.name]: val,
       _edited: true
@@ -86,6 +89,7 @@ class Subnet extends React.Component {
           <td>
             <select
               name="OnlyReservations"
+              type="bool"
               value={subnet.OnlyReservations}
               onChange={this.handleChange}>
                 <option value="true">Required</option>
@@ -230,7 +234,7 @@ class Subnets extends React.Component {
   addSubnet(template) {
     var subnet = {
       _new: true,
-      ActiveLeaseTime: 0,
+      ActiveLeaseTime: 60,
       ReservedLeaseTime: 7200,
       OnlyReservations: true,
       Strategy: "MAC",
@@ -282,6 +286,8 @@ class Subnets extends React.Component {
       resp.updating = false;
       resp._edited = false;
       resp._new = false;
+      resp.error = false;
+      resp.errorMessage = '';
       elem.setState(resp);
 
     }).fail((err) => {
