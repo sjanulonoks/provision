@@ -16,6 +16,11 @@ a:not(#logo) {
   text-align: right;
 }
 
+.input-table td {
+  border-bottom: none !important;
+  padding: 3px !important;
+}
+
 .interface-pair {
   align-items: center;
   border: none;

@@ -1,87 +1,109 @@
 /* jshint esversion: 6 */
 
-var SubnetForm = React.createClass({
-  getInitialState() {
-    return this.getDefaultState();
-  },
+class Subnet extends React.Component {
 
-  getDefaultState() {
-    return {
-      Name: "",
-      Subnet: "",
-      NextServer: "",
-      ActiveStart: "",
-      ActiveEnd: "",
-      ActiveLeaseTime: 0,
-      ReservedLeaseTime: 7200,
-      OnlyReservations: true,
-      Options: {
-        "3": "",
-        "6": "",
-        "15": "",
-        "67": ""
-      },
-      "Strategy": "MAC"
-    };
-  },
+  constructor(props) {
+    super(props);
+
+    this.state = this.props.subnet;
+
+    this.handleChange = this.handleChange.bind(this);
+  }
 
   handleChange(event) {
-    this.setState({[event.target.name]: event.target.value});
-  },
-
-  handleSubmit() {
-
-  },
-
-  shouldComponentUpdate(nextProps, nextState) {
-    this.setState(nextProps.value);
-    return true;
-  },
+    this.setState({
+      [event.target.name]: event.target.value,
+      _edited: true
+    });
+  }
 
   render() {
-    var inputs = [
-      {name: "Name", type: "text", display: "Name", placeholder: "eth0"},
-      {name: "Subnet", type: "text", display: "Subnet", placeholder: "10.10.10.1/24"},
-      {name: "NextServer", type: "text", display: "Next Server", placeholder: "10.10.10.1"},
-      {name: "ActiveStart", type: "text", display: "Active Start", placeholder: "10.10.10.0"},
-      {name: "ActiveEnd", type: "text", display: "Active End", placeholder: "10.10.10.255"},
-      {name: "ActiveLeaseTime", type: "text", display: "Active Lease Time", placeholder: "0"},
-      {name: "ReservedLeaseTime", type: "text", display: "Reserved Lease Time", placeholder: "7200"},
-      {name: "OnlyReservations", type: "checkbox", display: "Only Reservations", placeholder: "true"}
-    ];
-
+    var subnet = this.state;
     return (
-      <form onSubmit={this.handleSubmit}>
-        <table className="input-table">
-          <tbody>
-            {inputs.map(obj =>
-              <tr key={obj.name}>
-                <td>{obj.display}:</td>
-                <td>
-                  <input
-                    type={obj.type}
-                    name={obj.name}
-                    placeholder={obj.placeholder}
-                    value={this.state[obj.name]}
-                    onChange={this.handleChange}/>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </form>
+      <tbody>
+        <tr>
+          <td>
+            <input
+              type="text"
+              name="Name"
+              size="8"
+              placeholder="eth0"
+              value={subnet.Name}
+              onChange={this.handleChange}/>
+          </td>
+          <td>{subnet.broadcast ? "broadcast" : "relayed"}</td>
+          <td>
+            <input
+              type="text"
+              name="Subnet"
+              size="15"
+              placeholder="192.168.1.1/24"
+              value={subnet.Subnet}
+              onChange={this.handleChange}/>
+          </td>
+          <td>
+            <select
+              name="OnlyReservations"
+              value={subnet.OnlyReservations}
+              onChange={this.handleChange}>
+                <option value="true">Required</option>
+                <option value="false">Optional</option>
+              </select>
+          </td>
+          <td>
+            <input
+              type="number"
+              name="ActiveLeaseTime"
+              style={{width: "50px"}}
+              placeholder="0"
+              value={subnet.ActiveLeaseTime}
+              onChange={this.handleChange}/>
+            &amp;
+            <input
+              type="number"
+              name="ReservedLeaseTime"
+              style={{width: "50px"}}
+              placeholder="7200"
+              value={subnet.ReservedLeaseTime}
+              onChange={this.handleChange}/>
+          </td>
+          <td>
+            <input
+              type="text"
+              name="ActiveStart"
+              size="12"
+              placeholder="10.0.0.0"
+              value={subnet.ActiveStart}
+              onChange={this.handleChange}/>
+            ...
+            <input
+              type="text"
+              name="ActiveEnd"
+              size="12"
+              placeholder="10.0.0.255"
+              value={subnet.ActiveEnd}
+              onChange={this.handleChange}/>
+          </td>
+          <td>{subnet._new ? 'Add' : (subnet._edited ? 'Update' : '')}</td>
+        </tr>
+      </tbody>
     );
   }
-})
+}
 
-var Subnets = React.createClass({
-  getInitialState() {
-    return {
+class Subnets extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
       subnets: [],
       interfaces: [],
-      subnetVal: {}
     };
-  },
+
+    this.componentDidMount = this.componentDidMount.bind(this);
+    this.addSubnet = this.addSubnet.bind(this);
+    this.updateSubnet = this.updateSubnet.bind(this);
+  }
   
   getSubnets() {
     return new Promise((resolve, reject) => {
@@ -105,28 +127,43 @@ var Subnets = React.createClass({
           }
 
           resolve({
-            interfaces: Object.keys(interfaces).map(k => interfaces[k]),
-            subnets: Object.keys(subnets).map(k => subnets[k])
+            interfaces: interfaces,
+            subnets: subnets
           });
         });
       });
     });
-  },
+  }
 
   componentDidMount() {
     this.getSubnets().then(data => {
       this.setState({
-        subnets: data.subnets,
-        interfaces: data.interfaces
+        subnets: Object.keys(data.subnets).map(k => data.subnets[k]),
+        interfaces: Object.keys(data.interfaces).map(k => data.interfaces[k])
       });
     });
-  },
+  }
 
-  updateForm(data) {
-    return () => {
-      this.setState({subnetVal: data});
+  addSubnet(template) {
+    var subnet = {
+      _new: true,
+      ActiveLeaseTime: 0,
+      ReservedLeaseTime: 7200,
+      OnlyReservations: true,
     };
-  },
+    if(typeof template !== "undefined") {
+      for(var key in template) {
+        subnet[key] = template[key];
+      }
+    }
+    this.setState({
+      subnets: this.state.subnets.concat(subnet)
+    });
+  }
+
+  updateSubnet(subnet) {
+
+  }
 
   render() {
     return (
@@ -138,32 +175,29 @@ var Subnets = React.createClass({
             <th>Type</th>
             <th>Subnet</th>
             <th>Reservations</th>
-            <th>Active Lease Time</th>
-            <th>Reserved Lease Time</th>
+            <th>Active &amp; Reserved Lease Time</th>
             <th>Range</th>
+            <th></th>
           </tr>
         </thead>
-        <tbody>{this.state.subnets.map(
-          (val) => (<tr key={val.Name}>
-            <td><a onClick={this.updateForm(val)}>{val.Name}</a></td>
-            <td>{val.broadcast ? "broadcast" : "relayed"}</td>
-            <td>{val.Subnet}</td>
-            <td>{val.OnlyReservations ? "required" : "optional"}</td>
-            <td>{val.ActiveLeaseTime}</td>
-            <td>{val.ReservedLeaseTime}</td>
-            <td>{val.ActiveStart} to {val.ActiveEnd}</td>
-          </tr>)
-        )}</tbody>
+        {this.state.subnets.map(
+          (val, i) => <Subnet subnet={val} update={this.updateSubnet} key={i} />
+        )}
+        <tfoot>
+          <tr>
+            <td colSpan="7" style={{textAlign: "center"}}>
+              <button onClick={this.addSubnet}>New Subnet</button>
+            </td>
+          </tr>
+        </tfoot>
       </table>
-
-      <SubnetForm value={this.state.subnetVal}/>
 
       <h2 style={{display: "flex", flexDirection: "row", alignItems: "center"}}>
         <span>Available Interfaces: </span>
         <span className="interface-list">
           {this.state.interfaces.map(val => 
             val.Addresses.map(subval =>
-              <a key={val.Name} className="interface-pair">
+              <a key={val.Name} className="interface-pair" onClick={()=>this.addSubnet({Name: val.Name, Subnet: subval})}>
                 <header>{val.Name}</header>
                 <subhead>{subval}</subhead>
               </a>
@@ -174,6 +208,6 @@ var Subnets = React.createClass({
     </div>
     );
   }
-});
+}
 
 ReactDOM.render(<Subnets />, subnets)
