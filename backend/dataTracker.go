@@ -11,6 +11,38 @@ import (
 	"github.com/digitalrebar/digitalrebar/go/rebar-api/api"
 )
 
+var (
+	ignoreBoot = &BootEnv{
+		Name:        "ignore",
+		Description: "The boot environment you should use to have unknown machines boot off their local hard drive",
+		OS:          OsInfo{Name: "ignore"},
+		Templates: []TemplateInfo{
+			{
+				Name: "pxelinux",
+				Path: "pxelinux.cfg/default",
+				Contents: `DEFAULT local
+PROMPT 0
+TIMEOUT 10
+LABEL local
+localboot 0
+`,
+			},
+			{
+				Name:     "elilo",
+				Path:     "elilo.conf",
+				Contents: "exit",
+			},
+			{
+				Name: "ipxe",
+				Path: "default.ipxe",
+				Contents: `#!ipxe
+chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
+`,
+			},
+		},
+	}
+)
+
 type dtobjs struct {
 	sync.Mutex
 	d []store.KeySaver
@@ -134,17 +166,51 @@ func NewDataTracker(backend store.SimpleStore,
 
 		backends: map[string]store.SimpleStore{},
 	}
-	objs := []store.KeySaver{&Machine{p: res}, &User{p: res}}
-
-	if useProvisioner {
-		objs = append(objs, &Template{p: res}, &BootEnv{p: res})
-	}
-	if useDHCP {
-		objs = append(objs, &Subnet{p: res}, &Reservation{p: res}, &Lease{p: res})
+	objs := []store.KeySaver{
+		&Machine{p: res},
+		&User{p: res},
+		&Template{p: res},
+		&BootEnv{p: res},
+		&Subnet{p: res},
+		&Reservation{p: res},
+		&Lease{p: res},
 	}
 	res.makeBackends(backend, objs)
 	res.loadData(objs)
+	if _, ok := res.fetchOne(ignoreBoot, ignoreBoot.Name); !ok {
+		res.Save(ignoreBoot)
+	}
 	return res
+}
+
+func (p *DataTracker) RenderUnknown() error {
+	envIsh := p.load("bootenvs", p.UnknownBootEnv)
+	if envIsh == nil {
+		return fmt.Errorf("No such BootEnv: %s", p.UnknownBootEnv)
+	}
+	env := AsBootEnv(envIsh)
+	err := &Error{o: env, Type: "StartupError"}
+	if !env.Available {
+		err.Messages = env.Errors
+		err.containsError = true
+		return err
+	}
+	r := &RenderData{p: p, Env: env}
+	r.render(err)
+	if !err.containsError {
+		r.write(err)
+	}
+	return err.OrNil()
+}
+
+// Load should only be used by tests and initialization
+func (p *DataTracker) load(prefix, key string) store.KeySaver {
+	objs, idx, found := p.lockedGet(prefix, key)
+	defer objs.Unlock()
+	if found {
+		return objs.d[idx]
+	}
+	return nil
 }
 
 func (p *DataTracker) getBackend(t store.KeySaver) store.SimpleStore {

@@ -103,38 +103,29 @@ func TestBackingStorePersistence(t *testing.T) {
 	// There should be one of everything in the cache now.
 	for _, ot := range explDirs {
 		var items []store.KeySaver
+		var cnt int
 		switch ot {
 		case "users":
-			items = dt.fetchAll(dt.NewUser())
+			items, cnt = dt.fetchAll(dt.NewUser()), 1
 		case "templates":
-			items = dt.fetchAll(dt.NewTemplate())
+			items, cnt = dt.fetchAll(dt.NewTemplate()), 1
 		case "bootenvs":
-			items = dt.fetchAll(dt.NewBootEnv())
+			items, cnt = dt.fetchAll(dt.NewBootEnv()), 2
 		case "machines":
-			items = dt.fetchAll(dt.NewMachine())
+			items, cnt = dt.fetchAll(dt.NewMachine()), 1
 		case "leases":
-			items = dt.fetchAll(dt.NewLease())
+			items, cnt = dt.fetchAll(dt.NewLease()), 1
 		case "reservations":
-			items = dt.fetchAll(dt.NewReservation())
+			items, cnt = dt.fetchAll(dt.NewReservation()), 1
 		case "subnets":
-			items = dt.fetchAll(dt.NewSubnet())
+			items, cnt = dt.fetchAll(dt.NewSubnet()), 1
 		}
-		if len(items) != 1 {
-			t.Errorf("Expected to find 1 %s, instead found %d", ot, len(items))
+		if len(items) != cnt {
+			t.Errorf("Expected to find %d %s, instead found %d", cnt, ot, len(items))
 		} else {
-			t.Logf("Found 1 %s, as expected", ot)
+			t.Logf("Found %d %s, as expected", cnt, ot)
 		}
 	}
-}
-
-// Load should only be used by tests, hence it living in a _test file.
-func (p *DataTracker) load(prefix, key string) store.KeySaver {
-	objs, idx, found := p.lockedGet(prefix, key)
-	defer objs.Unlock()
-	if found {
-		return objs.d[idx]
-	}
-	return nil
 }
 
 func TestMain(m *testing.M) {

@@ -45,21 +45,21 @@ type ProgOpts struct {
 	VersionFlag bool `long:"version" description:"Print Version and exit"`
 
 	BackEndType string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"directory"`
-	DataRoot    string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
+	DataRoot    string `long:"data-root" description:"Location we should store runtime information in" default:"/var/lib/rocketskates"`
 
 	OurAddress string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
 	StaticPort int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
 	TftpPort   int    `long:"tftp-port" description:"Port for the TFTP server to listen on" default:"69"`
 	ApiPort    int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
 
-	FileRoot string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
+	FileRoot string `long:"file-root" description:"Root of filesystem we should manage" default:"/var/lib/tftpboot"`
 	DevUI    string `long:"dev-ui" description:"Root of UI Pages for Development"`
 
 	DisableProvisioner bool   `long:"disable-provisioner" description:"Disable provisioner"`
 	DisableDHCP        bool   `long:"disable-dhcp" description:"Disable DHCP"`
 	CommandURL         string `long:"endpoint" description:"DigitalRebar Endpoint" env:"EXTERNAL_REBAR_ENDPOINT"`
-	DefaultBootEnv     string `long:"default-boot-env" description:"The default bootenv for the nodes"`
-	UnknownBootEnv     string `long:"unknown-boot-env" description:"The unknown bootenv for the system"`
+	DefaultBootEnv     string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"sledgehammer"`
+	UnknownBootEnv     string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
 
 	ExcludeDiscovery bool   `long:"exclude-discovery" description:"Should NOT download discovery image"`
 	SledgeHammerURL  string `long:"sledgehammer-url" description:"Sledgehammer download URL" default:"http://opencrowbar.s3-website-us-east-1.amazonaws.com/sledgehammer"`
@@ -165,6 +165,14 @@ func main() {
 		logger.Fatalf("Error using backing store %s: %v", c_opts.BackEndType, err)
 	}
 
+	// We have a backend, now get default assets
+	if !c_opts.DisableProvisioner {
+		logger.Printf("Extracting Default Assets\n")
+		if err := ExtractAssets(c_opts.FileRoot); err != nil {
+			logger.Fatalf("Unable to extract assets: %v", err)
+		}
+	}
+
 	dt := backend.NewDataTracker(backendStore,
 		!c_opts.DisableProvisioner,
 		!c_opts.DisableDHCP,
@@ -177,13 +185,10 @@ func main() {
 		c_opts.OurAddress,
 		logger)
 
-	// We have a backend, now get default assets
-	if !c_opts.DisableProvisioner {
-		logger.Printf("Extracting Default Assets\n")
-		if err := ExtractAssets(c_opts.FileRoot); err != nil {
-			logger.Fatalf("Unable to extract assets: %v", err)
-		}
+	if err := dt.RenderUnknown(); err != nil {
+		logger.Fatalf("Unable to render default boot env for unknown PXE clients: %s", err)
 	}
+
 	// Add discovery image pieces if not excluded
 	if !c_opts.ExcludeDiscovery && !c_opts.DisableProvisioner {
 		logger.Printf("Installing Discovery Image - could take a long time (restart with --exclude-discovery flag to skip)\n")

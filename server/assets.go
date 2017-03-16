@@ -46,9 +46,6 @@ func ExtractAssets(fileRoot string) error {
 		"install-sledgehammer.sh": "",
 		"start-up.sh":             "machines",
 		"jq":                      "files",
-		"default.ipxe.tmpl":       "",
-		"elilo.conf.tmpl":         "",
-		"default.tmpl":            "pxelinux.cfg",
 
 		// General Boot things
 		"bootia32.efi": "",
