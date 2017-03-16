@@ -199,7 +199,7 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt DTI) {
 				http.StatusInsufficientStorage, fmt.Sprintf("upload: Failed to upload %s: %v", name, err)))
 		return
 	}
-	if c.Request.ContentLength != 0 && copied != c.Request.ContentLength {
+	if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
 		os.Remove(isoTmpName)
 		c.JSON(http.StatusBadRequest,
 			backend.NewError("API ERROR", http.StatusBadRequest,
