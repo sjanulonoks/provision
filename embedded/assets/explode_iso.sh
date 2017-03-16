@@ -81,7 +81,22 @@ case $os_name in
             chmod -R 555 .
         )
         ;;
-        
+    sledgehammer/*)
+        # For Sledgehammer, we also check the sha1sums that were
+        # extracted and die if they do not match
+        (
+            cd "${oid_cwd}${os_install_dir}.extracting"
+            extract "${iso_cwd}${iso}"
+            SHA1SUM="sha1sum"
+            if [[ $(uname -s) == Darwin ]] ; then
+                SHA1SUM="shasum -a 1"
+            fi
+            if ! $SHA1SUM -c sha1sums; then
+                echo "Sha1 check failed, invalid download."
+                exit 1
+            fi
+        ) || exit 1;;
+
     *)
         # Everything else just needs bsdtar/hdiutil
         (cd "${oid_cwd}${os_install_dir}.extracting"; extract "${iso_cwd}${iso}");;
