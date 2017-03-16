@@ -6,15 +6,16 @@
   justify-content: flex-start;
 }
 
-.swagger-ui-container a {
-  color: #547f00 !important;
-}
-
 a.nav-link {
   color: #fff !important;
   font-size: 20px;
   text-decoration: none;
 }
+
+h2 a {
+  color: #547f00 !important;
+}
+
 
 a.nav-link:hover {
   text-decoration: underline;

@@ -36,7 +36,7 @@
     <script type="text/javascript">
       $.getJSON( "../api/v3/bootenvs", function( data ) {
           $.each( data, function( key, val ) {
-            $("tbody#bootenvs").append( "<tr id='" + val.Name + "'><td>" + val.Name + "</td><td>" + (val.Available ? "&check;" : "") +'</td><td><a href=`'+ val.OS.IsoUrl + "'>" + val.OS.IsoFile +"</a></td></tr>" );
+            $("tbody#bootenvs").append( "<tr id='" + val.Name + "'><td>" + val.Name + "</td><td>" + (val.Available ? "&check;" : "") +'</td><td><a href="'+ val.OS.IsoUrl + '">' + val.OS.IsoFile +"</a></td></tr>" );
           });
        });
     </script>
