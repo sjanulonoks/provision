@@ -43,22 +43,17 @@
   </head>
 
   <body class="swagger-section">
-    <div id="header">
-      <div class="swagger-ui-wrap">
+    <div id="header" style="position: fixed; top: 0; width: 100%;">
+      <div class="swagger-ui-wrap" style="display: flex; flex-direction: row; justify-content: center; align-items: center;">
         <a id="logo" href="https://github.com/rackn/rocket-skates"><span class="logo__title">Rocket Skates</span></a>
+        <div style="flex-grow: 1;"></div>
+        <a class="nav-link" href="#subnets">Subnets(<span id="subnetCount">0</span>)</a>
       </div>
     </div>
 
     <div id="swagger-ui-container" class="swagger-ui-wrap">
-      
-      <h2 style="display: flex; justify-content: space-between;">
-        <span>Subnets</span>
-        <span>
-          <a target="_blank" href="http://rocket-skates.readthedocs.io/en/latest/doc/ui.html#subnets">UI Help</a> | <a target="_blank" href="/swagger-ui/#/subnets">API Help</a>
-        </span>
-      </h2>
 
-      <div id="subnets"></div>
+      <div style="padding-top: 51px;" id="subnets"></div>
 
       <hr/>
 

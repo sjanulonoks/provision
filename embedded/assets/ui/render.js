@@ -5,14 +5,18 @@ class Subnet extends React.Component {
   constructor(props) {
     super(props);
 
+    this.toggleExpand = this.toggleExpand.bind(this);
     this.handleChange = this.handleChange.bind(this);
     this.handleOptionChange = this.handleOptionChange.bind(this);
     this.update = this.update.bind(this);
     this.remove = this.remove.bind(this);
   }
 
-  componentDidUpdate(prevProps, prevState) {    
-    this.state = this.props.subnet;
+  // expands this subnet
+  toggleExpand() {
+    var subnet = this.props.subnet;
+    subnet._expand = !subnet._expand;
+    this.props.change(this.props.index, subnet);
   }
 
   // gets the name of an option from its code
@@ -70,7 +74,7 @@ class Subnet extends React.Component {
         className={(subnet.updating) ? 'updating-content' : ''}
         style={{
           position: "relative",
-          backgroundColor: (subnet.error ? '#fdd' : (subnet._new ? "#dfd" : (subnet._edited ? "#eee" : "#fff"))),
+          backgroundColor: (subnet._error ? '#fdd' : (subnet._new ? "#dfd" : (subnet._edited ? "#eee" : "#fff"))),
           borderBottom: "thin solid #ddd"
         }}>
         <tr>
@@ -141,6 +145,7 @@ class Subnet extends React.Component {
             {subnet._new ? <button onClick={this.update}>Add</button> :
             (subnet._edited ? <button onClick={this.update}>Update</button> : '')}
             <button onClick={this.remove}>Remove</button>
+            <button onClick={this.props.copy}>Copy</button>
           </td>
         </tr>
         <tr>
@@ -164,10 +169,10 @@ class Subnet extends React.Component {
                 </tbody>
               </table>
             </div>): <span/>}
-            {subnet.error && <div>
-              <h2>{this.state.errorMessage}</h2>
+            {subnet._error && <div>
+              <h2>{subnet._errorMessage}</h2>
             </div>}
-            <div className="expand" onClick={()=>this.handleChange({target: {name: '_expand', value: !subnet._expand}})}>
+            <div className="expand" onClick={this.toggleExpand}>
               {subnet._expand ? <span>&#x25B4;</span> : <span>&#x25BE;</span>}
             </div>
           </td>
@@ -234,6 +239,8 @@ class Subnets extends React.Component {
       this.setState({
         subnets: Object.keys(data.subnets).map(k => data.subnets[k]),
         interfaces: Object.keys(data.interfaces).map(k => data.interfaces[k])
+      }, err => {
+        // rejected ?? 
       });
     });
   }
@@ -262,13 +269,18 @@ class Subnets extends React.Component {
     // merge the template into our subnet if we have one
     if(typeof template !== "undefined") {
       for(var key in template) {
+        if(key[0] === "_")
+          continue;
+
         if(key === 'Options') {
-          for(var i = 0; i < template.length; i++) {
+          for(var i = 0; i < template.Options.length; i++) {
             var index = [3, 6, 15, 67].indexOf(template.Options[i].Code);
-            if(index >= 0)
-              subnet.Options[index] = template.Options[i];
-            else
+            if(index >= 0) {
+              subnet.Options[index].Value = template.Options[i].Value;
+            }
+            else {
               subnet.Options.push(template.Options[i]);
+            }
           }
         } else
           subnet[key] = template[key];
@@ -302,8 +314,8 @@ class Subnets extends React.Component {
       resp.updating = false;
       resp._edited = false;
       resp._new = false;
-      resp.error = false;
-      resp.errorMessage = '';
+      resp._error = false;
+      resp._errorMessage = '';
       
       //  update the state
       subnets[i] = resp;
@@ -316,14 +328,14 @@ class Subnets extends React.Component {
       var subnets = this.state.subnets.concat([]);
       var subnet = subnets[i];
       subnet.updating = false;
-      subnet.error = true;
+      subnet._error = true;
 
       // If our error is from the backend
       if(err.responseText) {
         var response = JSON.parse(err.responseText);
-        subnet.errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
+        subnet._errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
       } else { // maybe the backend is down
-        subnet.errorMessage = err.status;
+        subnet._errorMessage = err.status;
       }
 
       this.setState({
@@ -361,13 +373,13 @@ class Subnets extends React.Component {
 
     }).fail((err) => {
       subnet.updating = false;
-      subnet.error = true;
+      subnet._error = true;
       // If our error is from the backend
       if(err.responseText) {      
         var response = JSON.parse(err.responseText);
-        subnet.errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
+        subnet._errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
       } else { // maybe the backend is down
-        subnet.errorMessage = err.status;
+        subnet._errorMessage = err.status;
       }
 
       this.setState({
@@ -376,6 +388,7 @@ class Subnets extends React.Component {
     });
   }
 
+  // updates the state and changes a subnet at a specified index
   changeSubnet(i, subnet) {
     var subnets = this.state.subnets.concat([]);
     subnets[i] = subnet;
@@ -385,8 +398,16 @@ class Subnets extends React.Component {
   }
 
   render() {
+    $('#subnetCount').text(this.state.subnets.length);
     return (
     <div>
+      <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
+        <span>Subnets</span>
+        <span>
+          <a target="_blank" href="http://rocket-skates.readthedocs.io/en/latest/doc/ui.html#subnets">UI Help</a> | <a target="_blank" href="/swagger-ui/#/subnets">API Help</a>
+        </span>
+      </h2>
+
       <table className="fullwidth input-table">
         <thead>
           <tr>
@@ -398,8 +419,15 @@ class Subnets extends React.Component {
             <th></th>
           </tr>
         </thead>
-        {this.state.subnets.map(
-          (val, i) => <Subnet subnet={val} update={this.updateSubnet} change={this.changeSubnet} remove={this.removeSubnet} key={i} index={i} />
+        {this.state.subnets.map((val, i) =>
+          <Subnet
+            subnet={val}
+            update={this.updateSubnet}
+            change={this.changeSubnet}
+            remove={this.removeSubnet}
+            copy={()=>this.addSubnet(this.state.subnets[i])}
+            key={i}
+            index={i} />
         )}
         <tfoot>
           <tr>
@@ -428,4 +456,4 @@ class Subnets extends React.Component {
   }
 }
 
-ReactDOM.render(<Subnets />, subnets)
+ReactDOM.render(<Subnets />, subnets);
