@@ -33,19 +33,29 @@ type TemplateInfo struct {
 	//
 	// required: true
 	Path string
-	// The ID of the template that should be expanded.
+	// The ID of the template that should be expanded.  Either
+	// this or Contents should be set
 	//
-	// required: true
-	ID       string
+	// required: false
+	ID string
+	// The contents that should be used when this template needs
+	// to be expanded.  Either this or ID should be set.
+	//
+	// required: false
+	Contents string
 	pathTmpl *template.Template
 }
 
 func (t *TemplateInfo) contents(dt *DataTracker) (*Template, bool) {
-	res, found := dt.fetchOne(dt.NewTemplate(), t.ID)
-	if found {
-		return AsTemplate(res), found
+	if t.ID != "" {
+		res, found := dt.fetchOne(dt.NewTemplate(), t.ID)
+		if found {
+			return AsTemplate(res), found
+		}
+		return nil, found
+	} else {
+		return &Template{ID: t.Name, Contents: t.Contents}, true
 	}
-	return nil, found
 }
 
 // OsInfo holds information about the operating system this BootEnv
@@ -175,15 +185,15 @@ func (b *BootEnv) parseTemplates(e *Error) {
 				ti.pathTmpl = pathTmpl.Option("missingkey=error")
 			}
 		}
-		if ti.ID == "" {
-			e.Errorf("Templates[%d] has no ID", i)
-		} else {
+		if ti.ID != "" {
 			tmpl := b.p.NewTemplate()
 			if _, found := b.p.fetchOne(tmpl, ti.ID); !found {
 				e.Errorf("Templates[%d] wants Template %s, which does not exist",
 					i,
 					ti.ID)
 			}
+		} else if ti.Contents == "" {
+			e.Errorf("Templates[%d] has neither ID nor Contents, one of the other must be non-empty.", i)
 		}
 
 	}
