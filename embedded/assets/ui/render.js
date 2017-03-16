@@ -5,11 +5,14 @@ class Subnet extends React.Component {
   constructor(props) {
     super(props);
 
-    this.state = this.props.subnet;
-
     this.handleChange = this.handleChange.bind(this);
     this.handleOptionChange = this.handleOptionChange.bind(this);
     this.update = this.update.bind(this);
+    this.remove = this.remove.bind(this);
+  }
+
+  componentDidUpdate(prevProps, prevState) {    
+    this.state = this.props.subnet;
   }
 
   // gets the name of an option from its code
@@ -27,7 +30,12 @@ class Subnet extends React.Component {
 
   // called to make the post/put request that updates the subnet
   update() {
-    this.props.update(this.state, this);
+    this.props.update(this.props.index);
+  }
+
+  // makes the delete request to remove the subnet
+  remove() {
+    this.props.remove(this.props.index);
   }
 
   // called when an input changes
@@ -38,32 +46,31 @@ class Subnet extends React.Component {
     if(event.target.type === "select-one") {
       val = val === "true";
     }
-    this.setState({
-      [event.target.name]: val,
-      _edited: true
-    });
+    var subnet = this.props.subnet;
+    subnet[event.target.name] = val;
+    subnet._edited = true;
+
+    this.props.change(this.props.index, subnet);
   }
 
   // called when an option input is changed
   handleOptionChange(event) {
-    var options = this.state.Options;
-    options[event.target.name].Value = event.target.Value;
+    var subnet = this.props.subnet;
+    subnet.Options[event.target.name].Value = event.target.value;
+    subnet._edited = true;
 
-    this.setState({
-      Options: options,
-      _edited: true
-    });
+    this.props.change(this.props.index, subnet);
   }
 
   // renders the element
   render() {
-    var subnet = this.state;
+    var subnet = JSON.parse(JSON.stringify(this.props.subnet));
     return (
       <tbody 
-        className={(this.state.updating) ? 'updating-content' : ''}
+        className={(subnet.updating) ? 'updating-content' : ''}
         style={{
           position: "relative",
-          backgroundColor: (this.state.error ? '#fdd' : (this.state._new ? "#dfd" : (this.state._edited ? "#eee" : "#fff"))),
+          backgroundColor: (subnet.error ? '#fdd' : (subnet._new ? "#dfd" : (subnet._edited ? "#eee" : "#fff"))),
           borderBottom: "thin solid #ddd"
         }}>
         <tr>
@@ -76,7 +83,6 @@ class Subnet extends React.Component {
               value={subnet.Name}
               onChange={this.handleChange}/> : subnet.Name}
           </td>
-          <td>{subnet.broadcast ? "broadcast" : "relayed"}</td>
           <td>
             <input
               type="text"
@@ -131,8 +137,11 @@ class Subnet extends React.Component {
               value={subnet.ActiveEnd}
               onChange={this.handleChange}/>
           </td>
-          <td>{subnet._new ? <button onClick={this.update}>Add</button> :
-              (subnet._edited ? <button onClick={this.update}>Update</button> : '')}</td>
+          <td>
+            {subnet._new ? <button onClick={this.update}>Add</button> :
+            (subnet._edited ? <button onClick={this.update}>Update</button> : '')}
+            <button onClick={this.remove}>Remove</button>
+          </td>
         </tr>
         <tr>
           <td colSpan="7">
@@ -155,10 +164,10 @@ class Subnet extends React.Component {
                 </tbody>
               </table>
             </div>): <span/>}
-            {this.state.error && <div>
+            {subnet.error && <div>
               <h2>{this.state.errorMessage}</h2>
             </div>}
-            <div className="expand" onClick={()=>this.setState({_expand: !subnet._expand})}>
+            <div className="expand" onClick={()=>this.handleChange({target: {name: '_expand', value: !subnet._expand}})}>
               {subnet._expand ? <span>&#x25B4;</span> : <span>&#x25BE;</span>}
             </div>
           </td>
@@ -180,6 +189,8 @@ class Subnets extends React.Component {
     this.componentDidMount = this.componentDidMount.bind(this);
     this.addSubnet = this.addSubnet.bind(this);
     this.updateSubnet = this.updateSubnet.bind(this);
+    this.removeSubnet = this.removeSubnet.bind(this);
+    this.changeSubnet = this.changeSubnet.bind(this);
   }
   
   // gets the subnet and interface json from the api
@@ -192,7 +203,6 @@ class Subnets extends React.Component {
       $.getJSON("../api/v3/interfaces", data => {
         for(var key in data) {
           var iface = data[key];
-          iface.broadcast = true;
           interfaces[iface.Name] = iface;
         }
 
@@ -200,7 +210,6 @@ class Subnets extends React.Component {
         $.getJSON("../api/v3/subnets", data => {
           for(var key in data) {
             var subnet = data[key];
-            subnet.broadcast = typeof interfaces[subnet.Name] !== 'undefined';
             subnets[subnet.Name] = subnet;
           }
 
@@ -234,9 +243,13 @@ class Subnets extends React.Component {
   addSubnet(template) {
     var subnet = {
       _new: true,
+      Name: '',
       ActiveLeaseTime: 60,
       ReservedLeaseTime: 7200,
-      OnlyReservations: true,
+      OnlyReservations: false,
+      ActiveStart: '',
+      Subnet: '',
+      ActiveEnd: '',
       Strategy: "MAC",
       Options: [
         {Code: 3, Value: ''},
@@ -249,7 +262,16 @@ class Subnets extends React.Component {
     // merge the template into our subnet if we have one
     if(typeof template !== "undefined") {
       for(var key in template) {
-        subnet[key] = template[key];
+        if(key === 'Options') {
+          for(var i = 0; i < template.length; i++) {
+            var index = [3, 6, 15, 67].indexOf(template.Options[i].Code);
+            if(index >= 0)
+              subnet.Options[index] = template.Options[i];
+            else
+              subnet.Options.push(template.Options[i]);
+          }
+        } else
+          subnet[key] = template[key];
       }
     }
 
@@ -261,9 +283,10 @@ class Subnets extends React.Component {
 
   // makes the post/put request to update the subnet
   // also updates the interface
-  updateSubnet(subnet, elem) {
-    elem.setState({updating: true});
-    console.log("posting: ",subnet)
+  updateSubnet(i) {
+    var subnet = this.state.subnets[i];
+    subnet.updating = true;
+    this.setState({subnet: this.state.subnets});
 
     $.ajax({
       type: (subnet._new ? "POST" : "PUT"),
@@ -272,35 +295,92 @@ class Subnets extends React.Component {
       url: "/api/v3/subnets" + (subnet._new ? "" : "/" + subnet.Name),
       data: JSON.stringify(subnet)
     }).done((resp) => {
-      console.log('success,', elem.props.index, resp);
       
-      resp.broadcast = typeof this.state.interfaces[resp.Name] !== 'undefined';
       // update the subnets list with our new interface
       var subnets = this.state.subnets.concat([]);
-      subnets[elem.props.index] = resp;
-      this.setState({
-        subnets: subnets
-      });
 
-      // stop editing this subnet and update the state
       resp.updating = false;
       resp._edited = false;
       resp._new = false;
       resp.error = false;
       resp.errorMessage = '';
-      elem.setState(resp);
+      
+      //  update the state
+      subnets[i] = resp;
+      this.setState({
+        subnets: subnets
+      });
 
     }).fail((err) => {
-      console.error('fail', err);
+      
+      var subnets = this.state.subnets.concat([]);
+      var subnet = subnets[i];
+      subnet.updating = false;
+      subnet.error = true;
 
+      // If our error is from the backend
+      if(err.responseText) {
+        var response = JSON.parse(err.responseText);
+        subnet.errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
+      } else { // maybe the backend is down
+        subnet.errorMessage = err.status;
+      }
+
+      this.setState({
+        subnets: subnets
+      });
+    });
+  }
+
+  // makes the delete request to remove the subnet or just deletes the new subnet
+  removeSubnet(i) {
+    var subnets = this.state.subnets.concat([]);
+    var subnet = this.state.subnets[i];
+    if(subnet._new) {
+      subnets.splice(i, 1);
+      this.setState({
+        subnets: subnets
+      });
+      return;
+    }
+    subnets[i].updating = true;
+    this.setState({subnets: subnets});
+
+    $.ajax({
+      type: "DELETE",
+      dataType: "json",
+      contentType: "application/json",
+      url: "/api/v3/subnets/" + subnet.Name,
+    }).done((resp) => {
+            // update the subnets list with our new interface
+      var subnets = this.state.subnets.concat([]);
+      subnets.splice(i, 1);
+      this.setState({
+        subnets: subnets
+      });
+
+    }).fail((err) => {
+      subnet.updating = false;
+      subnet.error = true;
       // If our error is from the backend
       if(err.responseText) {      
         var response = JSON.parse(err.responseText);
-        elem.setState({updating: false, error: true, errorMessage: "Error (" + err.status + "): " + response.Messages.join(", ")});
-
+        subnet.errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
       } else { // maybe the backend is down
-        elem.setState({updating: false, error: true, errorMessage: err.status});
+        subnet.errorMessage = err.status;
       }
+
+      this.setState({
+        subnets: subnets
+      });
+    });
+  }
+
+  changeSubnet(i, subnet) {
+    var subnets = this.state.subnets.concat([]);
+    subnets[i] = subnet;
+    this.setState({
+      subnets: subnets
     });
   }
 
@@ -311,7 +391,6 @@ class Subnets extends React.Component {
         <thead>
           <tr>
             <th>Name/NIC</th>
-            <th>Type</th>
             <th>Subnet</th>
             <th>Reservations</th>
             <th>Active &amp; Reserved Lease</th>
@@ -320,7 +399,7 @@ class Subnets extends React.Component {
           </tr>
         </thead>
         {this.state.subnets.map(
-          (val, i) => <Subnet subnet={val} update={this.updateSubnet} key={i} index={i} />
+          (val, i) => <Subnet subnet={val} update={this.updateSubnet} change={this.changeSubnet} remove={this.removeSubnet} key={i} index={i} />
         )}
         <tfoot>
           <tr>
