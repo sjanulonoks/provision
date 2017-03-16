@@ -71,6 +71,7 @@ func (f *Frontend) InitMachineApi() {
 	//       201: MachineResponse
 	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.POST("/machines",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {
@@ -128,6 +129,7 @@ func (f *Frontend) InitMachineApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/machines/:name",
 		func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "machine patch: NOT IMPLEMENTED"))
@@ -144,6 +146,7 @@ func (f *Frontend) InitMachineApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PUT("/machines/:name",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {
