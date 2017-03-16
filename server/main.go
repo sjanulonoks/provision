@@ -141,6 +141,13 @@ func main() {
 		}
 	}
 
+	for _, d := range []string{c_opts.DataRoot, c_opts.FileRoot} {
+		err := os.MkdirAll(d, 0755)
+		if err != nil {
+			logger.Fatalf("Error creating required directory %s: %v", d, err)
+		}
+	}
+
 	var backendStore store.SimpleStore
 	switch c_opts.BackEndType {
 	case "consul":
