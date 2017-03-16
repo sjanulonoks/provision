@@ -197,6 +197,7 @@ func (p *DataTracker) RenderUnknown() error {
 	}
 	r := &RenderData{p: p, Env: env}
 	r.render(err)
+	r.mkPaths(err)
 	if !err.containsError {
 		r.write(err)
 	}
