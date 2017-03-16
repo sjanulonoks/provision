@@ -22,12 +22,10 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 
 	"github.com/digitalrebar/digitalrebar/go/common/client"
 	"github.com/digitalrebar/digitalrebar/go/common/service"
@@ -36,7 +34,6 @@ import (
 	consul "github.com/hashicorp/consul/api"
 	"github.com/jessevdk/go-flags"
 	"github.com/rackn/rocket-skates/backend"
-	"github.com/rackn/rocket-skates/embedded"
 	"github.com/rackn/rocket-skates/frontend"
 	"github.com/rackn/rocket-skates/midlayer"
 )
@@ -60,10 +57,6 @@ type ProgOpts struct {
 	CommandURL         string `long:"endpoint" description:"DigitalRebar Endpoint" env:"EXTERNAL_REBAR_ENDPOINT"`
 	DefaultBootEnv     string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"sledgehammer"`
 	UnknownBootEnv     string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
-
-	ExcludeDiscovery bool   `long:"exclude-discovery" description:"Should NOT download discovery image"`
-	SledgeHammerURL  string `long:"sledgehammer-url" description:"Sledgehammer download URL" default:"http://opencrowbar.s3-website-us-east-1.amazonaws.com/sledgehammer"`
-	SledgeHammerHash string `long:"sledgehammer-hash" description:"Sledgehammer Hash Identifier" default:"a42c8c66a60b77ca1c769b8dc7e712f6644579ed"`
 
 	TlsKeyFile  string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
 	TlsCertFile string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
@@ -193,55 +186,6 @@ func main() {
 	if err := dt.RenderUnknown(); err != nil {
 		logger.Fatalf("Unable to render default boot env for unknown PXE clients: %s", err)
 	}
-
-	// Add discovery image pieces if not excluded
-	if !c_opts.ExcludeDiscovery && !c_opts.DisableProvisioner {
-		logger.Printf("Installing Discovery Image - could take a long time (restart with --exclude-discovery flag to skip)\n")
-		cmd := exec.Command("./install-sledgehammer.sh", c_opts.SledgeHammerHash, c_opts.SledgeHammerURL)
-		cmd.Dir = c_opts.FileRoot
-		err := cmd.Run()
-		if err != nil {
-			logger.Fatal(err)
-		}
-	}
-
-	// Load default templates and bootenvs
-	children, err := embedded.AssetDir("templates")
-	for _, c := range children {
-		_, ok := dt.FetchOne(dt.NewTemplate(), c)
-		if !ok {
-			data, _ := embedded.Asset("templates/" + c)
-			t := dt.NewTemplate()
-			t.Contents = string(data)
-			t.ID = c
-			_, err = dt.Create(t)
-			if err != nil {
-				logger.Fatal(err)
-			} else {
-				logger.Printf("Adding default template: %s\n", t.ID)
-			}
-		}
-	}
-	children, err = embedded.AssetDir("bootenvs")
-	for _, c := range children {
-		data, _ := embedded.Asset("bootenvs/" + c)
-		b := dt.NewBootEnv()
-		err = json.Unmarshal(data, b)
-		if err != nil {
-			logger.Fatal(err)
-		}
-		_, ok := dt.FetchOne(dt.NewBootEnv(), b.Name)
-		if !ok {
-			_, err = dt.Create(b)
-			if err != nil {
-				logger.Fatal(err)
-			} else {
-				logger.Printf("Adding default bootenv: %s\n", b.Name)
-			}
-		}
-	}
-
-	// Load additional config dirs. ???
 
 	fe := frontend.NewFrontend(dt, logger, c_opts.FileRoot, c_opts.DevUI)
 

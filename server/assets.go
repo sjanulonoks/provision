@@ -43,9 +43,8 @@ func ExtractAssets(fileRoot string) error {
 		"explode_iso.sh": "",
 
 		// Sledgehammer things
-		"install-sledgehammer.sh": "",
-		"start-up.sh":             "machines",
-		"jq":                      "files",
+		"start-up.sh": "machines",
+		"jq":          "files",
 
 		// General Boot things
 		"bootia32.efi": "",
