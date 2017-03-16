@@ -139,7 +139,7 @@ func (b *BootEnv) Backend() store.SimpleStore {
 //    disk: Will expand to the path of the file inside the provisioner container.
 func (b *BootEnv) PathFor(proto, f string) string {
 	res := b.OS.Name
-	if res != "discovery" {
+	if strings.HasSuffix(res, "-install") {
 		res = path.Join(res, "install")
 	}
 	switch proto {
@@ -233,11 +233,6 @@ func (b *BootEnv) setDT(p *DataTracker) {
 }
 
 func (b *BootEnv) explodeIso() error {
-	// Only explode install things
-	if !strings.HasSuffix(b.Name, "-install") {
-		b.p.Logger.Printf("Explode ISO: Skipping %s becausing not -install\n", b.Name)
-		return nil
-	}
 	// Only work on things that are requested.
 	if b.OS.IsoFile == "" {
 		b.p.Logger.Printf("Explode ISO: Skipping %s becausing no iso image specified\n", b.Name)
