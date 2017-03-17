@@ -1,5 +1,5 @@
-hash: 8bf5eb57951a1f30ddcf774ec06ea31ed7565358d25f6b546b354a0d6dde77a6
-updated: 2017-03-10T14:35:11.202068145-06:00
+hash: 1c65ece5795139b4e4c7a6c1ef7f03f200e2e841c31f7cced85252ff00689a37
+updated: 2017-03-17T11:40:25.899265492-05:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: fdf19785fd3558d619ef81212f5edf1d6c2a5911
@@ -38,6 +38,8 @@ imports:
   version: 9a6736ed45b44bf3835afeebb3034b57ed329f3e
 - name: github.com/elithrar/simple-scrypt
   version: 2325946f714c95de4a6088202c402fbdfa64163b
+- name: github.com/ghodss/yaml
+  version: 04f313413ffd65ce25f2541bfd2b2ceec5c0908c
 - name: github.com/gin-gonic/gin
   version: e2212d40c62a98b388a5eb48ecbdcf88534688ba
   subpackages:
