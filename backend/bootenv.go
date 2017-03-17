@@ -151,13 +151,14 @@ func (b *BootEnv) PathFor(proto, f string) string {
 	if strings.HasSuffix(res, "-install") {
 		res = path.Join(res, "install")
 	}
+	tail := path.Join(res, f)
 	switch proto {
 	case "disk":
-		return path.Join(b.p.FileRoot, res, f)
+		return path.Join(b.p.FileRoot, tail)
 	case "tftp":
-		return path.Join(res, f)
+		return tail
 	case "http":
-		return b.p.FileURL + "/" + path.Join(res, f)
+		return b.p.FileURL + "/" + tail
 	default:
 		b.p.Logger.Fatalf("Unknown protocol %v", proto)
 	}
@@ -290,13 +291,14 @@ func (b *BootEnv) explodeIso(e *Error) {
 	// Call extract script
 	// /explode_iso.sh b.OS.Name fileRoot isoPath path.Dir(canaryPath)
 	cmdName := path.Join(b.p.FileRoot, "explode_iso.sh")
-	cmdArgs := []string{b.OS.Name, b.p.FileRoot, isoPath, path.Dir(canaryPath), b.OS.IsoSha256}
+	cmdArgs := []string{b.OS.Name, b.p.FileRoot, isoPath, b.PathFor("disk", ""), b.OS.IsoSha256}
 	if out, err := exec.Command(cmdName, cmdArgs...).Output(); err != nil {
 		e.Errorf("Explode ISO: explode_iso.sh failed for %s: %s", b.Name, err)
 		e.Errorf("Command output:\n%s", string(out))
 
 	} else {
 		b.p.Logger.Printf("Explode ISO: %s exploded to %s", b.OS.IsoFile, isoPath)
+		b.p.Logger.Printf("Explode ISO Log:\n%s", string(out))
 	}
 	return
 }
