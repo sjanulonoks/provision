@@ -1,0 +1,58 @@
+
+.interface-list {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+}
+
+a.nav-link {
+  color: #fff !important;
+  font-size: 20px;
+  text-decoration: none;
+}
+
+h2 a {
+  color: #547f00 !important;
+}
+
+
+a.nav-link:hover {
+  text-decoration: underline;
+}
+
+.updating-content {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.input-table td {
+  border-bottom: none !important;
+  padding: 3px !important;
+}
+
+.input-table .expand {
+  cursor: pointer;
+  display: flex;
+  font-size: 15px;
+  justify-content: center;
+  margin: 0;
+}
+
+.interface-pair {
+  align-items: center;
+  border: none;
+  color: #547f00;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin: 5px;
+}
+
+.interface-pair header {
+  font-size: 20px;
+}
+
+.interface-pair subhead {
+  font-size: 15px;
+}
