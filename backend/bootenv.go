@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -34,19 +33,29 @@ type TemplateInfo struct {
 	//
 	// required: true
 	Path string
-	// The ID of the template that should be expanded.
+	// The ID of the template that should be expanded.  Either
+	// this or Contents should be set
 	//
-	// required: true
-	ID       string
+	// required: false
+	ID string
+	// The contents that should be used when this template needs
+	// to be expanded.  Either this or ID should be set.
+	//
+	// required: false
+	Contents string
 	pathTmpl *template.Template
 }
 
 func (t *TemplateInfo) contents(dt *DataTracker) (*Template, bool) {
-	res, found := dt.fetchOne(dt.NewTemplate(), t.ID)
-	if found {
-		return AsTemplate(res), found
+	if t.ID != "" {
+		res, found := dt.fetchOne(dt.NewTemplate(), t.ID)
+		if found {
+			return AsTemplate(res), found
+		}
+		return nil, found
+	} else {
+		return &Template{ID: t.Name, Contents: t.Contents}, true
 	}
-	return nil, found
 }
 
 // OsInfo holds information about the operating system this BootEnv
@@ -142,13 +151,14 @@ func (b *BootEnv) PathFor(proto, f string) string {
 	if strings.HasSuffix(res, "-install") {
 		res = path.Join(res, "install")
 	}
+	tail := path.Join(res, f)
 	switch proto {
 	case "disk":
-		return path.Join(b.p.FileRoot, res, f)
+		return path.Join(b.p.FileRoot, tail)
 	case "tftp":
-		return path.Join(res, f)
+		return tail
 	case "http":
-		return b.p.FileURL + "/" + path.Join(res, f)
+		return b.p.FileURL + "/" + tail
 	default:
 		b.p.Logger.Fatalf("Unknown protocol %v", proto)
 	}
@@ -176,15 +186,15 @@ func (b *BootEnv) parseTemplates(e *Error) {
 				ti.pathTmpl = pathTmpl.Option("missingkey=error")
 			}
 		}
-		if ti.ID == "" {
-			e.Errorf("Templates[%d] has no ID", i)
-		} else {
+		if ti.ID != "" {
 			tmpl := b.p.NewTemplate()
 			if _, found := b.p.fetchOne(tmpl, ti.ID); !found {
 				e.Errorf("Templates[%d] wants Template %s, which does not exist",
 					i,
 					ti.ID)
 			}
+		} else if ti.Contents == "" {
+			e.Errorf("Templates[%d] has neither ID nor Contents, one of the other must be non-empty.", i)
 		}
 
 	}
@@ -232,34 +242,39 @@ func (b *BootEnv) setDT(p *DataTracker) {
 	b.p = p
 }
 
-func (b *BootEnv) explodeIso() error {
+func (b *BootEnv) explodeIso(e *Error) {
 	// Only work on things that are requested.
 	if b.OS.IsoFile == "" {
 		b.p.Logger.Printf("Explode ISO: Skipping %s becausing no iso image specified\n", b.Name)
-		return nil
+		return
 	}
 	// Have we already exploded this?  If file exists, then good!
 	canaryPath := b.PathFor("disk", "."+b.OS.Name+".rebar_canary")
 	buf, err := ioutil.ReadFile(canaryPath)
 	if err == nil && len(buf) != 0 && string(bytes.TrimSpace(buf)) == b.OS.IsoSha256 {
-		b.p.Logger.Printf("Explode ISO: Skipping %s becausing canary file, %s, in place and has proper SHA256\n", b.Name, canaryPath)
-		return nil
+		b.p.Logger.Printf("Explode ISO: canary file %s, in place and has proper SHA256\n", canaryPath)
+		return
 	}
 
 	isoPath := filepath.Join(b.p.FileRoot, "isos", b.OS.IsoFile)
 	if _, err := os.Stat(isoPath); os.IsNotExist(err) {
-		b.p.Logger.Printf("Explode ISO: Skipping %s becausing iso doesn't exist: %s\n", b.Name, isoPath)
-		return nil
+		e.Errorf("Explode ISO: iso doesn't exist: %s\n", isoPath)
+		if b.OS.IsoUrl != "" {
+			e.Errorf("You can download the required ISO from %s", b.OS.IsoUrl)
+		}
+		return
 	}
 
 	f, err := os.Open(isoPath)
 	if err != nil {
-		return fmt.Errorf("Explode ISO: For %s, failed to open iso file %s: %v", b.Name, isoPath, err)
+		e.Errorf("Explode ISO: failed to open iso file %s: %v", isoPath, err)
+		return
 	}
 	defer f.Close()
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, f); err != nil {
-		return fmt.Errorf("Explode ISO: For %s, failed to read iso file %s: %v", b.Name, isoPath, err)
+		e.Errorf("Explode ISO: failed to read iso file %s: %v", isoPath, err)
+		return
 	}
 	hash := hex.EncodeToString(hasher.Sum(nil))
 	// This will wind up being saved along with the rest of the
@@ -269,17 +284,23 @@ func (b *BootEnv) explodeIso() error {
 	}
 
 	if hash != b.OS.IsoSha256 {
-		return fmt.Errorf("iso: Iso checksum bad.  Re-download image: %s: actual: %v expected: %v", isoPath, hash, b.OS.IsoSha256)
+		e.Errorf("Explode ISO: SHA256 bad. actual: %v expected: %v", hash, b.OS.IsoSha256)
+		return
 	}
 
 	// Call extract script
 	// /explode_iso.sh b.OS.Name fileRoot isoPath path.Dir(canaryPath)
 	cmdName := path.Join(b.p.FileRoot, "explode_iso.sh")
-	cmdArgs := []string{b.OS.Name, b.p.FileRoot, isoPath, path.Dir(canaryPath), b.OS.IsoSha256}
-	if _, err := exec.Command(cmdName, cmdArgs...).Output(); err != nil {
-		return fmt.Errorf("Explode ISO: Exec command failed for %s: %s\n", b.Name, err)
+	cmdArgs := []string{b.OS.Name, b.p.FileRoot, isoPath, b.PathFor("disk", ""), b.OS.IsoSha256}
+	if out, err := exec.Command(cmdName, cmdArgs...).Output(); err != nil {
+		e.Errorf("Explode ISO: explode_iso.sh failed for %s: %s", b.Name, err)
+		e.Errorf("Command output:\n%s", string(out))
+
+	} else {
+		b.p.Logger.Printf("Explode ISO: %s exploded to %s", b.OS.IsoFile, isoPath)
+		b.p.Logger.Printf("Explode ISO Log:\n%s", string(out))
 	}
-	return nil
+	return
 }
 
 func (b *BootEnv) BeforeSave() error {
@@ -315,10 +336,7 @@ func (b *BootEnv) BeforeSave() error {
 	// Make sure the ISO for this bootenv has been exploded locally so that
 	// the boot env can use its contents.
 	if b.OS.IsoFile != "" {
-		b.p.Logger.Printf("Exploding ISO for %s\n", b.OS.Name)
-		if err := b.explodeIso(); err != nil {
-			e.Errorf("bootenv: Unable to expand ISO %s: %v", b.OS.IsoFile, err)
-		}
+		b.explodeIso(e)
 	}
 	// If we have a non-empty Kernel, make sure it points at something kernel-ish.
 	if b.Kernel != "" {
