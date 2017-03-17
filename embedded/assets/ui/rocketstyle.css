@@ -9,6 +9,7 @@
 a.nav-link {
   color: #fff !important;
   font-size: 20px;
+  margin-left: 5px;
   text-decoration: none;
 }
 
@@ -24,6 +25,10 @@ a.nav-link:hover {
 .updating-content {
   pointer-events: none;
   opacity: 0.6;
+}
+
+tbody.expanded > tr:last-child {
+  background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.1));
 }
 
 .input-table td {
