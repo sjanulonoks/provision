@@ -173,11 +173,9 @@ func main() {
 	}
 
 	// We have a backend, now get default assets
-	if !c_opts.DisableProvisioner {
-		logger.Printf("Extracting Default Assets\n")
-		if err := ExtractAssets(c_opts.FileRoot); err != nil {
-			logger.Fatalf("Unable to extract assets: %v", err)
-		}
+	logger.Printf("Extracting Default Assets\n")
+	if err := ExtractAssets(c_opts.FileRoot); err != nil {
+		logger.Fatalf("Unable to extract assets: %v", err)
 	}
 
 	dt := backend.NewDataTracker(backendStore,
