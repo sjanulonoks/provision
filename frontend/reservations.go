@@ -73,6 +73,7 @@ func (f *Frontend) InitReservationApi() {
 	//       201: ReservationResponse
 	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.POST("/reservations",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {
@@ -138,6 +139,7 @@ func (f *Frontend) InitReservationApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/reservations/:address",
 		func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "reservation patch: NOT IMPLEMENTED"))
@@ -154,6 +156,7 @@ func (f *Frontend) InitReservationApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PUT("/reservations/:address",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {

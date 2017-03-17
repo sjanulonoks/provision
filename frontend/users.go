@@ -71,6 +71,7 @@ func (f *Frontend) InitUserApi() {
 	//       201: UserResponse
 	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.POST("/users",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {
@@ -128,6 +129,7 @@ func (f *Frontend) InitUserApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/users/:name",
 		func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "user patch: NOT IMPLEMENTED"))
@@ -144,6 +146,7 @@ func (f *Frontend) InitUserApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {

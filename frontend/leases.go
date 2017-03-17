@@ -73,6 +73,7 @@ func (f *Frontend) InitLeaseApi() {
 	//       201: LeaseResponse
 	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.POST("/leases",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {
@@ -138,6 +139,7 @@ func (f *Frontend) InitLeaseApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/leases/:address",
 		func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "lease patch: NOT IMPLEMENTED"))
@@ -154,6 +156,7 @@ func (f *Frontend) InitLeaseApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PUT("/leases/:address",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {

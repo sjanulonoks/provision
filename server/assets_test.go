@@ -36,9 +36,6 @@ func TestExtractAssets(t *testing.T) {
 		"lpxelinux.0",
 		"pxechn.c32",
 		"wimboot",
-		"default.ipxe",
-		"elilo.conf",
-		"pxelinux.cfg/default",
 	}
 
 	for _, f := range files {

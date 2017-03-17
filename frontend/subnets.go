@@ -71,6 +71,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       201: SubnetResponse
 	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.POST("/subnets",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {
@@ -128,6 +129,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/subnets/:name",
 		func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "subnet patch: NOT IMPLEMENTED"))
@@ -144,6 +146,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PUT("/subnets/:name",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {

@@ -71,6 +71,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       201: TemplateResponse
 	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.POST("/templates",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {
@@ -95,8 +96,6 @@ func (f *Frontend) InitTemplateApi() {
 				c.JSON(http.StatusCreated, nb)
 			}
 		})
-
-	// GREG: add streaming create.	f.ApiGroup.POST("/templates/:uuid", createTemplate)
 
 	// swagger:route GET /templates/{name} Templates getTemplate
 	//
@@ -130,6 +129,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/templates/:id",
 		func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "template patch: NOT IMPLEMENTED"))
@@ -146,6 +146,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PUT("/templates/:id",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {

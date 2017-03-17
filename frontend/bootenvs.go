@@ -71,6 +71,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       201: BootEnvResponse
 	//       400: ErrorResponse
 	//       401: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.POST("/bootenvs",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {
@@ -128,6 +129,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/bootenvs/:name",
 		func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "bootenv patch: NOT IMPLEMENTED"))
@@ -144,6 +146,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       400: ErrorResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.PUT("/bootenvs/:name",
 		func(c *gin.Context) {
 			if !testContentType(c, "application/json") {
