@@ -25,19 +25,17 @@ if [[ "$os_install_dir" = /* ]] ; then
     oid_cwd=""
 fi
 
-mac_extract() {
-     7z x $1
-}
-
-other_extract() {
-    bsdtar -x -f $1
-}
-
+# Gotta be careful here -- 7z prefers extracting Joliet-based
+# names from ISO files, where bsdtar prefers extracting
+# RockRidge based names.  Problem is that RockRidge has no max
+# length on names, where Joliet tops out at 63 characters, so
+# isos that contain files with really long names (like some
+# Fedora install isos) will not extract correctly with 7zip.  
 extract() {
     if [[ $(uname -s) == Darwin ]] ; then
-        mac_extract $1
+        7z x "$@"
     else
-        other_extract $1
+        bsdtar -xf "$@"
     fi
 }
 
@@ -81,13 +79,30 @@ case $os_name in
             chmod -R 555 .
         )
         ;;
-        
+    sledgehammer/*)
+        # For Sledgehammer, we also check the sha1sums that were
+        # extracted and die if they do not match
+        (
+            cd "${oid_cwd}${os_install_dir}.extracting"
+            extract "${iso_cwd}${iso}"
+            SHA1SUM="sha1sum"
+            if [[ $(uname -s) == Darwin ]] ; then
+                SHA1SUM="shasum -a 1"
+            fi
+            if ! $SHA1SUM -c sha1sums; then
+                echo "Sha1 check failed, invalid download."
+                exit 1
+            fi
+        ) || exit 1;;
+
     *)
         # Everything else just needs bsdtar/hdiutil
         (cd "${oid_cwd}${os_install_dir}.extracting"; extract "${iso_cwd}${iso}");;
 esac
 if [[ $os_name =~ $rhelish_re ]]; then
-    # Rewrite local package metadata
+    # Rewrite local package metadata.  This allows for properly
+    # handling the case where we only use disc 1 of a multi-disc set
+    # for initial install purposes.
     (
         cd "${oid_cwd}${os_install_dir}.extracting"
         groups=($(echo repodata/*comps*.xml))
