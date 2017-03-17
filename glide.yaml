@@ -9,6 +9,7 @@ import:
   version: v2
   repo: https://github.com/go-yaml/yaml
 - package: github.com/VictorLowther/jsonpatch
+- package: github.com/ghodss/yaml
 - package: github.com/digitalrebar/digitalrebar
   subpackages:
   - go/common/client
