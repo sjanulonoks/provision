@@ -612,15 +612,12 @@ class BootEnv extends React.Component {
                   {bootenv.Templates.map((val, i) =>
                     <tr key={i}>
                       <td>
-                        {val}
                         <input
                           type="text"
                           size="15"
                           name="Name"
                           value={val.Name}
                           onChange={(e)=>this.changeTemplate(e, i)}/>
-                        }
-                      }
                       </td>
                       <td>
                         <input
