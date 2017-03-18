@@ -148,7 +148,7 @@ func (b *BootEnv) Backend() store.SimpleStore {
 //    disk: Will expand to the path of the file inside the provisioner container.
 func (b *BootEnv) PathFor(proto, f string) string {
 	res := b.OS.Name
-	if strings.HasSuffix(res, "-install") {
+	if strings.HasSuffix(b.Name, "-install") {
 		res = path.Join(res, "install")
 	}
 	tail := path.Join(res, f)
