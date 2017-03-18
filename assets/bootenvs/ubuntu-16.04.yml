@@ -1,0 +1,46 @@
+BootParams: 'debian-installer/locale=en_US.utf8 console-setup/layoutcode=us keyboard-configuration/layoutcode=us
+  netcfg/dhcp_timeout=120 netcfg/choose_interface=auto url={{.Machine.Url}}/seed netcfg/get_hostname={{.Machine.Name}}
+  root=/dev/ram rw quiet -- '
+Initrds:
+- install/netboot/ubuntu-installer/amd64/initrd.gz
+Kernel: install/netboot/ubuntu-installer/amd64/linux
+Name: ubuntu-16.04-install
+OS:
+  Family: ubuntu
+  IsoFile: ubuntu-16.04.2-server-amd64.iso
+  IsoSha256: 737ae7041212c628de5751d15c3016058b0e833fdc32e7420209b76ca3d0a535
+  IsoUrl: http://mirrors.kernel.org/ubuntu-releases/16.04/ubuntu-16.04.2-server-amd64.iso
+  Name: ubuntu-16.04
+  Version: '16.04'
+RequiredParams:
+- dns-domain
+- logging_servers
+- ntp_servers
+- operating-system-disk
+- provisioner-default-password-hash
+- provisioner-default-user
+- provisioner-use-local-security
+- proxy-servers
+- use-proxy
+- rebar-access_keys
+- rebar-machine_key
+Templates:
+- ID: default-pxelinux.tmpl
+  Name: pxelinux
+  Path: pxelinux.cfg/{{.Machine.HexAddress}}
+- ID: default-elilo.tmpl
+  Name: elilo
+  Path: '{{.Machine.HexAddress}}.conf'
+- ID: default-ipxe.tmpl
+  Name: ipxe
+  Path: '{{.Machine.Address}}.ipxe'
+- ID: net_seed.tmpl
+  Name: seed
+  Path: '{{.Machine.Path}}/seed'
+- ID: net-post-install.sh.tmpl
+  Name: net-post-install.sh
+  Path: '{{.Machine.Path}}/post-install.sh'
+- ID: rebar-join.sh.tmpl
+  Name: rebar_join.sh
+  Path: '{{.Machine.Path}}/rebar_join.sh'
+TenantId: 1

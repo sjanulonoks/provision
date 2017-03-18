@@ -1,0 +1,37 @@
+BootParams: ksdevice=bootif ks={{.Machine.Url}}/compute.ks method={{.Env.OS.InstallUrl}}
+  inst.geoloc=0
+Initrds:
+- images/pxeboot/initrd.img
+Kernel: images/pxeboot/vmlinuz
+Name: centos-7.2.1511-install
+OS:
+  IsoFile: CentOS-7-x86_64-Minimal-1511.iso
+  IsoSha256: f90e4d28fa377669b2db16cbcb451fcb9a89d2460e3645993e30e137ac37d284
+  IsoUrl: http://mirrors.kernel.org/centos/7.2.1511/isos/x86_64/CentOS-7-x86_64-Minimal-1511.iso
+  Name: centos-7.2.1511
+RequiredParams:
+- logging_servers
+- ntp_servers
+- operating-system-disk
+- provisioner-default-password-hash
+- proxy-servers
+- use-proxy
+- rebar-access_keys
+- rebar-machine_key
+Templates:
+- ID: default-pxelinux.tmpl
+  Name: pxelinux
+  Path: pxelinux.cfg/{{.Machine.HexAddress}}
+- ID: default-elilo.tmpl
+  Name: elilo
+  Path: '{{.Machine.HexAddress}}.conf'
+- ID: default-ipxe.tmpl
+  Name: ipxe
+  Path: '{{.Machine.Address}}.ipxe'
+- ID: centos-7.ks.tmpl
+  Name: compute.ks
+  Path: '{{.Machine.Path}}/compute.ks'
+- ID: rebar-join.sh.tmpl
+  Name: rebar_join.sh
+  Path: '{{.Machine.Path}}/rebar_join.sh'
+TenantId: 1

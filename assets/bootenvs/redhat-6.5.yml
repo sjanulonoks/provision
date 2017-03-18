@@ -1,0 +1,35 @@
+BootParams: ksdevice=bootif ks={{.Machine.Url}}/compute.ks method={{.Env.OS.InstallUrl}}
+Initrds:
+- images/pxeboot/initrd.img
+Kernel: images/pxeboot/vmlinuz
+Name: redhat-6.5-install
+OS:
+  IsoFile: RHEL6.5-20131111.0-Server-x86_64-DVD1.iso
+  IsoSha256: a51b90f3dd4585781293ea08adde60eeb9cfa94670943bd99e9c07f13a259539
+  Name: redhat-6.5
+RequiredParams:
+- logging_servers
+- ntp_servers
+- operating-system-disk
+- provisioner-default-password-hash
+- proxy-servers
+- use-proxy
+- rebar-access_keys
+- rebar-machine_key
+Templates:
+- ID: default-pxelinux.tmpl
+  Name: pxelinux
+  Path: pxelinux.cfg/{{.Machine.HexAddress}}
+- ID: default-elilo.tmpl
+  Name: elilo
+  Path: '{{.Machine.HexAddress}}.conf'
+- ID: default-ipxe.tmpl
+  Name: ipxe
+  Path: '{{.Machine.Address}}.ipxe'
+- ID: centos-6.ks.tmpl
+  Name: compute.ks
+  Path: '{{.Machine.Path}}/compute.ks'
+- ID: rebar-join.sh.tmpl
+  Name: rebar_join.sh
+  Path: '{{.Machine.Path}}/rebar_join.sh'
+TenantId: 1
