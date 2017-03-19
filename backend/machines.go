@@ -109,7 +109,7 @@ func (n *Machine) BeforeSave() error {
 		e.Errorf("Machine %s must have a name", n.Uuid)
 	}
 	if n.BootEnv == "" {
-		n.BootEnv = n.p.DefaultBootEnv
+		n.BootEnv = n.p.defaultBootEnv
 	}
 	validateMaybeZeroIP4(e, n.Address)
 	b, found := n.p.fetchOne(n.p.NewBootEnv(), n.BootEnv)

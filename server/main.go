@@ -176,12 +176,14 @@ func main() {
 		!c_opts.DisableDHCP,
 		c_opts.FileRoot,
 		c_opts.CommandURL,
-		c_opts.DefaultBootEnv,
-		c_opts.UnknownBootEnv,
 		fmt.Sprintf("http://%s:%d", c_opts.OurAddress, c_opts.StaticPort),
 		fmt.Sprintf("https://%s:%d", c_opts.OurAddress, c_opts.ApiPort),
 		c_opts.OurAddress,
-		logger)
+		logger,
+		map[string]string{
+			"defaultBootEnv": c_opts.DefaultBootEnv,
+			"unknownBootEnv": c_opts.UnknownBootEnv,
+		})
 
 	if err := dt.RenderUnknown(); err != nil {
 		logger.Fatalf("Unable to render default boot env for unknown PXE clients: %s", err)

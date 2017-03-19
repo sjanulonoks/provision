@@ -107,14 +107,19 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 
 func (r *RenderData) render(e *Error) {
 	var missingParams []string
-	for _, param := range r.Env.RequiredParams {
-		if _, ok := r.Machine.Params[param]; !ok {
-			missingParams = append(missingParams, param)
-		}
-	}
-	if len(missingParams) > 0 {
-		e.Errorf("missing required machine params for %s:\n %v", r.Machine.Name, missingParams)
+	if len(r.Env.RequiredParams) > 0 && (r.Machine == nil || r.Machine.Params == nil) {
+		e.Errorf("Machine is nil or does not have params")
 		return
+	} else {
+		for _, param := range r.Env.RequiredParams {
+			if _, ok := r.Machine.Params[param]; !ok {
+				missingParams = append(missingParams, param)
+			}
+		}
+		if len(missingParams) > 0 {
+			e.Errorf("missing required machine params for %s:\n %v", r.Machine.Name, missingParams)
+			return
+		}
 	}
 	r.renderedTemplates = make([]renderedTemplate, len(r.Env.Templates))
 

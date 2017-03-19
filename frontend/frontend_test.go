@@ -3,6 +3,7 @@ package frontend
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,21 +17,22 @@ import (
 )
 
 type LocalDTI struct {
-	CreateValue store.KeySaver
-	CreateError error
-	UpdateValue store.KeySaver
-	UpdateError error
-	SaveValue   store.KeySaver
-	SaveError   error
-	RemoveValue store.KeySaver
-	RemoveError error
-	ListValue   []store.KeySaver
-	GetValue    store.KeySaver
-	GetBool     bool
-	GIValue     []*backend.Interface
-	GIError     error
-	w           *httptest.ResponseRecorder
-	f           *Frontend
+	CreateValue  store.KeySaver
+	CreateError  error
+	UpdateValue  store.KeySaver
+	UpdateError  error
+	SaveValue    store.KeySaver
+	SaveError    error
+	RemoveValue  store.KeySaver
+	RemoveError  error
+	ListValue    []store.KeySaver
+	GetValue     store.KeySaver
+	GetBool      bool
+	GIValue      []*backend.Interface
+	GIError      error
+	DefaultPrefs map[string]string
+	w            *httptest.ResponseRecorder
+	f            *Frontend
 }
 
 func (dt *LocalDTI) Create(store.KeySaver) (store.KeySaver, error) {
@@ -53,6 +55,25 @@ func (dt *LocalDTI) FetchAll(ref store.KeySaver) []store.KeySaver {
 }
 func (dt *LocalDTI) GetInterfaces() ([]*backend.Interface, error) {
 	return dt.GIValue, dt.GIError
+}
+
+func (dt *LocalDTI) Pref(name string) (string, error) {
+	res, ok := dt.DefaultPrefs[name]
+	if ok {
+		return res, nil
+	}
+	return "", fmt.Errorf("Missing pref %s", name)
+}
+
+func (dt *LocalDTI) Prefs() map[string]string {
+	return dt.DefaultPrefs
+}
+
+func (dt *LocalDTI) SetPrefs(prefs map[string]string) error {
+	for name, val := range prefs {
+		dt.DefaultPrefs[name] = val
+	}
+	return nil
 }
 
 func (dt *LocalDTI) NewBootEnv() *backend.BootEnv         { return &backend.BootEnv{} }

@@ -64,6 +64,10 @@ type DTI interface {
 	NewSubnet() *backend.Subnet
 	NewUser() *backend.User
 
+	Pref(string) (string, error)
+	Prefs() map[string]string
+	SetPrefs(map[string]string) error
+
 	GetInterfaces() ([]*backend.Interface, error)
 }
 
@@ -91,6 +95,7 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Fronte
 	me.InitSubnetApi()
 	me.InitUserApi()
 	me.InitInterfaceApi()
+	me.InitPrefApi()
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("swagger.json")

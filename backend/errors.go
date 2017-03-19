@@ -77,6 +77,27 @@ func (e *Error) Error() string {
 	return res + allMsgs
 }
 
+func (e *Error) ContainsError() bool {
+	return e.containsError
+}
+
+func (e *Error) Merge(src error) {
+	if src == nil {
+		return
+	}
+	if e.Messages == nil {
+		e.Messages = []string{}
+	}
+	other, ok := src.(*Error)
+	if !ok {
+		e.containsError = true
+		e.Messages = append(e.Messages, src.Error())
+	} else if other.Messages != nil {
+		e.containsError = true
+		e.Messages = append(e.Messages, other.Messages...)
+	}
+}
+
 func (e *Error) OrNil() error {
 	if e.containsError {
 		return e
