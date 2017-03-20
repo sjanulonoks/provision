@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pborman/uuid"
 	"github.com/rackn/rocket-skates/backend"
 )
 
@@ -73,8 +74,27 @@ func (f *Frontend) InitMachineApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/machines",
 		func(c *gin.Context) {
+			// We don't use f.Create() because we need to be able to assign random
+			// UUIDs to new Machines without forcing the client to do so, yet allow them
+			// for testing purposes amd if they alrady have a UUID scheme for machines.
 			b := f.dt.NewMachine()
-			f.Create(c, b)
+			if !assureDecode(c, b) {
+				return
+			}
+			if b.Uuid == nil || len(b.Uuid) == 0 {
+				b.Uuid = uuid.NewRandom()
+			}
+			res, err := f.dt.Create(b)
+			if err != nil {
+				be, ok := err.(*backend.Error)
+				if ok {
+					c.JSON(be.Code, be)
+				} else {
+					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				}
+			} else {
+				c.JSON(http.StatusCreated, res)
+			}
 		})
 	// swagger:route GET /machines/{name} Machines getMachine
 	//
