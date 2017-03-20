@@ -150,7 +150,7 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	if !assureContentType(c, "application/json") {
 		return false
 	}
-	err := &backend.Error{Type: "API_ERROR", Code: 400}
+	err := &backend.Error{Type: "API_ERROR", Code: http.StatusBadRequest}
 	marshalErr := c.Bind(&val)
 	if marshalErr == nil {
 		return true
