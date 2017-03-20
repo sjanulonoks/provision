@@ -38,12 +38,13 @@ type MachinePatchBodyParameter struct {
 	Body []JSONPatchOperation
 }
 
-// MachinePathParameter used to name a Machine in the path
+// MachinePathParameter used to find a Machine in the path
 // swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine
 type MachinePathParameter struct {
 	// in: path
 	// required: true
-	Name string `json:"name"`
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
 }
 
 func (f *Frontend) InitMachineApi() {
@@ -96,26 +97,26 @@ func (f *Frontend) InitMachineApi() {
 				c.JSON(http.StatusCreated, res)
 			}
 		})
-	// swagger:route GET /machines/{name} Machines getMachine
+	// swagger:route GET /machines/{uuid} Machines getMachine
 	//
 	// Get a Machine
 	//
-	// Get the Machine specified by {name} or return NotFound.
+	// Get the Machine specified by {uuid} or return NotFound.
 	//
 	//     Responses:
 	//       200: MachineResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
-	f.ApiGroup.GET("/machines/:name",
+	f.ApiGroup.GET("/machines/:uuid",
 		func(c *gin.Context) {
-			f.Fetch(c, f.dt.NewMachine(), c.Param(`name`))
+			f.Fetch(c, f.dt.NewMachine(), c.Param(`uuid`))
 		})
 
-	// swagger:route PATCH /machines/{name} Machines patchMachine
+	// swagger:route PATCH /machines/{uuid} Machines patchMachine
 	//
 	// Patch a Machine
 	//
-	// Update a Machine specified by {name} using a RFC6902 Patch structure
+	// Update a Machine specified by {uuid} using a RFC6902 Patch structure
 	//
 	//     Responses:
 	//       200: MachineResponse
@@ -123,16 +124,16 @@ func (f *Frontend) InitMachineApi() {
 	//       401: ErrorResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
-	f.ApiGroup.PATCH("/machines/:name",
+	f.ApiGroup.PATCH("/machines/:uuid",
 		func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "machine patch: NOT IMPLEMENTED"))
 		})
 
-	// swagger:route PUT /machines/{name} Machines putMachine
+	// swagger:route PUT /machines/{uuid} Machines putMachine
 	//
 	// Put a Machine
 	//
-	// Update a Machine specified by {name} using a JSON Machine
+	// Update a Machine specified by {uuid} using a JSON Machine
 	//
 	//     Responses:
 	//       200: MachineResponse
@@ -140,25 +141,25 @@ func (f *Frontend) InitMachineApi() {
 	//       401: ErrorResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
-	f.ApiGroup.PUT("/machines/:name",
+	f.ApiGroup.PUT("/machines/:uuid",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewMachine(), c.Param(`name`))
+			f.Update(c, f.dt.NewMachine(), c.Param(`uuid`))
 		})
 
-	// swagger:route DELETE /machines/{name} Machines deleteMachine
+	// swagger:route DELETE /machines/{uuid} Machines deleteMachine
 	//
 	// Delete a Machine
 	//
-	// Delete a Machine specified by {name}
+	// Delete a Machine specified by {uuid}
 	//
 	//     Responses:
 	//       200: MachineResponse
 	//       401: ErrorResponse
 	//       404: ErrorResponse
-	f.ApiGroup.DELETE("/machines/:name",
+	f.ApiGroup.DELETE("/machines/:uuid",
 		func(c *gin.Context) {
 			b := f.dt.NewMachine()
-			b.Name = c.Param(`name`)
+			b.Uuid = uuid.Parse(c.Param(`uuid`))
 			f.Remove(c, b)
 		})
 }
