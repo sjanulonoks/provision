@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"sort"
 	"sync"
 
@@ -429,7 +430,13 @@ func (p *DataTracker) remove(ref store.KeySaver) (bool, error) {
 	mux, idx, found := p.lockedGet(prefix, key)
 	defer mux.Unlock()
 	if !found {
-		return false, fmt.Errorf("dataTracker remove %s: %s does not exist", prefix, key)
+		err := &Error{
+			Code:  http.StatusNotFound,
+			Key:   key,
+			Model: prefix,
+		}
+		err.Errorf("%s: DELETE %s: Not Found", err.Model, err.Key)
+		return false, err
 	}
 	removed, err := store.Remove(mux.d[idx])
 	if removed {
@@ -455,7 +462,13 @@ func (p *DataTracker) update(ref store.KeySaver) (bool, error) {
 	mux, idx, found := p.lockedGet(prefix, key)
 	defer mux.Unlock()
 	if !found {
-		return false, fmt.Errorf("dataTracker remove %s: %s does not exist", prefix, key)
+		err := &Error{
+			Code:  http.StatusNotFound,
+			Key:   key,
+			Model: prefix,
+		}
+		err.Errorf("%s: PUT %s: Not Found", err.Model, err.Key)
+		return false, err
 	}
 	p.setDT(ref)
 	ok, err := store.Update(ref)

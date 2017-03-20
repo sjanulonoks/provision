@@ -50,13 +50,10 @@ func (f *Frontend) InitPrefApi() {
 	f.ApiGroup.POST("/prefs",
 		func(c *gin.Context) {
 			prefs := map[string]string{}
-			err := &backend.Error{Type: "API_ERROR", Key: "Preference", Code: http.StatusBadRequest}
-			if !testContentType(c, "application/json") {
-				err.Errorf("Invalid content type: %s", c.ContentType())
-			} else if marshalErr := c.Bind(&prefs); marshalErr != nil {
-				err.Code = 400
-				err.Merge(marshalErr)
+			if !assureDecode(c, &prefs) {
+				return
 			}
+			err := &backend.Error{Type: "API_ERROR", Key: "Preference", Code: http.StatusBadRequest}
 			// Filter unknown preferences here
 			for k := range prefs {
 				switch k {

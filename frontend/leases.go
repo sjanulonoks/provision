@@ -60,7 +60,7 @@ func (f *Frontend) InitLeaseApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.GET("/leases",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, backend.AsLeases(f.dt.FetchAll(f.dt.NewLease())))
+			f.List(c, f.dt.NewLease())
 		})
 
 	// swagger:route POST /leases Leases createLease
@@ -76,28 +76,9 @@ func (f *Frontend) InitLeaseApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/leases",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
 			b := f.dt.NewLease()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			nb, err := f.dt.Create(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusCreated, nb)
-			}
+			f.Create(c, b)
 		})
-
 	// swagger:route GET /leases/{address} Leases getLease
 	//
 	// Get a Lease
@@ -118,14 +99,7 @@ func (f *Frontend) InitLeaseApi() {
 						fmt.Sprintf("lease get: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			res, ok := f.dt.FetchOne(f.dt.NewLease(), backend.Hexaddr(ip))
-			if ok {
-				c.JSON(http.StatusOK, backend.AsLease(res))
-			} else {
-				c.JSON(http.StatusNotFound,
-					backend.NewError("API_ERROR", http.StatusNotFound,
-						fmt.Sprintf("lease get: error not found: %v", c.Param(`address`))))
-			}
+			f.Fetch(c, f.dt.NewLease(), backend.Hexaddr(ip))
 		})
 
 	// swagger:route PATCH /leases/{address} Leases patchLease
@@ -159,10 +133,6 @@ func (f *Frontend) InitLeaseApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/leases/:address",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
@@ -170,28 +140,7 @@ func (f *Frontend) InitLeaseApi() {
 						fmt.Sprintf("lease put: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			b := f.dt.NewLease()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			if !b.Addr.Equal(ip) {
-				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("lease put: error can not change address: %v %v", ip, b.Addr)))
-				return
-			}
-			nb, err := f.dt.Update(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Update(c, f.dt.NewLease(), backend.Hexaddr(ip))
 		})
 
 	// swagger:route DELETE /leases/{address} Leases deleteLease
@@ -215,16 +164,6 @@ func (f *Frontend) InitLeaseApi() {
 						fmt.Sprintf("lease delete: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			nb, err := f.dt.Remove(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Remove(c, b)
 		})
 }

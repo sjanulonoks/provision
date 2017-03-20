@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -58,7 +57,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.GET("/bootenvs",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, backend.AsBootEnvs(f.dt.FetchAll(f.dt.NewBootEnv())))
+			f.List(c, f.dt.NewBootEnv())
 		})
 
 	// swagger:route POST /bootenvs BootEnvs createBootEnv
@@ -74,28 +73,9 @@ func (f *Frontend) InitBootEnvApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/bootenvs",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
 			b := f.dt.NewBootEnv()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			nb, err := f.dt.Create(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusCreated, nb)
-			}
+			f.Create(c, b)
 		})
-
 	// swagger:route GET /bootenvs/{name} BootEnvs getBootEnv
 	//
 	// Get a BootEnv
@@ -108,14 +88,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/bootenvs/:name",
 		func(c *gin.Context) {
-			res, ok := f.dt.FetchOne(f.dt.NewBootEnv(), c.Param(`name`))
-			if ok {
-				c.JSON(http.StatusOK, backend.AsBootEnv(res))
-			} else {
-				c.JSON(http.StatusNotFound,
-					backend.NewError("API_ERROR", http.StatusNotFound,
-						fmt.Sprintf("bootenv get: error not found: %v", c.Param(`name`))))
-			}
+			f.Fetch(c, f.dt.NewBootEnv(), c.Param(`name`))
 		})
 
 	// swagger:route PATCH /bootenvs/{name} BootEnvs patchBootEnv
@@ -149,32 +122,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/bootenvs/:name",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
-			b := f.dt.NewBootEnv()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			if b.Name != c.Param(`name`) {
-				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("bootenv put: error can not change name: %v %v", c.Param(`name`), b.Name)))
-				return
-			}
-			nb, err := f.dt.Update(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Update(c, f.dt.NewBootEnv(), c.Param(`name`))
 		})
 
 	// swagger:route DELETE /bootenvs/{name} BootEnvs deleteBootEnv
@@ -191,16 +139,7 @@ func (f *Frontend) InitBootEnvApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewBootEnv()
 			b.Name = c.Param(`name`)
-			nb, err := f.dt.Remove(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Remove(c, b)
+
 		})
 }

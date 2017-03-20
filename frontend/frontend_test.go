@@ -107,20 +107,28 @@ func (dt *LocalDTI) RunTest(req *http.Request) *httptest.ResponseRecorder {
 func (dt *LocalDTI) ValidateCode(t *testing.T, c int) {
 	if dt.w.Code != c {
 		t.Errorf("Response should be %v, was: %v", c, dt.w.Code)
+	} else {
+		t.Logf("Got expected code %d", c)
 	}
 }
 
 func (dt *LocalDTI) ValidateContentType(t *testing.T, ct string) {
 	if dt.w.HeaderMap.Get("Content-Type") != ct {
 		t.Errorf("Content-Type should be %v, was %v", ct, dt.w.HeaderMap.Get("Content-Type"))
+	} else {
+		t.Logf("Got expected content-type: %s", ct)
 	}
 }
 
 func (dt *LocalDTI) ValidateError(t *testing.T, ap string, mess string) {
 	var err backend.Error
-	lerr := json.Unmarshal(dt.w.Body.Bytes(), &err)
+	buf := dt.w.Body.Bytes()
+	lerr := json.Unmarshal(buf, &err)
 	if lerr != nil {
 		t.Errorf("Response should be valid error struct: %v: %v\n", lerr, err)
+	} else {
+		t.Logf("For response body: %s\n", string(buf))
+		t.Logf("Got error log: %#v", err)
 	}
 	if err.Type != ap {
 		t.Errorf("Error type should be: %v, but is %v\n", ap, err.Type)

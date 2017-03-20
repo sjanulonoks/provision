@@ -60,7 +60,7 @@ func (f *Frontend) InitReservationApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.GET("/reservations",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, backend.AsReservations(f.dt.FetchAll(f.dt.NewReservation())))
+			f.List(c, f.dt.NewReservation())
 		})
 
 	// swagger:route POST /reservations Reservations createReservation
@@ -76,26 +76,8 @@ func (f *Frontend) InitReservationApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/reservations",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
 			b := f.dt.NewReservation()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			nb, err := f.dt.Create(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusCreated, nb)
-			}
+			f.Create(c, b)
 		})
 
 	// swagger:route GET /reservations/{address} Reservations getReservation
@@ -118,14 +100,7 @@ func (f *Frontend) InitReservationApi() {
 						fmt.Sprintf("reservation get: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			res, ok := f.dt.FetchOne(f.dt.NewReservation(), backend.Hexaddr(ip))
-			if ok {
-				c.JSON(http.StatusOK, backend.AsReservation(res))
-			} else {
-				c.JSON(http.StatusNotFound,
-					backend.NewError("API_ERROR", http.StatusNotFound,
-						fmt.Sprintf("reservation get: error not found: %v", c.Param(`address`))))
-			}
+			f.Fetch(c, f.dt.NewReservation(), backend.Hexaddr(ip))
 		})
 
 	// swagger:route PATCH /reservations/{address} Reservations patchReservation
@@ -159,10 +134,6 @@ func (f *Frontend) InitReservationApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/reservations/:address",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
@@ -170,28 +141,7 @@ func (f *Frontend) InitReservationApi() {
 						fmt.Sprintf("reservation put: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			b := f.dt.NewReservation()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			if !b.Addr.Equal(ip) {
-				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("reservation put: error can not change address: %v %v", ip, b.Addr)))
-				return
-			}
-			nb, err := f.dt.Update(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Update(c, f.dt.NewReservation(), backend.Hexaddr(ip))
 		})
 
 	// swagger:route DELETE /reservations/{address} Reservations deleteReservation
@@ -215,16 +165,6 @@ func (f *Frontend) InitReservationApi() {
 						fmt.Sprintf("reservation delete: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			nb, err := f.dt.Remove(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Remove(c, b)
 		})
 }

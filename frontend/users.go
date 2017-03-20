@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -58,7 +57,7 @@ func (f *Frontend) InitUserApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.GET("/users",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, backend.AsUsers(f.dt.FetchAll(f.dt.NewUser())))
+			f.List(c, f.dt.NewUser())
 		})
 
 	// swagger:route POST /users Users createUser
@@ -74,26 +73,8 @@ func (f *Frontend) InitUserApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/users",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
 			b := f.dt.NewUser()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			nb, err := f.dt.Create(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusCreated, nb)
-			}
+			f.Create(c, b)
 		})
 
 	// swagger:route GET /users/{name} Users getUser
@@ -108,14 +89,7 @@ func (f *Frontend) InitUserApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/users/:name",
 		func(c *gin.Context) {
-			res, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
-			if ok {
-				c.JSON(http.StatusOK, backend.AsUser(res))
-			} else {
-				c.JSON(http.StatusNotFound,
-					backend.NewError("API_ERROR", http.StatusNotFound,
-						fmt.Sprintf("user get: error not found: %v", c.Param(`name`))))
-			}
+			f.Fetch(c, f.dt.NewUser(), c.Param(`name`))
 		})
 
 	// swagger:route PATCH /users/{name} Users patchUser
@@ -149,32 +123,7 @@ func (f *Frontend) InitUserApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
-			b := f.dt.NewUser()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			if b.Name != c.Param(`name`) {
-				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("user put: error can not change name: %v %v", c.Param(`name`), b.Name)))
-				return
-			}
-			nb, err := f.dt.Update(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Update(c, f.dt.NewUser(), c.Param(`name`))
 		})
 
 	// swagger:route DELETE /users/{name} Users deleteUser
@@ -191,16 +140,6 @@ func (f *Frontend) InitUserApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewUser()
 			b.Name = c.Param(`name`)
-			nb, err := f.dt.Remove(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Remove(c, b)
 		})
 }
