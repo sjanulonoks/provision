@@ -83,6 +83,7 @@ func (dt *LocalDTI) NewLease() *backend.Lease             { return &backend.Leas
 func (dt *LocalDTI) NewReservation() *backend.Reservation { return &backend.Reservation{} }
 func (dt *LocalDTI) NewSubnet() *backend.Subnet           { return &backend.Subnet{} }
 func (dt *LocalDTI) NewUser() *backend.User               { return &backend.User{} }
+func (dt *LocalDTI) NewParam() *backend.Param             { return &backend.Param{} }
 
 func testFrontend() *LocalDTI {
 	return testFrontendDev("")

@@ -63,6 +63,7 @@ type DTI interface {
 	NewReservation() *backend.Reservation
 	NewSubnet() *backend.Subnet
 	NewUser() *backend.User
+	NewParam() *backend.Param
 
 	Pref(string) (string, error)
 	Prefs() map[string]string
@@ -96,6 +97,7 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Fronte
 	me.InitUserApi()
 	me.InitInterfaceApi()
 	me.InitPrefApi()
+	me.InitParamApi()
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("swagger.json")
