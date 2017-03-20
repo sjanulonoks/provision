@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/pborman/uuid"
 	"github.com/rackn/rocket-skates/backend"
 )
 
@@ -72,7 +73,6 @@ func TestMachinePost(t *testing.T) {
 	localDTI.ValidateError(t, "API_ERROR", "invalid character 'a' looking for beginning of value")
 
 	/* GREG: handle json failure? hard to do - send a machine instead of machine */
-
 	localDTI.CreateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.CreateError = fmt.Errorf("this is a test: bad fred")
 	v, _ := json.Marshal(localDTI.CreateValue)
@@ -122,7 +122,7 @@ func TestMachineGet(t *testing.T) {
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusNotFound)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "machine get: Not Found: fred")
+	localDTI.ValidateError(t, "API_ERROR", "machines GET: fred: Not Found")
 
 	localDTI.GetValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.GetBool = true
@@ -151,6 +151,10 @@ func TestMachinePatch(t *testing.T) {
 
 func TestMachinePut(t *testing.T) {
 	localDTI := testFrontend()
+	goodUUID := uuid.NewRandom()
+	badUUID := uuid.NewRandom()
+	goodPath := fmt.Sprintf("/api/v3/machines/%s", goodUUID)
+	kcm := fmt.Sprintf("machines PUT: Key change from %s to %s not allowed", goodUUID, badUUID)
 
 	localDTI.UpdateValue = nil
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
@@ -181,40 +185,40 @@ func TestMachinePut(t *testing.T) {
 
 	/* GREG: handle json failure? hard to do - send a machine instead of machine */
 
-	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
+	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: goodUUID}
 	localDTI.UpdateError = fmt.Errorf("this is a test: bad fred")
 	v, _ := json.Marshal(localDTI.UpdateValue)
-	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader(string(v)))
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	localDTI.RunTest(req)
-	localDTI.ValidateCode(t, http.StatusNotFound)
-	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
-
-	localDTI.UpdateValue = &backend.Machine{Name: "kfred", BootEnv: "kfred"}
-	localDTI.UpdateError = nil
-	v, _ = json.Marshal(localDTI.UpdateValue)
-	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader(string(v)))
+	req, _ = http.NewRequest("PUT", goodPath, strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "machines put: Can not change name: fred -> kfred")
+	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
+	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: badUUID}
+	localDTI.UpdateError = nil
+	v, _ = json.Marshal(localDTI.UpdateValue)
+	req, _ = http.NewRequest("PUT", goodPath, strings.NewReader(string(v)))
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", kcm)
+
+	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: goodUUID}
 	localDTI.UpdateError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"test one"}}
 	v, _ = json.Marshal(localDTI.UpdateValue)
-	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader(string(v)))
+	req, _ = http.NewRequest("PUT", goodPath, strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, 23)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "test one")
 
-	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
+	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: goodUUID}
 	localDTI.UpdateError = nil
 	v, _ = json.Marshal(localDTI.UpdateValue)
-	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader(string(v)))
+	req, _ = http.NewRequest("PUT", goodPath, strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w := localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusOK)

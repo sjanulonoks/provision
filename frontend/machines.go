@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -58,7 +57,7 @@ func (f *Frontend) InitMachineApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.GET("/machines",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, backend.AsMachines(f.dt.FetchAll(f.dt.NewMachine())))
+			f.List(c, f.dt.NewMachine())
 		})
 
 	// swagger:route POST /machines Machines createMachine
@@ -74,29 +73,9 @@ func (f *Frontend) InitMachineApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/machines",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
 			b := f.dt.NewMachine()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			nb, err := f.dt.Create(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusCreated, nb)
-			}
+			f.Create(c, b)
 		})
-
 	// swagger:route GET /machines/{name} Machines getMachine
 	//
 	// Get a Machine
@@ -109,13 +88,7 @@ func (f *Frontend) InitMachineApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/machines/:name",
 		func(c *gin.Context) {
-			res, ok := f.dt.FetchOne(f.dt.NewMachine(), c.Param(`name`))
-			if ok {
-				c.JSON(http.StatusOK, backend.AsMachine(res))
-			} else {
-				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound,
-					fmt.Sprintf("machine get: Not Found: %v", c.Param(`name`))))
-			}
+			f.Fetch(c, f.dt.NewMachine(), c.Param(`name`))
 		})
 
 	// swagger:route PATCH /machines/{name} Machines patchMachine
@@ -149,31 +122,7 @@ func (f *Frontend) InitMachineApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/machines/:name",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
-			b := f.dt.NewMachine()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			if b.Name != c.Param(`name`) {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest,
-					fmt.Sprintf("machines put: Can not change name: %v -> %v", c.Param(`name`), b.Name)))
-				return
-			}
-			nb, err := f.dt.Update(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Update(c, f.dt.NewMachine(), c.Param(`name`))
 		})
 
 	// swagger:route DELETE /machines/{name} Machines deleteMachine
@@ -190,16 +139,6 @@ func (f *Frontend) InitMachineApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewMachine()
 			b.Name = c.Param(`name`)
-			nb, err := f.dt.Remove(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Remove(c, b)
 		})
 }

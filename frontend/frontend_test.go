@@ -3,6 +3,7 @@ package frontend
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,21 +17,22 @@ import (
 )
 
 type LocalDTI struct {
-	CreateValue store.KeySaver
-	CreateError error
-	UpdateValue store.KeySaver
-	UpdateError error
-	SaveValue   store.KeySaver
-	SaveError   error
-	RemoveValue store.KeySaver
-	RemoveError error
-	ListValue   []store.KeySaver
-	GetValue    store.KeySaver
-	GetBool     bool
-	GIValue     []*backend.Interface
-	GIError     error
-	w           *httptest.ResponseRecorder
-	f           *Frontend
+	CreateValue  store.KeySaver
+	CreateError  error
+	UpdateValue  store.KeySaver
+	UpdateError  error
+	SaveValue    store.KeySaver
+	SaveError    error
+	RemoveValue  store.KeySaver
+	RemoveError  error
+	ListValue    []store.KeySaver
+	GetValue     store.KeySaver
+	GetBool      bool
+	GIValue      []*backend.Interface
+	GIError      error
+	DefaultPrefs map[string]string
+	w            *httptest.ResponseRecorder
+	f            *Frontend
 }
 
 func (dt *LocalDTI) Create(store.KeySaver) (store.KeySaver, error) {
@@ -53,6 +55,25 @@ func (dt *LocalDTI) FetchAll(ref store.KeySaver) []store.KeySaver {
 }
 func (dt *LocalDTI) GetInterfaces() ([]*backend.Interface, error) {
 	return dt.GIValue, dt.GIError
+}
+
+func (dt *LocalDTI) Pref(name string) (string, error) {
+	res, ok := dt.DefaultPrefs[name]
+	if ok {
+		return res, nil
+	}
+	return "", fmt.Errorf("Missing pref %s", name)
+}
+
+func (dt *LocalDTI) Prefs() map[string]string {
+	return dt.DefaultPrefs
+}
+
+func (dt *LocalDTI) SetPrefs(prefs map[string]string) error {
+	for name, val := range prefs {
+		dt.DefaultPrefs[name] = val
+	}
+	return nil
 }
 
 func (dt *LocalDTI) NewBootEnv() *backend.BootEnv         { return &backend.BootEnv{} }
@@ -86,20 +107,28 @@ func (dt *LocalDTI) RunTest(req *http.Request) *httptest.ResponseRecorder {
 func (dt *LocalDTI) ValidateCode(t *testing.T, c int) {
 	if dt.w.Code != c {
 		t.Errorf("Response should be %v, was: %v", c, dt.w.Code)
+	} else {
+		t.Logf("Got expected code %d", c)
 	}
 }
 
 func (dt *LocalDTI) ValidateContentType(t *testing.T, ct string) {
 	if dt.w.HeaderMap.Get("Content-Type") != ct {
 		t.Errorf("Content-Type should be %v, was %v", ct, dt.w.HeaderMap.Get("Content-Type"))
+	} else {
+		t.Logf("Got expected content-type: %s", ct)
 	}
 }
 
 func (dt *LocalDTI) ValidateError(t *testing.T, ap string, mess string) {
 	var err backend.Error
-	lerr := json.Unmarshal(dt.w.Body.Bytes(), &err)
+	buf := dt.w.Body.Bytes()
+	lerr := json.Unmarshal(buf, &err)
 	if lerr != nil {
 		t.Errorf("Response should be valid error struct: %v: %v\n", lerr, err)
+	} else {
+		t.Logf("For response body: %s\n", string(buf))
+		t.Logf("Got error log: %#v", err)
 	}
 	if err.Type != ap {
 		t.Errorf("Error type should be: %v, but is %v\n", ap, err.Type)

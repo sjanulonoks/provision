@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -58,7 +57,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.GET("/templates",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, backend.AsTemplates(f.dt.FetchAll(f.dt.NewTemplate())))
+			f.List(c, f.dt.NewTemplate())
 		})
 
 	// swagger:route POST /templates Templates createTemplate
@@ -74,27 +73,8 @@ func (f *Frontend) InitTemplateApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/templates",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
 			b := f.dt.NewTemplate()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			nb, err := f.dt.Create(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusCreated, nb)
-			}
+			f.Create(c, b)
 		})
 
 	// swagger:route GET /templates/{name} Templates getTemplate
@@ -109,13 +89,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/templates/:id",
 		func(c *gin.Context) {
-			res, ok := f.dt.FetchOne(f.dt.NewTemplate(), c.Param(`id`))
-			if ok {
-				c.JSON(http.StatusOK, backend.AsTemplate(res))
-			} else {
-				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound,
-					fmt.Sprintf("templates get: Not Found: %v", c.Param(`id`))))
-			}
+			f.Fetch(c, f.dt.NewTemplate(), c.Param(`id`))
 		})
 
 	// swagger:route PATCH /templates/{name} Templates patchTemplate
@@ -149,31 +123,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/templates/:id",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
-			b := f.dt.NewTemplate()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			if b.ID != c.Param(`id`) {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest,
-					fmt.Sprintf("templates put: Can not change id: %v -> %v", c.Param(`id`), b.ID)))
-				return
-			}
-			nb, err := f.dt.Update(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Update(c, f.dt.NewTemplate(), c.Param(`id`))
 		})
 
 	// swagger:route DELETE /templates/{name} Templates deleteTemplate
@@ -190,16 +140,6 @@ func (f *Frontend) InitTemplateApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewTemplate()
 			b.ID = c.Param(`id`)
-			nb, err := f.dt.Remove(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Remove(c, b)
 		})
 }

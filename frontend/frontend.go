@@ -64,6 +64,10 @@ type DTI interface {
 	NewSubnet() *backend.Subnet
 	NewUser() *backend.User
 
+	Pref(string) (string, error)
+	Prefs() map[string]string
+	SetPrefs(map[string]string) error
+
 	GetInterfaces() ([]*backend.Interface, error)
 }
 
@@ -91,6 +95,7 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Fronte
 	me.InitSubnetApi()
 	me.InitUserApi()
 	me.InitInterfaceApi()
+	me.InitPrefApi()
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("swagger.json")
@@ -129,4 +134,107 @@ func testContentType(c *gin.Context, ct string) bool {
 	test := strings.ToUpper(c.ContentType())
 
 	return strings.Contains(test, ct)
+}
+
+func assureContentType(c *gin.Context, ct string) bool {
+	if testContentType(c, ct) {
+		return true
+	}
+	err := &backend.Error{Type: "API_ERROR", Code: http.StatusBadRequest}
+	err.Errorf("Invalid content type: %s", c.ContentType())
+	c.JSON(err.Code, err)
+	return false
+}
+
+func assureDecode(c *gin.Context, val interface{}) bool {
+	if !assureContentType(c, "application/json") {
+		return false
+	}
+	err := &backend.Error{Type: "API_ERROR", Code: 400}
+	marshalErr := c.Bind(&val)
+	if marshalErr == nil {
+		return true
+	}
+	err.Merge(marshalErr)
+	c.JSON(err.Code, err)
+	return false
+}
+
+func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
+	c.JSON(http.StatusOK, f.dt.FetchAll(ref))
+}
+
+func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
+	res, ok := f.dt.FetchOne(ref, key)
+	if ok {
+		c.JSON(http.StatusOK, res)
+	} else {
+		err := &backend.Error{
+			Code:  http.StatusNotFound,
+			Type:  "API_ERROR",
+			Model: ref.Prefix(),
+			Key:   key,
+		}
+		err.Errorf("%s GET: %s: Not Found", err.Model, err.Key)
+		c.JSON(err.Code, err)
+	}
+}
+
+func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
+	if !assureDecode(c, val) {
+		return
+	}
+	res, err := f.dt.Create(val)
+	if err != nil {
+		be, ok := err.(*backend.Error)
+		if ok {
+			c.JSON(be.Code, be)
+		} else {
+			c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+		}
+	} else {
+		c.JSON(http.StatusCreated, res)
+	}
+}
+
+func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
+	if !assureDecode(c, ref) {
+		return
+	}
+	if ref.Key() != key {
+		err := &backend.Error{
+			Code:  http.StatusBadRequest,
+			Type:  "API_ERROR",
+			Model: ref.Prefix(),
+			Key:   key,
+		}
+		err.Errorf("%s PUT: Key change from %s to %s not allowed", err.Model, key, ref.Key())
+		c.JSON(err.Code, err)
+		return
+	}
+	newThing, err := f.dt.Update(ref)
+	if err == nil {
+		c.JSON(http.StatusOK, newThing)
+		return
+	}
+	ne, ok := err.(*backend.Error)
+	if ok {
+		c.JSON(ne.Code, ne)
+	} else {
+		c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+	}
+}
+
+func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver) {
+	res, err := f.dt.Remove(ref)
+	if err != nil {
+		ne, ok := err.(*backend.Error)
+		if ok {
+			c.JSON(ne.Code, ne)
+		} else {
+			c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+		}
+	} else {
+		c.JSON(http.StatusOK, res)
+	}
 }

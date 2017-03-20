@@ -123,7 +123,7 @@ func TestReservationGet(t *testing.T) {
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusNotFound)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "reservation get: error not found: 1.1.1.1")
+	localDTI.ValidateError(t, "API_ERROR", "reservations GET: 01010101: Not Found")
 
 	localDTI.GetValue = nil
 	localDTI.GetBool = false
@@ -205,7 +205,7 @@ func TestReservationPut(t *testing.T) {
 	req, _ = http.NewRequest("PUT", "/api/v3/reservations/1.1.1.1", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
-	localDTI.ValidateCode(t, http.StatusNotFound)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad 1.1.1.1")
 
@@ -217,7 +217,7 @@ func TestReservationPut(t *testing.T) {
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "reservation put: error can not change address: 1.1.1.1 1.1.1.2")
+	localDTI.ValidateError(t, "API_ERROR", "reservations PUT: Key change from 01010101 to 01010102 not allowed")
 
 	localDTI.UpdateValue = &backend.Reservation{Addr: net.ParseIP("1.1.1.1"), Token: "kfred"}
 	localDTI.UpdateError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"test one"}}

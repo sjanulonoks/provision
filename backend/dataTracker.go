@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"sort"
 	"sync"
 
@@ -97,8 +98,6 @@ type DataTracker struct {
 	useDHCP        bool
 	FileRoot       string
 	CommandURL     string
-	DefaultBootEnv string
-	UnknownBootEnv string
 	OurAddress     string
 
 	FileURL string
@@ -111,8 +110,10 @@ type DataTracker struct {
 	// We shouls be able to get away with not locking them
 	// by only ever writing to them at DataTracker create time,
 	// and only ever reading from them afterwards.
-	backends map[string]store.SimpleStore
-	objs     map[string]*dtobjs
+	backends       map[string]store.SimpleStore
+	objs           map[string]*dtobjs
+	defaultPrefs   map[string]string
+	defaultBootEnv string
 }
 
 func (p *DataTracker) lockFor(prefix string) *dtobjs {
@@ -149,22 +150,21 @@ func (p *DataTracker) loadData(refObjs []store.KeySaver) error {
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.SimpleStore,
 	useProvisioner, useDHCP bool,
-	fileRoot, commandURL, dbe, ube, furl, aurl, addr string,
-	logger *log.Logger) *DataTracker {
+	fileRoot, commandURL, furl, aurl, addr string,
+	logger *log.Logger,
+	defaultPrefs map[string]string) *DataTracker {
 
 	res := &DataTracker{
 		useDHCP:        useDHCP,
 		useProvisioner: useProvisioner,
 		FileRoot:       fileRoot,
 		CommandURL:     commandURL,
-		DefaultBootEnv: dbe,
-		UnknownBootEnv: ube,
 		FileURL:        furl,
 		ApiURL:         aurl,
 		OurAddress:     addr,
 		Logger:         logger,
-
-		backends: map[string]store.SimpleStore{},
+		backends:       map[string]store.SimpleStore{},
+		defaultPrefs:   defaultPrefs,
 	}
 	objs := []store.KeySaver{
 		&Machine{p: res},
@@ -174,19 +174,88 @@ func NewDataTracker(backend store.SimpleStore,
 		&Subnet{p: res},
 		&Reservation{p: res},
 		&Lease{p: res},
+		&Pref{p: res},
 	}
 	res.makeBackends(backend, objs)
 	res.loadData(objs)
 	if _, ok := res.fetchOne(ignoreBoot, ignoreBoot.Name); !ok {
 		res.Save(ignoreBoot)
 	}
+	res.defaultBootEnv = defaultPrefs["defaultBootEnv"]
 	return res
 }
 
+func (p *DataTracker) Pref(name string) (string, error) {
+	prefIsh := p.load("preferences", name)
+	if prefIsh == nil {
+		val, ok := p.defaultPrefs[name]
+		if ok {
+			return val, nil
+		}
+		return "", fmt.Errorf("No such preference %s", name)
+	}
+	pref := AsPref(prefIsh)
+	return pref.Val, nil
+}
+
+func (p *DataTracker) Prefs() map[string]string {
+	vals := map[string]string{}
+	for k, v := range p.defaultPrefs {
+		vals[k] = v
+	}
+	prefs := p.lockFor("preferences")
+	defer prefs.Unlock()
+	for i := range prefs.d {
+		pref := AsPref(prefs.d[i])
+		vals[pref.Name] = pref.Val
+	}
+	return vals
+}
+
+func (p *DataTracker) SetPrefs(prefs map[string]string) error {
+	err := &Error{}
+	benvCheck := func(name, val string) bool {
+		if be := p.load("bootenvs", val); be == nil {
+			err.Errorf("%s: Bootenv %s does not exist", name, val)
+			return false
+		}
+		return true
+	}
+	savePref := func(name, val string) bool {
+		pref := &Pref{p: p, Name: name, Val: val}
+		if _, saveErr := p.save(pref); saveErr != nil {
+			err.Errorf("%s: Failed to save %s: %v", name, val, saveErr)
+			return false
+		}
+		return true
+	}
+	for name, val := range prefs {
+		log.Printf("Handling %v: %v", name, val)
+
+		switch name {
+		case "defaultBootEnv":
+			if benvCheck(name, val) && savePref(name, val) {
+				p.defaultBootEnv = val
+			}
+		case "unknownBootEnv":
+			if benvCheck(name, val) && savePref(name, val) {
+				err.Merge(p.RenderUnknown())
+			}
+		default:
+			err.Errorf("Unknown preference %s", name)
+		}
+	}
+	return err.OrNil()
+}
+
 func (p *DataTracker) RenderUnknown() error {
-	envIsh := p.load("bootenvs", p.UnknownBootEnv)
+	pref, e := p.Pref("unknownBootEnv")
+	if e != nil {
+		return e
+	}
+	envIsh := p.load("bootenvs", pref)
 	if envIsh == nil {
-		return fmt.Errorf("No such BootEnv: %s", p.UnknownBootEnv)
+		return fmt.Errorf("No such BootEnv: %s", pref)
 	}
 	env := AsBootEnv(envIsh)
 	err := &Error{o: env, Type: "StartupError"}
@@ -361,7 +430,13 @@ func (p *DataTracker) remove(ref store.KeySaver) (bool, error) {
 	mux, idx, found := p.lockedGet(prefix, key)
 	defer mux.Unlock()
 	if !found {
-		return false, fmt.Errorf("dataTracker remove %s: %s does not exist", prefix, key)
+		err := &Error{
+			Code:  http.StatusNotFound,
+			Key:   key,
+			Model: prefix,
+		}
+		err.Errorf("%s: DELETE %s: Not Found", err.Model, err.Key)
+		return false, err
 	}
 	removed, err := store.Remove(mux.d[idx])
 	if removed {
@@ -387,7 +462,13 @@ func (p *DataTracker) update(ref store.KeySaver) (bool, error) {
 	mux, idx, found := p.lockedGet(prefix, key)
 	defer mux.Unlock()
 	if !found {
-		return false, fmt.Errorf("dataTracker remove %s: %s does not exist", prefix, key)
+		err := &Error{
+			Code:  http.StatusNotFound,
+			Key:   key,
+			Model: prefix,
+		}
+		err.Errorf("%s: PUT %s: Not Found", err.Model, err.Key)
+		return false, err
 	}
 	p.setDT(ref)
 	ok, err := store.Update(ref)

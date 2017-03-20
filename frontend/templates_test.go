@@ -122,7 +122,7 @@ func TestTemplateGet(t *testing.T) {
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusNotFound)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "templates get: Not Found: fred")
+	localDTI.ValidateError(t, "API_ERROR", "templates GET: fred: Not Found")
 
 	localDTI.GetValue = &backend.Template{ID: "fred", Contents: "kfred"}
 	localDTI.GetBool = true
@@ -187,7 +187,7 @@ func TestTemplatePut(t *testing.T) {
 	req, _ = http.NewRequest("PUT", "/api/v3/templates/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
-	localDTI.ValidateCode(t, http.StatusNotFound)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
@@ -199,7 +199,7 @@ func TestTemplatePut(t *testing.T) {
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "templates put: Can not change id: fred -> kfred")
+	localDTI.ValidateError(t, "API_ERROR", "templates PUT: Key change from fred to kfred not allowed")
 
 	localDTI.UpdateValue = &backend.Template{ID: "fred", Contents: "kfred"}
 	localDTI.UpdateError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"test one"}}

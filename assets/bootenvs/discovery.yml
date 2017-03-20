@@ -1,0 +1,41 @@
+---
+Name: discovery
+Description: "The boot environment to use to have unknown machines boot to Sledgehammer"
+OS:
+  Name: "sledgehammer/fa8db28f5a64a54599afc0acbc5cf186e1ed57d8"
+  IsoFile: "sledgehammer-fa8db28f5a64a54599afc0acbc5cf186e1ed57d8.tar"
+  IsoUrl: "http://opencrowbar.s3-website-us-east-1.amazonaws.com/sledgehammer/fa8db28f5a64a54599afc0acbc5cf186e1ed57d8/sledgehammer-fa8db28f5a64a54599afc0acbc5cf186e1ed57d8.tar"
+Kernel: vmlinuz0
+Initrds: 
+  - "stage1.img"
+BootParams: "rootflags=loop root=live:/sledgehammer.iso rootfstype=auto ro liveimg rd_NO_LUKS rd_NO_MD rd_NO_DM provisioner.web={{.ProvisionerURL}} rebar.web={{.CommandURL}}"
+Templates:
+  - Name: pxelinux
+    Path: pxelinux.cfg/default
+    Contents: |
+      DEFAULT discovery
+      PROMPT 0
+      TIMEOUT 10
+      LABEL discovery
+        KERNEL {{.Env.PathFor "tftp" .Env.Kernel}}
+        INITRD {{.Env.JoinInitrds "tftp"}}
+        APPEND {{.BootParams}}
+        IPAPPEND
+  - Name: elilo
+    Path: elilo.conf
+    Contents: |
+      delay=2
+      timeout=20
+      verbose=5
+      image={{.Env.PathFor "tftp" .Env.Kernel}}
+      initrd={{.Env.JoinInitrds "tftp"}}
+      append={{.BootParams}}"
+  - Name: ipxe
+    Path: default.ipxe
+    Contents: |
+      #!ipxe
+      chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe && exit || goto sledgehammer
+      :sledgehammer
+      kernel {{.Env.PathFor "http" .Env.Kernel}} {{.BootParams}} BOOTIF=01-${netX/mac:hexhyp}
+      initrd {{.Env.PathFor "http" (index .Env.Initrds 0)}}
+      boot

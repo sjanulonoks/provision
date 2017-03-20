@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -58,7 +57,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       401: ErrorResponse
 	f.ApiGroup.GET("/subnets",
 		func(c *gin.Context) {
-			c.JSON(http.StatusOK, backend.AsSubnets(f.dt.FetchAll(f.dt.NewSubnet())))
+			f.List(c, f.dt.NewSubnet())
 		})
 
 	// swagger:route POST /subnets Subnets createSubnet
@@ -74,26 +73,8 @@ func (f *Frontend) InitSubnetApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/subnets",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
 			b := f.dt.NewSubnet()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			nb, err := f.dt.Create(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusCreated, nb)
-			}
+			f.Create(c, b)
 		})
 
 	// swagger:route GET /subnets/{name} Subnets getSubnet
@@ -108,14 +89,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/subnets/:name",
 		func(c *gin.Context) {
-			res, ok := f.dt.FetchOne(f.dt.NewSubnet(), c.Param(`name`))
-			if ok {
-				c.JSON(http.StatusOK, backend.AsSubnet(res))
-			} else {
-				c.JSON(http.StatusNotFound,
-					backend.NewError("API_ERROR", http.StatusNotFound,
-						fmt.Sprintf("subnet get: error not found: %v", c.Param(`name`))))
-			}
+			f.Fetch(c, f.dt.NewSubnet(), c.Param(`name`))
 		})
 
 	// swagger:route PATCH /subnets/{name} Subnets patchSubnet
@@ -149,32 +123,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/subnets/:name",
 		func(c *gin.Context) {
-			if !testContentType(c, "application/json") {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, fmt.Sprintf("Invalid content type: %s", c.ContentType())))
-				return
-			}
-			b := f.dt.NewSubnet()
-			if err := c.Bind(b); err != nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				return
-			}
-			if b.Name != c.Param(`name`) {
-				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("subnet put: error can not change name: %v %v", c.Param(`name`), b.Name)))
-				return
-			}
-			nb, err := f.dt.Update(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Update(c, f.dt.NewSubnet(), c.Param(`name`))
 		})
 
 	// swagger:route DELETE /subnets/{name} Subnets deleteSubnet
@@ -191,16 +140,6 @@ func (f *Frontend) InitSubnetApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewSubnet()
 			b.Name = c.Param(`name`)
-			nb, err := f.dt.Remove(b)
-			if err != nil {
-				ne, ok := err.(*backend.Error)
-				if ok {
-					c.JSON(ne.Code, ne)
-				} else {
-					c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				c.JSON(http.StatusOK, nb)
-			}
+			f.Remove(c, b)
 		})
 }

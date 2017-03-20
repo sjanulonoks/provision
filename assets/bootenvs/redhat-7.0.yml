@@ -1,0 +1,34 @@
+BootParams: ksdevice=bootif ks={{.Machine.Url}}/compute.ks method={{.Env.OS.InstallUrl}}
+  inst.geoloc=0
+Initrds:
+- images/pxeboot/initrd.img
+Kernel: images/pxeboot/vmlinuz
+Name: redhat-7.0-install
+OS:
+  Name: redhat-7.0
+RequiredParams:
+- logging_servers
+- ntp_servers
+- operating-system-disk
+- provisioner-default-password-hash
+- proxy-servers
+- rebar-access_keys
+- rebar-machine_key
+- use-proxy
+Templates:
+- ID: default-pxelinux.tmpl
+  Name: pxelinux
+  Path: pxelinux.cfg/{{.Machine.HexAddress}}
+- ID: default-elilo.tmpl
+  Name: elilo
+  Path: '{{.Machine.HexAddress}}.conf'
+- ID: default-ipxe.tmpl
+  Name: ipxe
+  Path: '{{.Machine.Address}}.ipxe'
+- ID: centos-7.ks.tmpl
+  Name: compute.ks
+  Path: '{{.Machine.Path}}/compute.ks'
+- ID: rebar-join.sh.tmpl
+  Name: rebar_join.sh
+  Path: '{{.Machine.Path}}/rebar_join.sh'
+TenantId: 1

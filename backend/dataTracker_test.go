@@ -68,7 +68,7 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 }
 
 func mkDT(bs store.SimpleStore) *DataTracker {
-	dt := NewDataTracker(bs, true, true, tmpDir, "CURL", "default", "default", "FURL", "AURL", "127.0.0.1", log.New(os.Stdout, "dt", 0))
+	dt := NewDataTracker(bs, true, true, tmpDir, "CURL", "FURL", "AURL", "127.0.0.1", log.New(os.Stdout, "dt", 0), map[string]string{"defaultBootEnv": "default"})
 	return dt
 }
 

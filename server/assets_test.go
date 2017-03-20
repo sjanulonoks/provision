@@ -22,7 +22,6 @@ func TestExtractAssets(t *testing.T) {
 	files := []string{
 		"ALL-LICENSE",
 		"explode_iso.sh",
-		"install-sledgehammer.sh",
 		"machines/start-up.sh",
 		"files/jq",
 		"files/rscli",

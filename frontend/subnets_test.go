@@ -122,7 +122,7 @@ func TestSubnetGet(t *testing.T) {
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusNotFound)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "subnet get: error not found: fred")
+	localDTI.ValidateError(t, "API_ERROR", "subnets GET: fred: Not Found")
 
 	localDTI.GetValue = &backend.Subnet{Name: "fred", Strategy: "kfred"}
 	localDTI.GetBool = true
@@ -187,7 +187,7 @@ func TestSubnetPut(t *testing.T) {
 	req, _ = http.NewRequest("PUT", "/api/v3/subnets/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
-	localDTI.ValidateCode(t, http.StatusNotFound)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
@@ -199,7 +199,7 @@ func TestSubnetPut(t *testing.T) {
 	localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusBadRequest)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-	localDTI.ValidateError(t, "API_ERROR", "subnet put: error can not change name: fred kfred")
+	localDTI.ValidateError(t, "API_ERROR", "subnets PUT: Key change from fred to kfred not allowed")
 
 	localDTI.UpdateValue = &backend.Subnet{Name: "fred", Strategy: "kfred"}
 	localDTI.UpdateError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"test one"}}
