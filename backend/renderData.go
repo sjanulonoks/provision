@@ -99,10 +99,14 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 // Param is a helper function for extracting a parameter from Machine.Params
 func (r *RenderData) Param(key string) (interface{}, error) {
 	res, ok := r.Machine.Params[key]
-	if !ok {
-		return nil, fmt.Errorf("No such machine parameter %s", key)
+	if ok {
+		return res, nil
 	}
-	return res, nil
+	param := r.p.load("parameters", key)
+	if param != nil {
+		return AsParam(param).Value, nil
+	}
+	return nil, fmt.Errorf("No such machine parameter %s", key)
 }
 
 func (r *RenderData) render(e *Error) {
@@ -110,16 +114,18 @@ func (r *RenderData) render(e *Error) {
 	if len(r.Env.RequiredParams) > 0 && (r.Machine == nil || r.Machine.Params == nil) {
 		e.Errorf("Machine is nil or does not have params")
 		return
-	} else {
-		for _, param := range r.Env.RequiredParams {
-			if _, ok := r.Machine.Params[param]; !ok {
+	}
+	for _, param := range r.Env.RequiredParams {
+		if _, ok := r.Machine.Params[param]; !ok {
+			globalParam := r.p.load("parameters", param)
+			if globalParam == nil {
 				missingParams = append(missingParams, param)
 			}
 		}
-		if len(missingParams) > 0 {
-			e.Errorf("missing required machine params for %s:\n %v", r.Machine.Name, missingParams)
-			return
-		}
+	}
+	if len(missingParams) > 0 {
+		e.Errorf("missing required machine params for %s:\n %v", r.Machine.Name, missingParams)
+		return
 	}
 	r.renderedTemplates = make([]renderedTemplate, len(r.Env.Templates))
 

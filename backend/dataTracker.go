@@ -175,6 +175,7 @@ func NewDataTracker(backend store.SimpleStore,
 		&Reservation{p: res},
 		&Lease{p: res},
 		&Pref{p: res},
+		&Param{p: res},
 	}
 	res.makeBackends(backend, objs)
 	res.loadData(objs)
@@ -314,6 +315,10 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 		res = p.NewReservation()
 	case *Subnet:
 		res = p.NewSubnet()
+	case *Param:
+		res = p.NewParam()
+	case *Pref:
+		res = p.NewPref()
 	default:
 		panic("Unknown type of KeySaver passed to Clone")
 	}
@@ -396,6 +401,7 @@ func (p *DataTracker) FetchOne(ref store.KeySaver, key string) (store.KeySaver, 
 }
 
 func (p *DataTracker) create(ref store.KeySaver) (bool, error) {
+	p.setDT(ref)
 	prefix := ref.Prefix()
 	key := ref.Key()
 	if key == "" {
@@ -406,7 +412,6 @@ func (p *DataTracker) create(ref store.KeySaver) (bool, error) {
 	if found {
 		return false, fmt.Errorf("dataTracker create %s: %s already exists", prefix, key)
 	}
-	p.setDT(ref)
 	saved, err := store.Create(ref)
 	if saved {
 		mux.add(ref)
