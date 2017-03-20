@@ -213,21 +213,33 @@ func (p *DataTracker) Prefs() map[string]string {
 
 func (p *DataTracker) SetPrefs(prefs map[string]string) error {
 	err := &Error{}
-	for name, val := range prefs {
+	benvCheck := func(name, val string) bool {
 		if be := p.load("bootenvs", val); be == nil {
 			err.Errorf("%s: Bootenv %s does not exist", name, val)
-			continue
+			return false
 		}
+		return true
+	}
+	savePref := func(name, val string) bool {
 		pref := &Pref{p: p, Name: name, Val: val}
 		if _, saveErr := p.save(pref); saveErr != nil {
 			err.Errorf("%s: Failed to save %s: %v", name, val, saveErr)
-			continue
+			return false
 		}
+		return true
+	}
+	for name, val := range prefs {
+		log.Printf("Handling %v: %v", name, val)
+
 		switch name {
 		case "defaultBootEnv":
-			p.defaultBootEnv = val
+			if benvCheck(name, val) && savePref(name, val) {
+				p.defaultBootEnv = val
+			}
 		case "unknownBootEnv":
-			err.Merge(p.RenderUnknown())
+			if benvCheck(name, val) && savePref(name, val) {
+				err.Merge(p.RenderUnknown())
+			}
 		default:
 			err.Errorf("Unknown preference %s", name)
 		}
