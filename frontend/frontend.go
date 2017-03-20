@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -53,6 +54,7 @@ type DTI interface {
 	Update(store.KeySaver) (store.KeySaver, error)
 	Remove(store.KeySaver) (store.KeySaver, error)
 	Save(store.KeySaver) (store.KeySaver, error)
+	Patch(store.KeySaver, string, []byte) (store.KeySaver, error)
 	FetchOne(store.KeySaver, string) (store.KeySaver, bool)
 	FetchAll(ref store.KeySaver) []store.KeySaver
 
@@ -196,6 +198,25 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 		}
 	} else {
 		c.JSON(http.StatusCreated, res)
+	}
+}
+
+func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
+	defer c.Request.Body.Close()
+	patch, err := ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, backend.NewError("API_ERROR", http.StatusInternalServerError, err.Error()))
+		return
+	}
+	res, patchErr := f.dt.Patch(ref, key, patch)
+	if patchErr == nil {
+		c.JSON(http.StatusOK, res)
+	}
+	ne, ok := err.(*backend.Error)
+	if ok {
+		c.JSON(ne.Code, ne)
+	} else {
+		c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 	}
 }
 

@@ -8,6 +8,8 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/VictorLowther/jsonpatch"
+	"github.com/VictorLowther/jsonpatch/utils"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/digitalrebar/go/rebar-api/api"
 )
@@ -459,6 +461,44 @@ func (p *DataTracker) Remove(ref store.KeySaver) (store.KeySaver, error) {
 		return p.Clone(ref), err
 	}
 	return ref, err
+}
+
+func (p *DataTracker) Patch(ref store.KeySaver, key string, patch []byte) (store.KeySaver, error) {
+	prefix := ref.Prefix()
+	mux, idx, found := p.lockedGet(prefix, key)
+	defer mux.Unlock()
+	if !found {
+		err := &Error{
+			Code:  http.StatusNotFound,
+			Key:   key,
+			Model: prefix,
+		}
+		err.Errorf("%s: PATCH %s: Not Found", err.Model, err.Key)
+		return nil, err
+	}
+	target := mux.d[idx]
+	res, patchErr, loc := jsonpatch.Apply(target, patch)
+	if patchErr == nil {
+		toSave := ref.New()
+		if err := utils.Remarshal(res, &toSave); err != nil {
+			return nil, err
+		}
+		p.setDT(toSave)
+		saved, err := store.Update(toSave)
+		if !saved {
+			return toSave, err
+		}
+		mux.d[idx] = toSave
+		return p.Clone(toSave), nil
+	}
+	err := &Error{
+		Code:  http.StatusNotAcceptable,
+		Key:   key,
+		Model: ref.Prefix(),
+		Type:  "JsonPatchError",
+	}
+	err.Errorf("Patch error at line %d: %v", loc, patchErr)
+	return nil, err
 }
 
 func (p *DataTracker) update(ref store.KeySaver) (bool, error) {
