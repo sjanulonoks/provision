@@ -67,6 +67,10 @@ func (r *RenderData) CommandURL() string {
 	return r.p.CommandURL
 }
 
+func (r *RenderData) ApiURL() string {
+	return r.p.ApiURL
+}
+
 // BootParams is a helper function that expands the BootParams
 // template from the boot environment.
 func (r *RenderData) BootParams() (string, error) {

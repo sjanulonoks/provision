@@ -61,6 +61,10 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet, l *backend.Lease) (dhcp.Option
 	nextServer := h.respondFrom(l.Addr)
 	if s != nil {
 		for _, opt := range s.Options {
+			if opt.Value == "" {
+				h.Printf("Ignoring DHCP option %d with zero-length value", opt.Code)
+				continue
+			}
 			c, v, err := opt.RenderToDHCP(srcOpts)
 			if err != nil {
 				h.Printf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
@@ -74,6 +78,10 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet, l *backend.Lease) (dhcp.Option
 	}
 	if r != nil {
 		for _, opt := range r.Options {
+			if opt.Value == "" {
+				h.Printf("Ignoring DHCP option %d with zero-length value", opt.Code)
+				continue
+			}
 			c, v, err := opt.RenderToDHCP(srcOpts)
 			if err != nil {
 				h.Printf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
