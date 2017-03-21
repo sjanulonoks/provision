@@ -184,10 +184,10 @@ func (h *DhcpHandler) respondFrom(testAddr net.IP) net.IP {
 	}
 	// Well, this sucks.  Return the first address we listen on for this interface.
 	if len(addrs) > 0 {
-		return addrs[0].IP
+		return addrs[0].IP.To4()
 	}
 	// Well, this really sucks.  Return our global listen-on address
-	return net.ParseIP(h.bk.OurAddress)
+	return net.ParseIP(h.bk.OurAddress).To4()
 }
 
 func (h *DhcpHandler) listenOn(testAddr net.IP) bool {
