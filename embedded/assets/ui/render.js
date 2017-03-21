@@ -27,7 +27,8 @@ class Subnet extends React.Component {
       6: "DNS Server",
       15: "Domain Name",
       28: "Broadcast",
-      67: "Next Boot"
+      42: "NTP Server",
+      67: "Bootfile Name"
     };
     return codes[code] || "Code " + code;
   }
@@ -152,6 +153,22 @@ class Subnet extends React.Component {
         <tr>
           <td colSpan="7">
             {subnet._expand ? (<div>
+              <h2>Other Values</h2>
+              <table>
+                <tbody>
+                  <tr>
+                    <td style={{textAlign: "right", fontWeight: "bold"}}>Next Server</td>
+                    <td>
+                      <input
+                        type="text"
+                        name="NextServer"
+                        size="12"
+                        value={subnet.NextServer}
+                        onChange={this.handleChange}/>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
               <h2>Options</h2>
               <table>
                 <tbody>
