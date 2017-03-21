@@ -113,7 +113,7 @@ Templates:
               echo "We could not create a node for ourself!"
               exit 1
           fi
-          RS_UUID="$(jq -r '.uuid' <<< "$json")"
+          RS_UUID="$(jq -r '.Uuid' <<< "$json")"
 
           dhclient -r && \
               rm /var/lib/dhclient/dhclient.leases && \
@@ -131,16 +131,9 @@ Templates:
         # Force reliance on DNS
         echo '127.0.0.1 localhost' >/etc/hosts
 
-        control_sh_found=''
-        for p in "$RS_UUID" "$HOSTNAME"; do
-            curl -s -f -L -o /tmp/control.sh "$PROVISIONER_WEB/machines/$p/control.sh" && \
+        if ! curl -s -f -L -o /tmp/control.sh "$PROVISIONER_WEB/machines/$RS_UUID/control.sh" && \
             grep -q '^exit 0$' /tmp/control.sh && \
-            head -1 /tmp/control.sh | grep -q '^#!/bin/bash' || continue
-            control_sh_found=true
-            break
-        done
-
-        if [[ ! $control_sh_found ]]; then
+            head -1 /tmp/control.sh | grep -q '^#!/bin/bash'; then
             echo "Could not load our control.sh!"
             exit 1
         fi
