@@ -100,6 +100,7 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 	return "", fmt.Errorf("No idea how to get URL part %s from %s", segment, rawUrl)
 }
 
+// ParamExists is a helper function for determining the existence of a machine parameter.
 func (r *RenderData) ParamExists(key string) bool {
 	_, ok := r.Machine.Params[key]
 	return ok
