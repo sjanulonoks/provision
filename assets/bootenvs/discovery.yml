@@ -20,7 +20,7 @@ Templates:
         KERNEL {{.Env.PathFor "tftp" .Env.Kernel}}
         INITRD {{.Env.JoinInitrds "tftp"}}
         APPEND {{.BootParams}}
-        IPAPPEND
+        IPAPPEND 2
   - Name: elilo
     Path: elilo.conf
     Contents: |
