@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"log"
 	"net"
 	"net/http"
 )
@@ -12,5 +13,10 @@ func ServeStatic(listenAt, fsPath string) error {
 	}
 	fs := http.FileServer(http.Dir(fsPath))
 	http.Handle("/", fs)
-	return http.Serve(conn, nil)
+	go func() {
+		if err := http.Serve(conn, nil); err != nil {
+			log.Fatalf("Static HTTP server error %v", err)
+		}
+	}()
+	return nil
 }

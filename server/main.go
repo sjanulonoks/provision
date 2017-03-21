@@ -194,22 +194,26 @@ func main() {
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)
 	}
+	if !c_opts.DisableProvisioner {
+		logger.Printf("Starting TFTP server")
+		if err = frontend.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), c_opts.FileRoot); err != nil {
+			logger.Fatalf("Error starting TFTP server: %v", err)
+		}
 
-	go func() {
-		if err = http.ListenAndServeTLS(fmt.Sprintf(":%d", c_opts.ApiPort), c_opts.TlsCertFile, c_opts.TlsKeyFile, fe.MgmtApi); err != nil {
-			log.Fatalf("Error running API service: %v", err)
+		logger.Printf("Starting static file server")
+		if err = frontend.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), c_opts.FileRoot); err != nil {
+			logger.Fatalf("Error starting static file server: %v", err)
 		}
-	}()
+	}
+
 	if !c_opts.DisableDHCP {
+		logger.Printf("Starting DHCP server")
 		if err = midlayer.StartDhcpHandlers(dt); err != nil {
-			log.Fatalf("Error starting DHCP server: %v", err)
+			logger.Fatalf("Error starting DHCP server: %v", err)
 		}
 	}
-	if err = frontend.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), c_opts.FileRoot); err != nil {
-		log.Fatalf("Error starting TFTP server: %v", err)
-	}
-	// Static file server must always be last, as all our health checks key off of it.
-	if err = frontend.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), c_opts.FileRoot); err != nil {
-		log.Fatalf("Error starting static file server: %v", err)
+	logger.Printf("Starting API server")
+	if err = http.ListenAndServeTLS(fmt.Sprintf(":%d", c_opts.ApiPort), c_opts.TlsCertFile, c_opts.TlsKeyFile, fe.MgmtApi); err != nil {
+		logger.Fatalf("Error running API service: %v", err)
 	}
 }
