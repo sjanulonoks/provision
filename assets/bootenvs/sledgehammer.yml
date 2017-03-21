@@ -1,9 +1,9 @@
 ---
 Name: "sledgehammer"
 OS:
-  Name: "sledgehammer/fa8db28f5a64a54599afc0acbc5cf186e1ed57d8"
-  IsoFile: "sledgehammer-fa8db28f5a64a54599afc0acbc5cf186e1ed57d8.tar"
-  IsoUrl: "http://opencrowbar.s3-website-us-east-1.amazonaws.com/sledgehammer/fa8db28f5a64a54599afc0acbc5cf186e1ed57d8/sledgehammer-fa8db28f5a64a54599afc0acbc5cf186e1ed57d8.tar"
+  Name: "sledgehammer/708de8b878e3818b1c1bb598a56de968939f9d4b"
+  IsoFile: "sledgehammer-708de8b878e3818b1c1bb598a56de968939f9d4b.tar"
+  IsoUrl: "http://opencrowbar.s3-website-us-east-1.amazonaws.com/sledgehammer/708de8b878e3818b1c1bb598a56de968939f9d4b/sledgehammer-708de8b878e3818b1c1bb598a56de968939f9d4b.tar"
 Kernel: "vmlinuz0"
 Initrds:
   - "stage1.img"
