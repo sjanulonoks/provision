@@ -20,12 +20,14 @@ FooParam = {{.Param "foo"}}
 BootEnv:
 Name = {{.Env.Name}}
 
+{{if .ParamExists "fred"}}{{.Param "fred"}}{{end}}
+
 RenderData:
 ProvisionerAddress = {{.ProvisionerAddress}}
 ProvisionerURL = {{.ProvisionerURL}}
 CommandURL = {{.CommandURL}}
 BootParams = {{.BootParams}}`
-	tmplDefaultRendered = `Machine: 
+	tmplDefaultRenderedWithoutFred = `Machine: 
 Name = Test Name
 HexAddress = C0A87C0B
 ShortName = Test Name
@@ -33,6 +35,24 @@ FooParam = bar
 
 BootEnv:
 Name = default
+
+
+
+RenderData:
+ProvisionerAddress = 127.0.0.1
+ProvisionerURL = FURL
+CommandURL = CURL
+BootParams = default`
+	tmplDefaultRenderedWithFred = `Machine: 
+Name = Test Name
+HexAddress = C0A87C0B
+ShortName = Test Name
+FooParam = bar
+
+BootEnv:
+Name = default
+
+fred = fred
 
 RenderData:
 ProvisionerAddress = 127.0.0.1
@@ -71,13 +91,28 @@ func TestRenderData(t *testing.T) {
 	buf, err := ioutil.ReadFile(genLoc)
 	if err != nil {
 		t.Errorf("Failed to read %s: %v", genLoc, err)
-	} else if string(buf) != tmplDefaultRendered {
-		t.Errorf("Failed to render expected template!\nExpected:\n%s\n\nGot:\n%s", tmplDefaultRendered, string(buf))
+	} else if string(buf) != tmplDefaultRenderedWithoutFred {
+		t.Errorf("Failed to render expected template!\nExpected:\n%s\n\nGot:\n%s", tmplDefaultRenderedWithoutFred, string(buf))
 	} else {
-		t.Logf("BootEnv default rendered properly for test machine")
+		t.Logf("BootEnv default without fred rendered properly for test machine")
 	}
-	machine.BootEnv = "nothing"
+
+	machine.Params = map[string]interface{}{"foo": "bar", "fred": "fred = fred"}
 	saved, err := dt.save(machine)
+	if !saved {
+		t.Errorf("Failed to save test machine with new bootenv: %v", err)
+	}
+	buf, err = ioutil.ReadFile(genLoc)
+	if err != nil {
+		t.Errorf("Failed to read %s: %v", genLoc, err)
+	} else if string(buf) != tmplDefaultRenderedWithFred {
+		t.Errorf("Failed to render expected template!\nExpected:\n%s\n\nGot:\n%s", tmplDefaultRenderedWithFred, string(buf))
+	} else {
+		t.Logf("BootEnv default with fred rendered properly for test machine")
+	}
+
+	machine.BootEnv = "nothing"
+	saved, err = dt.save(machine)
 	if !saved {
 		t.Errorf("Failed to save test machine with new bootenv: %v", err)
 	}
