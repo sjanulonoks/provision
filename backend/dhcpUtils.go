@@ -144,23 +144,22 @@ func findViaReservation(leases, reservations *dtobjs, strat, token string, req n
 	return
 }
 
-func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, req, via net.IP) (lease *Lease) {
-	if via == nil || !via.IsGlobalUnicast() {
-		// Without a via address, we have no way to look up the appropriate subnet
-		// to try.  Since that is the case, return nothing.  The DHCP midlayer
-		// should take that as a cue to not respond at all.
-		return nil
-	}
+func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, req net.IP, vias []net.IP) (lease *Lease) {
 	var subnet *Subnet
 	for idx := range subnets.d {
-		subnet = AsSubnet(subnets.d[idx])
-		if subnet.subnet().Contains(via) && subnet.Strategy == strat {
-			break
+		candidate := AsSubnet(subnets.d[idx])
+		for _, via := range vias {
+			if via == nil || !via.IsGlobalUnicast() {
+				continue
+			}
+			if candidate.subnet().Contains(via) && candidate.Strategy == strat {
+				subnet = candidate
+				break
+			}
 		}
-		subnet = nil
 	}
 	if subnet == nil {
-		// There is no subnet that can handle this via.
+		// There is no subnet that can handle the vias we want
 		return nil
 	}
 	currLeases := AsLeases(leases.subset(subnet.aBounds()))
@@ -168,12 +167,9 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, r
 	usedAddrs := map[string]store.KeySaver{}
 	for i := range currLeases {
 		// While we are iterating over leases, see if we run across a candidate.
-		if currLeases[i].Strategy == strat && currLeases[i].Token == token &&
-			!currLeases[i].Expired() {
+		if (req == nil || req.IsUnspecified() || currLeases[i].Addr.Equal(req)) &&
+			currLeases[i].Strategy == strat && currLeases[i].Token == token {
 			lease = currLeases[i]
-			if req != nil && !lease.Addr.Equal(req) {
-				lease = nil
-			}
 		}
 		// Leases get a false in the map.
 		usedAddrs[currLeases[i].Key()] = currLeases[i]
@@ -191,18 +187,23 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, r
 		// Reservations get true
 		usedAddrs[currReservations[i].Key()] = currReservations[i]
 	}
-	if lease == nil {
-		lease, _ = subnet.next(usedAddrs, token, req)
+	if lease != nil {
+		subnet.p.Logger.Printf("Subnet %s: handing out existing lease for %s to %s:%s", subnet.Name, lease.Addr, strat, token)
+		return lease
 	}
+	subnet.p.Logger.Printf("Subnet %s: %s:%s is in my range, attempting lease creation.", subnet.Name, strat, token)
+	lease, _ = subnet.next(usedAddrs, token, req)
 	if lease != nil {
 		if _, found := leases.find(lease.Key()); !found {
 			leases.add(lease)
 		}
+		return lease
 	}
-	return lease
+	subnet.p.Logger.Printf("Subnet %s: No lease for %s:%s, it gets no IP from us", subnet.Name, strat, token)
+	return nil
 }
 
-func findOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *Lease {
+func findOrCreateLease(dt *DataTracker, strat, token string, req net.IP, via []net.IP) *Lease {
 	leases := dt.lockFor("leases")
 	reservations := dt.lockFor("reservations")
 	subnets := dt.lockFor("subnets")
@@ -224,7 +225,7 @@ func findOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *L
 // If the returned lease is nil, then the DHCP system should not respond.
 //
 // This function should be called for DHCPDISCOVER.
-func FindOrCreateLease(dt *DataTracker, strat, token string, req, via net.IP) *Lease {
+func FindOrCreateLease(dt *DataTracker, strat, token string, req net.IP, via []net.IP) *Lease {
 	lease := findOrCreateLease(dt, strat, token, req, via)
 	if lease != nil {
 		lease.p = dt

@@ -54,6 +54,7 @@ type ProgOpts struct {
 
 	DisableProvisioner bool   `long:"disable-provisioner" description:"Disable provisioner"`
 	DisableDHCP        bool   `long:"disable-dhcp" description:"Disable DHCP"`
+	DhcpInterfaces     string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
 	CommandURL         string `long:"endpoint" description:"DigitalRebar Endpoint" env:"EXTERNAL_REBAR_ENDPOINT"`
 	DefaultBootEnv     string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"sledgehammer"`
 	UnknownBootEnv     string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
@@ -208,7 +209,7 @@ func main() {
 
 	if !c_opts.DisableDHCP {
 		logger.Printf("Starting DHCP server")
-		if err = midlayer.StartDhcpHandlers(dt); err != nil {
+		if err = midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces); err != nil {
 			logger.Fatalf("Error starting DHCP server: %v", err)
 		}
 	}

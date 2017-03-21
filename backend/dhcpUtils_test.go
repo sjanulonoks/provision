@@ -94,7 +94,7 @@ type ltc struct {
 }
 
 func (l *ltc) test(t *testing.T, dt *DataTracker) {
-	res := FindOrCreateLease(dt, l.strat, l.token, l.req, l.via)
+	res := FindOrCreateLease(dt, l.strat, l.token, l.req, []net.IP{l.via})
 	if l.created {
 		if res == nil {
 			t.Errorf("%s: Expected to create a lease with %s:%s, but did not!", l.msg, l.strat, l.token)
