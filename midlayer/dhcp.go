@@ -170,7 +170,7 @@ func (h *DhcpHandler) listenIPs() []net.IP {
 	addrs := h.listenAddrs()
 	res := make([]net.IP, len(addrs))
 	for i := range addrs {
-		res[i] = addrs[i].IP
+		res[i] = addrs[i].IP.To4()
 	}
 	return res
 }
@@ -179,7 +179,7 @@ func (h *DhcpHandler) respondFrom(testAddr net.IP) net.IP {
 	addrs := h.listenAddrs()
 	for _, addr := range addrs {
 		if addr.Contains(testAddr) {
-			return addr.IP
+			return addr.IP.To4()
 		}
 	}
 	// Well, this sucks.  Return the first address we listen on for this interface.
@@ -315,7 +315,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 	case dhcp.Request:
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
-		if ok && server.IsGlobalUnicast() && !h.listenOn(server) {
+		if ok && !h.listenOn(server) {
 			h.Printf("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
 			return nil
 		}
@@ -363,7 +363,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		if nextServer.IsGlobalUnicast() {
 			reply.SetSIAddr(nextServer)
 		}
-		h.Printf("%s: Request handing out %s to %s", xid(p), reply.YIAddr(), reply.CHAddr())
+		h.Printf("%s: Request handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr))
 		return reply
 	case dhcp.Discover:
 		for _, s := range h.strats {
@@ -381,7 +381,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 					lease.Addr,
 					duration,
 					opts.SelectOrderOrAll(opts[dhcp.OptionParameterRequestList]))
-				h.Printf("%s: Discovery handing out: %s to %s", xid(p), reply.YIAddr(), reply.CHAddr())
+				h.Printf("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr))
 				return reply
 			}
 		}
