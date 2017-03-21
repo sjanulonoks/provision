@@ -100,6 +100,11 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 	return "", fmt.Errorf("No idea how to get URL part %s from %s", segment, rawUrl)
 }
 
+func (r *RenderData) ParamExists(key string) bool {
+	_, ok := r.Machine.Params[key]
+	return ok
+}
+
 // Param is a helper function for extracting a parameter from Machine.Params
 func (r *RenderData) Param(key string) (interface{}, error) {
 	res, ok := r.Machine.Params[key]
