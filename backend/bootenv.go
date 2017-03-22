@@ -122,6 +122,14 @@ type BootEnv struct {
 	//
 	// required: true
 	RequiredParams []string
+	// The list of extra optional parameters for this
+	// bootstate. They can be present as Machine.Params when
+	// the bootenv is applied to the machine.  These are more
+	// other consumers of the bootenv to know what parameters
+	// could additionally be applied to the bootenv by the
+	// renderer based upon the Machine.Params
+	//
+	OptionalParams []string
 	// Whether the boot environment is useable.
 	//
 	// required: true

@@ -10,14 +10,6 @@ OS:
   IsoSha256: 8ce9f9b23aaf397913d927c7fda3343d411f6846ef7b94f29b51108e95c46f6e
   Name: windows-2012r2
 RequiredParams:
-- logging_servers
-- ntp_servers
-- operating-system-disk
-- provisioner-default-password-hash
-- proxy-servers
-- use-proxy
-- rebar-access_keys
-- rebar-machine_key
 - operating-system-license-key
 - operating-system-install-flavor
 Templates:
