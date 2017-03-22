@@ -11,7 +11,7 @@ Name: debian-8-install
 OS:
   Family: debian
   IsoFile: debian-8-amd64-mini.iso
-  IsoSha256: ba68093fde05d76b9adc4b74ebae219f9fdccc41c8a7c494de7cc1a6640db8a4
+  IsoSha256: 834fb7d6b94a8f38f49bece773ed5ce73f7da709ca3fc0ed8fd8aa65111ce531
   IsoUrl: http://mirrors.kernel.org/debian/dists/jessie/main/installer-amd64/current/images/netboot/mini.iso
   Name: debian-8
   Version: '8'

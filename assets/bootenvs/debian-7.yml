@@ -11,7 +11,7 @@ Name: debian-7-install
 OS:
   Family: debian
   IsoFile: debian-7-amd64-mini.iso
-  IsoSha256: 8a05824f13357576900345899a9c2dff47375f1bfc2000dda4083ce9fbaf4030
+  IsoSha256: 72da5874947570cb6eb375ad183b9dcd4ab54f03ddea9795835e73e1eaea1cbf
   IsoUrl: http://mirrors.kernel.org/debian/dists/wheezy/main/installer-amd64/current/images/netboot/mini.iso
   Name: debian-7
   Version: '7'
