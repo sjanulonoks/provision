@@ -6,8 +6,8 @@ OS:
   IsoSha256: b8eb47e171bd5a7eee92bee6d0bbb95ab18d0ab48c3cc6322b67815da1c9fc44
   Name: esxi-6u2
 RequiredParams:
+OptionalParams:
 - provisioner-default-password-hash
-- rebar-machine_key
 Templates:
 - ID: esxi-chain-pxelinux.tmpl
   Name: pxelinux

@@ -1,9 +1,9 @@
-# Rebar Centos-7 (and related distros) kickstart
+# Rocket Skates Centos-7 (and related distros) kickstart
 
 install
 url --url {{ .Env.OS.InstallUrl }}
 # Add support for our local proxy.
-repo --name="CentOS"  --baseurl={{ .Env.OS.InstallUrl }} {{if .Param "use-proxy"}} --proxy="{{index (.Param "proxy-servers") 0 "url"}}"{{end}} --cost=100
+repo --name="CentOS"  --baseurl={{ .Env.OS.InstallUrl }} {{if .ParamExists "proxy-servers"}} --proxy="{{index (.Param "proxy-servers") 0 "url"}}"{{end}} --cost=100
 # key --skip
 # Disable geolocation for language and timezone
 # Currently broken by https://bugzilla.redhat.com/show_bug.cgi?id=1111717
@@ -12,18 +12,18 @@ timezone --utc UTC
 lang en_US.UTF-8
 keyboard us
 # rebar
-rootpw --iscrypted {{ .Param "provisioner-default-password-hash" }}
+rootpw --iscrypted {{if .ParamExists "provisioner-default-password-hash"}}{{ .Param "provisioner-default-password-hash" }}{{else}}$6$rebar$HBaBj/uDmsQMEw4Si6eja9Yba3rhB73Na36hbrp9KxDHm6s5veeWyXlsUkoxRACtP47978iiidziRdsYUC7gC/{{end}}
 firewall --disabled
 authconfig --enableshadow --enablemd5
 selinux --disabled
-bootloader --location=mbr --driveorder={{ .Param "operating-system-disk" }} --append="rhgb quiet"
+bootloader --location=mbr {{if .ParamExists "operating-system-disk"}}--driveorder={{ .Param "operating-system-disk" }}{{end}} --append="rhgb quiet"
 zerombr
-ignoredisk --only-use={{ .Param "operating-system-disk" }}
-clearpart --all --drives={{ .Param "operating-system-disk" }}
-part /boot --fstype ext4 --size=512 --ondisk={{ .Param "operating-system-disk" }}
-part /boot/efi --fstype vfat --size=512 --ondisk={{ .Param "operating-system-disk" }}
+ignoredisk {{if .ParamExists "operating-system-disk"}}--only-use={{ .Param "operating-system-disk" }}{{end}}
+clearpart --all {{if .ParamExists "operating-system-disk"}}--drives={{ .Param "operating-system-disk" }}{{end}}
+part /boot --fstype ext4 --size=512 {{if .ParamExists "operating-system-disk"}}--ondisk={{ .Param "operating-system-disk" }}{{end}}
+part /boot/efi --fstype vfat --size=512 {{if .ParamExists "operating-system-disk"}}--ondisk={{ .Param "operating-system-disk" }}{{end}}
 part swap --recommended
-part pv.6 --size=1 --grow --ondisk={{ .Param "operating-system-disk" }}
+part pv.6 --size=1 --grow {{if .ParamExists "operating-system-disk"}}--ondisk={{ .Param "operating-system-disk" }}{{end}}
 volgroup {{ .Machine.ShortName }} --pesize=32768 pv.6
 logvol / --fstype ext4 --name=lv_root --vgname={{ .Machine.ShortName }} --size=1 --grow --maxsize=10240
 text
@@ -45,35 +45,20 @@ tar
 exec > /root/post-install.log 2>&1
 set -x
 export PS4='${BASH_SOURCE}@${LINENO}(${FUNCNAME[0]}): '
-(cd /bin; curl -fgl -O "{{.ProvisionerURL}}/files/rebar"; chmod 755 rebar)
-(cd /usr/local/bin; curl -fgL -O "{{.ProvisionerURL}}/files/jq"; chmod 755 jq)
-export PATH="$PATH:/usr/local/bin"
-export REBAR_ENDPOINT="{{.CommandURL}}"
-export REBAR_KEY="{{.Param "rebar-machine_key"}}"
-echo "$REBAR_KEY" >/etc/rebar.install.key
+
 
 (cd /etc/yum.repos.d; rm -f * || :)
 
 # Use the install repo from the provisioner for local package installation
 cat >/etc/yum.repos.d/00-rebar-base.repo <<EOF
 [rebar-base]
-name=Rebar Base Repo
+name=Rocket Skates Base Repo
 baseurl={{.Env.OS.InstallUrl}}
 gpgcheck=0
 EOF
 
-# Install ntpdate
-yum -y install ntpdate
+HOSTNAME="{{.Machine.Name}}"
 
-node_json="$(rebar nodes show "{{.Machine.UUID}}")" && \
-    HOSTNAME="$(jq -r '.name' <<<"$node_json")" && \
-    REBAR_UUID="$(jq -r '.uuid' <<< "$node_json")" 
-
-if ! [[ $HOSTNAME && $HOSTNAME != null && $REBAR_UUID && $REBAR_UUID != null ]]; then
-    echo "Unable to configure hostname and rebar uuid!"
-    sleep 9000
-    exit 1
-fi
 if [ -f /etc/sysconfig/network ] ; then
       sed -i -e "s/HOSTNAME=.*/HOSTNAME=${HOSTNAME}/" /etc/sysconfig/network
 fi
@@ -82,37 +67,18 @@ echo "$HOSTNAME" >/etc/hostname
 hostname "$HOSTNAME"
 export HOSTNAME
 
-echo "$REBAR_UUID" > /etc/rebar-uuid
-
-# Make sure we can install gems
-cat >/etc/gemrc <<EOF
-:sources:
-- http://rubygems.org/
-gem: --no-ri --no-rdoc --bindir /usr/local/bin {{if .Param "use-proxy"}} --http-proxy="{{index (.Param "proxy-servers") 0 "url"}}"{{end}}
-EOF
-cp /etc/gemrc /root/.gemrc
-
-rsyslog_dir="/etc/rsyslog.d"
-mkdir -p "$rsyslog_dir"
-echo '$IncludeConfig /etc/rsyslog.d/*.conf' >>/etc/rsyslog.conf
-if [ ! -f "$rsyslog_dir/10-rebar-client.conf" ]; then
-    echo "*.* @@${{index (.Param "logging_servers") 0}}" > "$rsyslog_dir/10-rebar-client.conf"
-    if ! curl -f -s -o "$rsyslog_dir/00-rebar-debug.conf" \
-        {{.ProvisionerURL}}/rsyslog.d/00-rebar-debug.conf
-    then
-        rm -f "$rsyslog_dir/00-rebar-debug.conf"
-    fi
-fi
+{{if .ParamExists "access_keys"}}
 mkdir -p /root/.ssh
 cat >/root/.ssh/authorized_keys <<EOF
 ### BEGIN GENERATED CONTENT
-{{ range $key := .Param "rebar-access_keys" }}{{$key}}{{ end }}
+{{ range $key := .Param "access_keys" }}{{$key}}{{ end }}
 ### END GENERATED CONTENT
 EOF
 echo "PermitRootLogin without-password" >> /etc/ssh/sshd_config
 echo "AcceptEnv http_proxy https_proxy no_proxy" >> /etc/ssh/sshd_config
+{{end}}
 
-{{if .Param "use-proxy"}}
+{{if .ParamExists "proxy-servers"}}
 # Setup a proxy for the environment
 echo "http_proxy={{index (.Param "proxy-servers") 0 "url"}}" >> /etc/environment
 echo "https_proxy={{index (.Param "proxy-servers") 0 "url"}}" >> /etc/environment
@@ -125,35 +91,11 @@ echo "https_proxy={{index (.Param "proxy-servers") 0 "url"}}" >>  /etc/profile.d
 echo "no_proxy=127.0.0.1,localhost,::1,{{index (.Param "proxy-servers") 0 "address"}}" >> /etc/profile.d/proxy.sh
 {{end}}
 
-# Set up the default rebar service.
-curl -s -o /usr/sbin/rebar_join  "{{.Machine.Url}}/rebar_join.sh"
-chmod +x /usr/sbin/rebar_join
-
-cat >/etc/systemd/system/rebar.service <<EOF
-[Unit]
-Description=Rebar Node Checkin
-Documentation=http://github.com/digitalrebar
-After=sshd.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/sbin/rebar_join start
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl enable rebar
-
-# The network barclamp is in charge of doing horrible things
-# to the network, not NetworkManager
-chkconfig NetworkManager off || :
-chkconfig network on || :
-
-rebar nodes update "$REBAR_UUID" '{"bootenv": "local"}'
-while [[ $(rebar nodes get "$REBAR_UUID" attrib provisioner-active-bootstate |jq -r '.value') != local ]]; do
-    sleep 1
-done
+# Tell rocket skates we are done
+(cd /bin; curl -fgl -O "{{.ProvisionerURL}}/files/rscli"; chmod 755 rscli)
+export PATH="$PATH:/usr/local/bin"
+export RS_ENDPOINT="{{.CommandURL}}"
+rscli machines update "{{.Machine.UUID}}" '{"bootenv": "local"}'
 
 sync
 %end

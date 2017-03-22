@@ -7,14 +7,12 @@ Name: redhat-7.0-install
 OS:
   Name: redhat-7.0
 RequiredParams:
-- logging_servers
+OptionalParams:
 - ntp_servers
 - operating-system-disk
 - provisioner-default-password-hash
 - proxy-servers
-- rebar-access_keys
-- rebar-machine_key
-- use-proxy
+- access_keys
 Templates:
 - ID: default-pxelinux.tmpl
   Name: pxelinux
@@ -28,7 +26,4 @@ Templates:
 - ID: centos-7.ks.tmpl
   Name: compute.ks
   Path: '{{.Machine.Path}}/compute.ks'
-- ID: rebar-join.sh.tmpl
-  Name: rebar_join.sh
-  Path: '{{.Machine.Path}}/rebar_join.sh'
 TenantId: 1

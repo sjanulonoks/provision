@@ -6,7 +6,7 @@
 vmaccepteula
 
 # Set the root password for the DCUI and Tech Support Mode
-rootpw --iscrypted {{ .Param "provisioner-default-password-hash" }}
+rootpw --iscrypted {{if .ParamExists "provisioner-default-password-hash"}}{{ .Param "provisioner-default-password-hash" }}{{else}}$6$rebar$HBaBj/uDmsQMEw4Si6eja9Yba3rhB73Na36hbrp9KxDHm6s5veeWyXlsUkoxRACtP47978iiidziRdsYUC7gC/{{end}}
 
 # Install on the first local disk available on machine
 install --firstdisk --overwritevmfs
@@ -19,13 +19,11 @@ reboot
 %pre --interpreter=python
 # urllib2 is a pile of suck.  Ask me how I know this.
 import sys,re,os,urllib,urllib2,base64,syslog,socket, string, ssl, time
-url = '{{.CommandURL}}/api/v2/nodes/{{.Machine.UUID}}'
+url = '{{.CommandURL}}/api/v3/machines/{{.Machine.UUID}}'
 
 class FakeMgr(urllib2.HTTPPasswordMgr):
     def find_user_password(foo, bar, baz):
-        key = '{{.Param "rebar-machine_key"}}'
-        up = string.split(key,':',2)
-        return up[0], up[1]
+        return "rs", "rs1"
 
 opener = urllib2.build_opener(
     urllib2.HTTPDigestAuthHandler(FakeMgr()),

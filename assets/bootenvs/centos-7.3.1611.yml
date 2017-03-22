@@ -10,14 +10,12 @@ OS:
   IsoUrl: http://mirrors.kernel.org/centos/7.3.1611/isos/x86_64/CentOS-7-x86_64-Minimal-1611.iso
   Name: centos-7.3.1611
 RequiredParams:
-- logging_servers
+OptionalParams:
 - ntp_servers
 - operating-system-disk
 - provisioner-default-password-hash
 - proxy-servers
-- use-proxy
-- rebar-access_keys
-- rebar-machine_key
+- access_keys
 Templates:
 - ID: default-pxelinux.tmpl
   Name: pxelinux
@@ -31,7 +29,4 @@ Templates:
 - ID: centos-7.ks.tmpl
   Name: compute.ks
   Path: '{{.Machine.Path}}/compute.ks'
-- ID: rebar-join.sh.tmpl
-  Name: rebar_join.sh
-  Path: '{{.Machine.Path}}/rebar_join.sh'
 TenantId: 1

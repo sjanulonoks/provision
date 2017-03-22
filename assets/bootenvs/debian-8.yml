@@ -16,17 +16,14 @@ OS:
   Name: debian-8
   Version: '8'
 RequiredParams:
+OptionalParams:
 - dns-domain
-- logging_servers
 - ntp_servers
 - operating-system-disk
 - provisioner-default-password-hash
 - provisioner-default-user
-- provisioner-use-local-security
 - proxy-servers
-- use-proxy
-- rebar-access_keys
-- rebar-machine_key
+- access_keys
 Templates:
 - ID: default-pxelinux.tmpl
   Name: pxelinux
@@ -43,7 +40,4 @@ Templates:
 - ID: net-post-install.sh.tmpl
   Name: net-post-install.sh
   Path: '{{.Machine.Path}}/post-install.sh'
-- ID: rebar-join.sh.tmpl
-  Name: rebar_join.sh
-  Path: '{{.Machine.Path}}/rebar_join.sh'
 TenantId: 1

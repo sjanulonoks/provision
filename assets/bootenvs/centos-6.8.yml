@@ -9,14 +9,12 @@ OS:
   IsoUrl: http://mirrors.kernel.org/centos/6.8/isos/x86_64/CentOS-6.8-x86_64-bin-DVD1.iso
   Name: centos-6.8
 RequiredParams:
-- logging_servers
+OptionalParams:
 - ntp_servers
 - operating-system-disk
 - provisioner-default-password-hash
-- use-proxy
 - proxy-servers
-- rebar-access_keys
-- rebar-machine_key
+- access_keys
 Templates:
 - ID: default-pxelinux.tmpl
   Name: pxelinux
@@ -30,7 +28,4 @@ Templates:
 - ID: centos-6.ks.tmpl
   Name: compute.ks
   Path: '{{.Machine.Path}}/compute.ks'
-- ID: rebar-join.sh.tmpl
-  Name: rebar_join.sh
-  Path: '{{.Machine.Path}}/rebar_join.sh'
 TenantId: 1

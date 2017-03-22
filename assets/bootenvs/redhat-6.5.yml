@@ -8,14 +8,12 @@ OS:
   IsoSha256: a51b90f3dd4585781293ea08adde60eeb9cfa94670943bd99e9c07f13a259539
   Name: redhat-6.5
 RequiredParams:
-- logging_servers
+OptionalParams:
 - ntp_servers
 - operating-system-disk
 - provisioner-default-password-hash
 - proxy-servers
-- use-proxy
-- rebar-access_keys
-- rebar-machine_key
+- access_keys
 Templates:
 - ID: default-pxelinux.tmpl
   Name: pxelinux
@@ -29,7 +27,4 @@ Templates:
 - ID: centos-6.ks.tmpl
   Name: compute.ks
   Path: '{{.Machine.Path}}/compute.ks'
-- ID: rebar-join.sh.tmpl
-  Name: rebar_join.sh
-  Path: '{{.Machine.Path}}/rebar_join.sh'
 TenantId: 1
