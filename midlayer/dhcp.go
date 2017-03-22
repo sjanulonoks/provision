@@ -398,7 +398,10 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 }
 
 func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string) error {
-	ifs := strings.Split(dhcpIfs, ",")
+	ifs := []string{}
+	if dhcpIfs != "" {
+		ifs = strings.Split(dhcpIfs, ",")
+	}
 	handler := &DhcpHandler{
 		ifs:    ifs,
 		bk:     dhcpInfo,
