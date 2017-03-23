@@ -75,7 +75,7 @@ export HOSTNAME
 # Tell rocket skates we are done
 (cd /bin; curl -s -f -L -o rscli "{{.ProvisionerURL}}/files/rscli.amd64.linux"; chmod 755 rscli)
 export RS_ENDPOINT="{{.CommandURL}}"
-/bin/rscli machines update "{{.Machine.UUID}}" '{"bootenv": "local"}'
+rscli machines update "{{.Machine.UUID}}" '{"bootenv": "local"}'
 
 EOF
 
