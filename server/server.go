@@ -130,12 +130,12 @@ func Server(c_opts *ProgOpts) {
 	}
 	if !c_opts.DisableProvisioner {
 		logger.Printf("Starting TFTP server")
-		if err = frontend.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), c_opts.FileRoot); err != nil {
+		if err = midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), c_opts.FileRoot); err != nil {
 			logger.Fatalf("Error starting TFTP server: %v", err)
 		}
 
 		logger.Printf("Starting static file server")
-		if err = frontend.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), c_opts.FileRoot); err != nil {
+		if err = midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), c_opts.FileRoot); err != nil {
 			logger.Fatalf("Error starting static file server: %v", err)
 		}
 	}
