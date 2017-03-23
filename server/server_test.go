@@ -2,13 +2,14 @@ package server
 
 import (
 	"crypto/tls"
-	"github.com/jessevdk/go-flags"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/jessevdk/go-flags"
 )
 
 var (

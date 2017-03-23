@@ -35,6 +35,7 @@ for tool in go-bindata swagger glide; do
 done
 
 glide install
+rm -rf client models embedded/assets/swagger.json
 go generate server/assets.go
 go build -o rocket-skates cmds/rocket-skates.go
 go build -o rscli cmds/rscli.go
