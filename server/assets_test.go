@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"io/ioutil"
@@ -23,7 +23,8 @@ func TestExtractAssets(t *testing.T) {
 		"ALL-LICENSE",
 		"explode_iso.sh",
 		"files/jq",
-		"files/rscli",
+		"files/rscli.amd64.linux",
+		"files/rscli.amd64.darwin",
 		"bootia32.efi",
 		"bootia64.efi",
 		"esxi.0",

@@ -80,7 +80,7 @@ Templates:
       fi
       export RS_ENDPOINT="$(get_param "$api_re")"
       if ! [[ -x /usr/bin/rscli ]]; then
-          curl -s -f -L -o /usr/bin/rscli "$PROVISIONER_WEB/files/rscli"
+          curl -s -f -L -o /usr/bin/rscli "$PROVISIONER_WEB/files/rscli.amd64.linux"
           chmod 755 /usr/bin/rscli
       fi
 
@@ -88,11 +88,11 @@ Templates:
       if [[ $(cat /proc/cmdline) =~ $host_re ]]; then
           RS_UUID="${BASH_REMATCH[1]}"
           if ! [[ $RS_UUID =~ $uuid_re ]]; then
-              RS_UUID="$(rebar machines show "$RS_UUID" |jq -r '.uuid')"
+              RS_UUID="$(rscli machines show "$RS_UUID" |jq -r '.Uuid')"
           fi
           # If we did not get a hostname from DHCP, get it from RocketSkates.
           if [[ ! $HOSTNAME ]]; then
-              HOSTNAME="$(rebar machines show "$RS_UUID" |jq -r '.name')"
+              HOSTNAME="$(rscli machines show "$RS_UUID" |jq -r '.Name')"
           fi
       else
           # If we did not get a hostname from DHCP, generate one for ourselves.

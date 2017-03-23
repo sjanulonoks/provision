@@ -98,8 +98,7 @@ echo "no_proxy=127.0.0.1,localhost,::1,{{index (.Param "proxy-servers") 0 "addre
 sed -i -e '/initdefault/ s/5/3/' /etc/inittab
 
 # Tell rocket skates we are done
-(cd /bin; curl -fgl -O "{{.ProvisionerURL}}/files/rscli"; chmod 755 rscli)
-export PATH="$PATH:/usr/local/bin"
+(cd /bin; curl -s -f -L -o rscli "{{.ProvisionerURL}}/files/rscli.amd64.linux"; chmod 755 rscli)
 export RS_ENDPOINT="{{.CommandURL}}"
 rscli machines update "{{.Machine.UUID}}" '{"bootenv": "local"}'
 
