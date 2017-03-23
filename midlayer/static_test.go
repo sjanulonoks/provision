@@ -1,4 +1,4 @@
-package frontend
+package midlayer
 
 import (
 	"io/ioutil"
@@ -21,7 +21,7 @@ func TestStaticFiles(t *testing.T) {
 
 	go ServeStatic(":32134", ".")
 
-	response, err := http.Get("http://127.0.0.1:32134/frontend.go")
+	response, err := http.Get("http://127.0.0.1:32134/dhcp.go")
 	count := 0
 	if err != nil && count < 10 {
 		t.Logf("Failed to get file: %v", err)
@@ -32,7 +32,7 @@ func TestStaticFiles(t *testing.T) {
 		t.Errorf("Should have served the file: missing content")
 	}
 	buf, _ := ioutil.ReadAll(response.Body)
-	if !strings.HasPrefix(string(buf), "package frontend") {
+	if !strings.HasPrefix(string(buf), "package midlayer") {
 		t.Errorf("Should have served the file: missing content")
 	}
 
