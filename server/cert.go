@@ -15,7 +15,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"fmt"
 	"log"
 	"math/big"
 	"net"
@@ -48,8 +47,7 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 	case *ecdsa.PrivateKey:
 		b, err := x509.MarshalECPrivateKey(k)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to marshal ECDSA private key: %v", err)
-			os.Exit(2)
+			log.Fatalf("Unable to marshal ECDSA private key: %v\n", err)
 		}
 		return &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
 	default:
@@ -85,8 +83,7 @@ func buildKeys(certFile, keyFile string) {
 	case "P521":
 		priv, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	default:
-		fmt.Fprintf(os.Stderr, "Unrecognized elliptic curve: %q", ecdsaCurve)
-		os.Exit(1)
+		log.Fatalf("Unrecognized elliptic curve: %q", ecdsaCurve)
 	}
 	if err != nil {
 		log.Fatalf("failed to generate private key: %s", err)

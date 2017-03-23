@@ -136,6 +136,10 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	ret := m.Run()
-	// os.RemoveAll(tmpDir)
+	err = os.RemoveAll(tmpDir)
+	if err != nil {
+		log.Printf("Creating temp dir for file root failed: %v", err)
+		os.Exit(1)
+	}
 	os.Exit(ret)
 }

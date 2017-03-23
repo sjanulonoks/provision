@@ -20,11 +20,16 @@ func TestStaticFiles(t *testing.T) {
 	}
 
 	go ServeStatic(":32134", ".")
-	time.Sleep(2 * time.Second)
 
 	response, err := http.Get("http://127.0.0.1:32134/frontend.go")
-	if err != nil {
-		t.Errorf("Failed to get file: %v", err)
+	count := 0
+	if err != nil && count < 10 {
+		t.Logf("Failed to get file: %v", err)
+		time.Sleep(1 * time.Second)
+		count++
+	}
+	if count == 10 {
+		t.Errorf("Should have served the file: missing content")
 	}
 	buf, _ := ioutil.ReadAll(response.Body)
 	if !strings.HasPrefix(string(buf), "package frontend") {

@@ -28,10 +28,8 @@ import (
 	"os"
 
 	"github.com/digitalrebar/digitalrebar/go/common/client"
-	"github.com/digitalrebar/digitalrebar/go/common/service"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/digitalrebar/go/common/version"
-	consul "github.com/hashicorp/consul/api"
 	"github.com/rackn/rocket-skates/backend"
 	"github.com/rackn/rocket-skates/frontend"
 	"github.com/rackn/rocket-skates/midlayer"
@@ -60,8 +58,6 @@ type ProgOpts struct {
 
 	TlsKeyFile  string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
 	TlsCertFile string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
-
-	RegisterConsul bool `long:"register-consul" description:"Register services with Consul"`
 }
 
 func Server(c_opts *ProgOpts) {
@@ -74,55 +70,6 @@ func Server(c_opts *ProgOpts) {
 	}
 	logger.Printf("Version: %s\n", version.REBAR_VERSION)
 
-	var consulClient *consul.Client
-	if c_opts.RegisterConsul {
-		consulClient, err = client.Consul(true)
-		if err != nil {
-			logger.Fatalf("Error talking to Consul: %v", err)
-		}
-
-		// Register service with Consul before continuing
-		if err = service.Register(consulClient,
-			&consul.AgentServiceRegistration{
-				Name: "provisioner-service",
-				Tags: []string{"deployment:system"},
-				Port: c_opts.StaticPort,
-				Check: &consul.AgentServiceCheck{
-					HTTP:     fmt.Sprintf("http://[::]:%d/", c_opts.StaticPort),
-					Interval: "10s",
-				},
-			},
-			true); err != nil {
-			log.Fatalf("Failed to register provisioner-service with Consul: %v", err)
-		}
-
-		if err = service.Register(consulClient,
-			&consul.AgentServiceRegistration{
-				Name: "provisioner-mgmt-service",
-				Tags: []string{"revproxy"}, // We want to be exposed through the revproxy
-				Port: c_opts.ApiPort,
-				Check: &consul.AgentServiceCheck{
-					HTTP:     fmt.Sprintf("http://[::]:%d/", c_opts.StaticPort),
-					Interval: "10s",
-				},
-			},
-			false); err != nil {
-			log.Fatalf("Failed to register provisioner-mgmt-service with Consul: %v", err)
-		}
-		if err = service.Register(consulClient,
-			&consul.AgentServiceRegistration{
-				Name: "provisioner-tftp-service",
-				Port: c_opts.TftpPort,
-				Check: &consul.AgentServiceCheck{
-					HTTP:     fmt.Sprintf("http://[::]:%d/", c_opts.StaticPort),
-					Interval: "10s",
-				},
-			},
-			true); err != nil {
-			log.Fatalf("Failed to register provisioner-tftp-service with Consul: %v", err)
-		}
-	}
-
 	for _, d := range []string{c_opts.DataRoot, c_opts.FileRoot} {
 		err := os.MkdirAll(d, 0755)
 		if err != nil {
@@ -133,11 +80,9 @@ func Server(c_opts *ProgOpts) {
 	var backendStore store.SimpleStore
 	switch c_opts.BackEndType {
 	case "consul":
-		if consulClient == nil {
-			consulClient, err = client.Consul(true)
-			if err != nil {
-				logger.Fatalf("Error talking to Consul: %v", err)
-			}
+		consulClient, err := client.Consul(true)
+		if err != nil {
+			logger.Fatalf("Error talking to Consul: %v", err)
 		}
 		backendStore, err = store.NewSimpleConsulStore(consulClient, c_opts.DataRoot)
 	case "directory":
