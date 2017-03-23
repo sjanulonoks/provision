@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-gonic/gin"
@@ -26,26 +27,6 @@ type NoContentResponse struct {
 	//description: Nothing
 }
 
-// operation represents a valid JSON Patch operation as defined by RFC 6902
-type JSONPatchOperation struct {
-	// All Operations must have an Op.
-	//
-	// required: true
-	// enum: add,remove,replace,move,copy,test
-	Op string `json:"op"`
-
-	// Path is a JSON Pointer as defined in RFC 6901
-	// required: true
-	Path string `json:"path"`
-
-	// From is a JSON pointer indicating where a value should be
-	// copied/moved from.  From is only used by copy and move operations.
-	From string `json:"from"`
-
-	// Value is the Value to be used for add, replace, and test operations.
-	Value interface{} `json:"value"`
-}
-
 // This interface defines the pieces of the backend.DataTracker that the
 // frontend needs.
 type DTI interface {
@@ -53,6 +34,7 @@ type DTI interface {
 	Update(store.KeySaver) (store.KeySaver, error)
 	Remove(store.KeySaver) (store.KeySaver, error)
 	Save(store.KeySaver) (store.KeySaver, error)
+	Patch(store.KeySaver, string, jsonpatch2.Patch) (store.KeySaver, error)
 	FetchOne(store.KeySaver, string) (store.KeySaver, bool)
 	FetchAll(ref store.KeySaver) []store.KeySaver
 
@@ -196,6 +178,23 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 		}
 	} else {
 		c.JSON(http.StatusCreated, res)
+	}
+}
+
+func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
+	patch := make(jsonpatch2.Patch, 0)
+	if !assureDecode(c, &patch) {
+		return
+	}
+	res, err := f.dt.Patch(ref, key, patch)
+	if err == nil {
+		c.JSON(http.StatusOK, res)
+	}
+	ne, ok := err.(*backend.Error)
+	if ok {
+		c.JSON(ne.Code, ne)
+	} else {
+		c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 	}
 }
 

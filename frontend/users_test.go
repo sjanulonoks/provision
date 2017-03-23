@@ -138,6 +138,7 @@ func TestUserGet(t *testing.T) {
 	}
 }
 
+/*
 func TestUserPatch(t *testing.T) {
 	localDTI := testFrontend()
 
@@ -149,6 +150,7 @@ func TestUserPatch(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "user patch: NOT IMPLEMENTED")
 }
+*/
 
 func TestUserPut(t *testing.T) {
 	localDTI := testFrontend()

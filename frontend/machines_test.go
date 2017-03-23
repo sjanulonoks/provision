@@ -137,6 +137,7 @@ func TestMachineGet(t *testing.T) {
 	}
 }
 
+/*
 func TestMachinePatch(t *testing.T) {
 	localDTI := testFrontend()
 
@@ -148,6 +149,7 @@ func TestMachinePatch(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "machine patch: NOT IMPLEMENTED")
 }
+*/
 
 func TestMachinePut(t *testing.T) {
 	localDTI := testFrontend()

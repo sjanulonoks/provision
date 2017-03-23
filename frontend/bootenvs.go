@@ -1,8 +1,7 @@
 package frontend
 
 import (
-	"net/http"
-
+	"github.com/VictorLowther/jsonpatch2"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
 )
@@ -34,7 +33,7 @@ type BootEnvBodyParameter struct {
 type BootEnvPatchBodyParameter struct {
 	// in: body
 	// required: true
-	Body []JSONPatchOperation
+	Body jsonpatch2.Patch
 }
 
 // BootEnvPathParameter used to name a BootEnv in the path
@@ -105,7 +104,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/bootenvs/:name",
 		func(c *gin.Context) {
-			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "bootenv patch: NOT IMPLEMENTED"))
+			f.Patch(c, f.dt.NewBootEnv(), c.Param(`name`))
 		})
 
 	// swagger:route PUT /bootenvs/{name} BootEnvs putBootEnv

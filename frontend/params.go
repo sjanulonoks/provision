@@ -1,8 +1,7 @@
 package frontend
 
 import (
-	"net/http"
-
+	"github.com/VictorLowther/jsonpatch2"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
 )
@@ -34,7 +33,7 @@ type ParamBodyParameter struct {
 type ParamPatchBodyParameter struct {
 	// in: body
 	// required: true
-	Body []JSONPatchOperation
+	Body jsonpatch2.Patch
 }
 
 // ParamPathParameter used to name a Param in the path
@@ -106,7 +105,7 @@ func (f *Frontend) InitParamApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/params/:name",
 		func(c *gin.Context) {
-			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "param patch: NOT IMPLEMENTED"))
+			f.Patch(c, f.dt.NewParam(), c.Param(`name`))
 		})
 
 	// swagger:route PUT /params/{name} Params putParam

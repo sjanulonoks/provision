@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/VictorLowther/jsonpatch2"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
 )
@@ -36,7 +37,7 @@ type ReservationBodyParameter struct {
 type ReservationPatchBodyParameter struct {
 	// in: body
 	// required: true
-	Body []JSONPatchOperation
+	Body jsonpatch2.Patch
 }
 
 // ReservationPathParameter used to address a Reservation in the path
@@ -117,7 +118,14 @@ func (f *Frontend) InitReservationApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/reservations/:address",
 		func(c *gin.Context) {
-			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "reservation patch: NOT IMPLEMENTED"))
+			ip := net.ParseIP(c.Param(`address`))
+			if ip == nil {
+				c.JSON(http.StatusBadRequest,
+					backend.NewError("API_ERROR", http.StatusBadRequest,
+						fmt.Sprintf("reservation get: address not valid: %v", c.Param(`address`))))
+				return
+			}
+			f.Patch(c, f.dt.NewReservation(), backend.Hexaddr(ip))
 		})
 
 	// swagger:route PUT /reservations/{address} Reservations putReservation

@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/VictorLowther/jsonpatch2"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
 )
@@ -36,7 +37,7 @@ type LeaseBodyParameter struct {
 type LeasePatchBodyParameter struct {
 	// in: body
 	// required: true
-	Body []JSONPatchOperation
+	Body jsonpatch2.Patch
 }
 
 // LeasePathParameter used to address a Lease in the path
@@ -116,7 +117,14 @@ func (f *Frontend) InitLeaseApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/leases/:address",
 		func(c *gin.Context) {
-			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "lease patch: NOT IMPLEMENTED"))
+			ip := net.ParseIP(c.Param(`address`))
+			if ip == nil {
+				c.JSON(http.StatusBadRequest,
+					backend.NewError("API_ERROR", http.StatusBadRequest,
+						fmt.Sprintf("lease get: address not valid: %v", c.Param(`address`))))
+				return
+			}
+			f.Patch(c, f.dt.NewLease(), backend.Hexaddr(ip))
 		})
 
 	// swagger:route PUT /leases/{address} Leases putLease

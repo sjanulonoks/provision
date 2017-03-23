@@ -11,6 +11,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
@@ -25,6 +26,8 @@ type LocalDTI struct {
 	SaveError    error
 	RemoveValue  store.KeySaver
 	RemoveError  error
+	PatchValue   store.KeySaver
+	PatchError   error
 	ListValue    []store.KeySaver
 	GetValue     store.KeySaver
 	GetBool      bool
@@ -44,6 +47,11 @@ func (dt *LocalDTI) Update(store.KeySaver) (store.KeySaver, error) {
 func (dt *LocalDTI) Remove(store.KeySaver) (store.KeySaver, error) {
 	return dt.RemoveValue, dt.RemoveError
 }
+
+func (dt *LocalDTI) Patch(ref store.KeySaver, key string, patch jsonpatch2.Patch) (store.KeySaver, error) {
+	return dt.PatchValue, dt.PatchError
+}
+
 func (dt *LocalDTI) Save(store.KeySaver) (store.KeySaver, error) {
 	return dt.SaveValue, dt.SaveError
 }
