@@ -137,6 +137,7 @@ func TestTemplateGet(t *testing.T) {
 	}
 }
 
+/*
 func TestTemplatePatch(t *testing.T) {
 	localDTI := testFrontend()
 
@@ -148,6 +149,7 @@ func TestTemplatePatch(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "template patch: NOT IMPLEMENTED")
 }
+*/
 
 func TestTemplatePut(t *testing.T) {
 	localDTI := testFrontend()

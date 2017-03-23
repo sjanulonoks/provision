@@ -140,6 +140,7 @@ func TestBootEnvGet(t *testing.T) {
 	}
 }
 
+/*
 func TestBootEnvPatch(t *testing.T) {
 	localDTI := testFrontend()
 
@@ -151,6 +152,7 @@ func TestBootEnvPatch(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "bootenv patch: NOT IMPLEMENTED")
 }
+*/
 
 func TestBootEnvPut(t *testing.T) {
 	localDTI := testFrontend()

@@ -137,6 +137,7 @@ func TestSubnetGet(t *testing.T) {
 	}
 }
 
+/*
 func TestSubnetPatch(t *testing.T) {
 	localDTI := testFrontend()
 
@@ -148,6 +149,7 @@ func TestSubnetPatch(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "subnet patch: NOT IMPLEMENTED")
 }
+*/
 
 func TestSubnetPut(t *testing.T) {
 	localDTI := testFrontend()

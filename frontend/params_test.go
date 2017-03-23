@@ -138,6 +138,7 @@ func TestParamGet(t *testing.T) {
 	}
 }
 
+/*
 func TestParamPatch(t *testing.T) {
 	localDTI := testFrontend()
 
@@ -149,6 +150,7 @@ func TestParamPatch(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "param patch: NOT IMPLEMENTED")
 }
+*/
 
 func TestParamPut(t *testing.T) {
 	localDTI := testFrontend()

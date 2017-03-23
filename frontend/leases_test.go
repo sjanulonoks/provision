@@ -146,6 +146,7 @@ func TestLeaseGet(t *testing.T) {
 	}
 }
 
+/*
 func TestLeasePatch(t *testing.T) {
 	localDTI := testFrontend()
 
@@ -157,6 +158,7 @@ func TestLeasePatch(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "lease patch: NOT IMPLEMENTED")
 }
+*/
 
 func TestLeasePut(t *testing.T) {
 	localDTI := testFrontend()
