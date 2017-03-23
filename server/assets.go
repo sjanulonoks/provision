@@ -1,4 +1,4 @@
-package main
+package server
 
 // Yes - Twice - once to get the basic pieces in place to let swagger run, then the final parts
 //
@@ -9,16 +9,15 @@ package main
 //go:generate ../tools/build-all-license.sh .. ALL-LICENSE
 //go:generate swagger generate client  -f ../embedded/assets/swagger.json -A RocketSkates --principal User -t ..
 //go:generate go build -o ../embedded/assets/rscli ../cli/...
+//go:generate env GOOS=linux GOARCH=amd64 go build -o ../embedded/assets/rscli.amd64.linux ../cli/...
+//go:generate env GOOS=darwin GOARCH=amd64 go build -o ../embedded/assets/rscli.amd64.darwin ../cli/...
 //go:generate go-bindata -prefix ../embedded/assets -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 
 import (
-	"bytes"
 	"fmt"
-	"html/template"
 	"io/ioutil"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/rackn/rocket-skates/embedded"
 )
@@ -37,7 +36,8 @@ func ExtractAssets(fileRoot string) error {
 		"ALL-LICENSE": "",
 
 		// CLI things
-		"rscli": "files",
+		"rscli.amd64.linux":  "files",
+		"rscli.amd64.darwin": "files",
 
 		// General ISO things
 		"explode_iso.sh": "",
@@ -67,31 +67,6 @@ func ExtractAssets(fileRoot string) error {
 		info, err := embedded.AssetInfo(src)
 		if err != nil {
 			return fmt.Errorf("No mode info for embedded asset %s: %v", src, err)
-		}
-
-		if strings.HasSuffix(src, ".tmpl") {
-			var doc bytes.Buffer
-
-			t, err := template.New("test").Parse(string(buf))
-			if err != nil {
-				return err
-			}
-
-			params := struct {
-				ProvIp      string
-				ProvFileURL string
-				ProvApiURL  string
-			}{
-				ProvIp:      c_opts.OurAddress,
-				ProvFileURL: fmt.Sprintf("http://%s:%d", c_opts.OurAddress, c_opts.StaticPort),
-				ProvApiURL:  fmt.Sprintf("https://%s:%d", c_opts.OurAddress, c_opts.ApiPort),
-			}
-			err = t.Execute(&doc, params)
-			if err != nil {
-				return err
-			}
-			buf = doc.Bytes()
-			src = strings.TrimSuffix(src, ".tmpl")
 		}
 
 		destFile := path.Join(fileRoot, dest, src)

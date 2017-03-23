@@ -1,4 +1,4 @@
-// Package main Rocket Skates Server
+// Package server Rocket Skates Server
 //
 // An RestFUL API-driven Provisioner and DHCP server
 //
@@ -19,7 +19,7 @@
 //     - application/json
 //
 // swagger:meta
-package main
+package server
 
 import (
 	"fmt"
@@ -32,7 +32,6 @@ import (
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/digitalrebar/go/common/version"
 	consul "github.com/hashicorp/consul/api"
-	"github.com/jessevdk/go-flags"
 	"github.com/rackn/rocket-skates/backend"
 	"github.com/rackn/rocket-skates/frontend"
 	"github.com/rackn/rocket-skates/midlayer"
@@ -65,21 +64,10 @@ type ProgOpts struct {
 	RegisterConsul bool `long:"register-consul" description:"Register services with Consul"`
 }
 
-var c_opts ProgOpts
-
-func main() {
+func Server(c_opts *ProgOpts) {
 	var err error
 
 	logger := log.New(os.Stderr, "rocket-skates ", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-
-	parser := flags.NewParser(&c_opts, flags.Default)
-	if _, err = parser.Parse(); err != nil {
-		if flagsErr, ok := err.(*flags.Error); ok && flagsErr.Type == flags.ErrHelp {
-			os.Exit(0)
-		} else {
-			os.Exit(1)
-		}
-	}
 
 	if c_opts.VersionFlag {
 		logger.Fatalf("Version: %s", version.REBAR_VERSION)

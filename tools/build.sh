@@ -36,8 +36,8 @@ done
 
 glide install
 go generate server/assets.go
-go build -o rocket-skates server/*
-go build -o rscli cli/*
+go build -o rocket-skates cmds/rocket-skates.go
+go build -o rscli cmds/rscli.go
 
 echo "To run tests, run: tools/test.sh"
 echo "To rebuild after changes, rerun tools/build.sh"
