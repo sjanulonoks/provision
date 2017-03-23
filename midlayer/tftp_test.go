@@ -1,4 +1,4 @@
-package frontend
+package midlayer
 
 import (
 	"bytes"
@@ -42,7 +42,7 @@ func TestTftpFiles(t *testing.T) {
 		if err != nil {
 			t.Errorf("tftpClient create: Should not return an error: %v", err)
 		}
-		wt, err := c.Receive("frontend.go", "octet")
+		wt, err := c.Receive("dhcp.go", "octet")
 		if err != nil {
 			t.Errorf("tftpClient receive: Should not return an error: %v", err)
 		}
@@ -51,7 +51,7 @@ func TestTftpFiles(t *testing.T) {
 		if err != nil {
 			t.Errorf("tftpClient write: Should not return an error: %v", err)
 		}
-		if !strings.HasPrefix(buf.String(), "package frontend") {
+		if !strings.HasPrefix(buf.String(), "package midlayer") {
 			t.Errorf("Should have served the file: missing content")
 		}
 
@@ -77,9 +77,9 @@ func TestTftpFiles(t *testing.T) {
 			t.Errorf("tftpClient receive: Should return an error: %v", err)
 		}
 
-		wt, err = c.Receive("../frontend.go", "octet")
+		wt, err = c.Receive("../dhcp.go", "octet")
 		if err != nil {
-			s := fmt.Sprintf("code: 1, message: Filename ../frontend.go tries to escape root %s", dir)
+			s := fmt.Sprintf("code: 1, message: Filename ../dhcp.go tries to escape root %s", dir)
 			s1 := err.Error()
 			if !strings.Contains(s1, s) {
 				t.Errorf("tftpClient receive: Should have returned the error: \n%s\n%s\n", s, s1)
