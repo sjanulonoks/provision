@@ -1,5 +1,5 @@
-hash: 1c65ece5795139b4e4c7a6c1ef7f03f200e2e841c31f7cced85252ff00689a37
-updated: 2017-03-17T11:40:25.899265492-05:00
+hash: a2594971179e39ea80f9e030f4e315c2be6c4e8c17cd013e41b571801a93cd63
+updated: 2017-03-23T11:11:26.812069625-05:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: fdf19785fd3558d619ef81212f5edf1d6c2a5911
@@ -123,6 +123,8 @@ imports:
   version: bf36a043be1fdc3127cc160767769878824ed71f
   subpackages:
   - utils
+- name: github.com/VictorLowther/jsonpatch2
+  version: 20869c7b1c725e6ff558ad10eb64f5e36bdf586d
 - name: golang.org/x/crypto
   version: 9a6f0a01987842989747adff311d80750ba25530
   subpackages:

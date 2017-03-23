@@ -8,8 +8,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/VictorLowther/jsonpatch"
-	"github.com/VictorLowther/jsonpatch/utils"
+	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/digitalrebar/go/rebar-api/api"
 )
@@ -463,7 +462,7 @@ func (p *DataTracker) Remove(ref store.KeySaver) (store.KeySaver, error) {
 	return ref, err
 }
 
-func (p *DataTracker) Patch(ref store.KeySaver, key string, patch []byte) (store.KeySaver, error) {
+func (p *DataTracker) Patch(ref store.KeySaver, key string, patch jsonpatch2.Patch) (store.KeySaver, error) {
 	prefix := ref.Prefix()
 	mux, idx, found := p.lockedGet(prefix, key)
 	defer mux.Unlock()
@@ -477,10 +476,15 @@ func (p *DataTracker) Patch(ref store.KeySaver, key string, patch []byte) (store
 		return nil, err
 	}
 	target := mux.d[idx]
-	res, patchErr, loc := jsonpatch.Apply(target, patch)
+	buf, fatalErr := json.Marshal(target)
+	if fatalErr != nil {
+		p.Logger.Fatalf("Non-JSON encodable %v:%v stored in cache: %v", prefix, key, fatalErr)
+	}
+
+	resBuf, patchErr, loc := patch.Apply(buf)
 	if patchErr == nil {
 		toSave := ref.New()
-		if err := utils.Remarshal(res, &toSave); err != nil {
+		if err := json.Unmarshal(resBuf, &toSave); err != nil {
 			return nil, err
 		}
 		p.setDT(toSave)

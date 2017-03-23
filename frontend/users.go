@@ -1,8 +1,7 @@
 package frontend
 
 import (
-	"net/http"
-
+	"github.com/VictorLowther/jsonpatch2"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
 )
@@ -34,7 +33,7 @@ type UserBodyParameter struct {
 type UserPatchBodyParameter struct {
 	// in: body
 	// required: true
-	Body []JSONPatchOperation
+	Body jsonpatch2.Patch
 }
 
 // UserPathParameter used to name a User in the path
@@ -106,7 +105,7 @@ func (f *Frontend) InitUserApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/users/:name",
 		func(c *gin.Context) {
-			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "user patch: NOT IMPLEMENTED"))
+			f.Patch(c, f.dt.NewUser(), c.Param(`name`))
 		})
 
 	// swagger:route PUT /users/{name} Users putUser

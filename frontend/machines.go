@@ -3,6 +3,7 @@ package frontend
 import (
 	"net/http"
 
+	"github.com/VictorLowther/jsonpatch2"
 	"github.com/gin-gonic/gin"
 	"github.com/pborman/uuid"
 	"github.com/rackn/rocket-skates/backend"
@@ -35,7 +36,7 @@ type MachineBodyParameter struct {
 type MachinePatchBodyParameter struct {
 	// in: body
 	// required: true
-	Body []JSONPatchOperation
+	Body jsonpatch2.Patch
 }
 
 // MachinePathParameter used to find a Machine in the path
@@ -126,7 +127,7 @@ func (f *Frontend) InitMachineApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/machines/:uuid",
 		func(c *gin.Context) {
-			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "machine patch: NOT IMPLEMENTED"))
+			f.Patch(c, f.dt.NewMachine(), c.Param(`uuid`))
 		})
 
 	// swagger:route PUT /machines/{uuid} Machines putMachine

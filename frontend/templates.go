@@ -1,8 +1,7 @@
 package frontend
 
 import (
-	"net/http"
-
+	"github.com/VictorLowther/jsonpatch2"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
 )
@@ -34,7 +33,7 @@ type TemplateBodyParameter struct {
 type TemplatePatchBodyParameter struct {
 	// in: body
 	// required: true
-	Body []JSONPatchOperation
+	Body jsonpatch2.Patch
 }
 
 // TemplatePathParameter used to name a Template in the path
@@ -106,7 +105,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/templates/:id",
 		func(c *gin.Context) {
-			c.JSON(http.StatusNotImplemented, backend.NewError("API_ERROR", http.StatusNotImplemented, "template patch: NOT IMPLEMENTED"))
+			f.Patch(c, f.dt.NewTemplate(), c.Param(`id`))
 		})
 
 	// swagger:route PUT /templates/{name} Templates putTemplate
