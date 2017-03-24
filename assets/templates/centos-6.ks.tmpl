@@ -14,7 +14,7 @@ selinux --disabled
 timezone --utc UTC
 bootloader --location=mbr {{if .ParamExists "operating-system-disk"}}--driveorder={{ .Param "operating-system-disk" }}{{end}} --append="rhgb quiet"
 zerombr
-ignoredisk {{if .ParamExists "operating-system-disk"}}--only-use={{ .Param "operating-system-disk" }}{{end}}
+{{if .ParamExists "operating-system-disk"}}ignoredisk --only-use={{ .Param "operating-system-disk" }}{{end}}
 clearpart --all {{if .ParamExists "operating-system-disk"}}--drives={{ .Param "operating-system-disk" }}{{end}}
 part /boot --fstype ext4 --size=512 {{if .ParamExists "operating-system-disk"}}--ondisk={{ .Param "operating-system-disk" }}{{end}}
 part /boot/efi --fstype vfat --size=512 {{if .ParamExists "operating-system-disk"}}--ondisk={{ .Param "operating-system-disk" }}{{end}}
@@ -99,7 +99,7 @@ sed -i -e '/initdefault/ s/5/3/' /etc/inittab
 
 # Tell rocket skates we are done
 (cd /bin; curl -s -f -L -o rscli "{{.ProvisionerURL}}/files/rscli.amd64.linux"; chmod 755 rscli)
-export RS_ENDPOINT="{{.CommandURL}}"
-rscli machines update "{{.Machine.UUID}}" '{"bootenv": "local"}'
+export RS_ENDPOINT="{{.ApiURL}}"
+rscli machines update "{{.Machine.UUID}}" '{"BootEnv": "local"}'
 
 sync
