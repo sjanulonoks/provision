@@ -189,6 +189,7 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	res, err := f.dt.Patch(ref, key, patch)
 	if err == nil {
 		c.JSON(http.StatusOK, res)
+		return
 	}
 	ne, ok := err.(*backend.Error)
 	if ok {
