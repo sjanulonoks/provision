@@ -1,12 +1,12 @@
 hash: a2594971179e39ea80f9e030f4e315c2be6c4e8c17cd013e41b571801a93cd63
-updated: 2017-03-23T11:11:26.812069625-05:00
+updated: 2017-03-23T16:05:50.702432746-05:00
 imports:
 - name: github.com/asaskevich/govalidator
-  version: fdf19785fd3558d619ef81212f5edf1d6c2a5911
+  version: 872bb01704d183fe276bce6fa429408a87661998
 - name: github.com/boltdb/bolt
   version: e9cf4fae01b5a8ff89d0ec6b32f0d9c9f79aefdd
 - name: github.com/cloudflare/cfssl
-  version: 2294778cce8f195e8969d9f7f0addd3ee81b5611
+  version: 1a5ac2e68991e01380068b96f50f5ff982d9bb14
   subpackages:
   - api
   - api/client
@@ -23,7 +23,7 @@ imports:
   - ocsp/config
   - signer
 - name: github.com/digitalrebar/digitalrebar
-  version: 38e4337079895a4064d93a7d9dcdfa3613005611
+  version: a446d4f4a8abc3e362486e2a3239a9cb58a29057
   subpackages:
   - go/common/cert
   - go/common/client
@@ -35,7 +35,7 @@ imports:
   - go/rebar-api/datatypes/dhcp
   - go/rebar-api/datatypes/provisioner
 - name: github.com/elazarl/go-bindata-assetfs
-  version: 9a6736ed45b44bf3835afeebb3034b57ed329f3e
+  version: 30f82fa23fd844bd5bb1e5f216db87fd77b5eb43
 - name: github.com/elithrar/simple-scrypt
   version: 2325946f714c95de4a6088202c402fbdfa64163b
 - name: github.com/ghodss/yaml
@@ -58,31 +58,31 @@ imports:
   subpackages:
   - fmts
 - name: github.com/go-openapi/runtime
-  version: 76cda4f2f90d26d9b4fa56447e6c85cd7b60a371
+  version: e66a4c4406028a04ddafd6002c378ffd3db7e52b
   subpackages:
   - client
 - name: github.com/go-openapi/spec
   version: 02fb9cd3430ed0581e0ceb4804d5d4b3cc702694
 - name: github.com/go-openapi/strfmt
-  version: bf5b18a89572c3ae2474b537f0c3d92bc78ababa
+  version: 93a31ef21ac23f317792fff78f9539219dd74619
 - name: github.com/go-openapi/swag
   version: d5f8ebc3b1c55a4cf6489eeae7354f338cfe299e
 - name: github.com/go-openapi/validate
   version: 035dcd74f1f61e83debe1c22950dc53556e7e4b2
 - name: github.com/golang/protobuf
-  version: 2402d76f3d41f928c7902a765dfc872356dd3aad
+  version: c9c7427a2a70d2eb3bafa0ab2dc163e45f143317
   subpackages:
   - proto
 - name: github.com/guregu/null
   version: 41961cea0328defc5f95c1c473f89ebf0d1813f6
 - name: github.com/hashicorp/consul
-  version: 65b7ed462cc574d57dc6dcc9bca74676089f7fee
+  version: a14a7130dc02e9d9f943fad97009e1f86ef7532b
   subpackages:
   - api
 - name: github.com/hashicorp/go-cleanhttp
   version: 3573b8b52aa7b37b9358d966a898feb387f62437
 - name: github.com/hashicorp/serf
-  version: 050c56d31a1ff2ebc50e3f4810fdff7e7563f6c8
+  version: 19f2c401e122352c047a84d6584dd51e2fb8fcc4
   subpackages:
   - coordinate
 - name: github.com/inconshreveable/mousetrap
@@ -92,7 +92,7 @@ imports:
 - name: github.com/krolaw/dhcp4
   version: f61f734b73027e29f7fa2ed623f2ed85a7ef08fa
 - name: github.com/mailru/easyjson
-  version: d89c33ca38a143e5190297c6252fcc75f01694ed
+  version: db58e6f9072c545a3a24b8d44c51d81fff6dcb51
   subpackages:
   - buffer
   - jlexer
@@ -100,9 +100,9 @@ imports:
 - name: github.com/manucorporat/sse
   version: ee05b128a739a0fb76c7ebd3ae4810c1de808d6d
 - name: github.com/mattn/go-isatty
-  version: dda3de49cbfcec471bd7a70e6cc01fcc3ff90109
+  version: fc9e8d8ef48496124e79ae0df75490096eccf6fe
 - name: github.com/mitchellh/mapstructure
-  version: bfdb1a85537d60bc7e954e600c250219ea497417
+  version: 53818660ed4955e899c0bcafa97299a388bd7c8e
 - name: github.com/pborman/uuid
   version: 1b00554d822231195d1babd97ff4a781231955c9
 - name: github.com/pin/tftp
@@ -114,17 +114,19 @@ imports:
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
 - name: github.com/spf13/cobra
-  version: 9495bc009a56819bdb0ddbc1a373e29c140bc674
+  version: 7be4beda01ec05d0b93d80b3facd2b6f44080d94
 - name: github.com/spf13/pflag
-  version: 5ccb023bc27df288a957c5e994cd44fd19619465
+  version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
 - name: github.com/tylerb/graceful
-  version: 4654dfbb6ad53cb5e27f37d99b02e16c1872fbbb
+  version: d72b0151351a13d0421b763b88f791469c4f5dc7
 - name: github.com/VictorLowther/jsonpatch
   version: bf36a043be1fdc3127cc160767769878824ed71f
   subpackages:
   - utils
 - name: github.com/VictorLowther/jsonpatch2
-  version: 20869c7b1c725e6ff558ad10eb64f5e36bdf586d
+  version: c7b50f49dce1ebe7c627bf0a92c87b633a45bf43
+  subpackages:
+  - utils
 - name: golang.org/x/crypto
   version: 9a6f0a01987842989747adff311d80750ba25530
   subpackages:
@@ -138,27 +140,29 @@ imports:
   - salsa20/salsa
   - scrypt
 - name: golang.org/x/net
-  version: f315505cf3349909cdf013ea56690da34e96a451
+  version: 3f122ce3dbbe488b7e6a8bdb26f41edec852a40b
   subpackages:
+  - bpf
   - context
   - context/ctxhttp
   - html
   - html/atom
   - idna
   - internal/iana
+  - internal/netreflect
   - ipv4
 - name: golang.org/x/sys
-  version: e24f485414aeafb646f6fca458b0bf869c0880a1
+  version: 8fd966b47dbdd4faa03de0d06e3d733baeb9a1a9
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 85c29909967d7f171f821e7a42e7b7af76fb9598
+  version: fc7fa097411d30e6708badff276c4c164425590c
   subpackages:
   - transform
   - unicode/norm
   - width
 - name: gopkg.in/go-playground/validator.v8
-  version: c193cecd124b5cc722d7ee5538e945bdb3348435
+  version: 5f57d2222ad794d0dffb07e664ea05e2ee07d60c
 - name: gopkg.in/mgo.v2
   version: 3f83fa5005286a7fe593b055f0d7771a7dce4655
   repo: https://github.com/go-mgo/mgo
