@@ -11,7 +11,9 @@ d-i keyboard-configuration/toggle select No toggling
 d-i netcfg/choose_interface select auto
 d-i netcfg/dhcp_timeout string 120
 d-i netcfg/get_hostname string {{.Machine.ShortName}}
+{{if .ParamExists "dns-domain"}}
 d-i netcfg/get_domain string {{.Param "dns-domain"}}
+{{end}}
 d-i mirror/country string manual
 {{if (eq "debian" .Env.OS.Family)}}
 d-i mirror/protocol string http
@@ -39,6 +41,8 @@ d-i clock-setup/ntp boolean false
 {{end}}
 {{if .ParamExists "operating-system-disk"}}
 d-i partman-auto/disk string {{ .Param "operating-system-disk" }}
+{{else}}
+d-i partman-auto/disk string /dev/sda
 {{end}}
 d-i partman-auto/method string lvm
 d-i partman-lvm/device_remove_lvm boolean true
@@ -78,6 +82,9 @@ d-i grub-installer/only_debian boolean true
 {{if .ParamExists "operating-system-disk"}}
 d-i grub-installer/choose_bootdev select {{ .Param "operating-system-disk" }}
 d-i grub-installer/bootdev string {{ .Param "operating-system-disk" }}
+{{else}}
+d-i grub-installer/choose_bootdev select /dev/sda
+d-i grub-installer/bootdev string /dev/sda
 {{end}}
 {{end}}
 d-i finish-install/reboot_in_progress note

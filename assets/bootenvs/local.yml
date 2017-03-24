@@ -4,11 +4,11 @@ OS:
 Templates:
 - ID: local-pxelinux.tmpl
   Name: pxelinux
-  Path: discovery/pxelinux.cfg/{{.Machine.HexAddress}}
+  Path: pxelinux.cfg/{{.Machine.HexAddress}}
 - ID: local-elilo.tmpl
   Name: elilo
-  Path: discovery/{{.Machine.HexAddress}}.conf
+  Path: {{.Machine.HexAddress}}.conf
 - ID: local-ipxe.tmpl
   Name: ipxe
-  Path: discovery/{{.Machine.Address}}.ipxe
+  Path: {{.Machine.Address}}.ipxe
 TenantId: 1

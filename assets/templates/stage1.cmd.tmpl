@@ -9,7 +9,7 @@ while ($setupRunning) {
       $setupRunning = $?
 }
 write-host "Updating boot environment"
-rebar nodes update {{.Machine.UUID}} '{""""bootenv"""": """"local""""}'
+rscli nodes update {{.Machine.UUID}} '{""""BootEnv"""": """"local""""}'
 
 write-host "Rebooting system"
 Restart-Computer
