@@ -262,6 +262,15 @@ func NewDataTracker(backend store.SimpleStore,
 	if _, ok := res.fetchOne(ignoreBoot, ignoreBoot.Name); !ok {
 		res.Save(ignoreBoot)
 	}
+	users := res.objs["users"]
+	if len(users.d) == 0 {
+		logger.Printf("Creating rocketskates user")
+		user := &User{p: res, Name: "rocketskates"}
+		if err := user.ChangePassword("r0cketsk8ts"); err != nil {
+			logger.Fatalf("Failed to create rocketskates user: %v", err)
+		}
+		users.add(user)
+	}
 	res.defaultBootEnv = defaultPrefs["defaultBootEnv"]
 	machines := res.lockFor("machines")
 	for i := range machines.d {

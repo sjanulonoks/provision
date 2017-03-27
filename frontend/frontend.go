@@ -1,6 +1,8 @@
 package frontend
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -64,9 +66,56 @@ type Frontend struct {
 
 func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
+
+	userAuth := func() gin.HandlerFunc {
+		return func(c *gin.Context) {
+			authHeader := c.Request.Header.Get("Authorization")
+			if len(authHeader) == 0 {
+				logger.Printf("No authentication header")
+				c.Header("WWW-Authenticate", "rocket-skates")
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+			hdrParts := strings.SplitN(authHeader, " ", 2)
+			if len(hdrParts) != 2 || hdrParts[0] != "Basic" {
+				logger.Printf("Bad auth header: %s", authHeader)
+				c.Header("WWW-Authenticate", "rocket-skates")
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+			hdr, err := base64.StdEncoding.DecodeString(hdrParts[1])
+			if err != nil {
+				logger.Printf("Malformed basic auth string: %s", hdrParts[1])
+				c.Header("WWW-Authenticate", "rocket-skates")
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+			userpass := bytes.SplitN(hdr, []byte(`:`), 2)
+			if len(userpass) != 2 {
+				logger.Printf("Malformed basic auth string: %s", hdrParts[1])
+				c.Header("WWW-Authenticate", "rocket-skates")
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+			userThing, found := dt.FetchOne(dt.NewUser(), string(userpass[0]))
+			if !found {
+				logger.Printf("No such user: %s", string(userpass[0]))
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+			user := backend.AsUser(userThing)
+			if !user.CheckPassword(string(userpass[1])) {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+			c.Next()
+		}
+	}
+
 	mgmtApi := gin.Default()
 
 	apiGroup := mgmtApi.Group("/api/v3")
+	apiGroup.Use(userAuth())
 
 	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt}
 
