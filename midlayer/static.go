@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func ServeStatic(listenAt, fsPath string) error {
+func ServeStatic(listenAt, fsPath string, logger *log.Logger) error {
 	conn, err := net.Listen("tcp", listenAt)
 	if err != nil {
 		return err
@@ -15,7 +15,7 @@ func ServeStatic(listenAt, fsPath string) error {
 	http.Handle("/", fs)
 	go func() {
 		if err := http.Serve(conn, nil); err != nil {
-			log.Fatalf("Static HTTP server error %v", err)
+			logger.Fatalf("Static HTTP server error %v", err)
 		}
 	}()
 	return nil

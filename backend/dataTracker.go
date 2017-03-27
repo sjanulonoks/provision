@@ -95,11 +95,9 @@ func (dt *dtobjs) remove(idx int) {
 
 // DataTracker represents everything there is to know about acting as a dataTracker.
 type DataTracker struct {
-	useProvisioner bool
-	useDHCP        bool
-	FileRoot       string
-	CommandURL     string
-	OurAddress     string
+	FileRoot   string
+	CommandURL string
+	OurAddress string
 
 	FileURL string
 	ApiURL  string
@@ -150,22 +148,19 @@ func (p *DataTracker) loadData(refObjs []store.KeySaver) error {
 
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.SimpleStore,
-	useProvisioner, useDHCP bool,
 	fileRoot, commandURL, furl, aurl, addr string,
 	logger *log.Logger,
 	defaultPrefs map[string]string) *DataTracker {
 
 	res := &DataTracker{
-		useDHCP:        useDHCP,
-		useProvisioner: useProvisioner,
-		FileRoot:       fileRoot,
-		CommandURL:     commandURL,
-		FileURL:        furl,
-		ApiURL:         aurl,
-		OurAddress:     addr,
-		Logger:         logger,
-		backends:       map[string]store.SimpleStore{},
-		defaultPrefs:   defaultPrefs,
+		FileRoot:     fileRoot,
+		CommandURL:   commandURL,
+		FileURL:      furl,
+		ApiURL:       aurl,
+		OurAddress:   addr,
+		Logger:       logger,
+		backends:     map[string]store.SimpleStore{},
+		defaultPrefs: defaultPrefs,
 	}
 	objs := []store.KeySaver{
 		&Machine{p: res},
@@ -232,8 +227,6 @@ func (p *DataTracker) SetPrefs(prefs map[string]string) error {
 		return true
 	}
 	for name, val := range prefs {
-		log.Printf("Handling %v: %v", name, val)
-
 		switch name {
 		case "defaultBootEnv":
 			if benvCheck(name, val) && savePref(name, val) {
