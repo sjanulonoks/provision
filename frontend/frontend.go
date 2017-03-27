@@ -129,6 +129,7 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 				c.AbortWithStatus(http.StatusForbidden)
 				return
 			}
+			user := backend.AsUser(userThing)
 			if !user.CheckPassword(string(userpass[1])) {
 				c.AbortWithStatus(http.StatusForbidden)
 				return
