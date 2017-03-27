@@ -12,7 +12,7 @@ import (
 	"github.com/pin/tftp"
 )
 
-func ServeTftp(listen, fileRoot string) error {
+func ServeTftp(listen, fileRoot string, logger *log.Logger) error {
 	a, err := net.ResolveUDPAddr("udp", listen)
 	if err != nil {
 		return err
@@ -26,13 +26,13 @@ func ServeTftp(listen, fileRoot string) error {
 		p = filepath.Clean(p)
 		if !strings.HasPrefix(p, fileRoot+string(filepath.Separator)) {
 			err := fmt.Errorf("Filename %s tries to escape root %s", filename, fileRoot)
-			log.Println(err)
+			logger.Println(err)
 			return err
 		}
-		log.Printf("Sending %s from %s", filename, p)
+		logger.Printf("Sending %s from %s", filename, p)
 		file, err := os.Open(p)
 		if err != nil {
-			log.Println(err)
+			logger.Println(err)
 			return err
 		}
 		if t, ok := rf.(tftp.OutgoingTransfer); ok {
@@ -42,10 +42,10 @@ func ServeTftp(listen, fileRoot string) error {
 		}
 		n, err := rf.ReadFrom(file)
 		if err != nil {
-			log.Println(err)
+			logger.Println(err)
 			return err
 		}
-		log.Printf("%d bytes sent\n", n)
+		logger.Printf("%d bytes sent\n", n)
 		return nil
 	}, nil)
 

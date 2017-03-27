@@ -3,6 +3,7 @@ package midlayer
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -12,7 +13,7 @@ import (
 
 func TestTftpFiles(t *testing.T) {
 
-	hh := ServeTftp(":3235235", ".")
+	hh := ServeTftp(":3235235", ".", log.New(os.Stderr, "", log.LstdFlags))
 	if hh != nil {
 		if hh.Error() != "address 3235235: invalid port" {
 			t.Errorf("Expected a different error: %v", hh.Error())
@@ -21,7 +22,7 @@ func TestTftpFiles(t *testing.T) {
 		t.Errorf("Should have returned an error")
 	}
 
-	hh = ServeTftp("1.1.1.1:11112", ".")
+	hh = ServeTftp("1.1.1.1:11112", ".", log.New(os.Stderr, "", log.LstdFlags))
 	if hh != nil {
 		if !strings.Contains(hh.Error(), "listen udp 1.1.1.1:11112: bind: ") {
 			t.Errorf("Expected a different error: %v", hh.Error())
@@ -34,7 +35,7 @@ func TestTftpFiles(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	hh = ServeTftp("127.0.0.1:11112", dir)
+	hh = ServeTftp("127.0.0.1:11112", dir, log.New(os.Stderr, "", log.LstdFlags))
 	if hh != nil {
 		t.Errorf("Should not return an error: %v", hh)
 	} else {

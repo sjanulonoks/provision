@@ -106,8 +106,6 @@ func Server(c_opts *ProgOpts) {
 	}
 
 	dt := backend.NewDataTracker(backendStore,
-		!c_opts.DisableProvisioner,
-		!c_opts.DisableDHCP,
 		c_opts.FileRoot,
 		c_opts.CommandURL,
 		fmt.Sprintf("http://%s:%d", c_opts.OurAddress, c_opts.StaticPort),
@@ -130,12 +128,12 @@ func Server(c_opts *ProgOpts) {
 	}
 	if !c_opts.DisableProvisioner {
 		logger.Printf("Starting TFTP server")
-		if err = midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), c_opts.FileRoot); err != nil {
+		if err = midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), c_opts.FileRoot, logger); err != nil {
 			logger.Fatalf("Error starting TFTP server: %v", err)
 		}
 
 		logger.Printf("Starting static file server")
-		if err = midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), c_opts.FileRoot); err != nil {
+		if err = midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), c_opts.FileRoot, logger); err != nil {
 			logger.Fatalf("Error starting static file server: %v", err)
 		}
 	}
