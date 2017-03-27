@@ -25,15 +25,12 @@ if [[ "$os_install_dir" = /* ]] ; then
     oid_cwd=""
 fi
 
-# Gotta be careful here -- 7z prefers extracting Joliet-based
-# names from ISO files, where bsdtar prefers extracting
-# RockRidge based names.  Problem is that RockRidge has no max
-# length on names, where Joliet tops out at 63 characters, so
-# isos that contain files with really long names (like some
-# Fedora install isos) will not extract correctly with 7zip.  
 extract() {
     if [[ $(uname -s) == Darwin ]] ; then
-        7z x "$@"
+        # This is bsdtar under the covers.
+        # If this errors, you may need to use homebrew to update
+        # libarchive to get the latest version.
+        tar -xf "$@"
     else
         bsdtar -xf "$@"
     fi
