@@ -55,6 +55,7 @@ type DTI interface {
 }
 
 type Frontend struct {
+	Logger   *log.Logger
 	FileRoot string
 	MgmtApi  *gin.Engine
 	ApiGroup *gin.RouterGroup
@@ -66,7 +67,7 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Fronte
 
 	apiGroup := mgmtApi.Group("/api/v3")
 
-	me = &Frontend{FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt}
+	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt}
 
 	me.InitBootEnvApi()
 	me.InitIsoApi()

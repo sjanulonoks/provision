@@ -40,6 +40,7 @@ type IsoResponse struct {
 	Body interface{}
 }
 
+// swagger:model
 type IsoInfo struct {
 	Path string `json:"path"`
 	Size int64  `json:"size"`
@@ -153,10 +154,10 @@ func (f *Frontend) InitIsoApi() {
 			isoName := path.Join(f.FileRoot, `isos`, path.Base(name))
 			if err := os.Remove(isoName); err != nil {
 				c.JSON(http.StatusNotFound,
-					backend.NewError("API ERROR", http.StatusNotFound, fmt.Sprintf("delete: unable to delete %s: %v", name, err)))
+					backend.NewError("API ERROR", http.StatusNotFound, fmt.Sprintf("delete: unable to delete %s", name)))
 				return
 			}
-			c.JSON(http.StatusAccepted, nil)
+			c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
 		})
 }
 
@@ -179,8 +180,8 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt DTI) {
 		return
 	}
 	if err := os.MkdirAll(path.Join(fileRoot, `isos`), 0755); err != nil {
-		c.JSON(http.StatusInternalServerError,
-			backend.NewError("API_ERROR", http.StatusInternalServerError, fmt.Sprintf("upload: unable to create isos directory")))
+		c.JSON(http.StatusConflict,
+			backend.NewError("API_ERROR", http.StatusConflict, fmt.Sprintf("upload: unable to create isos directory")))
 		return
 	}
 	isoTmpName := path.Join(fileRoot, `isos`, fmt.Sprintf(`.%s.part`, path.Base(name)))
@@ -194,6 +195,7 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt DTI) {
 	if err != nil {
 		c.JSON(http.StatusConflict,
 			backend.NewError("API ERROR", http.StatusConflict, fmt.Sprintf("upload: Unable to upload %s: %v", name, err)))
+		return
 	}
 
 	copied, err := io.Copy(tgt, c.Request.Body)
@@ -208,15 +210,11 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt DTI) {
 		os.Remove(isoTmpName)
 		c.JSON(http.StatusBadRequest,
 			backend.NewError("API ERROR", http.StatusBadRequest,
-				fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes recieved", name, c.Request.ContentLength, copied)))
+				fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes received", name, c.Request.ContentLength, copied)))
 		return
 	}
 	os.Remove(isoName)
 	os.Rename(isoTmpName, isoName)
-	res := &struct {
-		Name string
-		Size int64
-	}{name, copied}
 	go reloadBootenvsForIso(dt, name)
-	c.JSON(http.StatusCreated, res)
+	c.JSON(http.StatusCreated, &IsoInfo{Path: name, Size: copied})
 }

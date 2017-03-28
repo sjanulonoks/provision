@@ -60,6 +60,13 @@ type ProgOpts struct {
 	TlsCertFile string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
 }
 
+func mkdir(d string, logger *log.Logger) {
+	err := os.MkdirAll(d, 0755)
+	if err != nil {
+		logger.Fatalf("Error creating required directory %s: %v", d, err)
+	}
+}
+
 func Server(c_opts *ProgOpts) {
 	var err error
 
@@ -70,27 +77,25 @@ func Server(c_opts *ProgOpts) {
 	}
 	logger.Printf("Version: %s\n", version.REBAR_VERSION)
 
-	for _, d := range []string{c_opts.DataRoot, c_opts.FileRoot} {
-		err := os.MkdirAll(d, 0755)
-		if err != nil {
-			logger.Fatalf("Error creating required directory %s: %v", d, err)
-		}
-	}
+	mkdir(c_opts.FileRoot, logger)
 
 	var backendStore store.SimpleStore
 	switch c_opts.BackEndType {
 	case "consul":
+		mkdir(c_opts.DataRoot, logger)
 		consulClient, err := client.Consul(true)
 		if err != nil {
 			logger.Fatalf("Error talking to Consul: %v", err)
 		}
 		backendStore, err = store.NewSimpleConsulStore(consulClient, c_opts.DataRoot)
 	case "directory":
+		mkdir(c_opts.DataRoot, logger)
 		backendStore, err = store.NewFileBackend(c_opts.DataRoot)
 	case "memory":
 		backendStore = store.NewSimpleMemoryStore()
 		err = nil
 	case "bolt", "local":
+		mkdir(c_opts.DataRoot, logger)
 		backendStore, err = store.NewSimpleLocalStore(c_opts.DataRoot)
 	default:
 		logger.Fatalf("Unknown storage backend type %v\n", c_opts.BackEndType)

@@ -41,6 +41,7 @@ type FileResponse struct {
 	Body interface{}
 }
 
+// swagger:model
 type FileInfo struct {
 	Path string
 	Size int64
@@ -227,7 +228,7 @@ func (f *Frontend) InitFileApi() {
 			if err := os.Remove(fileName); err != nil {
 				c.JSON(http.StatusNotFound,
 					backend.NewError("API ERROR", http.StatusNotFound,
-						fmt.Sprintf("delete: unable to delete %s: %v", c.Param(`path`), err)))
+						fmt.Sprintf("delete: unable to delete %s", c.Param(`path`))))
 				return
 			}
 			c.Data(http.StatusNoContent, gin.MIMEJSON, nil)

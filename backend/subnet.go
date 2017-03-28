@@ -147,20 +147,20 @@ type Subnet struct {
 	Subnet string
 	// NextServer is the address of the next server
 	//
-	// swagger:strfmt ipv4
 	// required: true
+	// swagger:strfmt ipv4
 	NextServer net.IP
 	// ActiveStart is the first non-reserved IP address we will hand
 	// non-reserved leases from.
 	//
-	// swagger:strfmt ipv4
 	// required: true
+	// swagger:strfmt ipv4
 	ActiveStart net.IP
 	// ActiveEnd is the last non-reserved IP address we will hand
 	// non-reserved leases from.
 	//
-	// swagger:strfmt ipv4
 	// required: true
+	// swagger:strfmt ipv4
 	ActiveEnd net.IP
 	// ActiveLeaseTime is the default lease duration in seconds
 	// we will hand out to leases that do not have a reservation.

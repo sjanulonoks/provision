@@ -63,9 +63,10 @@ func (f *Frontend) InitPrefApi() {
 					err.Errorf("Unknown Preference %s", k)
 				}
 			}
-			err.Merge(f.dt.SetPrefs(prefs))
+			if !err.ContainsError() {
+				err.Merge(f.dt.SetPrefs(prefs))
+			}
 			if err.ContainsError() {
-				c.Error(err)
 				c.JSON(err.Code, err)
 			} else {
 				c.JSON(http.StatusCreated, prefs)

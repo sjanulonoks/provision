@@ -2,9 +2,14 @@ package backend
 
 import "github.com/digitalrebar/digitalrebar/go/common/store"
 
+// swagger:model
 type Param struct {
-	p     *DataTracker
-	Name  string
+	p *DataTracker
+	// Key part of the Key/Value parameter space
+	// required: true
+	Name string
+	// Value part of the Key/Value parameter space
+	// Any arbirtary structure can be stored.
 	Value interface{}
 }
 
