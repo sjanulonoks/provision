@@ -53,7 +53,8 @@ func (f *Frontend) InitSubnetApi() {
 	//
 	//     Responses:
 	//       200: SubnetsResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	f.ApiGroup.GET("/subnets",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewSubnet())
@@ -68,7 +69,8 @@ func (f *Frontend) InitSubnetApi() {
 	//     Responses:
 	//       201: SubnetResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/subnets",
 		func(c *gin.Context) {
@@ -84,7 +86,8 @@ func (f *Frontend) InitSubnetApi() {
 	//
 	//     Responses:
 	//       200: SubnetResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/subnets/:name",
 		func(c *gin.Context) {
@@ -100,7 +103,8 @@ func (f *Frontend) InitSubnetApi() {
 	//     Responses:
 	//       200: SubnetResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/subnets/:name",
@@ -117,7 +121,8 @@ func (f *Frontend) InitSubnetApi() {
 	//     Responses:
 	//       200: SubnetResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/subnets/:name",
@@ -133,7 +138,8 @@ func (f *Frontend) InitSubnetApi() {
 	//
 	//     Responses:
 	//       200: SubnetResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/subnets/:name",
 		func(c *gin.Context) {

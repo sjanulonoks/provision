@@ -12,6 +12,9 @@
 //     License: APL https://raw.githubusercontent.com/digitalrebar/digitalrebar/master/LICENSE.md
 //     Contact: Greg Althaus<greg@rackn.com> http://rackn.com
 //
+//     Security:
+//       basicAuth: []
+//
 //     Consumes:
 //     - application/json
 //
@@ -126,7 +129,7 @@ func Server(c_opts *ProgOpts) {
 		logger.Fatalf("Unable to render default boot env for unknown PXE clients: %s", err)
 	}
 
-	fe := frontend.NewFrontend(dt, logger, c_opts.FileRoot, c_opts.DevUI)
+	fe := frontend.NewFrontend(dt, logger, c_opts.FileRoot, c_opts.DevUI, nil)
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)

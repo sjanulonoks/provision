@@ -53,7 +53,8 @@ func (f *Frontend) InitUserApi() {
 	//
 	//     Responses:
 	//       200: UsersResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	f.ApiGroup.GET("/users",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewUser())
@@ -68,7 +69,8 @@ func (f *Frontend) InitUserApi() {
 	//     Responses:
 	//       201: UserResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/users",
 		func(c *gin.Context) {
@@ -84,7 +86,8 @@ func (f *Frontend) InitUserApi() {
 	//
 	//     Responses:
 	//       200: UserResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/users/:name",
 		func(c *gin.Context) {
@@ -100,7 +103,8 @@ func (f *Frontend) InitUserApi() {
 	//     Responses:
 	//       200: UserResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/users/:name",
@@ -117,7 +121,8 @@ func (f *Frontend) InitUserApi() {
 	//     Responses:
 	//       200: UserResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name",
@@ -133,7 +138,8 @@ func (f *Frontend) InitUserApi() {
 	//
 	//     Responses:
 	//       200: UserResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/users/:name",
 		func(c *gin.Context) {

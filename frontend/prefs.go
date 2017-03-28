@@ -30,7 +30,8 @@ func (f *Frontend) InitPrefApi() {
 	//
 	//      Responses:
 	//        200: PrefsResponse
-	//        401: ErrorResponse
+	//        401: NoContentResponse
+	//        403: NoContentResponse
 	f.ApiGroup.GET("/prefs",
 		func(c *gin.Context) {
 			c.JSON(http.StatusOK, f.dt.Prefs())
@@ -45,7 +46,8 @@ func (f *Frontend) InitPrefApi() {
 	//      Responses:
 	//       201: PrefsResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/prefs",
 		func(c *gin.Context) {

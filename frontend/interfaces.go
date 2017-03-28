@@ -38,7 +38,8 @@ func (f *Frontend) InitInterfaceApi() {
 	//
 	//     Responses:
 	//       200: InterfacesResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/interfaces",
 		func(c *gin.Context) {
@@ -63,7 +64,8 @@ func (f *Frontend) InitInterfaceApi() {
 	//
 	//     Responses:
 	//       200: InterfaceResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/interfaces/:name",

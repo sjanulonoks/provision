@@ -57,7 +57,8 @@ func (f *Frontend) InitMachineApi() {
 	//
 	//     Responses:
 	//       200: MachinesResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	f.ApiGroup.GET("/machines",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewMachine())
@@ -72,7 +73,8 @@ func (f *Frontend) InitMachineApi() {
 	//     Responses:
 	//       201: MachineResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/machines",
 		func(c *gin.Context) {
@@ -106,7 +108,8 @@ func (f *Frontend) InitMachineApi() {
 	//
 	//     Responses:
 	//       200: MachineResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/machines/:uuid",
 		func(c *gin.Context) {
@@ -122,7 +125,8 @@ func (f *Frontend) InitMachineApi() {
 	//     Responses:
 	//       200: MachineResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/machines/:uuid",
@@ -139,7 +143,8 @@ func (f *Frontend) InitMachineApi() {
 	//     Responses:
 	//       200: MachineResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/machines/:uuid",
@@ -155,7 +160,8 @@ func (f *Frontend) InitMachineApi() {
 	//
 	//     Responses:
 	//       200: MachineResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/machines/:uuid",
 		func(c *gin.Context) {

@@ -84,6 +84,19 @@ func (dt *LocalDTI) SetPrefs(prefs map[string]string) error {
 	return nil
 }
 
+type TestAuthSource struct{}
+
+var testUser *backend.User
+
+func (tas TestAuthSource) GetUser(username string) (u *backend.User) {
+	if testUser == nil {
+		testUser = &backend.User{Name: username}
+		testUser.PasswordHash = []byte("16384$8$1$de348bfcde8805b3b2d0435c6f4a4b96$8b649ab10cb43c7ae0717e8ccc8624aa9ebb4e76730b2e0ea4d41b91c669f234")
+	}
+	u = testUser
+	return
+}
+
 func (dt *LocalDTI) NewBootEnv() *backend.BootEnv         { return &backend.BootEnv{} }
 func (dt *LocalDTI) NewMachine() *backend.Machine         { return &backend.Machine{} }
 func (dt *LocalDTI) NewTemplate() *backend.Template       { return &backend.Template{} }
@@ -102,12 +115,13 @@ func testFrontendDev(devUI string) *LocalDTI {
 
 	localDTI := &LocalDTI{}
 	logger := log.New(os.Stderr, "bootenv-test", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-	localDTI.f = NewFrontend(localDTI, logger, ".", devUI)
+	localDTI.f = NewFrontend(localDTI, logger, ".", devUI, &TestAuthSource{})
 
 	return localDTI
 }
 
 func (dt *LocalDTI) RunTest(req *http.Request) *httptest.ResponseRecorder {
+	req.SetBasicAuth("rocketskates", "r0cketsk8ts")
 	dt.w = httptest.NewRecorder()
 	dt.f.MgmtApi.ServeHTTP(dt.w, req)
 	return dt.w
@@ -208,3 +222,5 @@ func TestUIDev(t *testing.T) {
 		t.Errorf("Rocket Skates Title Missing %v\n", uibody)
 	}
 }
+
+// GREG: Test DefaultAuthSource

@@ -58,7 +58,8 @@ func (f *Frontend) InitReservationApi() {
 	//
 	//     Responses:
 	//       200: ReservationsResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	f.ApiGroup.GET("/reservations",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewReservation())
@@ -73,7 +74,8 @@ func (f *Frontend) InitReservationApi() {
 	//     Responses:
 	//       201: ReservationResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/reservations",
 		func(c *gin.Context) {
@@ -90,7 +92,8 @@ func (f *Frontend) InitReservationApi() {
 	//     Responses:
 	//       200: ReservationResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/reservations/:address",
 		func(c *gin.Context) {
@@ -113,7 +116,8 @@ func (f *Frontend) InitReservationApi() {
 	//     Responses:
 	//       200: ReservationResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/reservations/:address",
@@ -137,7 +141,8 @@ func (f *Frontend) InitReservationApi() {
 	//     Responses:
 	//       200: ReservationResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/reservations/:address",
@@ -161,7 +166,8 @@ func (f *Frontend) InitReservationApi() {
 	//     Responses:
 	//       200: ReservationResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/reservations/:address",
 		func(c *gin.Context) {

@@ -83,7 +83,8 @@ func (f *Frontend) InitFileApi() {
 	//
 	//     Responses:
 	//       200: FilesResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/files",
 		func(c *gin.Context) {
@@ -118,7 +119,8 @@ func (f *Frontend) InitFileApi() {
 	//
 	//     Responses:
 	//       200: FileResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/files/*path",
 		func(c *gin.Context) {
@@ -142,7 +144,8 @@ func (f *Frontend) InitFileApi() {
 	//     Responses:
 	//       201: FileInfoResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       403: ErrorResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
@@ -214,7 +217,8 @@ func (f *Frontend) InitFileApi() {
 	//
 	//     Responses:
 	//       204: NoContentResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/files/*path",
 		func(c *gin.Context) {

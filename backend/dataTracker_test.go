@@ -154,7 +154,7 @@ func TestBackingStorePersistence(t *testing.T) {
 		var cnt int
 		switch ot {
 		case "users":
-			items, cnt = dt.fetchAll(dt.NewUser()), 1
+			items, cnt = dt.fetchAll(dt.NewUser()), 2
 		case "templates":
 			items, cnt = dt.fetchAll(dt.NewTemplate()), 1
 		case "bootenvs":

@@ -53,7 +53,8 @@ func (f *Frontend) InitTemplateApi() {
 	//
 	//     Responses:
 	//       200: TemplatesResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	f.ApiGroup.GET("/templates",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewTemplate())
@@ -68,7 +69,8 @@ func (f *Frontend) InitTemplateApi() {
 	//     Responses:
 	//       201: TemplateResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/templates",
 		func(c *gin.Context) {
@@ -84,7 +86,8 @@ func (f *Frontend) InitTemplateApi() {
 	//
 	//     Responses:
 	//       200: TemplateResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/templates/:id",
 		func(c *gin.Context) {
@@ -100,7 +103,8 @@ func (f *Frontend) InitTemplateApi() {
 	//     Responses:
 	//       200: TemplateResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/templates/:id",
@@ -117,7 +121,8 @@ func (f *Frontend) InitTemplateApi() {
 	//     Responses:
 	//       200: TemplateResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/templates/:id",
@@ -133,7 +138,8 @@ func (f *Frontend) InitTemplateApi() {
 	//
 	//     Responses:
 	//       200: TemplateResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/templates/:id",
 		func(c *gin.Context) {

@@ -23,7 +23,7 @@ type ErrorResponse struct {
 	Body backend.Error
 }
 
-// NoContentResponse is returned for deletes
+// NoContentResponse is returned for deletes and auth errors
 // swagger:response
 type NoContentResponse struct {
 	//description: Nothing
@@ -57,15 +57,41 @@ type DTI interface {
 }
 
 type Frontend struct {
-	Logger   *log.Logger
-	FileRoot string
-	MgmtApi  *gin.Engine
-	ApiGroup *gin.RouterGroup
-	dt       DTI
+	Logger     *log.Logger
+	FileRoot   string
+	MgmtApi    *gin.Engine
+	ApiGroup   *gin.RouterGroup
+	dt         DTI
+	authSource AuthSource
 }
 
-func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Frontend) {
-	gin.SetMode(gin.ReleaseMode)
+type AuthSource interface {
+	GetUser(username string) *backend.User
+}
+
+type DefaultAuthSource struct {
+	dt DTI
+}
+
+func (d DefaultAuthSource) GetUser(username string) (u *backend.User) {
+	userThing, found := d.dt.FetchOne(d.dt.NewUser(), username)
+	if !found {
+		return
+	}
+	u = backend.AsUser(userThing)
+	return
+}
+
+func NewDefaultAuthSource(dt DTI) (das AuthSource) {
+	das = DefaultAuthSource{dt: dt}
+	return
+}
+
+func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
+
+	if authSource == nil {
+		authSource = NewDefaultAuthSource(dt)
+	}
 
 	userAuth := func() gin.HandlerFunc {
 		return func(c *gin.Context) {
@@ -97,13 +123,12 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Fronte
 				c.AbortWithStatus(http.StatusUnauthorized)
 				return
 			}
-			userThing, found := dt.FetchOne(dt.NewUser(), string(userpass[0]))
-			if !found {
+			user := authSource.GetUser(string(userpass[0]))
+			if user == nil {
 				logger.Printf("No such user: %s", string(userpass[0]))
 				c.AbortWithStatus(http.StatusForbidden)
 				return
 			}
-			user := backend.AsUser(userThing)
 			if !user.CheckPassword(string(userpass[1])) {
 				c.AbortWithStatus(http.StatusForbidden)
 				return

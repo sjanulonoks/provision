@@ -75,7 +75,8 @@ func (f *Frontend) InitIsoApi() {
 	//
 	//     Responses:
 	//       200: IsosResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/isos",
 		func(c *gin.Context) {
@@ -106,7 +107,8 @@ func (f *Frontend) InitIsoApi() {
 	//
 	//     Responses:
 	//       200: IsoResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/isos/:name",
 		func(c *gin.Context) {
@@ -128,8 +130,8 @@ func (f *Frontend) InitIsoApi() {
 	//     Responses:
 	//       201: IsoInfoResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
-	//       403: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
 	//       415: ErrorResponse
@@ -146,7 +148,8 @@ func (f *Frontend) InitIsoApi() {
 	//
 	//     Responses:
 	//       204: NoContentResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/isos/:name",
 		func(c *gin.Context) {
