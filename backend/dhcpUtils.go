@@ -216,6 +216,17 @@ func findOrCreateLease(dt *DataTracker, strat, token string, req net.IP, via []n
 		lease = findViaSubnet(leases, subnets, reservations, strat, token, req, via)
 	}
 	if lease != nil {
+		// Clean up any other leases that have this strategy and token lying around.
+		toRemove := []int{}
+		for idx := range leases.d {
+			candidate := AsLease(leases.d[idx])
+			if candidate.Strategy == strat &&
+				candidate.Token == token &&
+				!candidate.Addr.Equal(lease.Addr) {
+				toRemove = append(toRemove, idx)
+			}
+		}
+		leases.remove(toRemove...)
 		lease.ExpireTime = time.Now().Add(2 * time.Second)
 	}
 	return lease
