@@ -41,6 +41,7 @@ func findLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, 
 		if reservation.Strategy != lease.Strategy ||
 			reservation.Token != lease.Token {
 			lease.Invalidate()
+			store.Save(lease)
 			err = LeaseNAK(fmt.Errorf("Reservation %s (%s:%s conflicts with %s:%s",
 				reservation.Addr,
 				reservation.Strategy,

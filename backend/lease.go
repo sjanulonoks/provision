@@ -158,9 +158,12 @@ func (l *Lease) Expired() bool {
 	return l.ExpireTime.Before(time.Now())
 }
 
+func (l *Lease) Expire() {
+	l.ExpireTime = time.Now()
+}
+
 func (l *Lease) Invalidate() {
 	l.ExpireTime = time.Now().Add(2 * time.Second)
 	l.Token = ""
 	l.Strategy = ""
-	store.Save(l)
 }

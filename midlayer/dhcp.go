@@ -314,8 +314,9 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		lease := backend.AsLease(leaseThing)
 		stratfn := h.Strategy(lease.Strategy)
 		if stratfn != nil && stratfn(p, options) == lease.Token {
-			h.Printf("%s: Lease for %s released, deleting.", xid(p), lease.Addr)
-			h.bk.Remove(lease)
+			h.Printf("%s: Lease for %s released, expiring.", xid(p), lease.Addr)
+			lease.Expire()
+			h.bk.Save(lease)
 		} else {
 			h.Printf("%s: Recieved spoofed release for %s, ignoring", xid(p), lease.Addr)
 		}
