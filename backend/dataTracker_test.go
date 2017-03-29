@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"sort"
 	"testing"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
@@ -34,6 +35,46 @@ func (test *crudTest) Test(t *testing.T) {
 		t.Error(msg)
 		t.Errorf("   err: %v", err)
 	}
+}
+
+func TestDTObjs(t *testing.T) {
+	names := []string{"b", "a", "c", "e", "d", "f", "h", "g", "i"}
+	bs := store.NewSimpleMemoryStore()
+	p := mkDT(bs)
+	dt := p.lockFor("users")
+	for _, name := range names {
+		u := &User{p: p, Name: name}
+		dt.add(u)
+	}
+	if len(dt.d) != len(names) {
+		t.Errorf("Failed to add all %d names, only added %d", len(names), len(dt.d))
+		return
+	}
+	t.Logf("All names added")
+	sort.Strings(names)
+	for i, name := range names {
+		if dt.d[i].Key() != name {
+			t.Errorf("Users not added in order. Expected %s, got %s", name, dt.d[i].Key())
+			return
+		}
+
+	}
+	t.Logf("All names added in order")
+	dt.remove(0, 2, 3, 4, 6, 8)
+	names = []string{"b", "f", "h"}
+	if len(dt.d) != len(names) {
+		t.Errorf("Expected only %d to remain, but %d do", len(names), len(dt.d))
+		return
+	}
+	t.Logf("Only %d names remain", len(dt.d))
+	for i, name := range names {
+		if dt.d[i].Key() != name {
+			t.Errorf("Users not removed properly. Expected %s, got %s", name, dt.d[i].Key())
+			return
+		}
+
+	}
+	t.Logf("Removed names match what was expected to remain")
 }
 
 func loadExample(dt *DataTracker, kind, p string) (bool, error) {
