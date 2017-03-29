@@ -45,20 +45,35 @@ chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 	}
 )
 
+// dtobjs is an in-memory cache of all the objects we could
+// reference. The implementation of this may need to change from
+// storing a slice of things to a more elaborate datastructure at some
+// point in time.  Since that point in time is when the slices are
+// forced out of CPU cache, I am not terribly concerned for now.
+// Until that point is reached, sorting and searching slices is
+// fantastically efficient.
 type dtobjs struct {
 	sync.Mutex
 	d []store.KeySaver
 }
 
+// sort is only used when loading data from the backingStore at
+// startup time.
 func (dt *dtobjs) sort() {
 	sort.Slice(dt.d, func(i, j int) bool { return dt.d[i].Key() < dt.d[j].Key() })
 }
 
+// find assumes that d is sorted.  It returns the index where
+// something with the key should be inserted at, along with a flag
+// indicating whether the object currently at that index has the
+// passed-in key.
 func (dt *dtobjs) find(key string) (int, bool) {
 	idx := sort.Search(len(dt.d), func(i int) bool { return dt.d[i].Key() >= key })
 	return idx, idx < len(dt.d) && dt.d[idx].Key() == key
 }
 
+// subset returns a copy of part of the cached data, based on the
+// search functions passed into subset.
 func (dt *dtobjs) subset(lower, upper func(string) bool) []store.KeySaver {
 	i := sort.Search(len(dt.d), func(i int) bool { return lower(dt.d[i].Key()) })
 	j := sort.Search(len(dt.d), func(i int) bool { return upper(dt.d[i].Key()) })
@@ -70,11 +85,66 @@ func (dt *dtobjs) subset(lower, upper func(string) bool) []store.KeySaver {
 	return res
 }
 
+// add adds a single object to the object cache in such a way that the
+// underlying slice remains sorted without actually needing to resort
+// the slice.
 func (dt *dtobjs) add(obj store.KeySaver) {
-	// This could be smarter and avoid sorting, but I really don't care
-	// right now.
-	dt.d = append(dt.d, obj)
-	dt.sort()
+	idx, found := dt.find(obj.Key())
+	if found {
+		dt.d[idx] = obj
+		return
+	}
+	if idx == len(dt.d) {
+		dt.d = append(dt.d, obj)
+		return
+	}
+	// Grow by one, amortized by append()
+	dt.d = append(dt.d, nil)
+	copy(dt.d[idx+1:], dt.d[idx:])
+	dt.d[idx] = obj
+}
+
+// remove removes the specified entries from the underlying slice
+// while maintaining the overall sort order and minimizing the amount
+// of data that needs to be moved.
+func (dt *dtobjs) remove(idxs ...int) {
+	if len(idxs) == 0 {
+		return
+	}
+	sort.Ints(idxs)
+	lastDT := len(dt.d)
+	lastIdx := len(idxs) - 1
+	// Progressively copy over slices to overwrite entries we are
+	// deleting
+	for i, idx := range idxs {
+		if idx == lastDT-1 {
+			continue
+		}
+		var srcend int
+		if i != lastIdx {
+			srcend = idxs[i+1]
+		} else {
+			srcend = lastDT
+		}
+		// copy(dest, src)
+		copy(dt.d[idx-i:srcend], dt.d[idx+1:srcend])
+	}
+	// Nil out entries that we should garbage collect.  We do this
+	// so that we don't wind up leaking items based on the
+	// underlying arrays still pointing at things we no longer
+	// care about.
+	for i := range idxs {
+		dt.d[lastDT-i-1] = nil
+	}
+	// Resize dt.d to forget about the last elements.  This does
+	// not always resize the underlying array, hence the above
+	// manual GC enablement.
+	//
+	// At some point we may want to manually switch to a smaller
+	// underlying array based on len() vs. cap() for dt.d, but
+	// probably only when we can potentially free a significant
+	// amount of memory by doing so.
+	dt.d = dt.d[:len(dt.d)-len(idxs)]
 }
 
 type dtSetter interface {
@@ -82,18 +152,8 @@ type dtSetter interface {
 	setDT(*DataTracker)
 }
 
-func (dt *dtobjs) remove(idx int) {
-	// This could also try harder to avoid copies, but I am not worrying for now.
-	neu := make([]store.KeySaver, 0, len(dt.d)-1)
-	for i := range dt.d {
-		if i != idx {
-			neu = append(neu, dt.d[i])
-		}
-	}
-	dt.d = neu
-}
-
-// DataTracker represents everything there is to know about acting as a dataTracker.
+// DataTracker represents everything there is to know about acting as
+// a dataTracker.
 type DataTracker struct {
 	FileRoot   string
 	CommandURL string
@@ -106,7 +166,7 @@ type DataTracker struct {
 
 	RebarClient *api.Client
 	// Note the lack of mutexes for these maps.
-	// We shouls be able to get away with not locking them
+	// We should be able to get away with not locking them
 	// by only ever writing to them at DataTracker create time,
 	// and only ever reading from them afterwards.
 	backends       map[string]store.SimpleStore
