@@ -237,6 +237,9 @@ class Subnets extends React.Component {
           for(var key in data) {
             var subnet = data[key];
             subnets[subnet.Name] = subnet;
+            // don't show interfaces if the name matches
+            if (interfaces[subnet.Name] != undefined)
+              delete interfaces[subnet.Name];
           }
 
           resolve({
@@ -462,9 +465,9 @@ class Subnets extends React.Component {
       <h2 style={{display: "flex", flexDirection: "row", alignItems: "center"}}>
         <span>Available Interfaces: </span>
         <span className="interface-list">
-          {this.state.interfaces.map(val => 
-            val.Addresses.map(subval =>
-              <a key={val.Name} className="interface-pair" onClick={()=>this.addSubnet({Name: val.Name, Subnet: subval})}>
+          {this.state.interfaces.map((val) => 
+            val.Addresses.map((subval, i) =>
+              <a key={val.Name+"-"+i} className="interface-pair" onClick={()=>this.addSubnet({Name: val.Name, Subnet: subval})}>
                 <header>{val.Name}</header>
                 <subhead>{subval}</subhead>
               </a>
