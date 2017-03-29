@@ -165,6 +165,13 @@ class Machines extends React.Component {
             <th>Uuid</th>
           </tr>
         </thead>
+        {this.state.machines.map((val, i) =>
+          <Machine
+            machine={val}
+            key={val.Uuid}
+            id={i}
+          />
+        )}
         <tfoot>
           <tr>
             <td colSpan="5" style={{textAlign: "center"}}>
