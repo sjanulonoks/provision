@@ -1,0 +1,16 @@
+#!/bin/bash
+# chkconfig: 2345 90 10
+# description: RocketSkates Provisioner and DHCP server
+PATH="$PATH:/usr/local/bin"
+touch /var/log/rocketskates.log
+case $1 in
+    start)
+        /usr/local/bin/rocket-skates &>>/var/log/rocketskates.log </dev/zero &
+        disown;;
+    stop)
+        pkill rocket-skates;;
+    status)
+        pgrep rocket-skates;;
+esac
+
+        

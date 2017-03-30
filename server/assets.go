@@ -9,7 +9,6 @@ package server
 //go:generate ../tools/build-all-license.sh .. ALL-LICENSE
 //go:generate swagger generate client  -f ../embedded/assets/swagger.json -A RocketSkates --principal User -t ..
 //go:generate env GOOS=linux GOARCH=amd64 go build -o ../embedded/assets/rscli.amd64.linux ../cmds/rscli.go
-//go:generate env GOOS=darwin GOARCH=amd64 go build -o ../embedded/assets/rscli.amd64.darwin ../cmds/rscli.go
 //go:generate go-bindata -prefix ../embedded/assets -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 
 import (
