@@ -113,6 +113,8 @@ func TestMachinePost(t *testing.T) {
 	}
 }
 
+// TODO: TEST MACHINE NAME Duplication error
+
 func TestMachineGet(t *testing.T) {
 	localDTI := testFrontend()
 

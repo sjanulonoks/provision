@@ -53,13 +53,13 @@ func TestServer(t *testing.T) {
 	client := &http.Client{Transport: tr}
 	_, apierr := client.Get("https://127.0.0.1:10001/api/v3/subnets")
 	count := 0
-	for apierr != nil && count < 15 {
+	for apierr != nil && count < 30 {
 		t.Logf("Failed to get file: %v", apierr)
 		time.Sleep(1 * time.Second)
 		count++
 		_, apierr = client.Get("https://127.0.0.1:10001/api/v3/subnets")
 	}
-	if count == 15 {
+	if count == 30 {
 		t.Errorf("Server failed to start in time allowed")
 	}
 
