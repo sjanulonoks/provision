@@ -46,7 +46,7 @@ func TestDTObjs(t *testing.T) {
 		u := &User{p: p, Name: name}
 		dt.add(u)
 	}
-	if len(dt.d) != len(names) {
+	if len(dt.d) != len(names)+1 {
 		t.Errorf("Failed to add all %d names, only added %d", len(names), len(dt.d))
 		return
 	}
@@ -62,7 +62,7 @@ func TestDTObjs(t *testing.T) {
 	t.Logf("All names added in order")
 	dt.remove(0, 2, 3, 4, 6, 8)
 	names = []string{"b", "f", "h"}
-	if len(dt.d) != len(names) {
+	if len(dt.d) != len(names)+1 {
 		t.Errorf("Expected only %d to remain, but %d do", len(names), len(dt.d))
 		return
 	}
