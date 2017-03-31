@@ -55,4 +55,4 @@ for arch in "${arches[@]}"; do
         )
         done
 done
-
+echo "To run tests, run: tools/test.sh"
