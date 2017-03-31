@@ -1,4 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
+if ! [[ -d assets/startup ]]; then
+    echo 'Missing required files to create a RocketSkates install package!'
+    exit 1
+fi
 
 [[ $GOPATH ]] || export GOPATH="$HOME/go"
 fgrep -q "$GOPATH/bin" <<< "$PATH" || export PATH="$PATH:$GOPATH/bin"
@@ -37,8 +41,18 @@ done
 glide install
 rm -rf client models embedded/assets/swagger.json
 go generate server/assets.go
-go build -o rocket-skates cmds/rocket-skates.go
-go build -o rscli cmds/rscli.go
-
+arches=("amd64")
+oses=("linux" "darwin" "windows")
+for arch in "${arches[@]}"; do
+    for os in "${oses[@]}"; do
+        (
+            export GOOS="$os" GOARCH="$arch"
+            echo "Building binaries for ${arch} ${os}"
+            binpath="bin/$os/$arch"
+            mkdir -p "$binpath"
+            go build -o "$binpath/rocket-skates" cmds/rocket-skates.go
+            go build -o "$binpath/rscli" cmds/rscli.go
+        )
+        done
+done
 echo "To run tests, run: tools/test.sh"
-echo "To rebuild after changes, rerun tools/build.sh"

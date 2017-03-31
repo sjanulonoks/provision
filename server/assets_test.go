@@ -24,7 +24,6 @@ func TestExtractAssets(t *testing.T) {
 		"explode_iso.sh",
 		"files/jq",
 		"files/rscli.amd64.linux",
-		"files/rscli.amd64.darwin",
 		"bootia32.efi",
 		"bootia64.efi",
 		"esxi.0",
