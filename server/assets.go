@@ -34,8 +34,7 @@ func ExtractAssets(fileRoot string) error {
 		"ALL-LICENSE": "",
 
 		// CLI things
-		"rscli.amd64.linux":  "files",
-		"rscli.amd64.darwin": "files",
+		"rscli.amd64.linux": "files",
 
 		// General ISO things
 		"explode_iso.sh": "",
