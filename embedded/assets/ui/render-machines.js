@@ -20,7 +20,9 @@ class Machine extends React.Component {
 
   // renders the element
   render() {
+    console.debug(this.props.bootenvs);
     var machine = JSON.parse(JSON.stringify(this.props.machine));
+    console.debug(JSON.stringify(this.props.bootenvs));
     return (
       <tbody 
         className={(machine.updating ? 'updating-content' : '') + " " + (machine._expand ? "expanded" : "")}
@@ -31,6 +33,7 @@ class Machine extends React.Component {
         }}>
         <tr>
           <td>
+    {this.props.bootenvs.length}
             {machine.Name}
           </td>
           <td>
@@ -38,6 +41,16 @@ class Machine extends React.Component {
           </td>
           <td>
             {machine.BootEnv}
+            <select
+              name="BootEnv"
+              type="bool"
+              value={machine.BootEnv}
+              onChange={this.handleChange}>
+                { bootenvs.map((val) =>
+                  <option value={val}>{val}</option>
+                )}
+            </select>
+            {bootenvs.length}
           </td>
           <td>
             {machine.Description}
@@ -56,7 +69,9 @@ class Machines extends React.Component {
     super(props);
 
     this.state = {
-      machines: []
+      machines: [],
+      // hack for now.  ideally, we'd pull this from the bootenvs!
+      bootenvs: []
     };
 
     this.componentDidMount = this.componentDidMount.bind(this);
@@ -66,11 +81,22 @@ class Machines extends React.Component {
   // gets the machine json from the api
   getMachines() {
     return new Promise((resolve, reject) => {
+      var bootenvs = [];
 
       // get the interfaces from the api
       $.getJSON("../api/v3/machines", data => {
+
+        // add get bootenvs from the api and update the state
+        $.getJSON("../api/v3/bootenvs", data2 => {
+          for(var key in data2) {
+            if (data2[key].Available)
+              bootenvs.push(data2[key].Name)
+          }
+        });
+
         resolve({
           machines: data,
+          bootenvs: bootenvs,
         });
       }).fail(() => {
         reject("Failed getting Machines");
@@ -84,6 +110,7 @@ class Machines extends React.Component {
     this.getMachines().then(data => {
       this.setState({
         machines: data.machines,
+        bootenvs: data.bootenvs
       }, err => {
         // rejected ?? 
       });
@@ -109,7 +136,7 @@ class Machines extends React.Component {
       data: JSON.stringify(machine)
     }).done((resp) => {
       
-      // update the machines list with our new interface
+      // update the machines list with our new machine
       var machines = this.state.machines.concat([]);
 
       resp.updating = false;
@@ -121,7 +148,8 @@ class Machines extends React.Component {
       //  update the state
       machines[i] = resp;
       this.setState({
-        machines: machines
+        machines: machines,
+        bootenvs: bootenvs
       });
 
     }).fail((err) => {
@@ -140,7 +168,8 @@ class Machines extends React.Component {
       }
 
       this.setState({
-        machines: machines
+        machines: machines,
+        bootenvs: bootenvs
       });
     });
   }
@@ -168,7 +197,8 @@ class Machines extends React.Component {
         {this.state.machines.map((val, i) =>
           <Machine
             machine={val}
-            key={val.Uuid}
+            bootenvs={this.state.bootenvs}
+            key={i}
             id={i}
           />
         )}
