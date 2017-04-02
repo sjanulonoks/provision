@@ -34,6 +34,7 @@ func addToCache(local, remote net.IP) {
 		return
 	}
 	if addrCache[idx].remote.Equal(remote) {
+		addrCache[idx].local = local
 		addrCache[idx].unused = false
 		return
 	}
