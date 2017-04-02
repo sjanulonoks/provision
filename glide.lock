@@ -106,7 +106,7 @@ imports:
 - name: github.com/pborman/uuid
   version: 1b00554d822231195d1babd97ff4a781231955c9
 - name: github.com/pin/tftp
-  version: 406b1e82684eadd8d765bc42659f000e9ff8e11a
+  version: 1869b2e50f8da16313700caa4a68a6877fbd65f4
   repo: https://github.com/VictorLowther/tftp
   subpackages:
   - netascii
