@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/pin/tftp"
+	"github.com/rackn/rocket-skates/backend"
 )
 
 func ServeTftp(listen, fileRoot string, logger *log.Logger) error {
@@ -39,7 +40,7 @@ func ServeTftp(listen, fileRoot string, logger *log.Logger) error {
 			local := t.LocalIP()
 			if local != nil && !local.IsUnspecified() {
 				remote := t.RemoteAddr()
-				addToCache(local, remote.IP)
+				backend.AddToCache(local, remote.IP)
 			}
 			// Need to add a function to add to the remote -> local IP cache
 			if fi, err := file.Stat(); err == nil {

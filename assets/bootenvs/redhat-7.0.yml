@@ -1,4 +1,4 @@
-BootParams: ksdevice=bootif ks={{.Machine.Url}}/compute.ks method={{.Env.OS.InstallUrl}}
+BootParams: ksdevice=bootif ks={{.Machine.Url}}/compute.ks method={{.Env.InstallUrl}}
   inst.geoloc=0
 Initrds:
 - images/pxeboot/initrd.img

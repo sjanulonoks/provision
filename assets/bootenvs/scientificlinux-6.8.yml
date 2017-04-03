@@ -1,4 +1,4 @@
-BootParams: ksdevice=bootif ks={{.Machine.Url}}/compute.ks method={{.Env.OS.InstallUrl}}
+BootParams: ksdevice=bootif ks={{.Machine.Url}}/compute.ks method={{.Env.InstallUrl}}
 Initrds:
 - images/pxeboot/initrd.img
 Kernel: images/pxeboot/vmlinuz

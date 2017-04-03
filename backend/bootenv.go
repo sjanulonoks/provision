@@ -80,8 +80,7 @@ type OsInfo struct {
 	// The URL that the ISO can be downloaded from, if any.
 	//
 	// swagger:strfmt uri
-	IsoUrl     string
-	InstallUrl string `json:"-"`
+	IsoUrl string
 }
 
 // BootEnv encapsulates the machine-agnostic information needed by the
@@ -147,34 +146,19 @@ func (b *BootEnv) Backend() store.SimpleStore {
 	return b.p.getBackend(b)
 }
 
-// PathFor expands the partial paths for kernels and initrds into full
-// paths appropriate for specific protocols.
-//
-// proto can be one of 3 choices:
-//    http: Will expand to the URL the file can be accessed over.
-//    tftp: Will expand to the path the file can be accessed at via TFTP.
-//    disk: Will expand to the path of the file inside the provisioner container.
-func (b *BootEnv) PathFor(proto, f string) string {
+func (b *BootEnv) pathFor(f string) string {
 	res := b.OS.Name
 	if strings.HasSuffix(b.Name, "-install") {
 		res = path.Join(res, "install")
 	}
-	tail := path.Join(res, f)
-	switch proto {
-	case "disk":
-		return path.Join(b.p.FileRoot, tail)
-	case "tftp":
-		return tail
-	case "http":
-		return b.p.FileURL + "/" + tail
-	default:
-		b.p.Logger.Fatalf("Unknown protocol %v", proto)
-	}
-	return ""
+	return path.Clean(path.Join(res, f))
+}
+
+func (b *BootEnv) localPathFor(f string) string {
+	return path.Join(b.p.FileRoot, b.pathFor(f))
 }
 
 func (b *BootEnv) parseTemplates(e *Error) {
-	b.OS.InstallUrl = b.p.FileURL + "/" + path.Join(b.OS.Name, "install")
 	for i := range b.Templates {
 		ti := &b.Templates[i]
 		if ti.Name == "" {
@@ -225,15 +209,6 @@ func (b *BootEnv) OnLoad() error {
 	return nil
 }
 
-// JoinInitrds joins the fully expanded initrd paths into a comma-separated string.
-func (b *BootEnv) JoinInitrds(proto string) string {
-	fullInitrds := make([]string, len(b.Initrds))
-	for i, initrd := range b.Initrds {
-		fullInitrds[i] = b.PathFor(proto, initrd)
-	}
-	return strings.Join(fullInitrds, " ")
-}
-
 func (b *BootEnv) Prefix() string {
 	return "bootenvs"
 }
@@ -257,7 +232,7 @@ func (b *BootEnv) explodeIso(e *Error) {
 		return
 	}
 	// Have we already exploded this?  If file exists, then good!
-	canaryPath := b.PathFor("disk", "."+b.OS.Name+".rebar_canary")
+	canaryPath := b.localPathFor("." + b.OS.Name + ".rebar_canary")
 	buf, err := ioutil.ReadFile(canaryPath)
 	if err == nil && len(buf) != 0 && string(bytes.TrimSpace(buf)) == b.OS.IsoSha256 {
 		b.p.Logger.Printf("Explode ISO: canary file %s, in place and has proper SHA256\n", canaryPath)
@@ -299,7 +274,7 @@ func (b *BootEnv) explodeIso(e *Error) {
 	// Call extract script
 	// /explode_iso.sh b.OS.Name fileRoot isoPath path.Dir(canaryPath)
 	cmdName := path.Join(b.p.FileRoot, "explode_iso.sh")
-	cmdArgs := []string{b.OS.Name, b.p.FileRoot, isoPath, b.PathFor("disk", ""), b.OS.IsoSha256}
+	cmdArgs := []string{b.OS.Name, b.p.FileRoot, isoPath, b.localPathFor(""), b.OS.IsoSha256}
 	if out, err := exec.Command(cmdName, cmdArgs...).Output(); err != nil {
 		e.Errorf("Explode ISO: explode_iso.sh failed for %s: %s", b.Name, err)
 		e.Errorf("Command output:\n%s", string(out))
@@ -348,7 +323,7 @@ func (b *BootEnv) BeforeSave() error {
 	}
 	// If we have a non-empty Kernel, make sure it points at something kernel-ish.
 	if b.Kernel != "" {
-		kPath := b.PathFor("disk", b.Kernel)
+		kPath := b.localPathFor(b.Kernel)
 		kernelStat, err := os.Stat(kPath)
 		if err != nil {
 			e.Errorf("bootenv: %s: missing kernel %s (%s)",
@@ -365,7 +340,7 @@ func (b *BootEnv) BeforeSave() error {
 	// Ditto for all the initrds.
 	if len(b.Initrds) > 0 {
 		for _, initrd := range b.Initrds {
-			iPath := b.PathFor("disk", initrd)
+			iPath := b.localPathFor(initrd)
 			initrdStat, err := os.Stat(iPath)
 			if err != nil {
 				e.Errorf("bootenv: %s: missing initrd %s (%s)",

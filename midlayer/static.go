@@ -4,6 +4,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+
+	"github.com/rackn/rocket-skates/backend"
 )
 
 func ServeStatic(listenAt, fsPath string, logger *log.Logger) error {
@@ -19,7 +21,7 @@ func ServeStatic(listenAt, fsPath string, logger *log.Logger) error {
 			laddr, lok := n.LocalAddr().(*net.TCPAddr)
 			raddr, rok := n.RemoteAddr().(*net.TCPAddr)
 			if lok && rok && cs == http.StateActive {
-				addToCache(laddr.IP, raddr.IP)
+				backend.AddToCache(laddr.IP, raddr.IP)
 			}
 			return
 		},

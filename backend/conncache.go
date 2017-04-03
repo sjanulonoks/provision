@@ -1,4 +1,4 @@
-package midlayer
+package backend
 
 import (
 	"math/big"
@@ -22,7 +22,7 @@ func a2i(n net.IP) *big.Int {
 var addrCache = []cacheLine{}
 var addrCacheMux = &sync.RWMutex{}
 
-func addToCache(local, remote net.IP) {
+func AddToCache(local, remote net.IP) {
 	if local == nil || remote == nil {
 		return
 	}
@@ -49,6 +49,9 @@ func addToCache(local, remote net.IP) {
 // LocalFor returns the local IP address that has responded
 // to TFTP or HTTP requests for the given remote IP.
 func LocalFor(remote net.IP) net.IP {
+	if remote == nil || remote.IsUnspecified() {
+		return nil
+	}
 	addrCacheMux.RLock()
 	defer addrCacheMux.RUnlock()
 	key := a2i(remote)

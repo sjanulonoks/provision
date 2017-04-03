@@ -62,10 +62,6 @@ func (n *Machine) UUID() string {
 	return n.Uuid.String()
 }
 
-func (n *Machine) Url() string {
-	return n.p.FileURL + "/" + n.Path()
-}
-
 func (n *Machine) Prefix() string {
 	return "machines"
 }
@@ -120,7 +116,7 @@ func (n *Machine) BeforeSave() error {
 		if !env.Available {
 			e.Errorf("Machine %s wants BootEnv %s, which is not available", n.UUID(), n.BootEnv)
 		} else {
-			n.toRender = &RenderData{Machine: n, Env: env, p: n.p}
+			n.toRender = n.p.NewRenderData(n, env)
 			n.toRender.render(e)
 			n.toRender.mkPaths(e)
 		}
@@ -133,7 +129,7 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	old := AsMachine(oldThing)
 	be, found := n.p.fetchOne(n.p.NewBootEnv(), old.BootEnv)
 	if found {
-		n.toRemove = &RenderData{Machine: n, Env: AsBootEnv(be), p: n.p}
+		n.toRemove = n.p.NewRenderData(n, AsBootEnv(be))
 		n.toRemove.render(e)
 	}
 	return e.OrNil()
@@ -161,7 +157,7 @@ func (n *Machine) BeforeDelete() error {
 		e.Errorf("Unable to find boot environment %s", n.BootEnv)
 		return e
 	}
-	n.toRemove = &RenderData{Machine: n, Env: AsBootEnv(b), p: n.p}
+	n.toRemove = n.p.NewRenderData(n, AsBootEnv(b))
 	n.toRemove.render(e)
 	return e.OrNil()
 }

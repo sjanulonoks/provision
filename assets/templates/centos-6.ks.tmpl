@@ -1,8 +1,8 @@
 # Rocket Skates Centos-6 (and related distros) kickstart
 install
-url --url {{ .Env.OS.InstallUrl }}
+url --url {{ .Env.InstallUrl }}
 # Add support for our local proxy.
-repo --name="CentOS"  --baseurl={{ .Env.OS.InstallUrl }} {{if .ParamExists "proxy-servers"}} --proxy="{{index (.Param "proxy-servers") 0 "url"}}"{{end}} --cost=100
+repo --name="CentOS"  --baseurl={{ .Env.InstallUrl }} {{if .ParamExists "proxy-servers"}} --proxy="{{index (.Param "proxy-servers") 0 "url"}}"{{end}} --cost=100
 key --skip
 lang en_US.UTF-8
 keyboard us
@@ -55,7 +55,7 @@ export PS4='${BASH_SOURCE}@${LINENO}(${FUNCNAME[0]}): '
 cat >/etc/yum.repos.d/00-rebar-base.repo <<EOF
 [rebar-base]
 name=Rocket Skates Base Repo
-baseurl={{.Env.OS.InstallUrl}}
+baseurl={{.Env.InstallUrl}}
 gpgcheck=0
 EOF
 
