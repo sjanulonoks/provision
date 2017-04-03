@@ -113,9 +113,9 @@ func Server(c_opts *ProgOpts) {
 	dt := backend.NewDataTracker(backendStore,
 		c_opts.FileRoot,
 		c_opts.CommandURL,
-		fmt.Sprintf("http://%s:%d", c_opts.OurAddress, c_opts.StaticPort),
-		fmt.Sprintf("https://%s:%d", c_opts.OurAddress, c_opts.ApiPort),
 		c_opts.OurAddress,
+		c_opts.StaticPort,
+		c_opts.ApiPort,
 		logger,
 		map[string]string{
 			"defaultBootEnv": c_opts.DefaultBootEnv,

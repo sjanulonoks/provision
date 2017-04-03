@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"sort"
+	"strconv"
 	"sync"
 
 	"github.com/VictorLowther/jsonpatch2"
@@ -155,16 +157,12 @@ type dtSetter interface {
 // DataTracker represents everything there is to know about acting as
 // a dataTracker.
 type DataTracker struct {
-	FileRoot   string
-	CommandURL string
-	OurAddress string
-
-	FileURL string
-	ApiURL  string
-
-	Logger *log.Logger
-
-	RebarClient *api.Client
+	FileRoot            string
+	CommandURL          string
+	OurAddress          string
+	StaticPort, ApiPort int
+	Logger              *log.Logger
+	RebarClient         *api.Client
 	// Note the lack of mutexes for these maps.
 	// We should be able to get away with not locking them
 	// by only ever writing to them at DataTracker create time,
@@ -173,6 +171,29 @@ type DataTracker struct {
 	objs           map[string]*dtobjs
 	defaultPrefs   map[string]string
 	defaultBootEnv string
+}
+
+func (p *DataTracker) LocalIP(remote net.IP) string {
+	if localIP := LocalFor(remote); localIP != nil {
+		return localIP.String()
+	}
+	// Determining what this is needs to be made smarter, probably by
+	// firguing out which interface the default route goes over for ipv4
+	// then ipv6, and then figurig out the appropriate address on that
+	// interface
+	return p.OurAddress
+}
+
+func (p *DataTracker) urlFor(scheme string, remoteIP net.IP, port int) string {
+	return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(p.LocalIP(remoteIP), strconv.Itoa(port)))
+}
+
+func (p *DataTracker) FileURL(remoteIP net.IP) string {
+	return p.urlFor("http", remoteIP, p.StaticPort)
+}
+
+func (p *DataTracker) ApiURL(remoteIP net.IP) string {
+	return p.urlFor("https", remoteIP, p.ApiPort)
 }
 
 func (p *DataTracker) lockFor(prefix string) *dtobjs {
@@ -208,15 +229,16 @@ func (p *DataTracker) loadData(refObjs []store.KeySaver) error {
 
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.SimpleStore,
-	fileRoot, commandURL, furl, aurl, addr string,
+	fileRoot, commandURL, addr string,
+	staticPort, apiPort int,
 	logger *log.Logger,
 	defaultPrefs map[string]string) *DataTracker {
 
 	res := &DataTracker{
 		FileRoot:     fileRoot,
 		CommandURL:   commandURL,
-		FileURL:      furl,
-		ApiURL:       aurl,
+		StaticPort:   staticPort,
+		ApiPort:      apiPort,
 		OurAddress:   addr,
 		Logger:       logger,
 		backends:     map[string]store.SimpleStore{},
@@ -319,7 +341,7 @@ func (p *DataTracker) RenderUnknown() error {
 		err.containsError = true
 		return err
 	}
-	r := &RenderData{p: p, Env: env}
+	r := p.NewRenderData(nil, env)
 	r.render(err)
 	r.mkPaths(err)
 	if !err.containsError {

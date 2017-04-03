@@ -22,6 +22,7 @@ import:
   - api
 - package: github.com/jessevdk/go-flags
 - package: github.com/pin/tftp
+  repo: https://github.com/VictorLowther/tftp
 - package: github.com/pborman/uuid
 - package: github.com/tylerb/graceful
 - package: github.com/elithrar/simple-scrypt

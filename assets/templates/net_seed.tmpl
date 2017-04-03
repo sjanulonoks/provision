@@ -20,9 +20,9 @@ d-i mirror/protocol string http
 d-i mirror/http/hostname string http.us.debian.org
 d-i mirror/http/directory string /debian
 {{else}}
-d-i mirror/protocol string {{.ParseUrl "scheme" .Env.OS.InstallUrl}}
-d-i mirror/http/hostname string {{.ParseUrl "host" .Env.OS.InstallUrl}}
-d-i mirror/http/directory string {{.ParseUrl "path" .Env.OS.InstallUrl}}
+d-i mirror/protocol string {{.ParseUrl "scheme" .Env.InstallUrl}}
+d-i mirror/http/hostname string {{.ParseUrl "host" .Env.InstallUrl}}
+d-i mirror/http/directory string {{.ParseUrl "path" .Env.InstallUrl}}
 {{end}}
 {{if .ParamExists "proxy-servers"}}
 d-i mirror/http/proxy string {{index (.Param "proxy-servers") 0 "url"}}
@@ -66,7 +66,7 @@ d-i partman/auto expert_recipe string \
       10240 20 10240 ext4 $lvmok{ } mountpoint{ / } lv_name{ root } in_vg{ {{ .Machine.ShortName }} } method{ format } format{ } use_filesystem{ } filesystem{ ext4 } . \
       50% 20 100% linux-swap $lvmok{ } lv_name{ swap } in_vg{ {{ .Machine.ShortName }} } method{ swap } format{ } .
 {{if (and (eq "ubuntu" .Env.OS.Family)  (lt "12.10" .Env.OS.Version))}}
-d-i live-installer/net-image string {{.Env.OS.InstallUrl}}/install/filesystem.squashfs
+d-i live-installer/net-image string {{.Env.InstallUrl}}/install/filesystem.squashfs
 {{end}}
 d-i passwd/user-fullname string {{if .ParamExists "provisioner-default-user"}}{{ .Param "provisioner-default-user" }}{{else}}rocketskates{{end}}
 d-i passwd/username string {{if .ParamExists "provisioner-default-user"}}{{ .Param "provisioner-default-user" }}{{else}}rocketskates{{end}}

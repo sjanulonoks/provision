@@ -4,6 +4,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+
+	"github.com/rackn/rocket-skates/backend"
 )
 
 func ServeStatic(listenAt, fsPath string, logger *log.Logger) error {
@@ -12,9 +14,20 @@ func ServeStatic(listenAt, fsPath string, logger *log.Logger) error {
 		return err
 	}
 	fs := http.FileServer(http.Dir(fsPath))
-	http.Handle("/", fs)
+	svr := &http.Server{
+		Addr:    listenAt,
+		Handler: fs,
+		ConnState: func(n net.Conn, cs http.ConnState) {
+			laddr, lok := n.LocalAddr().(*net.TCPAddr)
+			raddr, rok := n.RemoteAddr().(*net.TCPAddr)
+			if lok && rok && cs == http.StateActive {
+				backend.AddToCache(laddr.IP, raddr.IP)
+			}
+			return
+		},
+	}
 	go func() {
-		if err := http.Serve(conn, nil); err != nil {
+		if err := svr.Serve(conn); err != nil {
 			logger.Fatalf("Static HTTP server error %v", err)
 		}
 	}()

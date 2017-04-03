@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 // RenderTemplate is the result of rendering a BootEnv template
@@ -38,6 +39,51 @@ func (r *renderedTemplate) write(e *Error) {
 	tmplDest.Sync()
 }
 
+type rMachine struct {
+	*Machine
+}
+
+func (n *rMachine) Url() string {
+	return n.p.FileURL(nil) + "/" + n.Path()
+}
+
+type rBootEnv struct {
+	*BootEnv
+}
+
+// PathFor expands the partial paths for kernels and initrds into full
+// paths appropriate for specific protocols.
+//
+// proto can be one of 3 choices:
+//    http: Will expand to the URL the file can be accessed over.
+//    tftp: Will expand to the path the file can be accessed at via TFTP.
+//    disk: Will expand to the path of the file inside the provisioner container.
+func (b *rBootEnv) PathFor(proto, f string) string {
+	tail := b.pathFor(f)
+	switch proto {
+	case "tftp":
+		return tail
+	case "http":
+		return b.p.FileURL(nil) + "/" + tail
+	default:
+		b.p.Logger.Fatalf("Unknown protocol %v", proto)
+	}
+	return ""
+}
+
+func (b *rBootEnv) InstallUrl() string {
+	return b.p.FileURL(nil) + "/" + path.Join(b.OS.Name, "install")
+}
+
+// JoinInitrds joins the fully expanded initrd paths into a comma-separated string.
+func (b *rBootEnv) JoinInitrds(proto string) string {
+	fullInitrds := make([]string, len(b.Initrds))
+	for i, initrd := range b.Initrds {
+		fullInitrds[i] = b.PathFor(proto, initrd)
+	}
+	return strings.Join(fullInitrds, " ")
+}
+
 func (r *renderedTemplate) remove(e *Error) {
 	if r.Path != "" {
 		if err := os.Remove(r.Path); err != nil {
@@ -49,18 +95,29 @@ func (r *renderedTemplate) remove(e *Error) {
 // RenderData is the struct that is passed to templates as a source of
 // parameters and useful methods.
 type RenderData struct {
-	Machine           *Machine // The Machine that the template is being rendered for.
-	Env               *BootEnv // The boot environment that provided the template.
+	Machine           *rMachine // The Machine that the template is being rendered for.
+	Env               *rBootEnv // The boot environment that provided the template.
 	renderedTemplates []renderedTemplate
 	p                 *DataTracker
 }
 
+func (p *DataTracker) NewRenderData(m *Machine, e *BootEnv) *RenderData {
+	res := &RenderData{p: p}
+	if m != nil {
+		res.Machine = &rMachine{Machine: m}
+	}
+	if e != nil {
+		res.Env = &rBootEnv{BootEnv: e}
+	}
+	return res
+}
+
 func (r *RenderData) ProvisionerAddress() string {
-	return r.p.OurAddress
+	return r.p.LocalIP(nil)
 }
 
 func (r *RenderData) ProvisionerURL() string {
-	return r.p.FileURL
+	return r.p.FileURL(nil)
 }
 
 func (r *RenderData) CommandURL() string {
@@ -68,7 +125,7 @@ func (r *RenderData) CommandURL() string {
 }
 
 func (r *RenderData) ApiURL() string {
-	return r.p.ApiURL
+	return r.p.ApiURL(nil)
 }
 
 // BootParams is a helper function that expands the BootParams

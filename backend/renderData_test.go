@@ -40,7 +40,7 @@ Name = default
 
 RenderData:
 ProvisionerAddress = 127.0.0.1
-ProvisionerURL = FURL
+ProvisionerURL = http://127.0.0.1:8091
 CommandURL = CURL
 BootParams = default`
 	tmplDefaultRenderedWithFred = `Machine: 
@@ -56,7 +56,7 @@ fred = fred
 
 RenderData:
 ProvisionerAddress = 127.0.0.1
-ProvisionerURL = FURL
+ProvisionerURL = http://127.0.0.1:8091
 CommandURL = CURL
 BootParams = default`
 	tmplNothing = `Nothing`
