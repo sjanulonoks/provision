@@ -23,6 +23,9 @@ var addrCache = []cacheLine{}
 var addrCacheMux = &sync.RWMutex{}
 
 func addToCache(local, remote net.IP) {
+	if local == nil || remote == nil {
+		return
+	}
 	addrCacheMux.Lock()
 	defer addrCacheMux.Unlock()
 	key := a2i(remote)

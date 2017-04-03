@@ -36,9 +36,11 @@ func ServeTftp(listen, fileRoot string, logger *log.Logger) error {
 			return err
 		}
 		if t, ok := rf.(tftp.OutgoingTransfer); ok {
-			local := t.LocalAddr()
-			remote := t.RemoteAddr()
-			addToCache(local, remote.IP)
+			local := t.LocalIP()
+			if local != nil && !local.IsUnspecified() {
+				remote := t.RemoteAddr()
+				addToCache(local, remote.IP)
+			}
 			// Need to add a function to add to the remote -> local IP cache
 			if fi, err := file.Stat(); err == nil {
 				t.SetSize(fi.Size())
