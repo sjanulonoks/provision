@@ -92,6 +92,7 @@ func NewDefaultAuthSource(dt DTI) (das AuthSource) {
 }
 
 func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
+	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {
 		authSource = NewDefaultAuthSource(dt)

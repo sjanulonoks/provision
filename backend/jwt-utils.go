@@ -27,8 +27,7 @@ type JwtManager struct {
 }
 
 // New creates a new Manager which provides JWTs using the given signing key.
-// Defaults to signing with SHA256 HMAC (jwt.SigningMethodHS256) and expiring
-// tokens after 1 week.
+// Defaults to signing with SHA256 HMAC (jwt.SigningMethodHS256)
 func NewJwtManager(key []byte, configs ...JwtConfig) *JwtManager {
 	var c JwtConfig
 	if len(configs) == 0 {
