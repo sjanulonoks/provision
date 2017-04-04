@@ -24,12 +24,15 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 		var local net.IP
 		var remote net.UDPAddr
 		t, outgoing := rf.(tftp.OutgoingTransfer)
+		rpi, haveRPI := rf.(tftp.RequestPacketInfo)
+		if outgoing && haveRPI {
+			local = rpi.LocalIP()
+		}
 		if outgoing {
-			local = t.LocalIP()
-			if local != nil && !local.IsUnspecified() {
-				remote = t.RemoteAddr()
-				backend.AddToCache(local, remote.IP)
-			}
+			remote = t.RemoteAddr()
+		}
+		if outgoing && haveRPI {
+			backend.AddToCache(local, remote.IP)
 		}
 		source, err := responder(filename, remote.IP)
 		if err != nil {
