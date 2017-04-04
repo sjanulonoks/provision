@@ -7,6 +7,13 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
+func TestRandString(t *testing.T) {
+	r := randString(16)
+	if len(r) != 16 {
+		t.Errorf("Random string should be 16 bytes long: %s\n", r)
+	}
+}
+
 func TestJWTUtils(t *testing.T) {
 	testkey := "testhashkey01234testhashkey01234"
 	jwtManager := NewJwtManager([]byte(testkey))
