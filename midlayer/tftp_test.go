@@ -9,11 +9,13 @@ import (
 	"testing"
 
 	"github.com/pin/tftp"
+	"github.com/rackn/rocket-skates/backend"
 )
 
 func TestTftpFiles(t *testing.T) {
-
-	hh := ServeTftp(":3235235", ".", log.New(os.Stderr, "", log.LstdFlags))
+	logger := log.New(os.Stderr, "", log.LstdFlags)
+	fs := backend.NewFS(".", logger)
+	hh := ServeTftp(":3235235", fs.TftpResponder(), logger)
 	if hh != nil {
 		if hh.Error() != "address 3235235: invalid port" {
 			t.Errorf("Expected a different error: %v", hh.Error())
@@ -22,7 +24,7 @@ func TestTftpFiles(t *testing.T) {
 		t.Errorf("Should have returned an error")
 	}
 
-	hh = ServeTftp("1.1.1.1:11112", ".", log.New(os.Stderr, "", log.LstdFlags))
+	hh = ServeTftp("1.1.1.1:11112", fs.TftpResponder(), logger)
 	if hh != nil {
 		if !strings.Contains(hh.Error(), "listen udp 1.1.1.1:11112: bind: ") {
 			t.Errorf("Expected a different error: %v", hh.Error())
@@ -35,7 +37,8 @@ func TestTftpFiles(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	hh = ServeTftp("127.0.0.1:11112", dir, log.New(os.Stderr, "", log.LstdFlags))
+	fs = backend.NewFS(dir, logger)
+	hh = ServeTftp("127.0.0.1:11112", fs.TftpResponder(), logger)
 	if hh != nil {
 		t.Errorf("Should not return an error: %v", hh)
 	} else {
@@ -69,18 +72,7 @@ func TestTftpFiles(t *testing.T) {
 
 		wt, err = c.Receive("../bootenv.go", "octet")
 		if err != nil {
-			s := fmt.Sprintf("code: 1, message: Filename ../bootenv.go tries to escape root %s", dir)
-			s1 := err.Error()
-			if !strings.Contains(s1, s) {
-				t.Errorf("tftpClient receive: Should have returned the error: \n%s\n%s\n", s, s1)
-			}
-		} else {
-			t.Errorf("tftpClient receive: Should return an error: %v", err)
-		}
-
-		wt, err = c.Receive("../dhcp.go", "octet")
-		if err != nil {
-			s := fmt.Sprintf("code: 1, message: Filename ../dhcp.go tries to escape root %s", dir)
+			s := fmt.Sprintf("code: 1, message: open %s/bootenv.go: no such file or directory", dir)
 			s1 := err.Error()
 			if !strings.Contains(s1, s) {
 				t.Errorf("tftpClient receive: Should have returned the error: \n%s\n%s\n", s, s1)

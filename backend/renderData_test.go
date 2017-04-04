@@ -87,8 +87,13 @@ func TestRenderData(t *testing.T) {
 	} else {
 		t.Logf("Created new test machine")
 	}
-	genLoc := path.Join(dt.FileRoot, "machines", machine.UUID(), "file")
-	buf, err := ioutil.ReadFile(genLoc)
+	genLoc := path.Join("/", "machines", machine.UUID(), "file")
+	out, err := dt.FS.Open(genLoc, nil)
+	if err != nil || out == nil {
+		t.Errorf("Failed to get tmeplate for %s: %v\n%#v", genLoc, err, out)
+		return
+	}
+	buf, err := ioutil.ReadAll(out)
 	if err != nil {
 		t.Errorf("Failed to read %s: %v", genLoc, err)
 	} else if string(buf) != tmplDefaultRenderedWithoutFred {
@@ -102,7 +107,11 @@ func TestRenderData(t *testing.T) {
 	if !saved {
 		t.Errorf("Failed to save test machine with new bootenv: %v", err)
 	}
-	buf, err = ioutil.ReadFile(genLoc)
+	out, err = dt.FS.Open(genLoc, nil)
+	if err != nil {
+		t.Errorf("Failed to get tmeplate for %s: %v", genLoc, err)
+	}
+	buf, err = ioutil.ReadAll(out)
 	if err != nil {
 		t.Errorf("Failed to read %s: %v", genLoc, err)
 	} else if string(buf) != tmplDefaultRenderedWithFred {
@@ -116,7 +125,11 @@ func TestRenderData(t *testing.T) {
 	if !saved {
 		t.Errorf("Failed to save test machine with new bootenv: %v", err)
 	}
-	buf, err = ioutil.ReadFile(genLoc)
+	out, err = dt.FS.Open(genLoc, nil)
+	if err != nil {
+		t.Errorf("Failed to get tmeplate for %s: %v", genLoc, err)
+	}
+	buf, err = ioutil.ReadAll(out)
 	if err != nil {
 		t.Errorf("Failed to read %s: %v", genLoc, err)
 	} else if string(buf) != tmplNothing {

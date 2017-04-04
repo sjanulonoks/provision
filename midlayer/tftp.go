@@ -1,19 +1,17 @@
 package midlayer
 
 import (
-	"fmt"
+	"bytes"
 	"io"
 	"log"
 	"net"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/pin/tftp"
 	"github.com/rackn/rocket-skates/backend"
 )
 
-func ServeTftp(listen, fileRoot string, logger *log.Logger) error {
+func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error), logger *log.Logger) error {
 	a, err := net.ResolveUDPAddr("udp", listen)
 	if err != nil {
 		return err
@@ -23,36 +21,38 @@ func ServeTftp(listen, fileRoot string, logger *log.Logger) error {
 		return err
 	}
 	svr := tftp.NewServer(func(filename string, rf io.ReaderFrom) error {
-		p := filepath.Join(fileRoot, filename)
-		p = filepath.Clean(p)
-		if !strings.HasPrefix(p, fileRoot+string(filepath.Separator)) {
-			err := fmt.Errorf("Filename %s tries to escape root %s", filename, fileRoot)
-			logger.Println(err)
-			return err
-		}
-		logger.Printf("Sending %s from %s", filename, p)
-		file, err := os.Open(p)
-		if err != nil {
-			logger.Println(err)
-			return err
-		}
-		if t, ok := rf.(tftp.OutgoingTransfer); ok {
-			local := t.LocalIP()
+		var local net.IP
+		var remote net.UDPAddr
+		t, outgoing := rf.(tftp.OutgoingTransfer)
+		if outgoing {
+			local = t.LocalIP()
 			if local != nil && !local.IsUnspecified() {
-				remote := t.RemoteAddr()
+				remote = t.RemoteAddr()
 				backend.AddToCache(local, remote.IP)
 			}
-			// Need to add a function to add to the remote -> local IP cache
-			if fi, err := file.Stat(); err == nil {
-				t.SetSize(fi.Size())
-			}
 		}
-		n, err := rf.ReadFrom(file)
+		source, err := responder(filename, remote.IP)
+		if err != nil {
+			return err
+		}
+		if outgoing {
+			var size int64
+			switch src := source.(type) {
+			case *os.File:
+				defer src.Close()
+				if fi, err := src.Stat(); err == nil {
+					size = fi.Size()
+				}
+			case *bytes.Reader:
+				size = src.Size()
+			}
+			t.SetSize(size)
+		}
+		_, err = rf.ReadFrom(source)
 		if err != nil {
 			logger.Println(err)
 			return err
 		}
-		logger.Printf("%d bytes sent\n", n)
 		return nil
 	}, nil)
 

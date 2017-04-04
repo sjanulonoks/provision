@@ -162,6 +162,7 @@ type DataTracker struct {
 	OurAddress          string
 	StaticPort, ApiPort int
 	Logger              *log.Logger
+	FS                  *FileSystem
 	RebarClient         *api.Client
 	// Note the lack of mutexes for these maps.
 	// We should be able to get away with not locking them
@@ -243,6 +244,7 @@ func NewDataTracker(backend store.SimpleStore,
 		Logger:       logger,
 		backends:     map[string]store.SimpleStore{},
 		defaultPrefs: defaultPrefs,
+		FS:           NewFS(fileRoot, logger),
 	}
 	objs := []store.KeySaver{
 		&Machine{p: res},
@@ -261,6 +263,21 @@ func NewDataTracker(backend store.SimpleStore,
 		res.Save(ignoreBoot)
 	}
 	res.defaultBootEnv = defaultPrefs["defaultBootEnv"]
+	machines := res.lockFor("machines")
+	for i := range machines.d {
+		machine := AsMachine(machines.d[i])
+		be, found := res.fetchOne(res.NewBootEnv(), machine.BootEnv)
+		if !found {
+			continue
+		}
+		err := &Error{o: machine}
+		res.NewRenderData(machine, AsBootEnv(be)).render(err)
+		if err.containsError {
+			logger.Printf("Error rendering machine %s at startup:", machine.UUID())
+			logger.Println(err.Error())
+		}
+	}
+	machines.Unlock()
 	return res
 }
 
@@ -343,10 +360,6 @@ func (p *DataTracker) RenderUnknown() error {
 	}
 	r := p.NewRenderData(nil, env)
 	r.render(err)
-	r.mkPaths(err)
-	if !err.containsError {
-		r.write(err)
-	}
 	return err.OrNil()
 }
 
