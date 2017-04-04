@@ -8,15 +8,14 @@ import (
 	"github.com/rackn/rocket-skates/backend"
 )
 
-func ServeStatic(listenAt, fsPath string, logger *log.Logger) error {
+func ServeStatic(listenAt string, responder http.Handler, logger *log.Logger) error {
 	conn, err := net.Listen("tcp", listenAt)
 	if err != nil {
 		return err
 	}
-	fs := http.FileServer(http.Dir(fsPath))
 	svr := &http.Server{
 		Addr:    listenAt,
-		Handler: fs,
+		Handler: responder,
 		ConnState: func(n net.Conn, cs http.ConnState) {
 			laddr, lok := n.LocalAddr().(*net.TCPAddr)
 			raddr, rok := n.RemoteAddr().(*net.TCPAddr)

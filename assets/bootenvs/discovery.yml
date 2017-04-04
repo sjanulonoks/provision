@@ -106,13 +106,12 @@ Templates:
           # Create a new node for us,
           # Add the default noderoles we will need, and
           # Let the annealer do its thing.
-          if ! json="$(rscli machines create "{\"Name\": \"$HOSTNAME\",
+          while ! json="$(rscli machines create "{\"Name\": \"$HOSTNAME\",
                                                \"Address\": \"$IP\",
-                                               \"BootEnv\": \"sledgehammer\"}")"; then
-        
-              echo "We could not create a node for ourself!"
-              exit 1
-          fi
+                                               \"BootEnv\": \"sledgehammer\"}")"; do
+              echo "We could not create a node for ourself, trying again."
+              sleep 5
+          done
           RS_UUID="$(jq -r '.Uuid' <<< "$json")"
 
           dhclient -r && \

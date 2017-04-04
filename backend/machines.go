@@ -117,8 +117,6 @@ func (n *Machine) BeforeSave() error {
 			e.Errorf("Machine %s wants BootEnv %s, which is not available", n.UUID(), n.BootEnv)
 		} else {
 			n.toRender = n.p.NewRenderData(n, env)
-			n.toRender.render(e)
-			n.toRender.mkPaths(e)
 		}
 	}
 	return e.OrNil()
@@ -142,7 +140,7 @@ func (n *Machine) AfterSave() {
 		n.toRemove = nil
 	}
 	if n.toRender != nil {
-		n.toRender.write(e)
+		n.toRender.render(e)
 		n.toRender = nil
 	}
 	if e.containsError {

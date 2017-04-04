@@ -3,10 +3,9 @@ package backend
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"net/url"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -20,35 +19,26 @@ type renderedTemplate struct {
 	Vars *RenderData
 }
 
-func (r *renderedTemplate) mkdirAll() error {
-	return os.MkdirAll(path.Dir(r.Path), 0755)
-}
-
-func (r *renderedTemplate) write(e *Error) {
-	tmplDest, err := os.Create(r.Path)
-	if err != nil {
-		e.Errorf("Unable to create file %s: %v", r.Path, err)
-		return
+func (r *renderedTemplate) write() (*bytes.Reader, error) {
+	buf := bytes.Buffer{}
+	if err := r.Template.render(&buf, r.Vars); err != nil {
+		return nil, err
 	}
-	defer tmplDest.Close()
-	if err := r.Template.render(tmplDest, r.Vars); err != nil {
-		os.Remove(r.Path)
-		e.Errorf("Error rendering template %s: %v", r.Template.Key(), err)
-		return
-	}
-	tmplDest.Sync()
+	return bytes.NewReader(buf.Bytes()), nil
 }
 
 type rMachine struct {
 	*Machine
+	renderData *RenderData
 }
 
 func (n *rMachine) Url() string {
-	return n.p.FileURL(nil) + "/" + n.Path()
+	return n.p.FileURL(n.renderData.remoteIP) + "/" + n.Path()
 }
 
 type rBootEnv struct {
 	*BootEnv
+	renderData *RenderData
 }
 
 // PathFor expands the partial paths for kernels and initrds into full
@@ -64,7 +54,7 @@ func (b *rBootEnv) PathFor(proto, f string) string {
 	case "tftp":
 		return tail
 	case "http":
-		return b.p.FileURL(nil) + "/" + tail
+		return b.p.FileURL(b.renderData.remoteIP) + "/" + tail
 	default:
 		b.p.Logger.Fatalf("Unknown protocol %v", proto)
 	}
@@ -72,7 +62,7 @@ func (b *rBootEnv) PathFor(proto, f string) string {
 }
 
 func (b *rBootEnv) InstallUrl() string {
-	return b.p.FileURL(nil) + "/" + path.Join(b.OS.Name, "install")
+	return b.p.FileURL(b.renderData.remoteIP) + "/" + path.Join(b.OS.Name, "install")
 }
 
 // JoinInitrds joins the fully expanded initrd paths into a comma-separated string.
@@ -84,14 +74,6 @@ func (b *rBootEnv) JoinInitrds(proto string) string {
 	return strings.Join(fullInitrds, " ")
 }
 
-func (r *renderedTemplate) remove(e *Error) {
-	if r.Path != "" {
-		if err := os.Remove(r.Path); err != nil {
-			e.Errorf("%v", err)
-		}
-	}
-}
-
 // RenderData is the struct that is passed to templates as a source of
 // parameters and useful methods.
 type RenderData struct {
@@ -99,25 +81,26 @@ type RenderData struct {
 	Env               *rBootEnv // The boot environment that provided the template.
 	renderedTemplates []renderedTemplate
 	p                 *DataTracker
+	remoteIP          net.IP
 }
 
 func (p *DataTracker) NewRenderData(m *Machine, e *BootEnv) *RenderData {
 	res := &RenderData{p: p}
 	if m != nil {
-		res.Machine = &rMachine{Machine: m}
+		res.Machine = &rMachine{Machine: m, renderData: res}
 	}
 	if e != nil {
-		res.Env = &rBootEnv{BootEnv: e}
+		res.Env = &rBootEnv{BootEnv: e, renderData: res}
 	}
 	return res
 }
 
 func (r *RenderData) ProvisionerAddress() string {
-	return r.p.LocalIP(nil)
+	return r.p.LocalIP(r.remoteIP)
 }
 
 func (r *RenderData) ProvisionerURL() string {
-	return r.p.FileURL(nil)
+	return r.p.FileURL(r.remoteIP)
 }
 
 func (r *RenderData) CommandURL() string {
@@ -125,7 +108,7 @@ func (r *RenderData) CommandURL() string {
 }
 
 func (r *RenderData) ApiURL() string {
-	return r.p.ApiURL(nil)
+	return r.p.ApiURL(r.remoteIP)
 }
 
 // BootParams is a helper function that expands the BootParams
@@ -212,32 +195,18 @@ func (r *RenderData) render(e *Error) {
 				ti.Path,
 				err)
 		} else {
-			rt.Path = filepath.Join(r.p.FileRoot, buf.String())
+			rt.Path = path.Clean("/" + buf.String())
 		}
 		rt.Template = tmpl
 		rt.Vars = r
 		r.renderedTemplates[i] = rt
+		r.p.FS.addDynamic(rt.Path, &rt)
 	}
-}
 
-func (r *RenderData) mkPaths(e *Error) {
-	for _, rt := range r.renderedTemplates {
-		if rt.Path != "" {
-			if err := rt.mkdirAll(); err != nil {
-				e.Errorf("%v", err)
-			}
-		}
-	}
 }
 
 func (r *RenderData) remove(e *Error) {
 	for _, rt := range r.renderedTemplates {
-		rt.remove(e)
-	}
-}
-
-func (r *RenderData) write(e *Error) {
-	for _, rt := range r.renderedTemplates {
-		rt.write(e)
+		r.p.FS.delDynamic(rt.Path)
 	}
 }

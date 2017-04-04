@@ -63,6 +63,7 @@ type Frontend struct {
 }
 
 func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Frontend) {
+	gin.SetMode(gin.ReleaseMode)
 	mgmtApi := gin.Default()
 
 	apiGroup := mgmtApi.Group("/api/v3")
