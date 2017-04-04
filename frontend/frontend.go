@@ -100,22 +100,6 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 
 	userAuth := func() gin.HandlerFunc {
 		return func(c *gin.Context) {
-			// Check for Token Header
-			drpToken := c.Request.Header.Get("DRP-AUTH-TOKEN")
-			if len(drpToken) != 0 {
-				t, err := dt.GetToken(drpToken)
-				if err == nil {
-					c.Set("DRP-CLAIM", t)
-					c.Next()
-					return
-				} else {
-					logger.Printf("No DRP authentication token")
-					c.Header("WWW-Authenticate", "rocket-skates")
-					c.AbortWithStatus(http.StatusUnauthorized)
-					return
-				}
-			}
-
 			authHeader := c.Request.Header.Get("Authorization")
 			if len(authHeader) == 0 {
 				logger.Printf("No authentication header")
@@ -124,47 +108,58 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 				return
 			}
 			hdrParts := strings.SplitN(authHeader, " ", 2)
-			if len(hdrParts) != 2 || hdrParts[0] != "Basic" {
+			if len(hdrParts) != 2 || (hdrParts[0] != "Basic" && hdrParts[0] != "Bearer") {
 				logger.Printf("Bad auth header: %s", authHeader)
 				c.Header("WWW-Authenticate", "rocket-skates")
 				c.AbortWithStatus(http.StatusUnauthorized)
 				return
 			}
-			hdr, err := base64.StdEncoding.DecodeString(hdrParts[1])
-			if err != nil {
-				logger.Printf("Malformed basic auth string: %s", hdrParts[1])
-				c.Header("WWW-Authenticate", "rocket-skates")
-				c.AbortWithStatus(http.StatusUnauthorized)
-				return
-			}
-			userpass := bytes.SplitN(hdr, []byte(`:`), 2)
-			if len(userpass) != 2 {
-				logger.Printf("Malformed basic auth string: %s", hdrParts[1])
-				c.Header("WWW-Authenticate", "rocket-skates")
-				c.AbortWithStatus(http.StatusUnauthorized)
-				return
-			}
-			user := authSource.GetUser(string(userpass[0]))
-			if user == nil {
-				logger.Printf("No such user: %s", string(userpass[0]))
-				c.AbortWithStatus(http.StatusForbidden)
-				return
-			}
-			if !user.CheckPassword(string(userpass[1])) {
-				c.AbortWithStatus(http.StatusForbidden)
-				return
+			if hdrParts[0] == "Basic" {
+				hdr, err := base64.StdEncoding.DecodeString(hdrParts[1])
+				if err != nil {
+					logger.Printf("Malformed basic auth string: %s", hdrParts[1])
+					c.Header("WWW-Authenticate", "rocket-skates")
+					c.AbortWithStatus(http.StatusUnauthorized)
+					return
+				}
+				userpass := bytes.SplitN(hdr, []byte(`:`), 2)
+				if len(userpass) != 2 {
+					logger.Printf("Malformed basic auth string: %s", hdrParts[1])
+					c.Header("WWW-Authenticate", "rocket-skates")
+					c.AbortWithStatus(http.StatusUnauthorized)
+					return
+				}
+				user := authSource.GetUser(string(userpass[0]))
+				if user == nil {
+					logger.Printf("No such user: %s", string(userpass[0]))
+					c.AbortWithStatus(http.StatusForbidden)
+					return
+				}
+				if !user.CheckPassword(string(userpass[1])) {
+					c.AbortWithStatus(http.StatusForbidden)
+					return
+				}
+				t := &backend.DrpCustomClaims{
+					"all",
+					"",
+					"",
+					jwt.StandardClaims{
+						Issuer: "digitalrebar provision",
+						Id:     string(userpass[0]),
+					},
+				}
+				c.Set("DRP-CLAIM", t)
+			} else if hdrParts[0] == "Bearer" {
+				t, err := dt.GetToken(string(hdrParts[1]))
+				if err != nil {
+					logger.Printf("No DRP authentication token")
+					c.Header("WWW-Authenticate", "rocket-skates")
+					c.AbortWithStatus(http.StatusForbidden)
+					return
+				}
+				c.Set("DRP-CLAIM", t)
 			}
 
-			t := &backend.DrpCustomClaims{
-				"all",
-				"",
-				"",
-				jwt.StandardClaims{
-					Issuer: "digitalrebar provision",
-					Id:     string(userpass[0]),
-				},
-			}
-			c.Set("DRP-CLAIM", t)
 			c.Next()
 		}
 	}
