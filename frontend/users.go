@@ -3,6 +3,7 @@ package frontend
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/gin-gonic/gin"
@@ -57,6 +58,30 @@ type UserPathParameter struct {
 	// in: path
 	// required: true
 	Name string `json:"name"`
+}
+
+// swagger:parameters getUserToken
+type UserTokenQueryTTLParameter struct {
+	// in: query
+	TTL int `json:"ttl"`
+}
+
+// swagger:parameters getUserToken
+type UserTokenQueryScopeParameter struct {
+	// in: query
+	Scope string `json:"scope"`
+}
+
+// swagger:parameters getUserToken
+type UserTokenQueryActionParameter struct {
+	// in: query
+	Action string `json:"action"`
+}
+
+// swagger:parameters getUserToken
+type UserTokenQuerySpecificParameter struct {
+	// in: query
+	Specific string `json:"specific"`
 }
 
 func (f *Frontend) InitUserApi() {
@@ -132,7 +157,21 @@ func (f *Frontend) InitUserApi() {
 				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound, s))
 				return
 			}
-			if t, err := f.dt.NewToken(c.Param(`name`), 3600, "all", "", ""); err != nil {
+
+			sttl, _ := c.GetQuery("ttl")
+			ttl := 3600
+			if sttl != "" {
+				ttl64, _ := strconv.ParseInt(sttl, 10, 64)
+				ttl = int(ttl64)
+			}
+			scope, _ := c.GetQuery("scope")
+			if scope == "" {
+				scope = "all"
+			}
+			action, _ := c.GetQuery("action")
+			specific, _ := c.GetQuery("specific")
+
+			if t, err := f.dt.NewToken(c.Param(`name`), ttl, scope, action, specific); err != nil {
 				ne, ok := err.(*backend.Error)
 				if ok {
 					c.JSON(ne.Code, ne)
