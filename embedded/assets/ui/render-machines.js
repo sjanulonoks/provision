@@ -9,12 +9,35 @@ class Machine extends React.Component {
     super(props);
 
     this.toggleExpand = this.toggleExpand.bind(this);
+    this.handleChange = this.handleChange.bind(this);
+    this.update = this.update.bind(this);
+    this.remove = this.remove.bind(this);
   }
 
   // expands this subnet
   toggleExpand() {
     var machine = this.props.machine;
     machine._expand = !machine._expand;
+    this.props.change(this.props.index, machine);
+  }
+
+  // called to make the post/put request that updates the subnet
+  update() {
+    this.props.update(this.props.index);
+  }
+
+  // makes the delete request to remove the subnet
+  remove() {
+    this.props.remove(this.props.index);
+  }
+
+  // called when an input changes
+  handleChange(event) {
+    var val = event.target.value;
+    var machine = this.props.machine;
+    machine[event.target.name] = val;
+    machine._edited = true;
+
     this.props.change(this.props.index, machine);
   }
 
@@ -31,19 +54,66 @@ class Machine extends React.Component {
         }}>
         <tr>
           <td>
-            {machine.Name}
+            <input
+              type="text"
+              name="Name"
+              size="15"
+              placeholder="name.example.com"
+              value={machine.Name}
+              onChange={this.handleChange} />
           </td>
           <td>
-            {machine.Address}
+            <input
+              type="text"
+              name="Address"
+              size="15"
+              placeholder="0.0.0.0"
+              value={machine.Address}
+              onChange={this.handleChange} />
           </td>
           <td>
-            {machine.BootEnv}
+            <select
+              name="BootEnv"
+              type="bool"
+              value={machine.BootEnv}
+              onChange={this.handleChange}>
+                { this.props.bootenvs.map((val) =>
+                  <option key={val} value={val}>{val}</option>
+                )}
+            </select>
           </td>
           <td>
-            {machine.Description}
+            <input
+              type="text"
+              name="Description"
+              size="15"
+              placeholder=""
+              value={machine.Description}
+              onChange={this.handleChange} />            
           </td>
           <td>
-            {machine.Uuid}
+            <div title={machine.Uuid}>
+              {machine.Uuid.slice(0,4)}...{machine.Uuid.slice(-4)}
+            </div>
+          </td>
+          <td>
+            {machine._new ? <button onClick={this.update}>Add</button> :
+            (machine._edited ? <button onClick={this.update}>Update</button> : '')}
+            <button onClick={this.remove}>Remove</button>
+          </td>
+        </tr>
+        <tr>
+          <td colSpan="6">
+            {machine._expand ? (<div>
+              <h2>Errors</h2>
+              <h2>Params</h2>
+            </div>): <span/>}
+            {machine._error && <div>
+              <h2>{machine._errorMessage}</h2>
+            </div>}
+            <div className="expand" onClick={this.toggleExpand}>
+              {machine._expand ? <span>&#x25B4;</span> : <span>&#x25BE;</span>}
+            </div>
           </td>
         </tr>
       </tbody>
@@ -56,22 +126,38 @@ class Machines extends React.Component {
     super(props);
 
     this.state = {
-      machines: []
+      machines: [],
+      // hack for now.  ideally, we'd pull this from the bootenvs!
+      bootenvs: []
     };
 
     this.componentDidMount = this.componentDidMount.bind(this);
     this.addMachine = this.addMachine.bind(this);
+    this.changeMachine = this.changeMachine.bind(this);
+    this.removeMachine = this.removeMachine.bind(this);
+    this.updateMachine = this.updateMachine.bind(this);
   }
   
   // gets the machine json from the api
   getMachines() {
     return new Promise((resolve, reject) => {
+      var bootenvs = [];
 
       // get the interfaces from the api
       $.getJSON("../api/v3/machines", data => {
-        resolve({
-          machines: data,
+
+        // add get bootenvs from the api and update the state
+        $.getJSON("../api/v3/bootenvs", data2 => {
+          for(var key in data2) {
+            if (data2[key].Available)
+              bootenvs.push(data2[key].Name)
+          }
+          resolve({
+            machines: data,
+            bootenvs: bootenvs,
+          });
         });
+
       }).fail(() => {
         reject("Failed getting Machines");
       });
@@ -84,6 +170,7 @@ class Machines extends React.Component {
     this.getMachines().then(data => {
       this.setState({
         machines: data.machines,
+        bootenvs: data.bootenvs
       }, err => {
         // rejected ?? 
       });
@@ -93,6 +180,15 @@ class Machines extends React.Component {
   // called to create a new machine
   // allows some data other than defaults to be passed in
   addMachine(machine) {
+    this.props.machines.push({
+      Name: "",
+      Address: "0.0.0.0",
+      BootEnv: ( "sledgehammer" in this.props.bootenvs ? "sledgehammer" : "ignore"),
+      Description: "",
+      Uuid: ""
+    });
+    this.props.machine._edited = true;
+    this.props.change(this.props.index, this.props.machine);
   }
 
   // makes the post/put request to update the machine
@@ -105,11 +201,11 @@ class Machines extends React.Component {
       type: (machine._new ? "POST" : "PUT"),
       dataType: "json",
       contentType: "application/json",
-      url: "/api/v3/machines" + (machine._new ? "" : "/" + machine.Name),
+      url: "/api/v3/machines" + (machine._new ? "" : "/" + machine.Uuid),
       data: JSON.stringify(machine)
     }).done((resp) => {
       
-      // update the machines list with our new interface
+      // update the machines list with our new machine
       var machines = this.state.machines.concat([]);
 
       resp.updating = false;
@@ -130,6 +226,7 @@ class Machines extends React.Component {
       var machine = machines[i];
       machine.updating = false;
       machine._error = true;
+      machine._expand = true;
 
       // If our error is from the backend
       if(err.responseText) {
@@ -142,6 +239,19 @@ class Machines extends React.Component {
       this.setState({
         machines: machines
       });
+    });
+  }
+
+  removeMachine(i) {
+    // todo
+  }
+
+  // updates the state and changes a machine at a specified index
+  changeMachine(i, machine) {
+    var machines = this.state.machines.concat([]);
+    machines[i] = machine;
+    this.setState({
+      machines: machines
     });
   }
 
@@ -163,19 +273,24 @@ class Machines extends React.Component {
             <th>BootEnv</th>
             <th>Description</th>
             <th>Uuid</th>
+            <th></th>
           </tr>
         </thead>
         {this.state.machines.map((val, i) =>
           <Machine
             machine={val}
-            key={val.Uuid}
+            bootenvs={this.state.bootenvs}
+            update={this.updateMachine}
+            change={this.changeMachine}
+            remote={this.removeMachine}
+            key={i}
             id={i}
           />
         )}
         <tfoot>
           <tr>
             <td colSpan="5" style={{textAlign: "center"}}>
-              <button onClick={()=>this.addBootEnv({})}>New Machine</button>
+              <button onClick={()=>this.addMachine({})}>New Machine</button>
             </td>
           </tr>
         </tfoot>
