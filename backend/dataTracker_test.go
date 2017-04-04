@@ -174,6 +174,28 @@ func TestBackingStorePersistence(t *testing.T) {
 			t.Logf("Found %d %s, as expected", cnt, ot)
 		}
 	}
+
+	s, e := dt.NewToken("fred", 30, "all", "a", "m")
+	if e != nil {
+		t.Errorf("Failed to sign token: %v\n", e)
+	}
+	drpClaim, e := dt.GetToken(s)
+	if e != nil {
+		t.Errorf("Failed to get token: %v\n", e)
+	} else {
+		if drpClaim.Id != "fred" {
+			t.Errorf("Claim ID doesn't match: %v %v\n", "fred", drpClaim.Id)
+		}
+		if drpClaim.Scope != "all" {
+			t.Errorf("Claim Scope doesn't match: %v %v\n", "all", drpClaim.Scope)
+		}
+		if drpClaim.Action != "a" {
+			t.Errorf("Claim Action doesn't match: %v %v\n", "m", drpClaim.Action)
+		}
+		if drpClaim.Specific != "m" {
+			t.Errorf("Claim Specific doesn't match: %v %v\n", "m", drpClaim.Specific)
+		}
+	}
 }
 
 func TestMain(m *testing.M) {

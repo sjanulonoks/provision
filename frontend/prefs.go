@@ -34,6 +34,9 @@ func (f *Frontend) InitPrefApi() {
 	//        403: NoContentResponse
 	f.ApiGroup.GET("/prefs",
 		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "prefs", "list", "") {
+				return
+			}
 			c.JSON(http.StatusOK, f.dt.Prefs())
 		})
 
@@ -60,6 +63,9 @@ func (f *Frontend) InitPrefApi() {
 			for k := range prefs {
 				switch k {
 				case "defaultBootEnv", "unknownBootEnv":
+					if !assureAuth(c, f.Logger, "prefs", "post", k) {
+						return
+					}
 					continue
 				default:
 					err.Errorf("Unknown Preference %s", k)

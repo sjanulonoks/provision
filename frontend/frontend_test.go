@@ -34,6 +34,8 @@ type LocalDTI struct {
 	GIValue      []*backend.Interface
 	GIError      error
 	DefaultPrefs map[string]string
+	TokenValue   string
+	TokenError   error
 	w            *httptest.ResponseRecorder
 	f            *Frontend
 }
@@ -82,6 +84,13 @@ func (dt *LocalDTI) SetPrefs(prefs map[string]string) error {
 		dt.DefaultPrefs[name] = val
 	}
 	return nil
+}
+
+func (dt *LocalDTI) GetToken(ets string) (*backend.DrpCustomClaims, error) {
+	return nil, dt.TokenError
+}
+func (dt *LocalDTI) NewToken(id string, ttl int, s string, m string, a string) (string, error) {
+	return dt.TokenValue, dt.TokenError
 }
 
 type TestAuthSource struct{}

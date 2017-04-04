@@ -260,3 +260,49 @@ func TestUserDelete(t *testing.T) {
 		t.Errorf("Returned User was not correct: %v %v\n", []byte("kfred"), be.PasswordHash)
 	}
 }
+
+func TestUserToken(t *testing.T) {
+	localDTI := testFrontend()
+
+	localDTI.GetValue = nil
+	localDTI.GetBool = false
+	req, _ := http.NewRequest("GET", "/api/v3/users/fred/token", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusNotFound)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "User GET: fred: Not Found")
+
+	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.GetBool = true
+	localDTI.TokenValue = ""
+	localDTI.TokenError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"should get this one"}}
+	req, _ = http.NewRequest("GET", "/api/v3/users/fred/token", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, 23)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "should get this one")
+
+	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.GetBool = true
+	localDTI.TokenValue = ""
+	localDTI.TokenError = fmt.Errorf("this is a test: bad fred")
+	req, _ = http.NewRequest("GET", "/api/v3/users/fred/token", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
+
+	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.GetBool = true
+	localDTI.TokenValue = "fredtoken"
+	localDTI.TokenError = nil
+	req, _ = http.NewRequest("GET", "/api/v3/users/fred/token", nil)
+	w := localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusOK)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	var bet UserToken
+	json.Unmarshal(w.Body.Bytes(), &bet)
+	if bet.Token != "fredtoken" {
+		t.Errorf("Returned User token was not correct: %v %v\n", "fredtoken", bet.Token)
+	}
+}
