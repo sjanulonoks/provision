@@ -6,6 +6,7 @@ go:
 - 1.8
 
 install:
+- apt-get install bsdtar
 - ./tools/build.sh
 
 script:
