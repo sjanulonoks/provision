@@ -9,9 +9,11 @@ import (
 // swagger:model
 type User struct {
 	// Name is the name of the user
+	//
 	// required: true
 	Name string
-	// PasswordHash
+	// PasswordHash is the scrypt-hashed version of the user's Password.
+	//
 	// swagger:strfmt password
 	PasswordHash []byte `json:",omitempty"`
 	p            *DataTracker

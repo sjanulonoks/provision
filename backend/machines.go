@@ -13,25 +13,42 @@ import (
 // should manage the boot environment for.
 // swagger:model
 type Machine struct {
-	// The FQDN of the machine.
+	// The name of the machine.  THis must be unique across all
+	// machines, and by convention it is the FQDN of the machine,
+	// although nothing enforces that.
+	//
 	// required: true
 	// swagger:strfmt hostname
 	Name string
-	// A description of this machine
+	// A description of this machine.  This can contain any reference
+	// information for humans you want associated with the machine.
 	Description string
 	// The UUID of the machine.
 	// This is auto-created at Create time, and cannot change afterwards.
+	//
 	// required: true
 	// swagger:strfmt uuid
 	Uuid uuid.UUID
-	// The IPv4 address of the machine.  Specifically, the one
-	// that should be used for PXE purposes
+	// The IPv4 address of the machine that should be used for PXE
+	// purposes.  Note that this field does not directly tie into DHCP
+	// leases or reservations -- the provisioner relies solely on this
+	// address when determining what to render for a specific machine.
+	//
 	// swagger:strfmt ipv4
 	Address net.IP
-	// The boot environment that the machine should boot into.
+	// The boot environment that the machine should boot into.  This
+	// must be the name of a boot environment present in the backend.
+	// If this field is not present or blank, the global default bootenv
+	// will be used instead.
 	BootEnv string
-	Params  map[string]interface{} // Any additional parameters that may be needed for template expansion.
-	// Errors keeps hold of any errors that happen while writing out rendered templates
+	// Any additional parameters that may be needed to expand templates
+	// for BootEnv, as documented by that boot environment's
+	// RequiredParams and OptionalParams.
+	Params map[string]interface{}
+	// Errors keeps hold of any errors that happen while writing out
+	// rendered templates for the current BootEnv.  This field should be
+	// checked any time the boot environment is changed to verify that
+	// the boot environment change is valid.
 	Errors []string
 	p      *DataTracker
 

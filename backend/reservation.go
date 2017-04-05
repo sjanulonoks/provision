@@ -7,9 +7,10 @@ import (
 )
 
 // Reservation tracks persistent DHCP IP address reservations.
+//
 // swagger:model
 type Reservation struct {
-	// Addr is the IP address permanently assigned to the Mac
+	// Addr is the IP address permanently assigned to the strategy/token combination.
 	//
 	// required: true
 	// swagger:strfmt ipv4

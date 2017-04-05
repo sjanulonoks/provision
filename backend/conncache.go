@@ -22,6 +22,13 @@ func a2i(n net.IP) *big.Int {
 var addrCache = []cacheLine{}
 var addrCacheMux = &sync.RWMutex{}
 
+// AddToCache adds a new remote -> local IP address mapping to the
+// connection cache.  If the remote address is already in the cache,
+// its corresponding local address is updates and the mapping is
+// marked as used. Mappings that have not been accessed with LocalFor
+// or updated with AddToCache will be marked as unused within 60
+// seconds, and will be evicted if they are still unused within 60
+// more seconds.
 func AddToCache(local, remote net.IP) {
 	if local == nil || remote == nil {
 		return
@@ -46,8 +53,9 @@ func AddToCache(local, remote net.IP) {
 	addrCache[idx] = cacheLine{local, remote, false}
 }
 
-// LocalFor returns the local IP address that has responded
-// to TFTP or HTTP requests for the given remote IP.
+// LocalFor returns the local IP address that has responded to TFTP or
+// HTTP requests for the given remote IP.  It also marks the mapping
+// as used, delaying its eviction from the cache.
 func LocalFor(remote net.IP) net.IP {
 	if remote == nil || remote.IsUnspecified() {
 		return nil
@@ -65,10 +73,9 @@ func LocalFor(remote net.IP) net.IP {
 	return nil
 }
 
-// garbage-collect old addresses after 2 minutes of not being looked
-// up in LocalFor
 func init() {
 	go func() {
+		// Garbage collection loop for the address cache.
 		for {
 			time.Sleep(time.Minute)
 			addrCacheMux.Lock()

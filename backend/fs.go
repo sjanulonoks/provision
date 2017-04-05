@@ -13,6 +13,8 @@ import (
 	"sync"
 )
 
+// FileSystem provides the routines to allow the static HTTP and TFTP services to render
+// templates on demand..
 type FileSystem struct {
 	sync.Mutex
 	lower    string
@@ -20,6 +22,9 @@ type FileSystem struct {
 	dynamics map[string]*renderedTemplate
 }
 
+// NewFS creates a new initialized filesystem that will fall back to
+// serving files from backingFSPath if there is not a template to be
+// rendered.
 func NewFS(backingFSPath string, logger *log.Logger) *FileSystem {
 	return &FileSystem{
 		lower:    backingFSPath,
@@ -28,6 +33,12 @@ func NewFS(backingFSPath string, logger *log.Logger) *FileSystem {
 	}
 }
 
+// Open tests for the existence of a template to be rendered for a
+// file read request.  The returned Reader contains the rendered
+// template if there is one, and the returned error contains any
+// rendering errors.  If both the reader and error are nil, there is
+// no template to be expanded for p and FileSystem should fall back to
+// serving a static file.
 func (fs *FileSystem) Open(p string, remoteIP net.IP) (*bytes.Reader, error) {
 	p = path.Clean(p)
 	fs.Lock()
@@ -42,6 +53,7 @@ func (fs *FileSystem) Open(p string, remoteIP net.IP) (*bytes.Reader, error) {
 	return res.write()
 }
 
+// ServeHTTP implements http.Handler for the FileSystem.
 func (fs *FileSystem) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p := r.URL.Path
 	if !strings.HasPrefix(p, "/") {
@@ -68,6 +80,8 @@ func (fs *FileSystem) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// TftpResponder returns a function that allows the TFTP midlayer to
+// serve files from the FileSystem.
 func (fs *FileSystem) TftpResponder() func(string, net.IP) (io.Reader, error) {
 	return func(toSend string, remoteIP net.IP) (io.Reader, error) {
 		p := path.Clean("/" + toSend)

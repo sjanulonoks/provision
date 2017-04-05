@@ -2,6 +2,9 @@ package backend
 
 import "github.com/digitalrebar/digitalrebar/go/common/store"
 
+// Param tracks global parameters for BootEnv template expansion.
+// These are used if there are no machine-specific params
+//
 // swagger:model
 type Param struct {
 	p *DataTracker

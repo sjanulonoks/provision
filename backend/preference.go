@@ -2,6 +2,10 @@ package backend
 
 import "github.com/digitalrebar/digitalrebar/go/common/store"
 
+// Pref tracks a global RocketSkates preference -- things like the
+// bootenv to use for unknown systems trying to PXE boot to us, the
+// default bootenv for known systems, etc.
+//
 type Pref struct {
 	p    *DataTracker
 	Name string
