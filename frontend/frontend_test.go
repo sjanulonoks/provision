@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/VictorLowther/jsonpatch2"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
@@ -87,7 +88,16 @@ func (dt *LocalDTI) SetPrefs(prefs map[string]string) error {
 }
 
 func (dt *LocalDTI) GetToken(ets string) (*backend.DrpCustomClaims, error) {
-	return nil, dt.TokenError
+	t := &backend.DrpCustomClaims{
+		"all",
+		"",
+		"",
+		jwt.StandardClaims{
+			Issuer: "digitalrebar provision",
+			Id:     "rocketskates",
+		},
+	}
+	return t, nil
 }
 func (dt *LocalDTI) NewToken(id string, ttl int, s string, m string, a string) (string, error) {
 	return dt.TokenValue, dt.TokenError
@@ -130,7 +140,9 @@ func testFrontendDev(devUI string) *LocalDTI {
 }
 
 func (dt *LocalDTI) RunTest(req *http.Request) *httptest.ResponseRecorder {
-	req.SetBasicAuth("rocketskates", "r0cketsk8ts")
+	// BASIC AUTH TESTING: req.SetBasicAuth("rocketskates", "r0cketsk8ts")
+	// BEARER AUTH TESTING:
+	req.Header.Add("Authorization", "Bearer MyFakeToken")
 	dt.w = httptest.NewRecorder()
 	dt.f.MgmtApi.ServeHTTP(dt.w, req)
 	return dt.w
