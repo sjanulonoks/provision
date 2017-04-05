@@ -194,6 +194,12 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt DTI) {
 				fmt.Sprintf("upload: iso %s must have content-type application/octet-stream", name)))
 		return
 	}
+	if c.Request.Body == nil {
+		c.JSON(http.StatusBadRequest,
+			backend.NewError("API ERROR", http.StatusBadRequest,
+				fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
+		return
+	}
 	if err := os.MkdirAll(path.Join(fileRoot, `isos`), 0755); err != nil {
 		c.JSON(http.StatusConflict,
 			backend.NewError("API_ERROR", http.StatusConflict, fmt.Sprintf("upload: unable to create isos directory")))

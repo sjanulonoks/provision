@@ -124,7 +124,7 @@ func testFrontendDev(devUI string) *LocalDTI {
 
 	localDTI := &LocalDTI{}
 	logger := log.New(os.Stderr, "bootenv-test", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-	localDTI.f = NewFrontend(localDTI, logger, ".", devUI, &TestAuthSource{})
+	localDTI.f = NewFrontend(localDTI, logger, tmpDir, devUI, &TestAuthSource{})
 
 	return localDTI
 }
@@ -233,3 +233,21 @@ func TestUIDev(t *testing.T) {
 }
 
 // GREG: Test DefaultAuthSource
+
+var tmpDir string
+
+func TestMain(m *testing.M) {
+	var err error
+	tmpDir, err = ioutil.TempDir("", "frontend-")
+	if err != nil {
+		log.Printf("Creating temp dir for file root failed: %v", err)
+		os.Exit(1)
+	}
+	ret := m.Run()
+	err = os.RemoveAll(tmpDir)
+	if err != nil {
+		log.Printf("Creating temp dir for file root failed: %v", err)
+		os.Exit(1)
+	}
+	os.Exit(ret)
+}
