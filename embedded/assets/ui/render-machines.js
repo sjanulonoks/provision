@@ -92,9 +92,11 @@ class Machine extends React.Component {
               onChange={this.handleChange} />            
           </td>
           <td>
-            <div title={machine.Uuid}>
-              {machine.Uuid.slice(0,4)}...{machine.Uuid.slice(-4)}
-            </div>
+            {( machine.Uuid ?
+              <div title={machine.Uuid}>
+                {machine.Uuid.slice(0,4)}...{machine.Uuid.slice(-4)}
+              </div>
+              : "not set" )}
           </td>
           <td>
             {machine._new ? <button onClick={this.update}>Add</button> :
@@ -105,12 +107,14 @@ class Machine extends React.Component {
         <tr>
           <td colSpan="6">
             {machine._expand ? (<div>
-              <h2>Errors</h2>
-              <h2>Params</h2>
+              {machine._error && <div>
+                <h2>API Error: {machine._errorMessage}</h2>
+              </div>}
+              <h2>Template Errors</h2>
+              {(machine.Errors ? machines.Errors : "none.")}
+              <h2>Template Params</h2>
+              {(machine.Params ? machines.Params : "none.")}
             </div>): <span/>}
-            {machine._error && <div>
-              <h2>{machine._errorMessage}</h2>
-            </div>}
             <div className="expand" onClick={this.toggleExpand}>
               {machine._expand ? <span>&#x25B4;</span> : <span>&#x25BE;</span>}
             </div>
@@ -179,16 +183,19 @@ class Machines extends React.Component {
 
   // called to create a new machine
   // allows some data other than defaults to be passed in
-  addMachine(machine) {
-    this.props.machines.push({
+  addMachine() {
+    var machine = {
       Name: "",
       Address: "0.0.0.0",
-      BootEnv: ( "sledgehammer" in this.props.bootenvs ? "sledgehammer" : "ignore"),
+      BootEnv: "ignore",
       Description: "",
-      Uuid: ""
+      Uuid: null,
+      _new: true
+    };
+    // update the state
+    this.setState({
+      machines: this.state.machines.concat(machine)
     });
-    this.props.machine._edited = true;
-    this.props.change(this.props.index, this.props.machine);
   }
 
   // makes the post/put request to update the machine
@@ -207,7 +214,6 @@ class Machines extends React.Component {
       
       // update the machines list with our new machine
       var machines = this.state.machines.concat([]);
-
       resp.updating = false;
       resp._edited = false;
       resp._new = false;
@@ -243,7 +249,43 @@ class Machines extends React.Component {
   }
 
   removeMachine(i) {
-    // todo
+    var machines = this.state.machines.concat([]);
+    var machine = this.state.machines[i];
+    if (machine._new) {
+      machines.splice(i,1);
+      this.setState({machines: machines});
+      return;
+    }
+    machines[i].updating = true;
+
+    $.ajax({
+      type: "DELETE",
+      dataType: "json",
+      contentType: "application/json",
+      url: "/api/v3/machines/" + machine.Uuid,
+    }).done((resp) => {
+            // update the subnets list with our new interface
+      var machines = this.state.machines.concat([]);
+      machines.splice(i, 1);
+      this.setState({
+        machines: machines
+      });
+
+    }).fail((err) => {
+      machine.updating = false;
+      machine._error = true;
+      // If our error is from the backend
+      if(err.responseText) {
+        var response = JSON.parse(err.responseText);
+        machine._errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
+      } else { // maybe the backend is down
+        machine._errorMessage = err.status;
+      }
+
+      this.setState({
+        machines: machines
+      });
+    });
   }
 
   // updates the state and changes a machine at a specified index
@@ -282,14 +324,14 @@ class Machines extends React.Component {
             bootenvs={this.state.bootenvs}
             update={this.updateMachine}
             change={this.changeMachine}
-            remote={this.removeMachine}
+            remove={this.removeMachine}
             key={i}
-            id={i}
+            index={i}
           />
         )}
         <tfoot>
           <tr>
-            <td colSpan="5" style={{textAlign: "center"}}>
+            <td colSpan="6" style={{textAlign: "center"}}>
               <button onClick={()=>this.addMachine({})}>New Machine</button>
             </td>
           </tr>
