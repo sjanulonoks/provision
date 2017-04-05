@@ -34,8 +34,7 @@ func TestJWTUtils(t *testing.T) {
 	}
 
 	jwtManager = NewJwtManager([]byte(randString(32)))
-	tok := jwtManager.newToken("fred", 30, "all", "a", "m")
-	s, e := jwtManager.sign(tok)
+	s, e := NewClaim("fred", 30).Add("*", "a", "m").Seal(jwtManager)
 	if e != nil {
 		t.Errorf("Failed to sign token: %v\n", e)
 	}
@@ -46,19 +45,12 @@ func TestJWTUtils(t *testing.T) {
 		if drpClaim.Id != "fred" {
 			t.Errorf("Claim ID doesn't match: %v %v\n", "fred", drpClaim.Id)
 		}
-		if drpClaim.Scope != "all" {
-			t.Errorf("Claim Scope doesn't match: %v %v\n", "all", drpClaim.Scope)
-		}
-		if drpClaim.Action != "a" {
-			t.Errorf("Claim Action doesn't match: %v %v\n", "a", drpClaim.Action)
-		}
-		if drpClaim.Specific != "m" {
-			t.Errorf("Claim Specific doesn't match: %v %v\n", "m", drpClaim.Specific)
+		if !drpClaim.Match("all", "a", "m") {
+			t.Errorf("Claim Scope doesn't match: %v %v\n", []string{"all", "a", "m"}, drpClaim)
 		}
 	}
 
-	tok = jwtManager.newToken("fred", 1, "all", "m", "a")
-	s, e = jwtManager.sign(tok)
+	s, e = NewClaim("fred", 1).Add("*", "m", "a").Seal(jwtManager)
 	if e != nil {
 		t.Errorf("Failed to sign token: %v\n", e)
 	}

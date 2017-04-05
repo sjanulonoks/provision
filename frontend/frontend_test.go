@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
@@ -88,16 +87,7 @@ func (dt *LocalDTI) SetPrefs(prefs map[string]string) error {
 }
 
 func (dt *LocalDTI) GetToken(ets string) (*backend.DrpCustomClaims, error) {
-	t := &backend.DrpCustomClaims{
-		"all",
-		"",
-		"",
-		jwt.StandardClaims{
-			Issuer: "digitalrebar provision",
-			Id:     "rocketskates",
-		},
-	}
-	return t, nil
+	return backend.NewClaim("rocketskates", 30).Add("*", "*", "*"), nil
 }
 func (dt *LocalDTI) NewToken(id string, ttl int, s string, m string, a string) (string, error) {
 	return dt.TokenValue, dt.TokenError

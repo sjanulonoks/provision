@@ -166,10 +166,16 @@ func (f *Frontend) InitUserApi() {
 			}
 			scope, _ := c.GetQuery("scope")
 			if scope == "" {
-				scope = "all"
+				scope = "*"
 			}
 			action, _ := c.GetQuery("action")
+			if action == "" {
+				action = "*"
+			}
 			specific, _ := c.GetQuery("specific")
+			if specific == "" {
+				specific = "*"
+			}
 
 			if t, err := f.dt.NewToken(c.Param(`name`), ttl, scope, action, specific); err != nil {
 				ne, ok := err.(*backend.Error)
