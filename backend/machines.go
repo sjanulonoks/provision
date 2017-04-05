@@ -132,6 +132,8 @@ func (n *Machine) BeforeSave() error {
 		env := AsBootEnv(b)
 		if !env.Available {
 			e.Errorf("Machine %s wants BootEnv %s, which is not available", n.UUID(), n.BootEnv)
+		} else if env.OnlyUnknown {
+			e.Errorf("BootEnv %s does not allow Machine assignments, it has the OnlyUnknown flag.", env.Name)
 		} else {
 			n.toRender = n.p.NewRenderData(n, env)
 		}
