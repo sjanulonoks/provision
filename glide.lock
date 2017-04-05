@@ -110,8 +110,7 @@ imports:
 - name: github.com/pborman/uuid
   version: 1b00554d822231195d1babd97ff4a781231955c9
 - name: github.com/pin/tftp
-  version: 82937ae3e2c1de5d22200a136a879e425af03a1c
-  repo: https://github.com/VictorLowther/tftp
+  version: b859b2b3f2354540e40b9d447f131887dba7b726
   subpackages:
   - netascii
 - name: github.com/PuerkitoBio/purell

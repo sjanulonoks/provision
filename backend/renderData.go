@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"sync"
 )
 
 // RenderTemplate is the result of rendering a BootEnv template
@@ -77,6 +78,7 @@ func (b *rBootEnv) JoinInitrds(proto string) string {
 // RenderData is the struct that is passed to templates as a source of
 // parameters and useful methods.
 type RenderData struct {
+	sync.Mutex
 	Machine           *rMachine // The Machine that the template is being rendered for.
 	Env               *rBootEnv // The boot environment that provided the template.
 	renderedTemplates []renderedTemplate
@@ -160,6 +162,8 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 }
 
 func (r *RenderData) render(e *Error) {
+	r.Lock()
+	defer r.Unlock()
 	var missingParams []string
 	if len(r.Env.RequiredParams) > 0 && (r.Machine == nil || r.Machine.Params == nil) {
 		e.Errorf("Machine is nil or does not have params")
@@ -206,6 +210,8 @@ func (r *RenderData) render(e *Error) {
 }
 
 func (r *RenderData) remove(e *Error) {
+	r.Lock()
+	defer r.Unlock()
 	for _, rt := range r.renderedTemplates {
 		r.p.FS.delDynamic(rt.Path)
 	}
