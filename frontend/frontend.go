@@ -165,9 +165,9 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 	}
 
 	mgmtApi := gin.Default()
-	mgmtApi.Use(userAuth())
 
 	apiGroup := mgmtApi.Group("/api/v3")
+	apiGroup.Use(userAuth())
 
 	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt}
 
