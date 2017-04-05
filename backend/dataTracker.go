@@ -21,6 +21,7 @@ var (
 		Name:        "ignore",
 		Description: "The boot environment you should use to have unknown machines boot off their local hard drive",
 		OS:          OsInfo{Name: "ignore"},
+		OnlyUnknown: true,
 		Templates: []TemplateInfo{
 			{
 				Name: "pxelinux",
@@ -323,12 +324,13 @@ func (p *DataTracker) Prefs() map[string]string {
 
 func (p *DataTracker) SetPrefs(prefs map[string]string) error {
 	err := &Error{}
-	benvCheck := func(name, val string) bool {
-		if be := p.load("bootenvs", val); be == nil {
+	benvCheck := func(name, val string) *BootEnv {
+		be := p.load("bootenvs", val)
+		if be == nil {
 			err.Errorf("%s: Bootenv %s does not exist", name, val)
-			return false
+			return nil
 		}
-		return true
+		return AsBootEnv(be)
 	}
 	savePref := func(name, val string) bool {
 		pref := &Pref{p: p, Name: name, Val: val}
@@ -341,11 +343,13 @@ func (p *DataTracker) SetPrefs(prefs map[string]string) error {
 	for name, val := range prefs {
 		switch name {
 		case "defaultBootEnv":
-			if benvCheck(name, val) && savePref(name, val) {
+			be := benvCheck(name, val)
+			if be != nil && !be.OnlyUnknown {
+				savePref(name, val)
 				p.defaultBootEnv = val
 			}
 		case "unknownBootEnv":
-			if benvCheck(name, val) && savePref(name, val) {
+			if benvCheck(name, val) != nil && savePref(name, val) {
 				err.Merge(p.RenderUnknown())
 			}
 		default:
@@ -369,6 +373,10 @@ func (p *DataTracker) RenderUnknown() error {
 	if !env.Available {
 		err.Messages = env.Errors
 		err.containsError = true
+		return err
+	}
+	if !env.OnlyUnknown {
+		err.Errorf("BootEnv %s cannot be used for the unknownBootEnv", env.Name)
 		return err
 	}
 	r := p.NewRenderData(nil, env)

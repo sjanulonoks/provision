@@ -146,7 +146,13 @@ type BootEnv struct {
 	// environment.
 	//
 	// read only: true
-	Errors         []string
+	Errors []string
+	// OnlyUnknown indicates whether this bootenv can be used without a
+	// machine.  Only bootenvs with this flag set to `true` be used for
+	// the unknownBootEnv preference.
+	//
+	// required: true
+	OnlyUnknown    bool
 	bootParamsTmpl *template.Template
 	p              *DataTracker
 }
@@ -374,12 +380,25 @@ func (b *BootEnv) BeforeSave() error {
 
 func (b *BootEnv) BeforeDelete() error {
 	e := &Error{Code: 409, Type: StillInUseError, o: b}
-	machines := AsMachines(b.p.FetchAll(b.p.NewMachine()))
-	for _, machine := range machines {
-		if machine.BootEnv != b.Name {
-			continue
+	var pref string
+	var err error
+	if b.OnlyUnknown {
+		pref, err = b.p.Pref("unknownBootEnv")
+		if err == nil && pref == b.Name {
+			e.Errorf("BootEnv %s is the active unknownBootEnv, cannot remove it", pref)
 		}
-		e.Errorf("Bootenv %s in use by Machine %s", b.Name, machine.Name)
+	} else {
+		pref, err = b.p.Pref("defaultBootEnv")
+		if err == nil && pref == b.Name {
+			e.Errorf("BootEnv %s is the active defaultBootEnv, cannot remove it", pref)
+		}
+		machines := AsMachines(b.p.FetchAll(b.p.NewMachine()))
+		for _, machine := range machines {
+			if machine.BootEnv != b.Name {
+				continue
+			}
+			e.Errorf("Bootenv %s in use by Machine %s", b.Name, machine.Name)
+		}
 	}
 	return e.OrNil()
 }
