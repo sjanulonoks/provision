@@ -1,6 +1,10 @@
 package frontend
 
 import (
+	"fmt"
+	"net/http"
+	"strconv"
+
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
@@ -20,6 +24,18 @@ type UsersResponse struct {
 	Body []*backend.User
 }
 
+// UserTokenResponse returned on a successful GET of user token
+// swagger:response UserTokenResponse
+type UserTokenResponse struct {
+	//in: body
+	Body UserToken
+}
+
+// swagger:model
+type UserToken struct {
+	Token string
+}
+
 // UserBodyParameter used to inject a User
 // swagger:parameters createUser putUser
 type UserBodyParameter struct {
@@ -37,11 +53,35 @@ type UserPatchBodyParameter struct {
 }
 
 // UserPathParameter used to name a User in the path
-// swagger:parameters getUser putUser patchUser deleteUser
+// swagger:parameters getUser putUser patchUser deleteUser getUserToken
 type UserPathParameter struct {
 	// in: path
 	// required: true
 	Name string `json:"name"`
+}
+
+// swagger:parameters getUserToken
+type UserTokenQueryTTLParameter struct {
+	// in: query
+	TTL int `json:"ttl"`
+}
+
+// swagger:parameters getUserToken
+type UserTokenQueryScopeParameter struct {
+	// in: query
+	Scope string `json:"scope"`
+}
+
+// swagger:parameters getUserToken
+type UserTokenQueryActionParameter struct {
+	// in: query
+	Action string `json:"action"`
+}
+
+// swagger:parameters getUserToken
+type UserTokenQuerySpecificParameter struct {
+	// in: query
+	Specific string `json:"specific"`
 }
 
 func (f *Frontend) InitUserApi() {
@@ -53,7 +93,8 @@ func (f *Frontend) InitUserApi() {
 	//
 	//     Responses:
 	//       200: UsersResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	f.ApiGroup.GET("/users",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewUser())
@@ -68,7 +109,8 @@ func (f *Frontend) InitUserApi() {
 	//     Responses:
 	//       201: UserResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/users",
 		func(c *gin.Context) {
@@ -84,11 +126,61 @@ func (f *Frontend) InitUserApi() {
 	//
 	//     Responses:
 	//       200: UserResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/users/:name",
 		func(c *gin.Context) {
 			f.Fetch(c, f.dt.NewUser(), c.Param(`name`))
+		})
+
+	// swagger:route GET /users/{name}/token Users getUserToken
+	//
+	// Get a User Token
+	//
+	// Get a token for the User specified by {name} or return error
+	//
+	//     Responses:
+	//       200: UserTokenResponse
+	//       400: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/users/:name/token",
+		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "users", "token", c.Param(`name`)) {
+				return
+			}
+			_, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
+			if !ok {
+				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
+				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound, s))
+				return
+			}
+
+			sttl, _ := c.GetQuery("ttl")
+			ttl := 3600
+			if sttl != "" {
+				ttl64, _ := strconv.ParseInt(sttl, 10, 64)
+				ttl = int(ttl64)
+			}
+			scope, _ := c.GetQuery("scope")
+			if scope == "" {
+				scope = "all"
+			}
+			action, _ := c.GetQuery("action")
+			specific, _ := c.GetQuery("specific")
+
+			if t, err := f.dt.NewToken(c.Param(`name`), ttl, scope, action, specific); err != nil {
+				ne, ok := err.(*backend.Error)
+				if ok {
+					c.JSON(ne.Code, ne)
+				} else {
+					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				}
+			} else {
+				c.JSON(http.StatusOK, UserToken{Token: t})
+			}
 		})
 
 	// swagger:route PATCH /users/{name} Users patchUser
@@ -100,7 +192,8 @@ func (f *Frontend) InitUserApi() {
 	//     Responses:
 	//       200: UserResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/users/:name",
@@ -117,7 +210,8 @@ func (f *Frontend) InitUserApi() {
 	//     Responses:
 	//       200: UserResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name",
@@ -133,7 +227,8 @@ func (f *Frontend) InitUserApi() {
 	//
 	//     Responses:
 	//       200: UserResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/users/:name",
 		func(c *gin.Context) {

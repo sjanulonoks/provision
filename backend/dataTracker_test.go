@@ -46,7 +46,7 @@ func TestDTObjs(t *testing.T) {
 		u := &User{p: p, Name: name}
 		dt.add(u)
 	}
-	if len(dt.d) != len(names) {
+	if len(dt.d) != len(names)+1 {
 		t.Errorf("Failed to add all %d names, only added %d", len(names), len(dt.d))
 		return
 	}
@@ -62,7 +62,7 @@ func TestDTObjs(t *testing.T) {
 	t.Logf("All names added in order")
 	dt.remove(0, 2, 3, 4, 6, 8)
 	names = []string{"b", "f", "h"}
-	if len(dt.d) != len(names) {
+	if len(dt.d) != len(names)+1 {
 		t.Errorf("Expected only %d to remain, but %d do", len(names), len(dt.d))
 		return
 	}
@@ -154,7 +154,7 @@ func TestBackingStorePersistence(t *testing.T) {
 		var cnt int
 		switch ot {
 		case "users":
-			items, cnt = dt.fetchAll(dt.NewUser()), 1
+			items, cnt = dt.fetchAll(dt.NewUser()), 2
 		case "templates":
 			items, cnt = dt.fetchAll(dt.NewTemplate()), 1
 		case "bootenvs":
@@ -172,6 +172,28 @@ func TestBackingStorePersistence(t *testing.T) {
 			t.Errorf("Expected to find %d %s, instead found %d", cnt, ot, len(items))
 		} else {
 			t.Logf("Found %d %s, as expected", cnt, ot)
+		}
+	}
+
+	s, e := dt.NewToken("fred", 30, "all", "a", "m")
+	if e != nil {
+		t.Errorf("Failed to sign token: %v\n", e)
+	}
+	drpClaim, e := dt.GetToken(s)
+	if e != nil {
+		t.Errorf("Failed to get token: %v\n", e)
+	} else {
+		if drpClaim.Id != "fred" {
+			t.Errorf("Claim ID doesn't match: %v %v\n", "fred", drpClaim.Id)
+		}
+		if drpClaim.Scope != "all" {
+			t.Errorf("Claim Scope doesn't match: %v %v\n", "all", drpClaim.Scope)
+		}
+		if drpClaim.Action != "a" {
+			t.Errorf("Claim Action doesn't match: %v %v\n", "m", drpClaim.Action)
+		}
+		if drpClaim.Specific != "m" {
+			t.Errorf("Claim Specific doesn't match: %v %v\n", "m", drpClaim.Specific)
 		}
 	}
 }

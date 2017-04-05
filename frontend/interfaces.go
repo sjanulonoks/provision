@@ -38,10 +38,14 @@ func (f *Frontend) InitInterfaceApi() {
 	//
 	//     Responses:
 	//       200: InterfacesResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/interfaces",
 		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "interfaces", "list", "") {
+				return
+			}
 			intfs, err := f.dt.GetInterfaces()
 			if err != nil {
 				c.JSON(http.StatusInternalServerError,
@@ -63,11 +67,15 @@ func (f *Frontend) InitInterfaceApi() {
 	//
 	//     Responses:
 	//       200: InterfaceResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/interfaces/:name",
 		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "interfaces", "get", c.Param(`name`)) {
+				return
+			}
 			intfs, err := f.dt.GetInterfaces()
 			if err != nil {
 				c.JSON(http.StatusInternalServerError,

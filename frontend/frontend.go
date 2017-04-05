@@ -1,12 +1,15 @@
 package frontend
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
 
 	"github.com/VictorLowther/jsonpatch2"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-gonic/gin"
@@ -21,7 +24,7 @@ type ErrorResponse struct {
 	Body backend.Error
 }
 
-// NoContentResponse is returned for deletes
+// NoContentResponse is returned for deletes and auth errors
 // swagger:response
 type NoContentResponse struct {
 	//description: Nothing
@@ -52,19 +55,117 @@ type DTI interface {
 	SetPrefs(map[string]string) error
 
 	GetInterfaces() ([]*backend.Interface, error)
+
+	GetToken(string) (*backend.DrpCustomClaims, error)
+	NewToken(string, int, string, string, string) (string, error)
 }
 
 type Frontend struct {
-	Logger   *log.Logger
-	FileRoot string
-	MgmtApi  *gin.Engine
-	ApiGroup *gin.RouterGroup
-	dt       DTI
+	Logger     *log.Logger
+	FileRoot   string
+	MgmtApi    *gin.Engine
+	ApiGroup   *gin.RouterGroup
+	dt         DTI
+	authSource AuthSource
 }
 
-func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string) (me *Frontend) {
+type AuthSource interface {
+	GetUser(username string) *backend.User
+}
+
+type DefaultAuthSource struct {
+	dt DTI
+}
+
+func (d DefaultAuthSource) GetUser(username string) (u *backend.User) {
+	userThing, found := d.dt.FetchOne(d.dt.NewUser(), username)
+	if !found {
+		return
+	}
+	u = backend.AsUser(userThing)
+	return
+}
+
+func NewDefaultAuthSource(dt DTI) (das AuthSource) {
+	das = DefaultAuthSource{dt: dt}
+	return
+}
+
+func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
+
+	if authSource == nil {
+		authSource = NewDefaultAuthSource(dt)
+	}
+
+	userAuth := func() gin.HandlerFunc {
+		return func(c *gin.Context) {
+			authHeader := c.Request.Header.Get("Authorization")
+			if len(authHeader) == 0 {
+				logger.Printf("No authentication header")
+				c.Header("WWW-Authenticate", "rocket-skates")
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+			hdrParts := strings.SplitN(authHeader, " ", 2)
+			if len(hdrParts) != 2 || (hdrParts[0] != "Basic" && hdrParts[0] != "Bearer") {
+				logger.Printf("Bad auth header: %s", authHeader)
+				c.Header("WWW-Authenticate", "rocket-skates")
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+			if hdrParts[0] == "Basic" {
+				hdr, err := base64.StdEncoding.DecodeString(hdrParts[1])
+				if err != nil {
+					logger.Printf("Malformed basic auth string: %s", hdrParts[1])
+					c.Header("WWW-Authenticate", "rocket-skates")
+					c.AbortWithStatus(http.StatusUnauthorized)
+					return
+				}
+				userpass := bytes.SplitN(hdr, []byte(`:`), 2)
+				if len(userpass) != 2 {
+					logger.Printf("Malformed basic auth string: %s", hdrParts[1])
+					c.Header("WWW-Authenticate", "rocket-skates")
+					c.AbortWithStatus(http.StatusUnauthorized)
+					return
+				}
+				user := authSource.GetUser(string(userpass[0]))
+				if user == nil {
+					logger.Printf("No such user: %s", string(userpass[0]))
+					c.AbortWithStatus(http.StatusForbidden)
+					return
+				}
+				if !user.CheckPassword(string(userpass[1])) {
+					c.AbortWithStatus(http.StatusForbidden)
+					return
+				}
+				t := &backend.DrpCustomClaims{
+					"all",
+					"",
+					"",
+					jwt.StandardClaims{
+						Issuer: "digitalrebar provision",
+						Id:     string(userpass[0]),
+					},
+				}
+				c.Set("DRP-CLAIM", t)
+			} else if hdrParts[0] == "Bearer" {
+				t, err := dt.GetToken(string(hdrParts[1]))
+				if err != nil {
+					logger.Printf("No DRP authentication token")
+					c.Header("WWW-Authenticate", "rocket-skates")
+					c.AbortWithStatus(http.StatusForbidden)
+					return
+				}
+				c.Set("DRP-CLAIM", t)
+			}
+
+			c.Next()
+		}
+	}
+
 	mgmtApi := gin.Default()
+	mgmtApi.Use(userAuth())
 
 	apiGroup := mgmtApi.Group("/api/v3")
 
@@ -132,6 +233,41 @@ func assureContentType(c *gin.Context, ct string) bool {
 	return false
 }
 
+func assureAuth(c *gin.Context, logger *log.Logger, scope, action, specific string) bool {
+	obj, ok := c.Get("DRP-CLAIM")
+	if !ok {
+		logger.Printf("Request with no claims\n")
+		c.AbortWithStatus(http.StatusForbidden)
+		return false
+	}
+	drpClaim, ok := obj.(*backend.DrpCustomClaims)
+	if !ok {
+		logger.Printf("Request with bad claims\n")
+		c.AbortWithStatus(http.StatusForbidden)
+		return false
+	}
+
+	if drpClaim.Scope != "all" && drpClaim.Scope != scope {
+		logger.Printf("Request with bad scope: %s, %s\n", scope, drpClaim.Scope)
+		c.AbortWithStatus(http.StatusForbidden)
+		return false
+	}
+
+	if drpClaim.Action != "" && drpClaim.Action != action {
+		logger.Printf("Request with bad action: %s, %s\n", action, drpClaim.Action)
+		c.AbortWithStatus(http.StatusForbidden)
+		return false
+	}
+
+	if drpClaim.Specific != "" && drpClaim.Specific != specific {
+		logger.Printf("Request with bad specific: %s, %s\n", specific, drpClaim.Specific)
+		c.AbortWithStatus(http.StatusForbidden)
+		return false
+	}
+
+	return true
+}
+
 func assureDecode(c *gin.Context, val interface{}) bool {
 	if !assureContentType(c, "application/json") {
 		return false
@@ -147,12 +283,18 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 }
 
 func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
+	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
+		return
+	}
 	c.JSON(http.StatusOK, f.dt.FetchAll(ref))
 }
 
 func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	res, ok := f.dt.FetchOne(ref, key)
 	if ok {
+		if !assureAuth(c, f.Logger, ref.Prefix(), "get", res.Key()) {
+			return
+		}
 		c.JSON(http.StatusOK, res)
 	} else {
 		err := &backend.Error{
@@ -168,6 +310,9 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 
 func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 	if !assureDecode(c, val) {
+		return
+	}
+	if !assureAuth(c, f.Logger, val.Prefix(), "create", "") {
 		return
 	}
 	res, err := f.dt.Create(val)
@@ -188,6 +333,9 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	if !assureDecode(c, &patch) {
 		return
 	}
+	if !assureAuth(c, f.Logger, ref.Prefix(), "patch", key) {
+		return
+	}
 	res, err := f.dt.Patch(ref, key, patch)
 	if err == nil {
 		c.JSON(http.StatusOK, res)
@@ -203,6 +351,9 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 
 func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 	if !assureDecode(c, ref) {
+		return
+	}
+	if !assureAuth(c, f.Logger, ref.Prefix(), "update", key) {
 		return
 	}
 	if ref.Key() != key {
@@ -230,6 +381,9 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 }
 
 func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver) {
+	if !assureAuth(c, f.Logger, ref.Prefix(), "delete", ref.Key()) {
+		return
+	}
 	res, err := f.dt.Remove(ref)
 	if err != nil {
 		ne, ok := err.(*backend.Error)

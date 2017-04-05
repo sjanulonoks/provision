@@ -58,7 +58,8 @@ func (f *Frontend) InitLeaseApi() {
 	//
 	//     Responses:
 	//       200: LeasesResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	f.ApiGroup.GET("/leases",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewLease())
@@ -73,7 +74,8 @@ func (f *Frontend) InitLeaseApi() {
 	//     Responses:
 	//       201: LeaseResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/leases",
 		func(c *gin.Context) {
@@ -89,7 +91,8 @@ func (f *Frontend) InitLeaseApi() {
 	//     Responses:
 	//       200: LeaseResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/leases/:address",
 		func(c *gin.Context) {
@@ -112,7 +115,8 @@ func (f *Frontend) InitLeaseApi() {
 	//     Responses:
 	//       200: LeaseResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/leases/:address",
@@ -136,7 +140,8 @@ func (f *Frontend) InitLeaseApi() {
 	//     Responses:
 	//       200: LeaseResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/leases/:address",
@@ -160,7 +165,8 @@ func (f *Frontend) InitLeaseApi() {
 	//     Responses:
 	//       200: LeaseResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/leases/:address",
 		func(c *gin.Context) {

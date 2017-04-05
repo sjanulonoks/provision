@@ -75,10 +75,14 @@ func (f *Frontend) InitIsoApi() {
 	//
 	//     Responses:
 	//       200: IsosResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/isos",
 		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "isos", "list", "") {
+				return
+			}
 			ents, err := ioutil.ReadDir(path.Join(f.FileRoot, "isos"))
 			if err != nil {
 				c.JSON(http.StatusNotFound,
@@ -106,10 +110,14 @@ func (f *Frontend) InitIsoApi() {
 	//
 	//     Responses:
 	//       200: IsoResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/isos/:name",
 		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "isos", "get", c.Param(`name`)) {
+				return
+			}
 			isoName := path.Join(f.FileRoot, `isos`, path.Base(c.Param(`name`)))
 			c.File(isoName)
 		})
@@ -128,14 +136,17 @@ func (f *Frontend) InitIsoApi() {
 	//     Responses:
 	//       201: IsoInfoResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
-	//       403: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
 	//       415: ErrorResponse
 	//       507: ErrorResponse
 	f.ApiGroup.POST("/isos/:name",
 		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "isos", "post", c.Param(`name`)) {
+				return
+			}
 			uploadIso(c, f.FileRoot, c.Param(`name`), f.dt)
 		})
 	// swagger:route DELETE /isos/{path} Isos deleteIso
@@ -146,11 +157,15 @@ func (f *Frontend) InitIsoApi() {
 	//
 	//     Responses:
 	//       204: NoContentResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/isos/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
+			if !assureAuth(c, f.Logger, "isos", "delete", name) {
+				return
+			}
 			isoName := path.Join(f.FileRoot, `isos`, path.Base(name))
 			if err := os.Remove(isoName); err != nil {
 				c.JSON(http.StatusNotFound,

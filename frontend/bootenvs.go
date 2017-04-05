@@ -53,7 +53,8 @@ func (f *Frontend) InitBootEnvApi() {
 	//
 	//     Responses:
 	//       200: BootEnvsResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	f.ApiGroup.GET("/bootenvs",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewBootEnv())
@@ -68,7 +69,8 @@ func (f *Frontend) InitBootEnvApi() {
 	//     Responses:
 	//       201: BootEnvResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/bootenvs",
 		func(c *gin.Context) {
@@ -83,7 +85,8 @@ func (f *Frontend) InitBootEnvApi() {
 	//
 	//     Responses:
 	//       200: BootEnvResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/bootenvs/:name",
 		func(c *gin.Context) {
@@ -99,7 +102,8 @@ func (f *Frontend) InitBootEnvApi() {
 	//     Responses:
 	//       200: BootEnvResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/bootenvs/:name",
@@ -116,7 +120,8 @@ func (f *Frontend) InitBootEnvApi() {
 	//     Responses:
 	//       200: BootEnvResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/bootenvs/:name",
@@ -132,7 +137,8 @@ func (f *Frontend) InitBootEnvApi() {
 	//
 	//     Responses:
 	//       200: BootEnvResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/bootenvs/:name",
 		func(c *gin.Context) {

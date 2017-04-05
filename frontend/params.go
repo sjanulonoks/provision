@@ -53,7 +53,8 @@ func (f *Frontend) InitParamApi() {
 	//
 	//     Responses:
 	//       200: ParamsResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	f.ApiGroup.GET("/params",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewParam())
@@ -68,7 +69,8 @@ func (f *Frontend) InitParamApi() {
 	//     Responses:
 	//       201: ParamResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/params",
 		func(c *gin.Context) {
@@ -84,7 +86,8 @@ func (f *Frontend) InitParamApi() {
 	//
 	//     Responses:
 	//       200: ParamResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/params/:name",
 		func(c *gin.Context) {
@@ -100,7 +103,8 @@ func (f *Frontend) InitParamApi() {
 	//     Responses:
 	//       200: ParamResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/params/:name",
@@ -117,7 +121,8 @@ func (f *Frontend) InitParamApi() {
 	//     Responses:
 	//       200: ParamResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/params/:name",
@@ -133,7 +138,8 @@ func (f *Frontend) InitParamApi() {
 	//
 	//     Responses:
 	//       200: ParamResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/params/:name",
 		func(c *gin.Context) {

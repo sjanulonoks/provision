@@ -83,11 +83,15 @@ func (f *Frontend) InitFileApi() {
 	//
 	//     Responses:
 	//       200: FilesResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/files",
 		func(c *gin.Context) {
 			pathPart, _ := c.GetQuery("path")
+			if !assureAuth(c, f.Logger, "files", "list", pathPart) {
+				return
+			}
 			ents, err := ioutil.ReadDir(path.Join(f.FileRoot, "files", path.Clean(pathPart)))
 			if err != nil {
 				c.JSON(http.StatusNotFound,
@@ -118,10 +122,14 @@ func (f *Frontend) InitFileApi() {
 	//
 	//     Responses:
 	//       200: FileResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/files/*path",
 		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "files", "get", c.Param(`path`)) {
+				return
+			}
 			fileName := path.Join(f.FileRoot, `files`, path.Clean(c.Param(`path`)))
 			c.Writer.Header().Set("Content-Type", "application/octet-stream")
 			c.File(fileName)
@@ -142,7 +150,8 @@ func (f *Frontend) InitFileApi() {
 	//     Responses:
 	//       201: FileInfoResponse
 	//       400: ErrorResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       403: ErrorResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
@@ -151,6 +160,9 @@ func (f *Frontend) InitFileApi() {
 	f.ApiGroup.POST("/files/*path",
 		func(c *gin.Context) {
 			name := c.Param(`path`)
+			if !assureAuth(c, f.Logger, "files", "post", name) {
+				return
+			}
 			if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
 				c.JSON(http.StatusUnsupportedMediaType,
 					backend.NewError("API ERROR", http.StatusUnsupportedMediaType,
@@ -214,10 +226,14 @@ func (f *Frontend) InitFileApi() {
 	//
 	//     Responses:
 	//       204: NoContentResponse
-	//       401: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/files/*path",
 		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "files", "delete", c.Param(`path`)) {
+				return
+			}
 			fileName := path.Join(f.FileRoot, `files`, path.Clean(c.Param(`path`)))
 			if fileName == path.Join(f.FileRoot, `files`) {
 				c.JSON(http.StatusForbidden,

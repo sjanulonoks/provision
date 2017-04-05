@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/VictorLowther/jsonpatch2"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/digitalrebar/go/rebar-api/api"
 )
@@ -164,6 +165,7 @@ type DataTracker struct {
 	Logger              *log.Logger
 	FS                  *FileSystem
 	RebarClient         *api.Client
+
 	// Note the lack of mutexes for these maps.
 	// We should be able to get away with not locking them
 	// by only ever writing to them at DataTracker create time,
@@ -172,6 +174,7 @@ type DataTracker struct {
 	objs           map[string]*dtobjs
 	defaultPrefs   map[string]string
 	defaultBootEnv string
+	tokenManager   *JwtManager
 }
 
 func (p *DataTracker) LocalIP(remote net.IP) string {
@@ -245,6 +248,7 @@ func NewDataTracker(backend store.SimpleStore,
 		backends:     map[string]store.SimpleStore{},
 		defaultPrefs: defaultPrefs,
 		FS:           NewFS(fileRoot, logger),
+		tokenManager: NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
 	}
 	objs := []store.KeySaver{
 		&Machine{p: res},
@@ -261,6 +265,15 @@ func NewDataTracker(backend store.SimpleStore,
 	res.loadData(objs)
 	if _, ok := res.fetchOne(ignoreBoot, ignoreBoot.Name); !ok {
 		res.Save(ignoreBoot)
+	}
+	users := res.objs["users"]
+	if len(users.d) == 0 {
+		logger.Printf("Creating rocketskates user")
+		user := &User{p: res, Name: "rocketskates"}
+		if err := user.ChangePassword("r0cketsk8ts"); err != nil {
+			logger.Fatalf("Failed to create rocketskates user: %v", err)
+		}
+		users.add(user)
 	}
 	res.defaultBootEnv = defaultPrefs["defaultBootEnv"]
 	machines := res.lockFor("machines")
@@ -652,4 +665,12 @@ func (p *DataTracker) Save(ref store.KeySaver) (store.KeySaver, error) {
 		return p.Clone(ref), err
 	}
 	return ref, err
+}
+
+func (p *DataTracker) GetToken(tokenString string) (*DrpCustomClaims, error) {
+	return p.tokenManager.get(tokenString)
+}
+func (p *DataTracker) NewToken(id string, ttl int, scope, action, specific string) (string, error) {
+	t := p.tokenManager.newToken(id, ttl, scope, action, specific)
+	return p.tokenManager.sign(t)
 }
