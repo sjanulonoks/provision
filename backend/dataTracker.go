@@ -11,9 +11,9 @@ import (
 	"sync"
 
 	"github.com/VictorLowther/jsonpatch2"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/digitalrebar/go/rebar-api/api"
-	jwt "github.com/digitalrebar/digitalrebar/go/vendor_src/src/github.com/dgrijalva/jwt-go"
 )
 
 var (
