@@ -125,33 +125,62 @@ func (m *JwtManager) sign(token *jwt.Token) (string, error) {
 	return encrypt(m.key, jwtString)
 }
 
-type DrpCustomClaims struct {
+// Claim is an individial specifier for something we are allowed access to.
+type Claim struct {
 	Scope    string `json:"scope"`
 	Action   string `json:"action"`
 	Specific string `json:"specific"`
+}
+
+// Match tests to see if this claim allows access for the specified
+// scope, action, and specific item.
+//
+// If the Claim has `*` for any field, it matches all possible values
+// for that field.
+func (c *Claim) Match(scope, action, specific string) bool {
+	return (c.Scope == scope || c.Scope == "*") &&
+		(c.Action == action || c.Action == "*") &&
+		(c.Specific == specific || c.Specific == "*")
+}
+
+// DrpCustomClaims is a JWT token that contains a list of all the
+// things this token allows access to.
+type DrpCustomClaims struct {
+	DrpClaims []Claim `json:"drp_claims"`
 	jwt.StandardClaims
 }
 
-// New returns a new *jwt.Token which has the prescribed signing method, issued
-// at time, and expiration time set on it.
-//
-// Add claims to the Claims map and use the controller to Sign(token) to get
-// the standard JWT signed string representation.
-func (m *JwtManager) newToken(user string, ttl int, scope, action, specific string) *jwt.Token {
-	d := time.Duration(ttl) * time.Second
-	claims := &DrpCustomClaims{
-		scope,
-		action,
-		specific,
-		jwt.StandardClaims{
-			IssuedAt:  time.Now().Unix(),
-			ExpiresAt: time.Now().Add(d).Unix(),
-			Issuer:    "digitalrebar provision",
-			Id:        user,
-		},
+// Match tests all the claims in this Token to find one that matches.
+func (d *DrpCustomClaims) Match(scope, action, specific string) bool {
+	for _, claim := range d.DrpClaims {
+		if claim.Match(scope, action, specific) {
+			return true
+		}
 	}
-	token := jwt.NewWithClaims(m.method, claims)
-	return token
+	return false
+}
+
+// NewClaim creates a new, unsigned Token that doesn't allow access to anything.
+// You must call Seal() to turn this into a signed JWT token.
+func NewClaim(user string, ttl int) *DrpCustomClaims {
+	d := time.Duration(ttl) * time.Second
+	res := &DrpCustomClaims{DrpClaims: []Claim{}}
+	res.IssuedAt = time.Now().Unix()
+	res.ExpiresAt = time.Now().Add(d).Unix()
+	res.Issuer = "digitalrebar provision"
+	res.Id = user
+	return res
+}
+
+// Add adds a discrete Claim to our custom Token class.
+func (d *DrpCustomClaims) Add(scope, action, specific string) *DrpCustomClaims {
+	d.DrpClaims = append(d.DrpClaims, Claim{scope, action, specific})
+	return d
+}
+
+// Seal turns our custom Token class into a signed JWT Token.
+func (d *DrpCustomClaims) Seal(m *JwtManager) (string, error) {
+	return m.sign(jwt.NewWithClaims(m.method, d))
 }
 
 // Get gets the signed JWT from the Authorization header. If the token is

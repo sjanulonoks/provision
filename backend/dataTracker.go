@@ -678,7 +678,11 @@ func (p *DataTracker) Save(ref store.KeySaver) (store.KeySaver, error) {
 func (p *DataTracker) GetToken(tokenString string) (*DrpCustomClaims, error) {
 	return p.tokenManager.get(tokenString)
 }
+
+func (p *DataTracker) SealClaims(claims *DrpCustomClaims) (string, error) {
+	return claims.Seal(p.tokenManager)
+}
+
 func (p *DataTracker) NewToken(id string, ttl int, scope, action, specific string) (string, error) {
-	t := p.tokenManager.newToken(id, ttl, scope, action, specific)
-	return p.tokenManager.sign(t)
+	return NewClaim(id, ttl).Add(scope, action, specific).Seal(p.tokenManager)
 }

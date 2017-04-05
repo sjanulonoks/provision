@@ -186,14 +186,8 @@ func TestBackingStorePersistence(t *testing.T) {
 		if drpClaim.Id != "fred" {
 			t.Errorf("Claim ID doesn't match: %v %v\n", "fred", drpClaim.Id)
 		}
-		if drpClaim.Scope != "all" {
-			t.Errorf("Claim Scope doesn't match: %v %v\n", "all", drpClaim.Scope)
-		}
-		if drpClaim.Action != "a" {
-			t.Errorf("Claim Action doesn't match: %v %v\n", "m", drpClaim.Action)
-		}
-		if drpClaim.Specific != "m" {
-			t.Errorf("Claim Specific doesn't match: %v %v\n", "m", drpClaim.Specific)
+		if !drpClaim.Match("all", "a", "m") {
+			t.Errorf("Claim doesn't match: %v %#v\n", []string{"all", "a", "m"}, drpClaim)
 		}
 	}
 }

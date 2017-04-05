@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-gonic/gin"
@@ -139,15 +138,7 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 					c.AbortWithStatus(http.StatusForbidden)
 					return
 				}
-				t := &backend.DrpCustomClaims{
-					"all",
-					"",
-					"",
-					jwt.StandardClaims{
-						Issuer: "digitalrebar provision",
-						Id:     string(userpass[0]),
-					},
-				}
+				t := backend.NewClaim(string(userpass[0]), 30).Add("*", "*", "*")
 				c.Set("DRP-CLAIM", t)
 			} else if hdrParts[0] == "Bearer" {
 				t, err := dt.GetToken(string(hdrParts[1]))
@@ -246,25 +237,10 @@ func assureAuth(c *gin.Context, logger *log.Logger, scope, action, specific stri
 		c.AbortWithStatus(http.StatusForbidden)
 		return false
 	}
-
-	if drpClaim.Scope != "all" && drpClaim.Scope != scope {
-		logger.Printf("Request with bad scope: %s, %s\n", scope, drpClaim.Scope)
+	if !drpClaim.Match(scope, action, specific) {
 		c.AbortWithStatus(http.StatusForbidden)
 		return false
 	}
-
-	if drpClaim.Action != "" && drpClaim.Action != action {
-		logger.Printf("Request with bad action: %s, %s\n", action, drpClaim.Action)
-		c.AbortWithStatus(http.StatusForbidden)
-		return false
-	}
-
-	if drpClaim.Specific != "" && drpClaim.Specific != specific {
-		logger.Printf("Request with bad specific: %s, %s\n", specific, drpClaim.Specific)
-		c.AbortWithStatus(http.StatusForbidden)
-		return false
-	}
-
 	return true
 }
 
