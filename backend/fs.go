@@ -36,6 +36,8 @@ func (fs *FileSystem) Open(p string, remoteIP net.IP) (*bytes.Reader, error) {
 	if !ok {
 		return nil, nil
 	}
+	res.Vars.Lock()
+	defer res.Vars.Unlock()
 	res.Vars.remoteIP = remoteIP
 	return res.write()
 }
