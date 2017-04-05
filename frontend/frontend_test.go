@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/VictorLowther/jsonpatch2"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
@@ -87,7 +88,16 @@ func (dt *LocalDTI) SetPrefs(prefs map[string]string) error {
 }
 
 func (dt *LocalDTI) GetToken(ets string) (*backend.DrpCustomClaims, error) {
-	return nil, dt.TokenError
+	t := &backend.DrpCustomClaims{
+		"all",
+		"",
+		"",
+		jwt.StandardClaims{
+			Issuer: "digitalrebar provision",
+			Id:     "rocketskates",
+		},
+	}
+	return t, nil
 }
 func (dt *LocalDTI) NewToken(id string, ttl int, s string, m string, a string) (string, error) {
 	return dt.TokenValue, dt.TokenError
@@ -124,13 +134,15 @@ func testFrontendDev(devUI string) *LocalDTI {
 
 	localDTI := &LocalDTI{}
 	logger := log.New(os.Stderr, "bootenv-test", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-	localDTI.f = NewFrontend(localDTI, logger, ".", devUI, &TestAuthSource{})
+	localDTI.f = NewFrontend(localDTI, logger, tmpDir, devUI, &TestAuthSource{})
 
 	return localDTI
 }
 
 func (dt *LocalDTI) RunTest(req *http.Request) *httptest.ResponseRecorder {
-	req.SetBasicAuth("rocketskates", "r0cketsk8ts")
+	// BASIC AUTH TESTING: req.SetBasicAuth("rocketskates", "r0cketsk8ts")
+	// BEARER AUTH TESTING:
+	req.Header.Add("Authorization", "Bearer MyFakeToken")
 	dt.w = httptest.NewRecorder()
 	dt.f.MgmtApi.ServeHTTP(dt.w, req)
 	return dt.w
@@ -233,3 +245,21 @@ func TestUIDev(t *testing.T) {
 }
 
 // GREG: Test DefaultAuthSource
+
+var tmpDir string
+
+func TestMain(m *testing.M) {
+	var err error
+	tmpDir, err = ioutil.TempDir("", "frontend-")
+	if err != nil {
+		log.Printf("Creating temp dir for file root failed: %v", err)
+		os.Exit(1)
+	}
+	ret := m.Run()
+	err = os.RemoveAll(tmpDir)
+	if err != nil {
+		log.Printf("Creating temp dir for file root failed: %v", err)
+		os.Exit(1)
+	}
+	os.Exit(ret)
+}

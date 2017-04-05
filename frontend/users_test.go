@@ -264,6 +264,7 @@ func TestUserDelete(t *testing.T) {
 func TestUserToken(t *testing.T) {
 	localDTI := testFrontend()
 
+	t.Logf("Test missing user")
 	localDTI.GetValue = nil
 	localDTI.GetBool = false
 	req, _ := http.NewRequest("GET", "/api/v3/users/fred/token", nil)
@@ -272,6 +273,7 @@ func TestUserToken(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "User GET: fred: Not Found")
 
+	t.Logf("Test backend error")
 	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
 	localDTI.GetBool = true
 	localDTI.TokenValue = ""
@@ -282,6 +284,7 @@ func TestUserToken(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "should get this one")
 
+	t.Logf("Test default error")
 	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
 	localDTI.GetBool = true
 	localDTI.TokenValue = ""
@@ -292,6 +295,7 @@ func TestUserToken(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
+	t.Logf("Test valid new token")
 	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
 	localDTI.GetBool = true
 	localDTI.TokenValue = "fredtoken"

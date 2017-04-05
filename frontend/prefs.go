@@ -77,7 +77,7 @@ func (f *Frontend) InitPrefApi() {
 			if err.ContainsError() {
 				c.JSON(err.Code, err)
 			} else {
-				c.JSON(http.StatusCreated, prefs)
+				c.JSON(http.StatusCreated, f.dt.Prefs())
 			}
 		})
 }

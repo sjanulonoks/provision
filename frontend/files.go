@@ -89,6 +89,9 @@ func (f *Frontend) InitFileApi() {
 	f.ApiGroup.GET("/files",
 		func(c *gin.Context) {
 			pathPart, _ := c.GetQuery("path")
+			if pathPart == "" {
+				pathPart = "/"
+			}
 			if !assureAuth(c, f.Logger, "files", "list", pathPart) {
 				return
 			}
@@ -169,14 +172,20 @@ func (f *Frontend) InitFileApi() {
 						fmt.Sprintf("upload: file %s must have content-type application/octet-stream", name)))
 				return
 			}
-			fileTmpName := path.Join(f.FileRoot, `files`, fmt.Sprintf(`.%s.part`, path.Clean(name)))
-			fileName := path.Join(f.FileRoot, `files`, path.Clean(name))
-			if strings.HasSuffix(fileName, "/") {
+			if c.Request.Body == nil {
+				c.JSON(http.StatusBadRequest,
+					backend.NewError("API ERROR", http.StatusBadRequest,
+						fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
+				return
+			}
+			if strings.HasSuffix(name, "/") {
 				c.JSON(http.StatusForbidden,
 					backend.NewError("API ERROR", http.StatusForbidden,
 						fmt.Sprintf("upload: Cannot upload a directory")))
 				return
 			}
+			fileTmpName := path.Join(f.FileRoot, `files`, fmt.Sprintf(`.%s.part`, path.Clean(name)))
+			fileName := path.Join(f.FileRoot, `files`, path.Clean(name))
 			if err := os.MkdirAll(path.Dir(fileName), 0755); err != nil {
 				c.JSON(http.StatusConflict,
 					backend.NewError("API ERROR", http.StatusConflict,
@@ -184,6 +193,7 @@ func (f *Frontend) InitFileApi() {
 				return
 			}
 			if _, err := os.Open(fileTmpName); err == nil {
+				os.Remove(fileName)
 				c.JSON(http.StatusConflict,
 					backend.NewError("API ERROR", http.StatusConflict,
 						fmt.Sprintf("upload: file %s already uploading", name)))
@@ -191,6 +201,7 @@ func (f *Frontend) InitFileApi() {
 			}
 			tgt, err := os.Create(fileTmpName)
 			if err != nil {
+				os.Remove(fileName)
 				c.JSON(http.StatusConflict,
 					backend.NewError("API ERROR", http.StatusConflict,
 						fmt.Sprintf("upload: Unable to upload %s: %v", name, err)))
@@ -199,6 +210,7 @@ func (f *Frontend) InitFileApi() {
 
 			copied, err := io.Copy(tgt, c.Request.Body)
 			if err != nil {
+				os.Remove(fileName)
 				os.Remove(fileTmpName)
 				c.JSON(http.StatusInsufficientStorage,
 					backend.NewError("API ERROR", http.StatusInsufficientStorage,
@@ -207,6 +219,7 @@ func (f *Frontend) InitFileApi() {
 			}
 
 			if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
+				os.Remove(fileName)
 				os.Remove(fileTmpName)
 				c.JSON(http.StatusBadRequest,
 					backend.NewError("API ERROR", http.StatusBadRequest,
