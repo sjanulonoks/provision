@@ -31,7 +31,9 @@ type Lease struct {
 	//
 	// required: true
 	Token string
-	// ExpireTime is the time at which the lease expires and is no longer valid
+	// ExpireTime is the time at which the lease expires and is no
+	// longer valid The DHCP renewal time will be half this, and the
+	// DHCP rebind time will be three quarters of this.
 	//
 	// required: true
 	// swagger:strfmt date-time

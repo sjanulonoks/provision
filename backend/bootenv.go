@@ -88,11 +88,14 @@ type OsInfo struct {
 //
 // swagger:model
 type BootEnv struct {
-	// The name of the boot environment.
+	// The name of the boot environment.  Boot environments that install
+	// an operating system must end in '-install'.
 	//
 	// required: true
 	Name string
-	// A description of this boot environment
+	// A description of this boot environment.  This should tell what
+	// the boot environment is for, any special considerations that
+	// shoudl be taken into account when using it, etc.
 	Description string
 	// The OS specific information for the boot environment.
 	OS OsInfo
@@ -101,12 +104,15 @@ type BootEnv struct {
 	//
 	// required: true
 	Templates []TemplateInfo
-	// The partial path to the kernel in the boot environment.
+	// The partial path to the kernel for the boot environment.  This
+	// should be path that the kernel is located at in the OS ISO or
+	// install archive.
 	//
 	// required: true
 	Kernel string
-	// Partial paths to the initrds that should be loaded for the
-	// boot environment.
+	// Partial paths to the initrds that should be loaded for the boot
+	// environment. These should be paths that the initrds are located
+	// at in the OS ISO or install archive.
 	//
 	// required: true
 	Initrds []string
@@ -129,12 +135,15 @@ type BootEnv struct {
 	// renderer based upon the Machine.Params
 	//
 	OptionalParams []string
-	// Whether the boot environment is useable.
+	// Whether the boot environment is useable.  This can only be set to
+	// `true` if there are no Errors, and if there are any errors
+	// Avaialble will be set to `false`, and will require user
+	// intervention to set it back to `true`.
 	//
 	// required: true
 	Available bool
-	// Any errors that were recorded in the process of processing
-	// this boot environment
+	// Any errors that were recorded in the processing of this boot
+	// environment.
 	//
 	// read only: true
 	Errors         []string

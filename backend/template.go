@@ -13,7 +13,7 @@ import (
 //
 // swagger:model
 type Template struct {
-	// ID is a unique identifier for this template.
+	// ID is a unique identifier for this template.  It cannot change once it is set.
 	//
 	// required: true
 	ID string
