@@ -58,8 +58,8 @@ type ProgOpts struct {
 	CommandURL          string `long:"endpoint" description:"DigitalRebar Endpoint" env:"EXTERNAL_REBAR_ENDPOINT"`
 	DefaultBootEnv      string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"sledgehammer"`
 	UnknownBootEnv      string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
-	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:600`
-	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:3600`
+	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
+	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
 
 	TlsKeyFile  string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
 	TlsCertFile string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
