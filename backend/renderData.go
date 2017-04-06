@@ -113,6 +113,18 @@ func (r *RenderData) ApiURL() string {
 	return r.p.ApiURL(r.remoteIP)
 }
 
+func (r *RenderData) GenerateToken() string {
+	var t string
+	if r.Machine == nil {
+		t, _ = NewClaim("general", 10*60).Add("machines", "post", "*").
+			Add("machines", "get", "*").Seal(r.p.tokenManager)
+	} else {
+		t, _ = NewClaim(r.Machine.Key(), 10*60).Add("machines", "patch", r.Machine.Key()).
+			Add("machines", "get", r.Machine.Key()).Seal(r.p.tokenManager)
+	}
+	return t
+}
+
 // BootParams is a helper function that expands the BootParams
 // template from the boot environment.
 func (r *RenderData) BootParams() (string, error) {

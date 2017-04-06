@@ -1,4 +1,7 @@
 ---
+# Sledgehammer (the per machine bootenv)
+# This bootenv requires the start-up.sh file to be rendered by the discovery bootenv.
+# These two bootenvs are linked and should be used as a pair.
 Name: "sledgehammer"
 OS:
   Name: "sledgehammer/708de8b878e3818b1c1bb598a56de968939f9d4b"
