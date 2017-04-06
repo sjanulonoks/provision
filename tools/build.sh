@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+set -e
+
 if ! [[ -d assets/startup ]]; then
     echo 'Missing required files to create a RocketSkates install package!'
     exit 1

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+set -e
 
 if ! [[ -x bin/linux/amd64/rocket-skates || ! -d assets/startup ]]; then
     echo "RocketSkates has not been built!"
