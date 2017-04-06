@@ -168,12 +168,11 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 
 // ParamExists is a helper function for determining the existence of a machine parameter.
 func (r *RenderData) ParamExists(key string) bool {
-	if r.Machine == nil {
-		return false
-	}
-	_, ok := r.Machine.Params[key]
-	if ok {
-		return ok
+	if r.Machine != nil {
+		_, ok := r.Machine.Params[key]
+		if ok {
+			return ok
+		}
 	}
 	param := r.p.load("parameters", key)
 	if param != nil {
@@ -184,12 +183,11 @@ func (r *RenderData) ParamExists(key string) bool {
 
 // Param is a helper function for extracting a parameter from Machine.Params
 func (r *RenderData) Param(key string) (interface{}, error) {
-	if r.Machine == nil {
-		return nil, fmt.Errorf("Missing machine")
-	}
-	res, ok := r.Machine.Params[key]
-	if ok {
-		return res, nil
+	if r.Machine != nil {
+		res, ok := r.Machine.Params[key]
+		if ok {
+			return res, nil
+		}
 	}
 	param := r.p.load("parameters", key)
 	if param != nil {

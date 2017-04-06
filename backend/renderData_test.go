@@ -191,14 +191,32 @@ func TestRenderData(t *testing.T) {
 	// Test other functions - without a machine or env
 	_, e = rd.Param("bogus")
 	if e == nil {
-		t.Errorf("Param should return an error when machine is not defined in RenderData\n")
-	} else if e.Error() != "Missing machine" {
-		t.Errorf("Param should return an error: Missing machine, but returned: %s\n", e.Error())
+		t.Errorf("Param should return an error when machine is not and not global defined in RenderData\n")
+	} else if e.Error() != "No such machine parameter bogus" {
+		t.Errorf("Param should return an error: No such machine parameter bogus, but returned: %s\n", e.Error())
 	}
 	ok := rd.ParamExists("bogus")
 	if ok {
-		t.Errorf("ParamExists should return false when machine is not defined in RenderData\n")
+		t.Errorf("ParamExists should return false when machine is not defined and not global in RenderData\n")
 	}
+	// Test global parameter
+	d, e := rd.Param("test")
+	if e != nil {
+		t.Errorf("Param test should NOT return an error: %v\n", e)
+	}
+	s, ok = d.(string)
+	if !ok {
+		t.Errorf("Parameter test should have been a string\n")
+	} else {
+		if s != "foreal" {
+			t.Errorf("Parameter test should have been foreal: %s\n", s)
+		}
+	}
+	ok = rd.ParamExists("test")
+	if !ok {
+		t.Errorf("ParamExists test should return true when machine has foo defined in RenderData\n")
+	}
+
 	s, e = rd.BootParams()
 	if e == nil {
 		t.Errorf("BootParams with no ENV should have generated an error\n")
@@ -255,7 +273,7 @@ func TestRenderData(t *testing.T) {
 	}
 
 	// Test machine parameter
-	d, e := rd.Param("foo")
+	d, e = rd.Param("foo")
 	if e != nil {
 		t.Errorf("Param foo should NOT return an error: %v\n", e)
 	}
