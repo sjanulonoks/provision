@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rackn/rocket-skates/backend"
@@ -65,6 +66,14 @@ func (f *Frontend) InitPrefApi() {
 				case "defaultBootEnv", "unknownBootEnv":
 					if !assureAuth(c, f.Logger, "prefs", "post", k) {
 						return
+					}
+					continue
+				case "knownTokenTimeout", "unknownTokenTimeout":
+					if !assureAuth(c, f.Logger, "prefs", "post", k) {
+						return
+					}
+					if _, e := strconv.Atoi(prefs[k]); e != nil {
+						err.Errorf("Preference %s: %v", k, e)
 					}
 					continue
 				default:

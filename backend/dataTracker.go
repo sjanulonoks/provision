@@ -332,6 +332,14 @@ func (p *DataTracker) SetPrefs(prefs map[string]string) error {
 		}
 		return AsBootEnv(be)
 	}
+	intCheck := func(name, val string) bool {
+		_, e := strconv.Atoi(val)
+		if e == nil {
+			return true
+		}
+		err.Errorf("%s: %s", name, e.Error())
+		return false
+	}
 	savePref := func(name, val string) bool {
 		pref := &Pref{p: p, Name: name, Val: val}
 		if _, saveErr := p.save(pref); saveErr != nil {
@@ -352,6 +360,16 @@ func (p *DataTracker) SetPrefs(prefs map[string]string) error {
 			if benvCheck(name, val) != nil && savePref(name, val) {
 				err.Merge(p.RenderUnknown())
 			}
+		case "unknownTokenTimeout":
+			if intCheck(name, val) {
+				savePref(name, val)
+			}
+			continue
+		case "knownTokenTimeout":
+			if intCheck(name, val) {
+				savePref(name, val)
+			}
+			continue
 		default:
 			err.Errorf("Unknown preference %s", name)
 		}

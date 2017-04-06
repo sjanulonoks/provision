@@ -52,12 +52,14 @@ type ProgOpts struct {
 	FileRoot string `long:"file-root" description:"Root of filesystem we should manage" default:"/var/lib/tftpboot"`
 	DevUI    string `long:"dev-ui" description:"Root of UI Pages for Development"`
 
-	DisableProvisioner bool   `long:"disable-provisioner" description:"Disable provisioner"`
-	DisableDHCP        bool   `long:"disable-dhcp" description:"Disable DHCP"`
-	DhcpInterfaces     string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
-	CommandURL         string `long:"endpoint" description:"DigitalRebar Endpoint" env:"EXTERNAL_REBAR_ENDPOINT"`
-	DefaultBootEnv     string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"sledgehammer"`
-	UnknownBootEnv     string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
+	DisableProvisioner  bool   `long:"disable-provisioner" description:"Disable provisioner"`
+	DisableDHCP         bool   `long:"disable-dhcp" description:"Disable DHCP"`
+	DhcpInterfaces      string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
+	CommandURL          string `long:"endpoint" description:"DigitalRebar Endpoint" env:"EXTERNAL_REBAR_ENDPOINT"`
+	DefaultBootEnv      string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"sledgehammer"`
+	UnknownBootEnv      string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
+	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
+	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
 
 	TlsKeyFile  string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
 	TlsCertFile string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
@@ -121,8 +123,10 @@ func Server(c_opts *ProgOpts) {
 		c_opts.ApiPort,
 		logger,
 		map[string]string{
-			"defaultBootEnv": c_opts.DefaultBootEnv,
-			"unknownBootEnv": c_opts.UnknownBootEnv,
+			"defaultBootEnv":      c_opts.DefaultBootEnv,
+			"unknownBootEnv":      c_opts.UnknownBootEnv,
+			"knownTokenTimeout":   fmt.Sprintf("%d", c_opts.KnownTokenTimeout),
+			"unknownTokenTimeout": fmt.Sprintf("%d", c_opts.UnknownTokenTimeout),
 		})
 
 	if err := dt.RenderUnknown(); err != nil {

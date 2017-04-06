@@ -100,6 +100,9 @@ sed -i -e '/initdefault/ s/5/3/' /etc/inittab
 # Tell rocket skates we are done
 (cd /bin; curl -s -f -L -o rscli "{{.ProvisionerURL}}/files/rscli.amd64.linux"; chmod 755 rscli)
 export RS_ENDPOINT="{{.ApiURL}}"
+# This will contain a token appropriate for the path being
+# used below.  Either a create or update/show token
+export RS_TOKEN="{{.GenerateToken}}"
 rscli machines update "{{.Machine.UUID}}" '{"BootEnv": "local"}'
 
 sync

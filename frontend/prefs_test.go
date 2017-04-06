@@ -91,4 +91,31 @@ func TestPrefsOps(t *testing.T) {
 	localDTI.ValidateCode(t, http.StatusCreated)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	validateMap(t, w, map[string]string{"defaultBootEnv": "james", "unknownBootEnv": "charles"})
+
+	localDTI.DefaultPrefs = map[string]string{"defaultBootEnv": "greg", "unknownBootEnv": "fred"}
+	s, _ = json.Marshal(map[string]string{"knownTokenTimeout": "james"})
+	req, _ = http.NewRequest("POST", "/api/v3/prefs", strings.NewReader(string(s)))
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	w = localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	validateError(t, w, []string{"Preference knownTokenTimeout: strconv.Atoi: parsing \"james\": invalid syntax"})
+
+	localDTI.DefaultPrefs = map[string]string{"defaultBootEnv": "greg", "unknownBootEnv": "fred"}
+	s, _ = json.Marshal(map[string]string{"unknownTokenTimeout": "charles"})
+	req, _ = http.NewRequest("POST", "/api/v3/prefs", strings.NewReader(string(s)))
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	w = localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	validateError(t, w, []string{"Preference unknownTokenTimeout: strconv.Atoi: parsing \"charles\": invalid syntax"})
+
+	localDTI.DefaultPrefs = map[string]string{"defaultBootEnv": "greg", "unknownBootEnv": "fred"}
+	s, _ = json.Marshal(map[string]string{"knownTokenTimeout": "50", "unknownTokenTimeout": "40"})
+	req, _ = http.NewRequest("POST", "/api/v3/prefs", strings.NewReader(string(s)))
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	w = localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusCreated)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	validateMap(t, w, map[string]string{"defaultBootEnv": "greg", "unknownBootEnv": "fred", "knownTokenTimeout": "50", "unknownTokenTimeout": "40"})
 }
