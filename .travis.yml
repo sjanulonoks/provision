@@ -25,3 +25,4 @@ deploy:
     - rocket-skates.sha256
   on:
     repo: rackn/rocket-skates
+    tags: true
