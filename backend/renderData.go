@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -116,10 +117,18 @@ func (r *RenderData) ApiURL() string {
 func (r *RenderData) GenerateToken() string {
 	var t string
 	if r.Machine == nil {
-		t, _ = NewClaim("general", 10*60).Add("machines", "post", "*").
+		ttl := 600
+		if sttl, e := r.p.Pref("unknownTokenTimeout"); e == nil {
+			ttl, _ = strconv.Atoi(sttl)
+		}
+		t, _ = NewClaim("general", ttl).Add("machines", "post", "*").
 			Add("machines", "get", "*").Seal(r.p.tokenManager)
 	} else {
-		t, _ = NewClaim(r.Machine.Key(), 10*60).Add("machines", "patch", r.Machine.Key()).
+		ttl := 3600
+		if sttl, e := r.p.Pref("knownTokenTimeout"); e == nil {
+			ttl, _ = strconv.Atoi(sttl)
+		}
+		t, _ = NewClaim(r.Machine.Key(), ttl).Add("machines", "patch", r.Machine.Key()).
 			Add("machines", "get", r.Machine.Key()).Seal(r.p.tokenManager)
 	}
 	return t
@@ -128,6 +137,9 @@ func (r *RenderData) GenerateToken() string {
 // BootParams is a helper function that expands the BootParams
 // template from the boot environment.
 func (r *RenderData) BootParams() (string, error) {
+	if r.Env == nil {
+		return "", fmt.Errorf("Missing bootenv")
+	}
 	res := &bytes.Buffer{}
 	if r.Env.bootParamsTmpl == nil {
 		return "", nil
@@ -156,12 +168,25 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 
 // ParamExists is a helper function for determining the existence of a machine parameter.
 func (r *RenderData) ParamExists(key string) bool {
+	if r.Machine == nil {
+		return false
+	}
 	_, ok := r.Machine.Params[key]
-	return ok
+	if ok {
+		return ok
+	}
+	param := r.p.load("parameters", key)
+	if param != nil {
+		return true
+	}
+	return false
 }
 
 // Param is a helper function for extracting a parameter from Machine.Params
 func (r *RenderData) Param(key string) (interface{}, error) {
+	if r.Machine == nil {
+		return nil, fmt.Errorf("Missing machine")
+	}
 	res, ok := r.Machine.Params[key]
 	if ok {
 		return res, nil
