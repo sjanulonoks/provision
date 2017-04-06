@@ -1,24 +1,27 @@
 language: go
-
 addons:
   apt:
     packages:
-      - bsdtar
-
+    - bsdtar
 sudo: false
-
 go:
 - 1.8
-
 install:
 - ./tools/build.sh
-
+- ./tools/package.sh
 script:
 - ./tools/test.sh
-
 after_success:
 - bash <(curl -s https://codecov.io/bash) -t 6259c706-5c1d-471f-b62b-4f908ea1801d
-
 notifications:
   slack:
     secure: ejZnsyfPz7eRd0EyUfWD07Qy8cV12IfYQARcVSIjGxxPp5AOoZ96TPsE5W+GUD2XxGhzcGbXzMhZHE2cu2icC7NBjpuQuWP9o56cR6lz5qwpz5TbE7Q3GIxPWaWjkLGnr+OHymqXHCk6ArLoDVWiUeOoJXrL6MgHnNXOmIez3o6yQMvW03K2P095G9saG8LKx7AxNLBXTJUHgKiiQJ8VrsK8uOKmumG/mbUoh8jG5TtUVK8g7m7ye11kiocvezJwNlRsjdGsBNlzJoL4EB5d47hD2xQ9LoGgLp6HvGXGk0Zun4ZvXkP1b3WeUqxkmaRCaRKH8ESMEekZ3bab2dAtd858PPoofNYfc94T2TSug5Zc4EfMniLUv1NZByono4deLhzFPnolDXdRE+rxtmRhw4ubp281tYgiZFJ2ZFqbMlHHsQjMLNLlKNpFnxmKaWdwR8lgYkyHatEReZUbyDxrAUmfUYGKHy8RQNmWEz17d2yg8gnNYqp7jD86cHZrAUGowaoT3kwYb6yHkfWtEu1UyzQOrEtM4tSPC7ZnZT9HT3/Wn6EVl58cFisDKL/ta1LxKLACrbroZvkZ2W74jJ1X7juGrNE7qrZ493xyzYEZ6tFF0JD5Nz2USKaDFuCfGtMAjkAia4IQJl+5pNc+nzGHdWW92ESqQGyL2nUTDzsW+aY=
+deploy:
+  provider: releases
+  api_key:
+    secure: eypn2Q7bV8I1BMyTiAKykENAVXH7YEleYrgGsJvhobZFDyu8jMe9sLW8QSOQ1pYfVd0pHNUKYMI8icUB9XxieqJuRMGjcBAcnNKzhQKwvEt1BUnZp7ngfiMa5lv4pLhW0oXXJ9eimrIjc86bBld7lV7Bel5vU1Fzug1e2HrqpFY8JrzFMli5FkfACKBldIOhn3LirC5+lJQRwiiESS7nS0g/8CnBHR9aIVLKGS5P1LDr/yrRJlm1doLU4/rTToBw9kkEnvNswxZcV0d/t9WEb7xqJsdMQ+4e/ME1aG+nEfGy4e6ad2UQm7WUt1Ik8GyC5LfW8GL2oWAFDJXMCuUEgZwRgyOwzwHwzMr3r1qPZckMD6W7DUk4+S8HHZmYKGrkWm0MayO4Hx+fRx1Gdayqj45p4MDx2M9AbWdThBCRbBGmQmqome84Uq1+DgeRTJu0XkXeEZoRp01tyjV4EnPtI62G+FVFYDCzwrzY6TSiqwL4JEfrjhqOF3tD+S3XVo7v+AsFSQVHFzISIUQyhcFil5tr84VsKvYgYOe5QweJbBSwIAFZZJ08AGpSjUfBWsa2xJLcEHs36uW1nVHGWhtAZ4PppGAdYUrXz/DUmIb/IQr8W0zYB8dea6MDzb/5OkgukcmxL+JhrEMALF11Nbdow37kTZCNLJZcC35S10vsQXk=
+  file:
+    - rocket-skates.zip
+    - rocket-skates.sha256
+  on:
+    repo: rackn/rocket-skates
