@@ -56,7 +56,7 @@ for f in ipxe.efi ipxe.pxe jq bootx64.efi lpxelinux.0 esxi.0 wimboot; do
         wimboot)
             curl -sfgL https://git.ipxe.org/releases/wimboot/wimboot-2.5.2.tar.bz2 -o wimboot-2.5.2.tar.bz2
             tar xOf wimboot-2.5.2.tar.bz2 wimboot-2.5.2/wimboot > wimboot.tmp
-            mv winboot.tmp wimboot
+            mv wimboot.tmp wimboot
             rm -rf wimboot-2.5.2.tar.bz2 wimboot-2.5.2;;
         *)
             echo "Unknown provisioner file to test for: $f"
