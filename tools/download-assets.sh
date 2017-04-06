@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+
 if ! [[ -d $1 ]]; then
     echo "Cannot find target directory $1"
     exit 1
@@ -49,11 +50,13 @@ for f in ipxe.efi ipxe.pxe jq bootx64.efi lpxelinux.0 esxi.0 wimboot; do
             rm -rf syslinux-6.03.tar.xz syslinux-6.03;;
         esxi.0)
             curl -sfgL https://s3.amazonaws.com/opencrowbar/provisioner/syslinux-3.86.tar.xz -o syslinux-3.86.tar.xz
-            tar xOJf syslinux-3.86.tar.xz syslinux-3.86/core/pxelinux.0 > esxi.0
+            tar xOJf syslinux-3.86.tar.xz syslinux-3.86/core/pxelinux.0 > esxi.0.tmp
+            mv esxi.0.tmp esxi.0
             rm -rf syslinux-3.86.tar.xz syslinux-3.86;;
         wimboot)
             curl -sfgL https://git.ipxe.org/releases/wimboot/wimboot-2.5.2.tar.bz2 -o wimboot-2.5.2.tar.bz2
-            tar xOf wimboot-2.5.2.tar.bz2 wimboot-2.5.2/wimboot > wimboot
+            tar xOf wimboot-2.5.2.tar.bz2 wimboot-2.5.2/wimboot > wimboot.tmp
+            mv winboot.tmp wimboot
             rm -rf wimboot-2.5.2.tar.bz2 wimboot-2.5.2;;
         *)
             echo "Unknown provisioner file to test for: $f"
