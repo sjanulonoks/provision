@@ -28,4 +28,5 @@ cp -a bin assets/startup assets/templates assets/bootenvs tools/install.sh "$tmp
 )
 
 cp "$tmpdir/rocketskates.zip" .
+$shasum rocketskates.zip > rocketskates.sha256
 rm -rf "$tmpdir"

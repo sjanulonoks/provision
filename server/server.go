@@ -32,7 +32,7 @@ import (
 
 	"github.com/digitalrebar/digitalrebar/go/common/client"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
-	"github.com/digitalrebar/digitalrebar/go/common/version"
+	"github.com/rackn/rocket-skates"
 	"github.com/rackn/rocket-skates/backend"
 	"github.com/rackn/rocket-skates/frontend"
 	"github.com/rackn/rocket-skates/midlayer"
@@ -78,9 +78,9 @@ func Server(c_opts *ProgOpts) {
 	logger := log.New(os.Stderr, "rocket-skates ", log.LstdFlags|log.Lmicroseconds|log.LUTC)
 
 	if c_opts.VersionFlag {
-		logger.Fatalf("Version: %s", version.REBAR_VERSION)
+		logger.Fatalf("Version: %s", rocketskates.RS_VERSION)
 	}
-	logger.Printf("Version: %s\n", version.REBAR_VERSION)
+	logger.Printf("Version: %s\n", rocketskates.RS_VERSION)
 
 	mkdir(c_opts.FileRoot, logger)
 
