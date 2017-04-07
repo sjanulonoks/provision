@@ -13,7 +13,8 @@
 //     Contact: Greg Althaus<greg@rackn.com> http://rackn.com
 //
 //     Security:
-//       basicAuth: []
+//       - basicAuth: []
+//       - Bearer: []
 //
 //     Consumes:
 //     - application/json
