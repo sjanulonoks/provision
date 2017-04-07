@@ -1,6 +1,41 @@
 #!/usr/bin/env bash
 
-set -x
+
+usage() {
+	echo "Usage: $0 [--version=<Version to install>] [install|remove]
+	echo "Defaults are: "
+	echo "  version = tip (instead of v2.9.1003)"
+	exit 1
+}
+
+VERSION="tip"
+args=()
+while (( $# > 0 )); do
+    arg="$1"
+    arg_key="${arg%%=*}"
+    arg_data="${arg#*=}"
+    case $arg_key in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --*)
+            arg_key="${arg_key#--}"
+            arg_key="${arg_key//-/_}"
+            arg_key="${arg_key^^}"
+            echo "Overriding $arg_key with $arg_data"
+            export $arg_key="$arg_data"
+            ;;
+        *)
+            args+=("$arg");;
+    esac
+    shift
+done
+set -- "${args[@]}"
+
+if [[ $DEBUG == true ]] ; then
+    set -x
+fi
 
 # Figure out what Linux distro we are running on.
 export OS_TYPE= OS_VER= OS_NAME=
