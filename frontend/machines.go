@@ -97,6 +97,10 @@ func (f *Frontend) InitMachineApi() {
 					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
+				s, ok := res.(Sanitizable)
+				if ok {
+					s.Sanitize()
+				}
 				c.JSON(http.StatusCreated, res)
 			}
 		})
