@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/rackn/rocket-skates/backend"
+	"github.com/digitalrebar/provision/backend"
 )
 
 func ServeStatic(listenAt string, responder http.Handler, logger *log.Logger) error {

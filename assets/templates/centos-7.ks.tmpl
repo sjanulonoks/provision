@@ -1,4 +1,4 @@
-# Rocket Skates Centos-7 (and related distros) kickstart
+# DigitalRebar Provision Centos-7 (and related distros) kickstart
 
 install
 url --url {{ .Env.InstallUrl }}
@@ -53,7 +53,7 @@ export PS4='${BASH_SOURCE}@${LINENO}(${FUNCNAME[0]}): '
 # Use the install repo from the provisioner for local package installation
 cat >/etc/yum.repos.d/00-rebar-base.repo <<EOF
 [rebar-base]
-name=Rocket Skates Base Repo
+name=DigitalRebar Provision Base Repo
 baseurl={{.Env.InstallUrl}}
 gpgcheck=0
 EOF
@@ -92,13 +92,13 @@ echo "https_proxy={{index (.Param "proxy-servers") 0 "url"}}" >>  /etc/profile.d
 echo "no_proxy=127.0.0.1,localhost,::1,{{index (.Param "proxy-servers") 0 "address"}}" >> /etc/profile.d/proxy.sh
 {{end}}
 
-# Tell rocket skates we are done
-(cd /bin; curl -s -f -L -o rscli "{{.ProvisionerURL}}/files/rscli.amd64.linux"; chmod 755 rscli)
+# Tell dr-provision we are done
+(cd /bin; curl -s -f -L -o drpcli "{{.ProvisionerURL}}/files/drpcli.amd64.linux"; chmod 755 drpcli)
 export RS_ENDPOINT="{{.ApiURL}}"
 # This will contain a token appropriate for the path being
 # used below.  Either a create or update/show token
 export RS_TOKEN="{{.GenerateToken}}"
-rscli machines update "{{.Machine.UUID}}" '{"BootEnv": "local"}'
+drpcli machines update "{{.Machine.UUID}}" '{"BootEnv": "local"}'
 
 sync
 %end

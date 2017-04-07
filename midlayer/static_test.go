@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rackn/rocket-skates/backend"
+	"github.com/digitalrebar/provision/backend"
 )
 
 func TestStaticFiles(t *testing.T) {

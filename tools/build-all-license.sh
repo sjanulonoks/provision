@@ -6,7 +6,7 @@ if [[ $1 != "" ]] ; then
 fi
 
 echo
-echo "Rocket-skates License"
+echo "DigitalRebar Provision License"
 echo
 
 cat LICENSE.rst

@@ -8,8 +8,8 @@ import (
 	"os"
 	"path"
 
+	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
-	"github.com/rackn/rocket-skates/backend"
 )
 
 type IsoPaths []string

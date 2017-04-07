@@ -1,10 +1,10 @@
 [Unit]
-Description=RocketSkates Integrated DHCP and File Provisioner
-Documentation=http://rocket-skates.readthedocs.io/en/latest/
+Description=DigitalRebar Provision Integrated DHCP and File Provisioner
+Documentation=http://provision.readthedocs.io/en/latest/
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/rocket-skates
+ExecStart=/usr/local/bin/dr-provision
 LimitNOFILE=1048576
 LimitNPROC=1048576
 LimitCORE=infinity

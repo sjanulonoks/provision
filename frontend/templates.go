@@ -2,8 +2,8 @@ package frontend
 
 import (
 	"github.com/VictorLowther/jsonpatch2"
+	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
-	"github.com/rackn/rocket-skates/backend"
 )
 
 // TemplateResponse return on a successful GET, PUT, PATCH or POST of a single Template

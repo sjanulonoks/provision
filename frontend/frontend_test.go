@@ -13,8 +13,8 @@ import (
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
-	"github.com/rackn/rocket-skates/backend"
 )
 
 type LocalDTI struct {
@@ -202,7 +202,6 @@ func TestRoot(t *testing.T) {
 }
 
 func TestUIBase(t *testing.T) {
-	return
 	localDTI := testFrontend()
 
 	req, _ := http.NewRequest("GET", "/ui/", nil)
@@ -213,13 +212,12 @@ func TestUIBase(t *testing.T) {
 	if len(uibody) == 0 {
 		t.Errorf("Response should not be an empty set, but got: %d\n", len(uibody))
 	}
-	if !bytes.Contains(uibody, []byte("<title>Rocket Skates</title>")) {
-		t.Errorf("Rocket Skates Title Missing %v\n", uibody)
+	if !bytes.Contains(uibody, []byte("<title>DigitalRebar Provision</title>")) {
+		t.Errorf("DigitalRebar Provision Title Missing %v\n", uibody)
 	}
 }
 
 func TestUIDev(t *testing.T) {
-	return
 	localDTI := testFrontendDev("../test-data/ui")
 	req, _ := http.NewRequest("GET", "/ui/", nil)
 	w := localDTI.RunTest(req)
@@ -229,8 +227,8 @@ func TestUIDev(t *testing.T) {
 	if len(uibody) == 0 {
 		t.Errorf("Response should not be an empty set, but got: %d\n", len(uibody))
 	}
-	if !bytes.Contains(uibody, []byte("<title>Test Skates</title>")) {
-		t.Errorf("Rocket Skates Title Missing %v\n", uibody)
+	if !bytes.Contains(uibody, []byte("<title>Test DRP</title>")) {
+		t.Errorf("DigitalRebar Provision Title Missing %v\n", uibody)
 	}
 }
 

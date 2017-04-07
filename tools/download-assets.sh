@@ -8,7 +8,7 @@ if ! [[ -d $1 ]]; then
 fi
 
 if ! [[ -f $1/../backend/dataTracker.go ]]; then
-    echo "$1 is not in a RocketSkates checkout"
+    echo "$1 is not in a DigitalRebar Provision checkout"
     exit 1
 fi
 

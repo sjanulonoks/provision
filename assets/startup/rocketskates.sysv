@@ -1,16 +1,16 @@
 #!/bin/bash
 # chkconfig: 2345 90 10
-# description: RocketSkates Provisioner and DHCP server
+# description: DigitalRebar Provision Provisioner and DHCP server
 PATH="$PATH:/usr/local/bin"
-touch /var/log/rocketskates.log
+touch /var/log/dr-provision.log
 case $1 in
     start)
-        /usr/local/bin/rocket-skates &>>/var/log/rocketskates.log </dev/zero &
+        /usr/local/bin/dr-provision &>>/var/log/dr-provision.log </dev/zero &
         disown;;
     stop)
-        pkill rocket-skates;;
+        pkill dr-provision;;
     status)
-        pgrep rocket-skates;;
+        pgrep dr-provision;;
 esac
 
         

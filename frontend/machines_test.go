@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend"
 	"github.com/pborman/uuid"
-	"github.com/rackn/rocket-skates/backend"
 )
 
 func TestMachineList(t *testing.T) {

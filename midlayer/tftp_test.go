@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/digitalrebar/provision/backend"
 	"github.com/pin/tftp"
-	"github.com/rackn/rocket-skates/backend"
 )
 
 func TestTftpFiles(t *testing.T) {

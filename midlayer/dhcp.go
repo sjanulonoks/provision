@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/net/ipv4"
 
+	"github.com/digitalrebar/provision/backend"
 	dhcp "github.com/krolaw/dhcp4"
-	"github.com/rackn/rocket-skates/backend"
 )
 
 func xid(p dhcp.Packet) string {

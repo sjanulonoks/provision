@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/rackn/rocket-skates/backend"
+	"github.com/digitalrebar/provision/backend"
 )
 
 func TestInterfaceList(t *testing.T) {

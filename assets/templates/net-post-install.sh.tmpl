@@ -72,13 +72,13 @@ echo "$HOSTNAME" >/etc/hostname
 hostname "$HOSTNAME"
 export HOSTNAME
 
-# Tell rocket skates we are done
-(cd /bin; curl -s -f -L -o rscli "{{.ProvisionerURL}}/files/rscli.amd64.linux"; chmod 755 rscli)
+# Tell dr-provision we are done
+(cd /bin; curl -s -f -L -o drpcli "{{.ProvisionerURL}}/files/drpcli.amd64.linux"; chmod 755 drpcli)
 export RS_ENDPOINT="{{.ApiURL}}"
 # This will contain a token appropriate for the path being
 # used below.  Either a create or update/show token
 export RS_TOKEN="{{.GenerateToken}}"
-rscli machines update "{{.Machine.UUID}}" '{"BootEnv": "local"}'
+drpcli machines update "{{.Machine.UUID}}" '{"BootEnv": "local"}'
 
 EOF
 

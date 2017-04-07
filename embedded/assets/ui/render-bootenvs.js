@@ -399,7 +399,7 @@ class BootEnvs extends React.Component {
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
         <span>Boot Environments</span>
         <span>
-          <a target="_blank" href="http://rocket-skates.readthedocs.io/en/latest/doc/ui.html#bootenvs">UI Help</a> | <a target="_blank" href="/swagger-ui/#/bootenvs">API Help</a>
+          <a target="_blank" href="http://provision.readthedocs.io/en/latest/doc/ui.html#bootenvs">UI Help</a> | <a target="_blank" href="/swagger-ui/#/bootenvs">API Help</a>
         </span>
       </h2>
       <table className="fullwidth input-table">

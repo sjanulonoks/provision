@@ -1,4 +1,4 @@
-package: github.com/rackn/rocket-skates
+package: github.com/digitalrebar/provision
 import:
 - package: gopkg.in/mgo.v2
   version: v2
