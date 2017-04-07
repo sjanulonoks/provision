@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rackn/rocket-skates/backend"
+	"github.com/digitalrebar/provision/backend"
 )
 
 func validateError(t *testing.T, w *httptest.ResponseRecorder, mess []string) {

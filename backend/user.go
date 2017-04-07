@@ -5,7 +5,7 @@ import (
 	sc "github.com/elithrar/simple-scrypt"
 )
 
-// User is an API user of Rocketskates
+// User is an API user of DigitalRebar Provision
 // swagger:model
 type User struct {
 	// Name is the name of the user

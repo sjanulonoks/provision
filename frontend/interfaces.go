@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
-	"github.com/rackn/rocket-skates/backend"
 )
 
 // InterfacesResponse returned on a successful GET of an interfaces

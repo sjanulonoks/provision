@@ -428,7 +428,7 @@ class Subnets extends React.Component {
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
         <span>Subnets</span>
         <span>
-          <a target="_blank" href="http://rocket-skates.readthedocs.io/en/latest/doc/ui.html#subnets">UI Help</a> | <a target="_blank" href="/swagger-ui/#/subnets">API Help</a>
+          <a target="_blank" href="http://provision.readthedocs.io/en/latest/doc/ui.html#subnets">UI Help</a> | <a target="_blank" href="/swagger-ui/#/subnets">API Help</a>
         </span>
       </h2>
 

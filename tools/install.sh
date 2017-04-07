@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -x
+
 # Figure out what Linux distro we are running on.
 export OS_TYPE= OS_VER= OS_NAME=
 
@@ -88,19 +90,22 @@ case $(uname -s) in
         bindest="/usr/local/bin"
         if [[ -d /etc/systemd/system ]]; then
             # SystemD
-            initfile="startup/rocketskates.service"
-            initdest="/etc/systemd/system/rocketskates.service"
-            starter="sudo systemctl daemon-reload && sudo systemctl start rocketskates"
+            initfile="startup/dr-provision.service"
+            initdest="/etc/systemd/system/dr-provision.service"
+            starter="sudo systemctl daemon-reload && sudo systemctl start dr-provision"
+            enabler="sudo systemctl daemon-reload && sudo systemctl enable dr-provision"
         elif [[ -d /etc/init ]]; then
             # Upstart
-            initfile="startup/rocketskates.unit"
-            initdest="/etc/init/rocketskates.conf"
-            starter="sudo service rocketskates start"
+            initfile="startup/dr-provision.unit"
+            initdest="/etc/init/dr-provision.conf"
+            starter="sudo service dr-provision start"
+            starter="sudo service dr-provision enable"
         elif [[ -d /etc/init.d ]]; then
             # SysV
-            initfile="startup/rocketskates.sysv"
-            initdest="/etc/init.d/rocketskates"
-            starter="/etc/init.d/rocketskates start"
+            initfile="startup/dr-provision.sysv"
+            initdest="/etc/init.d/dr-provision"
+            starter="/etc/init.d/dr-provision start"
+            starter="/etc/init.d/dr-provision enable"
         else
             echo "No idea how to install startup stuff -- not using systemd, upstart, or sysv init"
             exit 1
@@ -118,11 +123,13 @@ case $1 in
              sudo cp "$binpath"/* "$bindest"
              if [[ $initfile ]]; then
                  sudo cp "$initfile" "$initdest"
-                 echo "You can start the RocketSkates service with:"
+                 echo "You can start the DigitalRebar Provision service with:"
                  echo "$starter"
+                 echo "You can enable the DigitalRebar Provision service with:"
+                 echo "$enabler"
              fi;;
      remove)
-         sudo rm -f "$bindest/rocket-skates" "$bindest/rscli" "$initdest";;
+         sudo rm -f "$bindest/dr-provision" "$bindest/drpcli" "$initdest";;
      *)
          echo "Unknown action \"$1\". Please use 'install' or 'remove'";;
 esac

@@ -23,7 +23,7 @@ func TestExtractAssets(t *testing.T) {
 		"ALL-LICENSE",
 		"explode_iso.sh",
 		"files/jq",
-		"files/rscli.amd64.linux",
+		"files/drpcli.amd64.linux",
 		"bootia32.efi",
 		"bootia64.efi",
 		"esxi.0",

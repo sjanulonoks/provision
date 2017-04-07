@@ -1,4 +1,4 @@
-// Package server Rocket Skates Server
+// Package server DigitalRebar Provision Server
 //
 // An RestFUL API-driven Provisioner and DHCP server
 //
@@ -32,17 +32,17 @@ import (
 
 	"github.com/digitalrebar/digitalrebar/go/common/client"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
-	"github.com/rackn/rocket-skates"
-	"github.com/rackn/rocket-skates/backend"
-	"github.com/rackn/rocket-skates/frontend"
-	"github.com/rackn/rocket-skates/midlayer"
+	"github.com/digitalrebar/provision"
+	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/frontend"
+	"github.com/digitalrebar/provision/midlayer"
 )
 
 type ProgOpts struct {
 	VersionFlag bool `long:"version" description:"Print Version and exit"`
 
 	BackEndType string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"directory"`
-	DataRoot    string `long:"data-root" description:"Location we should store runtime information in" default:"/var/lib/rocketskates"`
+	DataRoot    string `long:"data-root" description:"Location we should store runtime information in" default:"/var/lib/dr-provision"`
 
 	OurAddress string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
 	StaticPort int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
@@ -75,12 +75,12 @@ func mkdir(d string, logger *log.Logger) {
 func Server(c_opts *ProgOpts) {
 	var err error
 
-	logger := log.New(os.Stderr, "rocket-skates ", log.LstdFlags|log.Lmicroseconds|log.LUTC)
+	logger := log.New(os.Stderr, "dr-provision", log.LstdFlags|log.Lmicroseconds|log.LUTC)
 
 	if c_opts.VersionFlag {
-		logger.Fatalf("Version: %s", rocketskates.RS_VERSION)
+		logger.Fatalf("Version: %s", provision.RS_VERSION)
 	}
-	logger.Printf("Version: %s\n", rocketskates.RS_VERSION)
+	logger.Printf("Version: %s\n", provision.RS_VERSION)
 
 	mkdir(c_opts.FileRoot, logger)
 

@@ -7,8 +7,8 @@ package server
 //go:generate swagger generate spec -i ./swagger.base.yml -o ../embedded/assets/swagger.json
 //go:generate ../tools/build-all-license.sh .. embedded/assets/ALL-LICENSE
 //go:generate ../tools/build-all-license.sh .. ALL-LICENSE
-//go:generate swagger generate client  -f ../embedded/assets/swagger.json -A RocketSkates --principal User -t .. --template-dir ../override
-//go:generate env GOOS=linux GOARCH=amd64 go build -o ../embedded/assets/rscli.amd64.linux ../cmds/rscli.go
+//go:generate swagger generate client  -f ../embedded/assets/swagger.json -A DigitalRebarProvision --principal User -t .. --template-dir ../override
+//go:generate env GOOS=linux GOARCH=amd64 go build -o ../embedded/assets/drpcli.amd64.linux ../cmds/drpcli.go
 //go:generate go-bindata -prefix ../embedded/assets -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 
 import (
@@ -17,7 +17,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/rackn/rocket-skates/embedded"
+	"github.com/digitalrebar/provision/embedded"
 )
 
 func ExtractAssets(fileRoot string) error {
@@ -34,7 +34,7 @@ func ExtractAssets(fileRoot string) error {
 		"ALL-LICENSE": "",
 
 		// CLI things
-		"rscli.amd64.linux": "files",
+		"drpcli.amd64.linux": "files",
 
 		// General ISO things
 		"explode_iso.sh": "",

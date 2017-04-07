@@ -1,5 +1,5 @@
-hash: 0f210b2a6a61249cf95a2ca24197869a90289adb599840bd6f54a060c2623096
-updated: 2017-04-04T10:31:48.436626698-05:00
+hash: a97241769746a60d2a81c4cce876091d052b51a02a780cec31ca4e912de4f0e4
+updated: 2017-04-06T22:27:10.307351505-05:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 71551cef584cae1b2e01c37e8c0e1f1160eedd6f
@@ -24,8 +24,6 @@ imports:
   - signer
 - name: github.com/dgrijalva/jwt-go
   version: d2709f9f1f31ebcda9651b03077758c1f3a0018c
-  subpackages:
-  - request
 - name: github.com/digitalrebar/digitalrebar
   version: d1a912ced52de58d8b164c415df3cd133477818b
   subpackages:

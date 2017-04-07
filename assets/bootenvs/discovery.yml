@@ -80,9 +80,9 @@ Templates:
           fi
       fi
       export RS_ENDPOINT="$(get_param "$api_re")"
-      if ! [[ -x /usr/bin/rscli ]]; then
-          curl -s -f -L -o /usr/bin/rscli "$PROVISIONER_WEB/files/rscli.amd64.linux"
-          chmod 755 /usr/bin/rscli
+      if ! [[ -x /usr/bin/drpcli ]]; then
+          curl -s -f -L -o /usr/bin/drpcli "$PROVISIONER_WEB/files/drpcli.amd64.linux"
+          chmod 755 /usr/bin/drpcli
       fi
 
       # This will contain a token appropriate for the path being
@@ -92,9 +92,9 @@ Templates:
       # See if we have already been created.
       if [[ $(cat /proc/cmdline) =~ $host_re ]]; then
           RS_UUID="${BASH_REMATCH[1]}"
-          # If we did not get a hostname from DHCP, get it from RocketSkates.
+          # If we did not get a hostname from DHCP, get it from DigitalRebar Provision.
           if [[ ! $HOSTNAME ]]; then
-              HOSTNAME="$(rscli machines show "$RS_UUID" |jq -r '.Name')"
+              HOSTNAME="$(drpcli machines show "$RS_UUID" |jq -r '.Name')"
           fi
       else
           # If we did not get a hostname from DHCP, generate one for ourselves.
@@ -108,7 +108,7 @@ Templates:
           # Create a new node for us,
           # Add the default noderoles we will need, and
           # Let the annealer do its thing.
-          while ! json="$(rscli machines create "{\"Name\": \"$HOSTNAME\",
+          while ! json="$(drpcli machines create "{\"Name\": \"$HOSTNAME\",
                                                \"Address\": \"$IP\",
                                                \"BootEnv\": \"sledgehammer\"}")"; do
               echo "We could not create a node for ourself, trying again."

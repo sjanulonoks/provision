@@ -21,8 +21,8 @@ deploy:
   api_key:
     secure: P3pJaK+kWz8gH6NNOtCuFM6tcoKvmlFxpNF43wdlBU4AMIbrhcIhh8hU3UB2x6YUYq4kD8tlIWwQOUzZ89kOwu+InCb2hmgBe+MtXKxJEQeucp8OYOmGpY85tMg13ZTF/HJt8S97xy/ofRUbfyQn8NQgC8B5bPBG7q/CnaUVqVw5YAmG8AowQvSIP7dL7OSkhv5c2bq/kSdZn7nFC2iY+7oCOr254nQuMHIKd+EA+my+WTx99U528+GsbX8CMlb7O2Nf0Xwtd1mcjawJLinAGyvqbYiC2igq5c6iA9Vl9BPUJNfuhoB5eX3NMUZ6MLH9epJ1Vo6fBinBGtywiCrazqAzCCS1EZZ57LlLZJEl7JwaQ2C7YP2MzyPbYyhlhdUMTZ0DPqnrAHBIm6gEj9Zd5RgS2Z6VPEWDuWtnPh3yjWXuHKoHI2TWWB7/tCCgzxgYM/6EKausz9xCfMnST8oaEz7sGNVXUOQWlK20qm+oix5m46MMcZSPAOWBwg4Oj7o5SBUg9TBE+ZgyG7qYYt7K1T4D2MQGPPWkfA/Xlw0+01fElct59kJO/qhuE+xHJfOUw6hpmoI4VgRtXAZqa60RJMDgF2Yj+yOjIBvlKoZH2IZh1I2rTMCHkE6pNoD1NKJXpsT2C5x7NiWhsbXE0dbqV0G9Vve0jBmYxPc1xOhgJ1U=
   file:
-    - rocketskates.zip
-    - rocketskates.sha256
+    - dr-provision.zip
+    - dr-provision.sha256
   on:
-    repo: rackn/rocket-skates
+    repo: digitalrebar/provision
     tags: true

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
-	"github.com/rackn/rocket-skates/backend"
+	"github.com/digitalrebar/provision/backend"
 )
 
 func TestSubnetList(t *testing.T) {

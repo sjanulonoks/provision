@@ -7,8 +7,8 @@ import (
 	"net"
 	"os"
 
+	"github.com/digitalrebar/provision/backend"
 	"github.com/pin/tftp"
-	"github.com/rackn/rocket-skates/backend"
 )
 
 func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error), logger *log.Logger) error {

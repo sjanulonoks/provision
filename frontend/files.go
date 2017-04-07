@@ -9,8 +9,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
-	"github.com/rackn/rocket-skates/backend"
 )
 
 type FilePaths []string

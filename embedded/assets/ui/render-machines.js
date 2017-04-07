@@ -304,7 +304,7 @@ class Machines extends React.Component {
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
         <span>Machines</span>
         <span>
-          <a target="_blank" href="http://rocket-skates.readthedocs.io/en/latest/doc/ui.html#machines">UI Help</a> | <a target="_blank" href="/swagger-ui/#/machines">API Help</a>
+          <a target="_blank" href="http://provision.readthedocs.io/en/latest/doc/ui.html#machines">UI Help</a> | <a target="_blank" href="/swagger-ui/#/machines">API Help</a>
         </span>
       </h2>
       <table className="fullwidth input-table">

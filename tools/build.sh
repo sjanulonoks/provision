@@ -3,16 +3,16 @@
 set -e
 
 if ! [[ -d assets/startup ]]; then
-    echo 'Missing required files to create a RocketSkates install package!'
+    echo 'Missing required files to create a DigitalRebar Provision install package!'
     exit 1
 fi
 
 [[ $GOPATH ]] || export GOPATH="$HOME/go"
 fgrep -q "$GOPATH/bin" <<< "$PATH" || export PATH="$PATH:$GOPATH/bin"
 
-[[ -d "$GOPATH/src/github.com/rackn/rocket-skates" ]] || go get github.com/rackn/rocket-skates
+[[ -d "$GOPATH/src/github.com/digitalrebar/provision" ]] || go get github.com/digitalrebar/provision
 
-cd "$GOPATH/src/github.com/rackn/rocket-skates"
+cd "$GOPATH/src/github.com/digitalrebar/provision"
 if ! which go &>/dev/null; then
         echo "Must have go installed"
         exit 255
@@ -53,8 +53,8 @@ for arch in "${arches[@]}"; do
             echo "Building binaries for ${arch} ${os}"
             binpath="bin/$os/$arch"
             mkdir -p "$binpath"
-            go build -o "$binpath/rocket-skates" cmds/rocket-skates.go
-            go build -o "$binpath/rscli" cmds/rscli.go
+            go build -o "$binpath/dr-provision" cmds/dr-provision.go
+            go build -o "$binpath/drpcli" cmds/drpcli.go
         )
         done
 done

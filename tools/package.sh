@@ -2,8 +2,8 @@
 
 set -e
 
-if ! [[ -x bin/linux/amd64/rocket-skates || ! -d assets/startup ]]; then
-    echo "RocketSkates has not been built!"
+if ! [[ -x bin/linux/amd64/dr-provision || ! -d assets/startup ]]; then
+    echo "dr-provision has not been built!"
     exit 1
 fi
 
@@ -24,9 +24,9 @@ cp -a bin assets/startup assets/templates assets/bootenvs tools/install.sh "$tmp
 (
     cd "$tmpdir"
     $shasum $(find . -type f) >sha256sums
-    zip -p -r rocketskates.zip *
+    zip -p -r dr-provision.zip *
 )
 
-cp "$tmpdir/rocketskates.zip" .
-$shasum rocketskates.zip > rocketskates.sha256
+cp "$tmpdir/dr-provision.zip" .
+$shasum dr-provision.zip > dr-provision.sha256
 rm -rf "$tmpdir"

@@ -18,7 +18,7 @@ func validateIP4(e *Error, a net.IP) {
 	if a == nil {
 		e.Errorf("IP Address is nil")
 	} else if !a.IsGlobalUnicast() {
-		e.Errorf("%s is not a valid IP address for rocketskates", a)
+		e.Errorf("%s is not a valid IP address for dr-provision", a)
 	}
 }
 
