@@ -48,19 +48,11 @@ ensure_packages() {
             echo "E.g: brew install libarchive"
             exit 1
         fi
-
-        if [ "${BASH_VERSINFO}" -lt 4 ] ; then
-            echo "Must have a bash version of 4 or higher"
-            echo "E.g: brew install bash"
-            exit 1
-        fi
-
         if ! which 7z &>/dev/null; then
             echo "Must have 7z"
             echo "E.g: brew install p7zip"
             exit 1
         fi
-
     else
         if ! which bsdtar &>/dev/null; then
             if [[ $OS_FAMILY == rhel ]] ; then
@@ -83,11 +75,13 @@ case $(uname -s) in
     Darwin)
         binpath="bin/darwin/amd64"
         bindest="/usr/local/bin"
+        tar="command bsdtar"
         # Someday, handle adding all the launchd stuff we will need.
         shasum="command shasum -a 256";;
     Linux)
         binpath="bin/linux/amd64"
         bindest="/usr/local/bin"
+        tar="command bsdtar"
         if [[ -d /etc/systemd/system ]]; then
             # SystemD
             initfile="startup/dr-provision.service"
@@ -113,12 +107,20 @@ case $(uname -s) in
         shasum="command sha256sum";;
     *)
         # Someday, support installing on Windows.  Service creation could be tricky.
-        echo "No idea how to check sha256sums";;
+        echo "No idea how to check sha256sums"
+        exit 1;;
 esac
 
 case $1 in
      install)
              ensure_packages
+             if [ ! -e sha256sums ] ; then
+                 curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$VERSION/dr-provision.zip
+                 curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$VERSION/dr-provision.sha256
+
+                 $shasum -c dr-provision.sha256
+                 $tar -xf dr-provision.zip
+             fi
              $shasum -c sha256sums || exit 1
              sudo cp "$binpath"/* "$bindest"
              if [[ $initfile ]]; then
