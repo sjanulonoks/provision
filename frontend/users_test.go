@@ -224,8 +224,8 @@ func TestUserPut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	var be backend.User
 	json.Unmarshal(w.Body.Bytes(), &be)
-	if bytes.Compare(be.PasswordHash, []byte("kfred")) != 0 {
-		t.Errorf("Returned User was not correct: %v %v\n", []byte("kfred"), be.PasswordHash)
+	if bytes.Compare(be.PasswordHash, []byte("")) != 0 {
+		t.Errorf("Returned User was not correct: %v %v\n", []byte(""), be.PasswordHash)
 	}
 }
 
@@ -256,8 +256,8 @@ func TestUserDelete(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	var be backend.User
 	json.Unmarshal(w.Body.Bytes(), &be)
-	if bytes.Compare(be.PasswordHash, []byte("kfred")) != 0 {
-		t.Errorf("Returned User was not correct: %v %v\n", []byte("kfred"), be.PasswordHash)
+	if bytes.Compare(be.PasswordHash, []byte("")) != 0 {
+		t.Errorf("Returned User was not correct: %v %v\n", []byte(""), be.PasswordHash)
 	}
 }
 

@@ -59,6 +59,10 @@ type DTI interface {
 	NewToken(string, int, string, string, string) (string, error)
 }
 
+type Sanitizable interface {
+	Sanitize()
+}
+
 type Frontend struct {
 	Logger     *log.Logger
 	FileRoot   string
@@ -262,7 +266,14 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
 		return
 	}
-	c.JSON(http.StatusOK, f.dt.FetchAll(ref))
+	arr := f.dt.FetchAll(ref)
+	for _, res := range arr {
+		s, ok := res.(Sanitizable)
+		if ok {
+			s.Sanitize()
+		}
+	}
+	c.JSON(http.StatusOK, arr)
 }
 
 func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
@@ -270,6 +281,10 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	if ok {
 		if !assureAuth(c, f.Logger, ref.Prefix(), "get", res.Key()) {
 			return
+		}
+		s, ok := res.(Sanitizable)
+		if ok {
+			s.Sanitize()
 		}
 		c.JSON(http.StatusOK, res)
 	} else {
@@ -300,6 +315,10 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 			c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 		}
 	} else {
+		s, ok := res.(Sanitizable)
+		if ok {
+			s.Sanitize()
+		}
 		c.JSON(http.StatusCreated, res)
 	}
 }
@@ -314,6 +333,10 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	}
 	res, err := f.dt.Patch(ref, key, patch)
 	if err == nil {
+		s, ok := res.(Sanitizable)
+		if ok {
+			s.Sanitize()
+		}
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -345,6 +368,10 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 	}
 	newThing, err := f.dt.Update(ref)
 	if err == nil {
+		s, ok := newThing.(Sanitizable)
+		if ok {
+			s.Sanitize()
+		}
 		c.JSON(http.StatusOK, newThing)
 		return
 	}
@@ -369,6 +396,10 @@ func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver) {
 			c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 		}
 	} else {
+		s, ok := res.(Sanitizable)
+		if ok {
+			s.Sanitize()
+		}
 		c.JSON(http.StatusOK, res)
 	}
 }
