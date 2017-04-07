@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 
+set -e
 
 usage() {
-	echo "Usage: $0 [--version=<Version to install>] [install|remove]
+	echo "Usage: $0 [--version=<Version to install>] [--static-ip=<published ip>]"
 	echo "Defaults are: "
 	echo "  version = tip (instead of v2.9.1003)"
+	echo "  static-ip = IP of interface with the default gateway or first global address"
 	exit 1
 }
 
+IPADDR=""
 VERSION="tip"
 args=()
 while (( $# > 0 )); do
@@ -15,6 +18,9 @@ while (( $# > 0 )); do
     arg_key="${arg%%=*}"
     arg_data="${arg#*=}"
     case $arg_key in
+        --static-ip)
+            IPADDR=$arg
+            ;;
         --help|-h)
             usage
             exit 0
@@ -75,17 +81,32 @@ case $OS_TYPE in
     *) OS_FAMILY=$OS_TYPE;;
 esac
 
+if [[ $IPADDR == "" ]] ; then
+    if [[ $OS_FAMILY == darwin ]]; then
+            echo "On Darwin, must specify --static-ip"
+            usage
+    fi
+    gwdev=$(/sbin/ip -o -4 route show default |head -1 |awk '{print $5}')
+    if [[ $gwdev ]]; then
+        # First, advertise the address of the device with the default gateway
+	IPADDR=$(/sbin/ip -o -4 addr show scope global dev "$gwdev" |head -1 |awk '{print $4}')
+    else
+        # Hmmm... we have no access to the Internet.  Pick an address with
+        # global scope and hope for the best.
+	IPADDR=$(/sbin/ip -o -4 addr show scope global |head -1 |awk '{print $4}')
+    fi
+
+    IPADDR="--static-ip=$IPADDR"
+fi
+
+
 ensure_packages() {
+    # On Macs, tar is bsdtar, but we need a good enough version
     if [[ $OS_FAMILY == darwin ]] ; then
         VER=$(tar -h | grep "bsdtar " | awk '{ print $2 }' | awk -F. '{ print $1 }')
         if [[ $VER != 3 ]] ; then
             echo "Please update tar to greater than 3.0.0"
             echo "E.g: brew install libarchive"
-            exit 1
-        fi
-        if ! which 7z &>/dev/null; then
-            echo "Must have 7z"
-            echo "E.g: brew install p7zip"
             exit 1
         fi
     else
@@ -96,12 +117,23 @@ ensure_packages() {
                 sudo apt-get install -y bsdtar
             fi
         fi
-        if ! which 7z &>/dev/null; then
-            if [[ $OS_FAMILY == rhel ]] ; then
-                sudo yum install -y p7zip
-            elif [[ $OS_FAMILY == debian ]] ; then
-                sudo apt-get install -y p7zip
+    fi
+
+    if ! which curl &>/dev/null; then
+        echo "Installing curl ..."
+        if [[ $OS_FAMILY == rhel ]] ; then
+            sudo yum install -y curl 2>/dev/null >/dev/null
+        elif [[ $OS_FAMILY == debian ]] ; then
+            sudo apt-get install -y curl 2>/dev/null >/dev/null
+            sudo updatedb 2>/dev/null >/dev/null
+        fi
+
+        if ! which curl &>/dev/null; then
+            echo "Please install curl!"
+            if [[ $(uname -s) == Darwin ]] ; then
+                echo "Something like: brew install curl"
             fi
+            exit 1
         fi
     fi
 }
@@ -109,36 +141,11 @@ ensure_packages() {
 case $(uname -s) in
     Darwin)
         binpath="bin/darwin/amd64"
-        bindest="/usr/local/bin"
-        tar="command bsdtar"
-        # Someday, handle adding all the launchd stuff we will need.
+        tar="command tar"
         shasum="command shasum -a 256";;
     Linux)
         binpath="bin/linux/amd64"
-        bindest="/usr/local/bin"
         tar="command bsdtar"
-        if [[ -d /etc/systemd/system ]]; then
-            # SystemD
-            initfile="startup/dr-provision.service"
-            initdest="/etc/systemd/system/dr-provision.service"
-            starter="sudo systemctl daemon-reload && sudo systemctl start dr-provision"
-            enabler="sudo systemctl daemon-reload && sudo systemctl enable dr-provision"
-        elif [[ -d /etc/init ]]; then
-            # Upstart
-            initfile="startup/dr-provision.unit"
-            initdest="/etc/init/dr-provision.conf"
-            starter="sudo service dr-provision start"
-            starter="sudo service dr-provision enable"
-        elif [[ -d /etc/init.d ]]; then
-            # SysV
-            initfile="startup/dr-provision.sysv"
-            initdest="/etc/init.d/dr-provision"
-            starter="/etc/init.d/dr-provision start"
-            starter="/etc/init.d/dr-provision enable"
-        else
-            echo "No idea how to install startup stuff -- not using systemd, upstart, or sysv init"
-            exit 1
-        fi
         shasum="command sha256sum";;
     *)
         # Someday, support installing on Windows.  Service creation could be tricky.
@@ -146,28 +153,22 @@ case $(uname -s) in
         exit 1;;
 esac
 
-case $1 in
-     install)
-             ensure_packages
-             if [ ! -e sha256sums ] ; then
-                 curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$VERSION/dr-provision.zip
-                 curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$VERSION/dr-provision.sha256
+ensure_packages
+curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$VERSION/dr-provision.zip
+curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$VERSION/dr-provision.sha256
 
-                 $shasum -c dr-provision.sha256
-                 $tar -xf dr-provision.zip
-             fi
-             $shasum -c sha256sums || exit 1
-             sudo cp "$binpath"/* "$bindest"
-             if [[ $initfile ]]; then
-                 sudo cp "$initfile" "$initdest"
-                 echo "You can start the DigitalRebar Provision service with:"
-                 echo "$starter"
-                 echo "You can enable the DigitalRebar Provision service with:"
-                 echo "$enabler"
-             fi;;
-     remove)
-         sudo rm -f "$bindest/dr-provision" "$bindest/drpcli" "$initdest";;
-     *)
-         echo "Unknown action \"$1\". Please use 'install' or 'remove'";;
-esac
+$shasum -c dr-provision.sha256
+$tar -xf dr-provision.zip
+$shasum -c sha256sums
+
+rm -f drpcli dr-provision
+ln -s $binpath/drpcli drpcli
+ln -s $binpath/dr-provision dr-provision
+
+sudo rm -rf drp-data
+mkdir -p drp-data
+
+./initial_load.sh &
+
+sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar
 
