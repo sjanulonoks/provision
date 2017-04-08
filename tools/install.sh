@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 
+set -e
 
 usage() {
-	echo "Usage: $0 [--version=<Version to install>] [install|remove]
+	echo "Usage: $0 [--version=<Version to install>] [--isolated] [install|remove]"
 	echo "Defaults are: "
 	echo "  version = tip (instead of v2.9.1003)"
 	exit 1
 }
 
 VERSION="tip"
+ISOLATED=false
 args=()
 while (( $# > 0 )); do
     arg="$1"
@@ -18,6 +20,9 @@ while (( $# > 0 )); do
         --help|-h)
             usage
             exit 0
+            ;;
+        --isolated)
+            ISOLATED=true
             ;;
         --*)
             arg_key="${arg_key#--}"
@@ -157,13 +162,47 @@ case $1 in
                  $tar -xf dr-provision.zip
              fi
              $shasum -c sha256sums || exit 1
-             sudo cp "$binpath"/* "$bindest"
-             if [[ $initfile ]]; then
-                 sudo cp "$initfile" "$initdest"
-                 echo "You can start the DigitalRebar Provision service with:"
-                 echo "$starter"
-                 echo "You can enable the DigitalRebar Provision service with:"
-                 echo "$enabler"
+
+             if [[ $ISOLATED == false ]] ; then
+                 sudo cp "$binpath"/* "$bindest"
+                 if [[ $initfile ]]; then
+                     sudo cp "$initfile" "$initdest"
+                     echo "You can start the DigitalRebar Provision service with:"
+                     echo "$starter"
+                     echo "You can enable the DigitalRebar Provision service with:"
+                     echo "$enabler"
+                 fi
+             else
+                 mkdir -p drp-data
+
+                 # Make local links for execs
+                 rm -f drpcli dr-provision
+                 ln -s $binpath/drpcli drpcli
+                 ln -s $binpath/dr-provision dr-provision
+
+                 if [[ $IPADDR == "" ]] ; then
+                     if [[ $OS_FAMILY == darwin ]]; then
+                         echo "On Darwin, must specify --static-ip"
+                     else
+                         gwdev=$(/sbin/ip -o -4 route show default |head -1 |awk '{print $5}')
+                         if [[ $gwdev ]]; then
+                             # First, advertise the address of the device with the default gateway
+                             IPADDR=$(/sbin/ip -o -4 addr show scope global dev "$gwdev" |head -1 |awk '{print $4}')
+                         else
+                             # Hmmm... we have no access to the Internet.  Pick an address with
+                             # global scope and hope for the best.
+                             IPADDR=$(/sbin/ip -o -4 addr show scope global |head -1 |awk '{print $4}')
+                         fi
+
+                         IPADDR="--static-ip=$IPADDR"
+                     fi
+                 fi
+
+                 echo "Run the following commands to start up dr-provision in a local isolated way."
+                 echo "The server will store information and server files from the drp-data directory."
+                 echo
+                 echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar &"
+                 echo "./discovery-load.sh"
              fi;;
      remove)
          sudo rm -f "$bindest/dr-provision" "$bindest/drpcli" "$initdest";;
