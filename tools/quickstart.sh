@@ -165,10 +165,11 @@ rm -f drpcli dr-provision
 ln -s $binpath/drpcli drpcli
 ln -s $binpath/dr-provision dr-provision
 
-sudo rm -rf drp-data
 mkdir -p drp-data
 
-./initial_load.sh &
-
-sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar
+echo "Run the following commands to start up dr-provision in a local isolated way."
+echo "The server will store information and server files from the drp-data directory."
+echo
+echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar &"
+echo "./discovery-load.sh"
 
