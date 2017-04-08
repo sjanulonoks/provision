@@ -20,7 +20,7 @@ esac
 
 
 tmpdir="$(mktemp -d /tmp/rs-bundle-XXXXXXXX)"
-cp -a bin assets/startup assets/templates assets/bootenvs tools/install.sh "$tmpdir"
+cp -a bin assets/startup assets/templates assets/bootenvs tools/install.sh tools/discovery-load.sh "$tmpdir"
 (
     cd "$tmpdir"
     $shasum $(find . -type f) >sha256sums
