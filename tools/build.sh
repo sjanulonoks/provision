@@ -53,8 +53,10 @@ for arch in "${arches[@]}"; do
             echo "Building binaries for ${arch} ${os}"
             binpath="bin/$os/$arch"
             mkdir -p "$binpath"
-            go build -o "$binpath/dr-provision" cmds/dr-provision.go
-            go build -o "$binpath/drpcli" cmds/drpcli.go
+            VERFLAGS="-X github.com/digitalrebar/provision.BuildStamp=`date -u '+%Y-%m-%d_%I:%M:%S%p'` \
+                      -X github.com/digitalrebar/provision.GitHash=`git rev-parse HEAD`" -o "$binpath/dr-provision"
+            go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision.go
+            go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli.go
         )
         done
 done
