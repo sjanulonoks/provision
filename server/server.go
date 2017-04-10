@@ -49,6 +49,7 @@ type ProgOpts struct {
 	StaticPort int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
 	TftpPort   int    `long:"tftp-port" description:"Port for the TFTP server to listen on" default:"69"`
 	ApiPort    int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
+	DhcpPort   int    `long:"dhcp-port" description:"Port for the DHCP server to listen on" default:"67"`
 
 	FileRoot string `long:"file-root" description:"Root of filesystem we should manage" default:"/var/lib/tftpboot"`
 	DevUI    string `long:"dev-ui" description:"Root of UI Pages for Development"`
@@ -153,7 +154,7 @@ func Server(c_opts *ProgOpts) {
 
 	if !c_opts.DisableDHCP {
 		logger.Printf("Starting DHCP server")
-		if err = midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces); err != nil {
+		if err = midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.DhcpPort); err != nil {
 			logger.Fatalf("Error starting DHCP server: %v", err)
 		}
 	}
