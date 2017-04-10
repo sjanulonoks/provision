@@ -3,13 +3,13 @@
 set -e
 
 usage() {
-	echo "Usage: $0 [--version=<Version to install>] [--isolated] [install|remove]"
+	echo "Usage: $0 [--rs-version=<Version to install>] [--isolated] [install|remove]"
 	echo "Defaults are: "
 	echo "  version = tip (instead of v2.9.1003)"
 	exit 1
 }
 
-VERSION="tip"
+RS_VERSION="tip"
 ISOLATED=false
 args=()
 while (( $# > 0 )); do
@@ -81,6 +81,7 @@ case $OS_TYPE in
 esac
 
 ensure_packages() {
+    echo "Ensuring required tools are installed"
     if [[ $OS_FAMILY == darwin ]] ; then
         VER=$(tar -h | grep "bsdtar " | awk '{ print $2 }' | awk -F. '{ print $1 }')
         if [[ $VER != 3 ]] ; then
@@ -95,6 +96,7 @@ ensure_packages() {
         fi
     else
         if ! which bsdtar &>/dev/null; then
+            echo "Installing bsdtar"
             if [[ $OS_FAMILY == rhel ]] ; then
                 sudo yum install -y bsdtar
             elif [[ $OS_FAMILY == debian ]] ; then
@@ -102,10 +104,11 @@ ensure_packages() {
             fi
         fi
         if ! which 7z &>/dev/null; then
+            echo "Installing bsdtar"
             if [[ $OS_FAMILY == rhel ]] ; then
-                sudo yum install -y p7zip
+                sudo yum install -y p7zip-full
             elif [[ $OS_FAMILY == debian ]] ; then
-                sudo apt-get install -y p7zip
+                sudo apt-get install -y p7zip-full
             fi
         fi
     fi
@@ -155,8 +158,9 @@ case $1 in
      install)
              ensure_packages
              if [ ! -e sha256sums ] ; then
-                 curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$VERSION/dr-provision.zip
-                 curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$VERSION/dr-provision.sha256
+                 echo "Installing Version $RS_VERSION of Digital Rebar Provision"
+                 curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$RS_VERSION/dr-provision.zip
+                 curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$RS_VERSION/dr-provision.sha256
 
                  $shasum -c dr-provision.sha256
                  $tar -xf dr-provision.zip
