@@ -2,11 +2,6 @@
 
 set -e
 
-if ! [[ -d assets/startup ]]; then
-    echo 'Missing required files to create a DigitalRebar Provision install package!'
-    exit 1
-fi
-
 [[ $GOPATH ]] || export GOPATH="$HOME/go"
 fgrep -q "$GOPATH/bin" <<< "$PATH" || export PATH="$PATH:$GOPATH/bin"
 
