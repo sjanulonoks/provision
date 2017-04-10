@@ -533,6 +533,7 @@ class Token extends React.Component {
   }
 
   setToken(token) {
+    var bootenvs = []
     var send_token = "Bearer " + token;
     if (token.length < 80)
       send_token = "Basic " + btoa(token);
@@ -541,12 +542,16 @@ class Token extends React.Component {
         'Authorization' : send_token
       }
     });
-    $.getJSON("../api/v3/prefs", data => { 
+    $.getJSON("../api/v3/bootenvs", data => {
+      for(var key in data) {
+        if (data[key].Available)
+          bootenvs.push(data[key].Name)
+      }
       this.setState({code: 200, token: token});
-      this.props.onAccessChange(true);
+      this.props.onAccessChange(true, bootenvs);
     }).fail((jqXHR, textStatus, errorThrown) => {
       this.setState({code: jqXHR.status, token: token});
-      this.props.onAccessChange(false);
+      this.props.onAccessChange(false, bootenvs);
     });
   }
 
@@ -700,8 +705,6 @@ class Machines extends React.Component {
 
     this.state = {
       machines: [],
-      // hack for now.  ideally, we'd pull this from the bootenvs!
-      bootenvs: []
     };
 
     this.componentDidMount = this.componentDidMount.bind(this);
@@ -719,17 +722,8 @@ class Machines extends React.Component {
       // get the interfaces from the api
       $.getJSON("../api/v3/machines", data => {
 
-        // add get bootenvs from the api and update the state
-        // header Authorization:Bearer [string]
-        $.getJSON("../api/v3/bootenvs", data2 => {
-          for(var key in data2) {
-            if (data2[key].Available)
-              bootenvs.push(data2[key].Name)
-          }
-          resolve({
-            machines: data,
-            bootenvs: bootenvs,
-          });
+        resolve({
+          machines: data
         });
 
       }).fail(() => {
@@ -743,8 +737,7 @@ class Machines extends React.Component {
   componentDidMount() {
     this.getMachines().then(data => {
       this.setState({
-        machines: data.machines,
-        bootenvs: data.bootenvs
+        machines: data.machines
       }, err => {
         // rejected ?? 
       });
@@ -891,7 +884,7 @@ class Machines extends React.Component {
         {this.state.machines.map((val, i) =>
           <Machine
             machine={val}
-            bootenvs={this.state.bootenvs}
+            bootenvs={this.props.bootenvs}
             update={this.updateMachine}
             change={this.changeMachine}
             remove={this.removeMachine}
@@ -911,6 +904,135 @@ class Machines extends React.Component {
     );
   }
 }
+
+class Prefs extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      prefs: {},
+      updated: false
+    };
+
+    this.componentDidMount = this.componentDidMount.bind(this);
+    this.changePrefs = this.changePrefs.bind(this);
+    this.updatePrefs = this.updatePrefs.bind(this);
+    this.handleChange = this.handleChange.bind(this);
+  }
+
+  // gets the machine json from the api
+  getPrefs() {
+    return new Promise((resolve, reject) => {
+      $.getJSON("../api/v3/prefs", data => {
+        resolve({
+          prefs: data
+        });
+      }).fail(() => {
+        reject("Failed getting Prefs");
+      });
+    });
+  }
+
+  // get the machine once this component mounts
+  componentDidMount() {
+    this.getPrefs().then(data => {
+      this.setState({
+        prefs: data.prefs
+      }, err => {
+        // rejected ??
+      });
+    });
+  }
+
+  // makes the put request to update the param
+  updatePrefs() {
+    var prefs = this.state.prefs;
+
+    $.ajax({
+      type: "POST",
+      dataType: "json",
+      contentType: "application/json",
+      url: "/api/v3/prefs",
+      data: JSON.stringify(prefs)
+    }).done((resp) => {
+      this.setState({
+        prefs: prefs,
+        updated: false
+      });
+    }).fail((err) => {
+      this.onAccessChange(false);
+    });
+  }
+
+  // updates the state and changes a param at a specified index
+  changePrefs(name, value) {
+    var prefs = this.state.prefs;
+    prefs[name] = value;
+    this.setState({
+      prefs: prefs,
+      updated: true
+    });
+  }
+
+  // called when an option input is changed
+  handleChange(event) {
+    var name = event.target.name;
+    var val = event.target.value;
+    this.changePrefs(name, val);
+  }
+
+  render() {
+    return (
+    <div>
+      <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
+      <span>Preferences</span>
+      <span>
+        <a target="_blank" href="http://provision.readthedocs.io/en/latest/doc/ui.html#prefs">UI Help</a> | <a target="_blank" href="/swagger-ui/#/prefs">API Help</a>
+      </span>
+      </h2>
+      <table className="fullwidth input-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Value</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.keys(this.state.prefs).map((val, i) =>
+            <tr key={i}>
+              <td>{val}</td>
+              <td>
+              {( val.indexOf("BootEnv") > 0
+                ?  <select
+                    name={val}
+                    type="bool"
+                    value={this.state.prefs[val]}
+                    onChange={this.handleChange}>
+                    { this.props.bootenvs.map((v) =>
+                      <option key={v} value={v}>{v}</option>
+                    )}
+                  </select>
+                : <input
+                    type="text"
+                    name={val}
+                    size="10"
+                    value={this.state.prefs[val]}
+                    onChange={this.handleChange} />
+              )}
+              </td>
+              <td>
+                {(this.state.updated && Object.keys(this.state.prefs).length-1 == i ? <button onClick={this.updatePrefs}>Update</button> : '')}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+    );
+  }
+}
+
 
 class BootEnv extends React.Component {
 
@@ -1349,7 +1471,8 @@ class Page extends React.Component {
     super(props);
 
     this.state = {
-      access: false
+      access: false,
+      bootenvs: []
     };
 
     this.onAccessChange = this.onAccessChange.bind(this);
@@ -1361,12 +1484,13 @@ class Page extends React.Component {
   }
 
   // called when an input changes
-  onAccessChange(access) {
-    this.setState({access: access});
+  onAccessChange(access, bootenvs) {
+    this.setState({access: access, bootenvs: bootenvs});
   }
 
   render() {
     const access = this.state.access;
+    const bootenvs = this.state.bootenvs;
     if (access) {
       return (
         <div id="swagger-ui-container" className="swagger-ui-wrap">
@@ -1378,15 +1502,25 @@ class Page extends React.Component {
             style={{paddingTop: '51px'}}
             onAccessChange={this.onAccessChange} />
           <hr/>
+          <Prefs
+            style={{paddingTop: '51px'}}
+            bootenvs={bootenvs}
+            onAccessChange={this.onAccessChange} />
+          <hr/>
           <Machines
             style={{paddingTop: '51px'}}
+            bootenvs={bootenvs}
             onAccessChange={this.onAccessChange} />
         </div>
       );
     }
     return (
       <div>
-        <center><Token access={access} onAccessChange={this.onAccessChange} /></center>
+        <center>
+          <Token
+            access={access}
+            onAccessChange={this.onAccessChange} />
+        </center>
       </div>
     );
   }
