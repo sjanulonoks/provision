@@ -2,14 +2,26 @@
 
 set -e
 
+DEFAULT_RS_VERSION="tip"
+
 usage() {
-	echo "Usage: $0 [--rs-version=<Version to install>] [--isolated] [install|remove]"
+	echo "Usage: $0 [--rs-version=<Version to install>] [--isolated] <install|remove>"
+        echo "Options:"
+        echo "  --debug=[true|false] # Enables debug output"
+        echo "  --isolated # Sets up the current directory as a place to the cli and provision"
+        echo "  --rs-version=<string>  # Version identifier if downloading.  Defaults to $DEFAULT_RS_VERSION"
+        echo
+        echo "  install    # Sets up an insolated or system enabled install.  Outputs nexts steps"
+        echo "  remove     # Removes the system enabled install.  Requires no other flags"
 	echo "Defaults are: "
 	echo "  version = tip (instead of v2.9.1003)"
+        echo "  isolated = false"
+        echo "  force = false"
+        echo "  debug = false"
 	exit 1
 }
 
-RS_VERSION="tip"
+RS_VERSION=$DEFAULT_RS_VERSION
 ISOLATED=false
 args=()
 while (( $# > 0 )); do
@@ -157,15 +169,26 @@ esac
 case $1 in
      install)
              ensure_packages
-             if [ ! -e sha256sums ] ; then
-                 echo "Installing Version $RS_VERSION of Digital Rebar Provision"
-                 curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$RS_VERSION/dr-provision.zip
-                 curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$RS_VERSION/dr-provision.sha256
+             # Are we in a build tree
+             if [ -e server ] ;; then
+                 if [ ! -e bin/linux/amd64/drpcli ] ; then
+                     echo "It appears that nothing has been built."
+                     echo "Please run tools/build.sh and then rerun this command".
+                     exit 1
+                 fi
+             else
+                 # We aren't a build tree, but are we extracted install yet?
+                 # If not, get the requested version.
+                 if [[ ! -e sha256sums || $force ]] ; then
+                     echo "Installing Version $RS_VERSION of Digital Rebar Provision"
+                     curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$RS_VERSION/dr-provision.zip
+                     curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$RS_VERSION/dr-provision.sha256
 
-                 $shasum -c dr-provision.sha256
-                 $tar -xf dr-provision.zip
+                     $shasum -c dr-provision.sha256
+                     $tar -xf dr-provision.zip
+                 fi
+                 $shasum -c sha256sums || exit 1
              fi
-             $shasum -c sha256sums || exit 1
 
              if [[ $ISOLATED == false ]] ; then
                  sudo cp "$binpath"/* "$bindest"
