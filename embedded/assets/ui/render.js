@@ -185,6 +185,7 @@ class Subnet extends React.Component {
                           value={val.Value}
                           onChange={this.handleOptionChange}/>
                       </td>
+                      <td>Option # {val.Code}</td>
                     </tr>
                   )}
                 </tbody>
@@ -272,21 +273,27 @@ class Subnets extends React.Component {
   // called to create a new subnet
   // allows some data other than defaults to be passed in
   addSubnet(template) {
+    var ip;
+    if (template.IP) {
+      var fq = template.IP.indexOf('/');
+      ip = template.IP.substring(0,fq);
+    }
     var subnet = {
       _new: true,
       Name: '',
       ActiveLeaseTime: 60,
       ReservedLeaseTime: 7200,
       OnlyReservations: false,
-      ActiveStart: '',
+      ActiveStart: (ip ? ip+'0' : ''),
       Subnet: '',
-      ActiveEnd: '',
+      ActiveEnd: (ip ? ip+'9' : ''),
       Strategy: "MAC",
+      NextServer: (ip || ''),
       Options: [
-        {Code: 3, Value: ''},
-        {Code: 6, Value: ''},
-        {Code: 15, Value: ''},
-        {Code: 67, Value: ''}
+        {Code: 3, Value: (ip || '')},
+        {Code: 6, Value: (ip || '')},
+        {Code: 15, Value: 'example.com'},
+        {Code: 67, Value: 'lpxelinux.0'}
       ]
     };
 
@@ -343,8 +350,17 @@ class Subnets extends React.Component {
       
       //  update the state
       subnets[i] = resp;
+
+      // remove matching interfaces
+      var interfaces = this.state.interfaces.concat([]);
+      for (var index in interfaces) {
+        if (interfaces[index].Name == resp.Name)
+          interfaces.splice(index)
+        }
+
       this.setState({
-        subnets: subnets
+        subnets: subnets,
+        interfaces: interfaces
       });
 
     }).fail((err) => {
@@ -467,7 +483,7 @@ class Subnets extends React.Component {
         <span className="interface-list">
           {this.state.interfaces.map((val) => 
             val.Addresses.map((subval, i) =>
-              <a key={val.Name+"-"+i} className="interface-pair" onClick={()=>this.addSubnet({Name: val.Name, Subnet: subval})}>
+              <a key={val.Name+"-"+i} className="interface-pair" onClick={()=>this.addSubnet({Name: val.Name, Subnet: subval, Interface: val.Name, IP: subval})}>
                 <header>{val.Name}</header>
                 <subhead>{subval}</subhead>
               </a>
@@ -818,7 +834,7 @@ class Machines extends React.Component {
       contentType: "application/json",
       url: "/api/v3/machines/" + machine.Uuid,
     }).done((resp) => {
-            // update the subnets list with our new interface
+      // update the subnets list with our new interface
       var machines = this.state.machines.concat([]);
       machines.splice(i, 1);
       this.setState({
