@@ -215,9 +215,6 @@ func TestUIBase(t *testing.T) {
 	if !bytes.Contains(uibody, []byte("<title>Digital Rebar: Provision</title>")) {
 		t.Errorf("Digital Rebar: Provision Title Missing %v\n", uibody)
 	}
-	if bytes.Contains(uibody, []byte("<title>DR:P Dev Mode</title>")) {
-		t.Errorf("Digital Rebar: Provision Dev Mode Title SHOULD NOT BE PRESENT %v\n", uibody)
-	}
 }
 
 func TestUIDev(t *testing.T) {
