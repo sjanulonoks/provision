@@ -44,6 +44,51 @@ done
 glide install
 rm -rf client models embedded/assets/swagger.json
 go generate server/assets.go
+
+
+TAG=$(git describe --tags --abbrev=1000)
+if [[ $TAG == tip ]] ; then
+    TAG=$(git describe --tags --abbrev=1000 HEAD^2)
+fi
+
+tag_re='([^-]+)-([^-]+)-g([^ ]+)'
+semver_re='v([0-9]+).([0-9]+).([0-9]+)'
+if [[ $TAG =~ $tag_re ]]; then
+            BASE="${BASH_REMATCH[1]}"
+            AHEAD="${BASH_REMATCH[2]}"
+            GITHASH="${BASH_REMATCH[3]}"
+fi
+
+if [[ $BASE == tip ]] ; then
+        MajorV="tip"
+        MinorV=$(whoami)
+        PatchV=$AHEAD
+        Extra="-dev"
+        Prepart=""
+elif [[ $BASE =~ $semver_re ]] ; then
+        MajorV=${BASH_REMATCH[1]}
+        MinorV=${BASH_REMATCH[2]}
+        PatchV=${BASH_REMATCH[3]}
+        Extra="-$AHEAD"
+        Prepart="v"
+else
+        MajorV="$BASE"
+        MinorV=$(whoami)
+        PatchV=$AHEAD
+        Extra="-strange"
+        Prepart=""
+fi
+
+echo "Version = $Prepart$MajorV.$MinorV.$PatchV$Extra-$GITHASH"
+
+VERFLAGS="-X github.com/digitalrebar/provision.RS_MAJOR_VERSION=$MajorV \
+          -X github.com/digitalrebar/provision.RS_MINOR_VERSION=$MinorV \
+          -X github.com/digitalrebar/provision.RS_PATCH_VERSION=$PatchV \
+          -X github.com/digitalrebar/provision.RS_EXTRA=$Extra \
+          -X github.com/digitalrebar/provision.RS_PREPART=$Prepart \
+          -X github.com/digitalrebar/provision.BuildStamp=`date -u '+%Y-%m-%d_%I:%M:%S%p'` \
+          -X github.com/digitalrebar/provision.GitHash=$GITHASH"
+
 arches=("amd64")
 oses=("linux" "darwin" "windows")
 for arch in "${arches[@]}"; do
@@ -53,8 +98,6 @@ for arch in "${arches[@]}"; do
             echo "Building binaries for ${arch} ${os}"
             binpath="bin/$os/$arch"
             mkdir -p "$binpath"
-            VERFLAGS="-X github.com/digitalrebar/provision.BuildStamp=`date -u '+%Y-%m-%d_%I:%M:%S%p'` \
-                      -X github.com/digitalrebar/provision.GitHash=`git rev-parse HEAD`" -o "$binpath/dr-provision"
             go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision.go
             go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli.go
         )
