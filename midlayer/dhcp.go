@@ -31,6 +31,7 @@ func MacStrategy(p dhcp.Packet, options dhcp.Options) string {
 
 type DhcpHandler struct {
 	ifs    []string
+	port   int
 	conn   *ipv4.PacketConn
 	bk     *backend.DataTracker
 	cm     *ipv4.ControlMessage
@@ -208,7 +209,7 @@ func (h *DhcpHandler) listenOn(testAddr net.IP) bool {
 }
 
 func (h *DhcpHandler) Serve() error {
-	l, err := net.ListenPacket("udp4", ":67")
+	l, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", h.port))
 	if err != nil {
 		return err
 	}
@@ -398,7 +399,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 	return nil
 }
 
-func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string) error {
+func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string, dhcpPort int) error {
 	ifs := []string{}
 	if dhcpIfs != "" {
 		ifs = strings.Split(dhcpIfs, ",")
@@ -406,6 +407,7 @@ func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string) error {
 	handler := &DhcpHandler{
 		ifs:    ifs,
 		bk:     dhcpInfo,
+		port:   dhcpPort,
 		strats: []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
 	}
 	go func() {
