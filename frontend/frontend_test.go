@@ -212,8 +212,8 @@ func TestUIBase(t *testing.T) {
 	if len(uibody) == 0 {
 		t.Errorf("Response should not be an empty set, but got: %d\n", len(uibody))
 	}
-	if !bytes.Contains(uibody, []byte("<title>DigitalRebar Provision</title>")) {
-		t.Errorf("DigitalRebar Provision Title Missing %v\n", uibody)
+	if !bytes.Contains(uibody, []byte("<title>Digital Rebar: Provision</title>")) {
+		t.Errorf("Digital Rebar: Provision Title Missing %v\n", uibody)
 	}
 }
 
@@ -228,7 +228,7 @@ func TestUIDev(t *testing.T) {
 		t.Errorf("Response should not be an empty set, but got: %d\n", len(uibody))
 	}
 	if !bytes.Contains(uibody, []byte("<title>Test DRP</title>")) {
-		t.Errorf("DigitalRebar Provision Title Missing %v\n", uibody)
+		t.Errorf("Digital Rebar UI Dev Mode Not Working! %v\n", uibody)
 	}
 }
 
