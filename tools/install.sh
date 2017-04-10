@@ -127,19 +127,19 @@ case $(uname -s) in
         tar="command bsdtar"
         if [[ -d /etc/systemd/system ]]; then
             # SystemD
-            initfile="startup/dr-provision.service"
+            initfile="assets/startup/dr-provision.service"
             initdest="/etc/systemd/system/dr-provision.service"
             starter="sudo systemctl daemon-reload && sudo systemctl start dr-provision"
             enabler="sudo systemctl daemon-reload && sudo systemctl enable dr-provision"
         elif [[ -d /etc/init ]]; then
             # Upstart
-            initfile="startup/dr-provision.unit"
+            initfile="assets/startup/dr-provision.unit"
             initdest="/etc/init/dr-provision.conf"
             starter="sudo service dr-provision start"
             starter="sudo service dr-provision enable"
         elif [[ -d /etc/init.d ]]; then
             # SysV
-            initfile="startup/dr-provision.sysv"
+            initfile="assets/startup/dr-provision.sysv"
             initdest="/etc/init.d/dr-provision"
             starter="/etc/init.d/dr-provision start"
             starter="/etc/init.d/dr-provision enable"
@@ -206,7 +206,7 @@ case $1 in
                  echo "The server will store information and server files from the drp-data directory."
                  echo
                  echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar &"
-                 echo "./discovery-load.sh"
+                 echo "tools/discovery-load.sh"
              fi;;
      remove)
          sudo rm -f "$bindest/dr-provision" "$bindest/drpcli" "$initdest";;
