@@ -24,6 +24,7 @@ deploy:
   file:
     - dr-provision.zip
     - dr-provision.sha256
+    - embedded/assets/swagger.json
   skip_cleanup: true
   on:
     repo: digitalrebar/provision
