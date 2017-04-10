@@ -501,13 +501,13 @@ class Token extends React.Component {
       0: "API Unreachable",
       1: " ",
       200: "Granted",
-      401: "No Token",
-      403: "Invalid Token"
+      401: "No Credentials/Token",
+      403: "Invalid Credentials/Token"
     };
     return codes[this.state.code] || "Code " + this.state.code;
   }
 
-  // get the page and interfaces once this component mounts
+  // get the page and intferfaces once this component mounts
   componentDidMount() {
     if (location.search.startsWith("?token=")) {
       var t = location.search.substring(7);
@@ -517,12 +517,14 @@ class Token extends React.Component {
   }
 
   setToken(token) {
+    var send_token = "Bearer " + token;
+    if (token.length < 80)
+      send_token = "Basic " + btoa(token);
     $.ajaxSetup({
       headers : {
-        'Authorization' : 'Bearer ' + token
+        'Authorization' : send_token
       }
     });
-    // get the interfaces from the api
     $.getJSON("../api/v3/prefs", data => { 
       this.setState({code: 200, token: token});
       this.props.onAccessChange(true);
@@ -540,12 +542,12 @@ class Token extends React.Component {
   render() {
     return (
       <div>
-        Access Token: 
+        Username:Password (or Token): 
         <input
           type="text"
           name="token"
           size="15"
-          placeholder="no_token"
+          placeholder="user:password"
           value={this.state.token}
           onChange={this.handleChange} />
         <strong>{this.getCodeName()}</strong>
