@@ -5,7 +5,9 @@ set -e
 DEFAULT_RS_VERSION="tip"
 
 usage() {
+        echo
 	echo "Usage: $0 [--rs-version=<Version to install>] [--isolated] <install|remove>"
+        echo
         echo "Options:"
         echo "  --debug=[true|false] # Enables debug output"
         echo "  --isolated # Sets up the current directory as a place to the cli and provision"
@@ -148,13 +150,13 @@ case $(uname -s) in
             initfile="assets/startup/dr-provision.unit"
             initdest="/etc/init/dr-provision.conf"
             starter="sudo service dr-provision start"
-            starter="sudo service dr-provision enable"
+            enabler="sudo service dr-provision enable"
         elif [[ -d /etc/init.d ]]; then
             # SysV
             initfile="assets/startup/dr-provision.sysv"
             initdest="/etc/init.d/dr-provision"
             starter="/etc/init.d/dr-provision start"
-            starter="/etc/init.d/dr-provision enable"
+            enabler="/etc/init.d/dr-provision enable"
         else
             echo "No idea how to install startup stuff -- not using systemd, upstart, or sysv init"
             exit 1
@@ -226,7 +228,7 @@ case $1 in
                  fi
 
                  echo "Run the following commands to start up dr-provision in a local isolated way."
-                 echo "The server will store information and server files from the drp-data directory."
+                 echo "The server will store information and server files in the drp-data directory."
                  echo
                  echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar &"
                  echo "tools/discovery-load.sh"

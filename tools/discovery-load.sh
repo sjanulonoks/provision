@@ -7,12 +7,14 @@ if [ ! -e assets ] ; then
         exit 1
 fi
 
+export PATH=$PATH:`pwd`
+
 cd assets
 
 export RS_KEY=${RS_KEY:-rocketskates:r0cketsk8ts}
-./drpcli bootenvs install bootenvs/local.yml
-./drpcli bootenvs install bootenvs/discovery.yml
-./drpcli bootenvs install bootenvs/sledgehammer.yml
+drpcli bootenvs install bootenvs/local.yml
+drpcli bootenvs install bootenvs/discovery.yml
+drpcli bootenvs install bootenvs/sledgehammer.yml
 
-./drpcli set prefs unknownBootEnv discovery defaultBootEnv sledgehammer
+drpcli set prefs unknownBootEnv discovery defaultBootEnv sledgehammer
 
