@@ -172,7 +172,7 @@ case $1 in
      install)
              ensure_packages
              # Are we in a build tree
-             if [ -e server ] ;; then
+             if [ -e server ] ; then
                  if [ ! -e bin/linux/amd64/drpcli ] ; then
                      echo "It appears that nothing has been built."
                      echo "Please run tools/build.sh and then rerun this command".
