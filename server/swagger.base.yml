@@ -5,3 +5,16 @@ securityDefinitions:
     type: apiKey
     name: Authorization
     in: header
+tags:
+  - name: BootEnvs
+  - name: Templates
+  - name: Files
+  - name: Interfaces
+  - name: Isos
+  - name: Subnets
+  - name: Reservations
+  - name: Prefs
+  - name: Params
+  - name: Leases
+  - name: Machines
+  - name: Users
