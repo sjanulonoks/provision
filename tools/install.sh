@@ -100,7 +100,13 @@ ensure_packages() {
         VER=$(tar -h | grep "bsdtar " | awk '{ print $2 }' | awk -F. '{ print $1 }')
         if [[ $VER != 3 ]] ; then
             echo "Please update tar to greater than 3.0.0"
-            echo "E.g: brew install libarchive"
+            echo 
+            echo "E.g: "
+            echo "  brew install libarchive --force"
+            echo "  brew link libarchive --force"
+            echo
+            echo "Close current terminal and open a new terminal"
+            echo
             exit 1
         fi
         if ! which 7z &>/dev/null; then
