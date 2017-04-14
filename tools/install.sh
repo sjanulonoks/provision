@@ -223,7 +223,7 @@ case $1 in
                              IPADDR=$(/sbin/ip -o -4 addr show scope global |head -1 |awk '{print $4}')
                          fi
 
-                         IPADDR="--static-ip=$IPADDR"
+                         IPADDR="--static-ip=${IPADDR///*}"
                      fi
                  fi
 
