@@ -2,16 +2,19 @@
 
 set -e
 
-DEFAULT_RS_VERSION="tip"
+DEFAULT_RS_VERSION="stable"
 
 usage() {
         echo
-	echo "Usage: $0 [--rs-version=<Version to install>] [--isolated] <install|remove>"
+	echo "Usage: $0 [--rs-version=<Version to install>] [--isolated] [--ipaddr=<ip>] <install|remove>"
         echo
         echo "Options:"
         echo "  --debug=[true|false] # Enables debug output"
         echo "  --isolated # Sets up the current directory as a place to the cli and provision"
-        echo "  --rs-version=<string>  # Version identifier if downloading.  Defaults to $DEFAULT_RS_VERSION"
+        echo "  --ipaddr=<ip> # The IP to use for the system identified IP.  The system will attempt to discover the value"
+        echo "                # if not specified"
+        echo "  --rs-version=<string>  # Version identifier if downloading.  stable, tip, or specific version label."
+        echo "                         # Defaults to $DEFAULT_RS_VERSION"
         echo
         echo "  install    # Sets up an insolated or system enabled install.  Outputs nexts steps"
         echo "  remove     # Removes the system enabled install.  Requires no other flags"
@@ -20,6 +23,7 @@ usage() {
         echo "  isolated = false"
         echo "  force = false"
         echo "  debug = false"
+        echo
 	exit 1
 }
 
@@ -215,9 +219,18 @@ case $1 in
                  ln -s $binpath/drpcli drpcli
                  ln -s $binpath/dr-provision dr-provision
 
+                 echo "Run the following commands to start up dr-provision in a local isolated way."
+                 echo "The server will store information and server files in the drp-data directory."
+                 echo
+
                  if [[ $IPADDR == "" ]] ; then
                      if [[ $OS_FAMILY == darwin ]]; then
-                         echo "On Darwin, must specify --static-ip"
+                         ifdefgw=$(netstat -rn -f inet | grep default | awk '{ print $6 }')
+                         if [[ $ifdefgw ]] ; then
+                                 IPADDR=$(ifconfig en0 | grep 'inet ' | awk '{ print $2 }')
+                         else
+                                 IPADDR=$(ifconfig -a | grep "inet " | grep broadcast | head -1 | awk '{ print $2 }')
+                         fi
                      else
                          gwdev=$(/sbin/ip -o -4 route show default |head -1 |awk '{print $5}')
                          if [[ $gwdev ]]; then
@@ -228,16 +241,24 @@ case $1 in
                              # global scope and hope for the best.
                              IPADDR=$(/sbin/ip -o -4 addr show scope global |head -1 |awk '{print $4}')
                          fi
+                     fi
+                 fi
+                 if [[ $IPADDR ]] ; then
+                     IPADDR="--static-ip=${IPADDR///*}"
+                 fi
 
-                         IPADDR="--static-ip=${IPADDR///*}"
+                 if [[ $OS_FAMILY == darwin ]]; then
+                     bcast=$(netstat -rn | grep "255.255.255.255 " | awk '{ print $6 }')
+                     if [[ $bcast == "" && $IPADDR ]] ; then
+                             echo "# No broadcast route set - this is required for Darwin."
+                             echo "sudo route add 255.255.255.255 $IPADDR"
                      fi
                  fi
 
-                 echo "Run the following commands to start up dr-provision in a local isolated way."
-                 echo "The server will store information and server files in the drp-data directory."
-                 echo
                  echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar &"
+                 echo
                  echo "tools/discovery-load.sh"
+                 echo
              fi;;
      remove)
          sudo rm -f "$bindest/dr-provision" "$bindest/drpcli" "$initdest";;
