@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -46,16 +48,11 @@ type TemplateInfo struct {
 	pathTmpl *template.Template
 }
 
-func (t *TemplateInfo) contents(dt *DataTracker) (*Template, bool) {
-	if t.ID != "" {
-		res, found := dt.fetchOne(dt.NewTemplate(), t.ID)
-		if found {
-			return AsTemplate(res), found
-		}
-		return nil, found
-	} else {
-		return &Template{ID: t.Name, Contents: t.Contents}, true
+func (ti *TemplateInfo) id() string {
+	if ti.ID == "" {
+		return ti.Name
 	}
+	return ti.ID
 }
 
 // OsInfo holds information about the operating system this BootEnv
@@ -155,6 +152,8 @@ type BootEnv struct {
 	OnlyUnknown    bool
 	bootParamsTmpl *template.Template
 	p              *DataTracker
+	rootTemplate   *template.Template
+	tmplMux        sync.Mutex
 }
 
 func (b *BootEnv) Backend() store.SimpleStore {
@@ -173,14 +172,28 @@ func (b *BootEnv) localPathFor(f string) string {
 	return path.Join(b.p.FileRoot, b.pathFor(f))
 }
 
-func (b *BootEnv) parseTemplates(e *Error) {
+func (b *BootEnv) genRoot(commonRoot *template.Template, e *Error) *template.Template {
+	var res *template.Template
+	var err error
+	if commonRoot == nil {
+		res = template.New("")
+	} else {
+		res, err = commonRoot.Clone()
+	}
+	if err != nil {
+		e.Errorf("Error cloning commonRoot: %v", err)
+		return nil
+	}
+	buf := &bytes.Buffer{}
 	for i := range b.Templates {
 		ti := &b.Templates[i]
 		if ti.Name == "" {
 			e.Errorf("Templates[%d] has no Name", i)
+			continue
 		}
 		if ti.Path == "" {
 			e.Errorf("Templates[%d] has no Path", i)
+			continue
 		} else {
 			pathTmpl, err := template.New(ti.Name).Parse(ti.Path)
 			if err != nil {
@@ -194,16 +207,20 @@ func (b *BootEnv) parseTemplates(e *Error) {
 			}
 		}
 		if ti.ID != "" {
-			tmpl := b.p.NewTemplate()
-			if _, found := b.p.fetchOne(tmpl, ti.ID); !found {
-				e.Errorf("Templates[%d] wants Template %s, which does not exist",
-					i,
-					ti.ID)
+			if res.Lookup(ti.ID) == nil {
+				e.Errorf("Templates[%d]: No common template for %s", i, ti.ID)
 			}
-		} else if ti.Contents == "" {
-			e.Errorf("Templates[%d] has neither ID nor Contents, one of the other must be non-empty.", i)
+			continue
 		}
-
+		if ti.Contents == "" {
+			e.Errorf("Templates[%d] has both an empty ID and contents", i)
+		}
+		fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}\n`, ti.Name, ti.Contents)
+	}
+	_, err = res.Parse(buf.String())
+	if err != nil {
+		e.Errorf("Error parsing inline templates: %v", err)
+		return nil
 	}
 	if b.BootParams != "" {
 		tmpl, err := template.New("machine").Parse(b.BootParams)
@@ -213,12 +230,19 @@ func (b *BootEnv) parseTemplates(e *Error) {
 			b.bootParamsTmpl = tmpl.Option("missingkey=error")
 		}
 	}
-	return
+	if e.containsError {
+		return nil
+	}
+	return res
 }
 
 func (b *BootEnv) OnLoad() error {
 	e := &Error{o: b}
-	b.parseTemplates(e)
+	b.tmplMux.Lock()
+	defer b.tmplMux.Unlock()
+	b.p.tmplMux.Lock()
+	defer b.p.tmplMux.Unlock()
+	b.rootTemplate = b.genRoot(b.p.rootTemplate, e)
 	b.Errors = e.Messages
 	b.Available = !e.containsError
 	return nil
@@ -304,10 +328,16 @@ func (b *BootEnv) explodeIso(e *Error) {
 func (b *BootEnv) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: b}
 	// If our basic templates do not parse, it is game over for us
-	b.parseTemplates(e)
-	if e.containsError {
+	b.p.tmplMux.Lock()
+	b.tmplMux.Lock()
+	root := b.genRoot(b.p.rootTemplate, e)
+	b.p.tmplMux.Unlock()
+	if root == nil {
+		b.tmplMux.Unlock()
 		return e
 	}
+	b.rootTemplate = root
+	b.tmplMux.Unlock()
 	// Otherwise, we will save the BootEnv, but record
 	// the list of errors and mark it as not available.
 	//
