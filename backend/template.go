@@ -1,8 +1,8 @@
 package backend
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"text/template"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
@@ -23,9 +23,8 @@ type Template struct {
 	// according to text/template.
 	//
 	// required: true
-	Contents   string
-	parsedTmpl *template.Template
-	p          *DataTracker
+	Contents string
+	p        *DataTracker
 }
 
 func (t *Template) Prefix() string {
@@ -53,27 +52,67 @@ func (t *Template) List() []*Template {
 	return AsTemplates(t.p.FetchAll(t))
 }
 
-// Parse checks to make sure the template contents are valid according to text/template.
-func (t *Template) parse() error {
-	e := &Error{Code: 422, Type: ValidationError, o: t}
-	parsedTmpl, err := template.New(t.ID).Parse(t.Contents)
-	if err != nil {
-		e.Errorf("%v", err)
-		return e
-	}
-	t.parsedTmpl = parsedTmpl.Option("missingkey=error")
-	return nil
+func (t *Template) parse(root *template.Template) error {
+	_, err := root.New(t.ID).Parse(t.Contents)
+	return err
 }
 
 func (t *Template) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: t}
 	if t.ID == "" {
 		e.Errorf("Template must have an ID")
+		return e
 	}
-	if err := t.parse(); err != nil {
-		e.Errorf("Parse error: %v", err)
+	t.p.tmplMux.Lock()
+	root, err := t.p.rootTemplate.Clone()
+	t.p.tmplMux.Unlock()
+	if err != nil {
+		e.Errorf("Error cloning shared template namespace: %v", err)
+		return e
+	}
+	if err := t.parse(root); err != nil {
+		e.Errorf("Parse error for template %s: %v", t.ID, err)
+		return e
+	}
+	bootEnvs := t.p.lockFor("bootenvs")
+	defer bootEnvs.Unlock()
+	for _, env := range bootEnvs.d {
+		AsBootEnv(env).genRoot(root, e)
 	}
 	return e.OrNil()
+}
+
+func (t *Template) AfterSave() {
+	t.p.tmplMux.Lock()
+	defer t.p.tmplMux.Unlock()
+	root, err := t.p.rootTemplate.Clone()
+	if err != nil {
+		t.p.Logger.Printf("Error cloning shared template namespace: %v", err)
+		return
+	}
+	if err := t.parse(root); err != nil {
+		t.p.Logger.Printf("Parse error for template %s: %v", t.ID, err)
+		return
+	}
+	bootEnvs := t.p.lockFor("bootenvs")
+	defer bootEnvs.Unlock()
+	newRoots := make([]*template.Template, len(bootEnvs.d))
+	for i, envIsh := range bootEnvs.d {
+		env := AsBootEnv(envIsh)
+		env.tmplMux.Lock()
+		defer env.tmplMux.Unlock()
+		e := &Error{o: env}
+		newRoots[i] = env.genRoot(root, e)
+		if e.containsError {
+			t.p.Logger.Print(e.Error())
+			return
+		}
+	}
+	t.p.rootTemplate = root
+	for i, envIsh := range bootEnvs.d {
+		env := AsBootEnv(envIsh)
+		env.rootTemplate = newRoots[i]
+	}
 }
 
 func (t *Template) BootEnvs() []*BootEnv {
@@ -82,26 +121,39 @@ func (t *Template) BootEnvs() []*BootEnv {
 
 func (t *Template) BeforeDelete() error {
 	e := &Error{Code: 409, Type: StillInUseError, o: t}
-	for _, bootEnv := range t.BootEnvs() {
-		for _, tmpl := range bootEnv.Templates {
-			if tmpl.ID == t.ID {
-				e.Errorf("In use by bootenv %s (as %s)", bootEnv.Name, tmpl.Name)
-			}
+	buf := &bytes.Buffer{}
+	templates := t.p.objs["templates"].d
+	for i := range templates {
+		tmpl := AsTemplate(templates[i])
+		if tmpl.ID == t.ID {
+			continue
 		}
+		fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}\n`, tmpl.ID, tmpl.Contents)
 	}
-	return e.OrNil()
-}
-
-// Render executes the template with params writing the results to dest
-func (t *Template) render(dest io.Writer, params interface{}) error {
-	if t.parsedTmpl == nil {
-		if err := t.parse(); err != nil {
-			return fmt.Errorf("template: %s does not compile: %v", t.ID, err)
-		}
+	root, err := template.New("").Parse(buf.String())
+	if err != nil {
+		e.Errorf("Template %s still required: %v", t.ID, err)
+		return e
 	}
-	if err := t.parsedTmpl.Execute(dest, params); err != nil {
-		return fmt.Errorf("template: cannot execute %s: %v", t.ID, err)
+	t.p.tmplMux.Lock()
+	defer t.p.tmplMux.Unlock()
+	bootEnvs := t.p.lockFor("bootenvs")
+	benvRoots := make([]*template.Template, len(bootEnvs.d))
+	defer bootEnvs.Unlock()
+	for i := range bootEnvs.d {
+		env := AsBootEnv(bootEnvs.d[i])
+		benvRoots[i] = env.genRoot(root, e)
 	}
+	if e.containsError {
+		return e
+	}
+	for i := range benvRoots {
+		env := AsBootEnv(bootEnvs.d[i])
+		env.tmplMux.Lock()
+		env.rootTemplate = benvRoots[i]
+		env.tmplMux.Unlock()
+	}
+	t.p.rootTemplate = root
 	return nil
 }
 

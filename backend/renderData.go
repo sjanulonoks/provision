@@ -14,16 +14,17 @@ import (
 // RenderTemplate is the result of rendering a BootEnv template
 type renderedTemplate struct {
 	// Path is the absolute path that the Template will be rendered to.
-	Path string
+	path string
 	// Template is the template that will rendered
-	Template *Template
+	tmpl string
 	// Vars holds the variables that will be used during template expansion.
 	Vars *RenderData
 }
 
 func (r *renderedTemplate) write() (*bytes.Reader, error) {
 	buf := bytes.Buffer{}
-	if err := r.Template.render(&buf, r.Vars); err != nil {
+	tmpl := r.Vars.Env.rootTemplate.Lookup(r.tmpl)
+	if err := tmpl.Execute(&buf, r.Vars); err != nil {
 		return nil, err
 	}
 	return bytes.NewReader(buf.Bytes()), nil
@@ -220,12 +221,8 @@ func (r *RenderData) render(e *Error) {
 
 	for i := range r.Env.Templates {
 		ti := &r.Env.Templates[i]
-		rt := renderedTemplate{}
-		tmpl, found := ti.contents(r.p)
-		if !found {
-			e.Errorf("Template does not exist: %s", ti.ID)
-			continue
-		}
+		rt := renderedTemplate{tmpl: ti.id(), Vars: r}
+
 		// first, render the path
 		buf := &bytes.Buffer{}
 		if err := ti.pathTmpl.Execute(buf, r); err != nil {
@@ -234,12 +231,10 @@ func (r *RenderData) render(e *Error) {
 				ti.Path,
 				err)
 		} else {
-			rt.Path = path.Clean("/" + buf.String())
+			rt.path = path.Clean("/" + buf.String())
 		}
-		rt.Template = tmpl
-		rt.Vars = r
 		r.renderedTemplates[i] = rt
-		r.p.FS.addDynamic(rt.Path, &rt)
+		r.p.FS.addDynamic(rt.path, &rt)
 	}
 
 }
@@ -248,6 +243,6 @@ func (r *RenderData) remove(e *Error) {
 	r.Lock()
 	defer r.Unlock()
 	for _, rt := range r.renderedTemplates {
-		r.p.FS.delDynamic(rt.Path)
+		r.p.FS.delDynamic(rt.path)
 	}
 }

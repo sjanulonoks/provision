@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"text/template"
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/dgrijalva/jwt-go"
@@ -176,6 +178,8 @@ type DataTracker struct {
 	defaultPrefs   map[string]string
 	defaultBootEnv string
 	tokenManager   *JwtManager
+	rootTemplate   *template.Template
+	tmplMux        *sync.Mutex
 }
 
 func (p *DataTracker) LocalIP(remote net.IP) string {
@@ -218,18 +222,14 @@ func (p *DataTracker) makeBackends(backend store.SimpleStore, objs []store.KeySa
 	}
 }
 
-func (p *DataTracker) loadData(refObjs []store.KeySaver) error {
-	p.objs = map[string]*dtobjs{}
-	for _, refObj := range refObjs {
-		prefix := refObj.Prefix()
-		objs, err := store.List(refObj)
-		if err != nil {
-			p.Logger.Fatalf("dataTracker: Error loading data for %s: %v", prefix, err)
-		}
-		p.objs[prefix] = &dtobjs{d: objs}
-		p.objs[prefix].sort()
+func (p *DataTracker) loadData(refObj store.KeySaver) {
+	prefix := refObj.Prefix()
+	objs, err := store.List(refObj)
+	if err != nil {
+		p.Logger.Fatalf("dataTracker: Error loading data for %s: %v", prefix, err)
 	}
-	return nil
+	p.objs[prefix] = &dtobjs{d: objs}
+	p.objs[prefix].sort()
 }
 
 // Create a new DataTracker that will use passed store to save all operational data
@@ -238,7 +238,6 @@ func NewDataTracker(backend store.SimpleStore,
 	staticPort, apiPort int,
 	logger *log.Logger,
 	defaultPrefs map[string]string) *DataTracker {
-
 	res := &DataTracker{
 		FileRoot:     fileRoot,
 		CommandURL:   commandURL,
@@ -250,6 +249,7 @@ func NewDataTracker(backend store.SimpleStore,
 		defaultPrefs: defaultPrefs,
 		FS:           NewFS(fileRoot, logger),
 		tokenManager: NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
+		tmplMux:      &sync.Mutex{},
 	}
 	objs := []store.KeySaver{
 		&Machine{p: res},
@@ -263,7 +263,23 @@ func NewDataTracker(backend store.SimpleStore,
 		&Param{p: res},
 	}
 	res.makeBackends(backend, objs)
-	res.loadData(objs)
+	res.objs = map[string]*dtobjs{}
+	for _, obj := range objs {
+		res.loadData(obj)
+		if obj.Prefix() == "templates" {
+			buf := &bytes.Buffer{}
+			for _, thing := range res.objs["templates"].d {
+				tmpl := AsTemplate(thing)
+				fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}`, tmpl.ID, tmpl.Contents)
+			}
+			root, err := template.New("").Parse(buf.String())
+			if err != nil {
+				logger.Fatalf("Unable to load root templates: %v", err)
+			}
+			res.rootTemplate = root
+			res.rootTemplate.Option("missingkey=error")
+		}
+	}
 	if _, ok := res.fetchOne(ignoreBoot, ignoreBoot.Name); !ok {
 		res.Save(ignoreBoot)
 	}
