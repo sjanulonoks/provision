@@ -27,10 +27,11 @@ func TestStaticFiles(t *testing.T) {
 
 	response, err := http.Get("http://127.0.0.1:32134/dhcp.go")
 	count := 0
-	if err != nil && count < 10 {
+	for err != nil && count < 10 {
 		t.Logf("Failed to get file: %v", err)
 		time.Sleep(1 * time.Second)
 		count++
+		response, err = http.Get("http://127.0.0.1:32134/dhcp.go")
 	}
 	if count == 10 {
 		t.Errorf("Should have served the file: missing content")
