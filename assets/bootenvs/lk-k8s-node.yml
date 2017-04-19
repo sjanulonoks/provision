@@ -1,0 +1,41 @@
+---
+Name: lk-k8s-node
+Description: "Docker's linuxkit k8s node"
+OnlyUnknown: false
+OS:
+  Name: "lk-k8s-node"
+  IsoFile: "kube-node.iso"
+Kernel: vmlinuz64
+Initrds:
+  - "initrd.img"
+BootParams: "console=ttyS0 console=tty0 page_poison=1"
+Templates:
+  - Name: pxelinux
+    Path: pxelinux.cfg/default
+    Contents: |
+      DEFAULT discovery
+      PROMPT 0
+      TIMEOUT 10
+      LABEL discovery
+        KERNEL {{.Env.PathFor "tftp" .Env.Kernel}}
+        INITRD {{.Env.JoinInitrds "tftp"}}
+        APPEND {{.BootParams}}
+        IPAPPEND 2
+  - Name: elilo
+    Path: elilo.conf
+    Contents: |
+      delay=2
+      timeout=20
+      verbose=5
+      image={{.Env.PathFor "tftp" .Env.Kernel}}
+      initrd={{.Env.JoinInitrds "tftp"}}
+      append={{.BootParams}}
+  - Name: ipxe
+    Path: default.ipxe
+    Contents: |
+      #!ipxe
+      chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe && exit || goto sledgehammer
+      :sledgehammer
+      kernel {{.Env.PathFor "http" .Env.Kernel}} {{.BootParams}} BOOTIF=01-${netX/mac:hexhyp}
+      initrd {{.Env.PathFor "http" (index .Env.Initrds 0)}}
+      boot
