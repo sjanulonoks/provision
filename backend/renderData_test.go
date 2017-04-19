@@ -11,11 +11,13 @@ import (
 )
 
 const (
-	tmplDefault = `Machine: 
+	tmplIncluded = `Machine: 
 Name = {{.Machine.Name}}
 HexAddress = {{.Machine.HexAddress}}
 ShortName = {{.Machine.ShortName}}
-FooParam = {{.Param "foo"}}
+FooParam = {{.Param "foo"}}`
+
+	tmplDefault = `{{template "included" .}}
 
 BootEnv:
 Name = {{.Env.Name}}
@@ -77,6 +79,7 @@ func TestRenderData(t *testing.T) {
 		{"Create test parameter with no value", dt.create, &Param{Name: "test"}, true},
 		{"Update test with a value", dt.update, &Param{Name: "test", Value: "foreal"}, true},
 
+		{"Create included template", dt.create, &Template{p: dt, ID: "included", Contents: tmplIncluded}, true},
 		{"Create default template", dt.create, &Template{p: dt, ID: "default", Contents: tmplDefault}, true},
 		{"Create nothing template", dt.create, &Template{p: dt, ID: "nothing", Contents: tmplNothing}, true},
 		{"Create default bootenv", dt.create, defaultBootEnv, true},
