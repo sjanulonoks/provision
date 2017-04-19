@@ -1,9 +1,9 @@
 ---
-Name: lk-ssd
-Description: "Docker's ssd linuxkit iso bootenv"
+Name: lk-sshd
+Description: "Docker's sshd linuxkit iso bootenv"
 OnlyUnknown: false
 OS:
-  Name: "lk-ssd"
+  Name: "lk-sshd"
   IsoFile: "sshd.iso"
 Kernel: vmlinuz64
 Initrds:
