@@ -2,7 +2,8 @@
 
 tag_re='([^-]+)-([^-]+)-g([^ ]+)'
 semver_re='v([0-9]+).([0-9]+).([0-9]+)'
-stable_re='^stable-'
+tip_re='^tip-'
+
 
 TAG=$(git describe --tags --abbrev=1000)
 if [[ $TAG =~ $tag_re ]]; then
@@ -11,8 +12,25 @@ if [[ $TAG =~ $tag_re ]]; then
     GITHASH="${BASH_REMATCH[3]}"
 fi
 
+if [[ $BASE == tip || $TAG == tip ]] ; then
+    Extra="-tip"
+    TAG=$(git describe --tags --abbrev=1000 tip^2)
+    if [[ $TAG =~ $tag_re ]]; then
+        BASE="${BASH_REMATCH[1]}"
+        if [[ $AHEAD ]] ; then
+            AHEAD=$(($AHEAD + ${BASH_REMATCH[2]}))
+            Extra="$Extra-$(whoami)-dev"
+        else
+            AHEAD="${BASH_REMATCH[2]}"
+        fi
+        GITHASH="${GITHASH:-${BASH_REMATCH[3]}}"
+    fi
+    commit=$(git show $BASE | head -1 | awk '{ print $2 }')
+    REAL_VER=$(git tag --points-at $commit | grep -v stable)
+    TAG="${REAL_VER}-${AHEAD}-g${GITHASH}"
+fi
+
 if [[ $GITHASH == "" ]] ; then
-    echo "TAG is exact"
     # Find ref tag
     commit=$(git show $TAG | head -1 | awk '{ print $2 }')
     REAL_VER=$(git tag --points-at $commit | grep -v stable)
@@ -25,18 +43,7 @@ if [[ $TAG =~ $tag_re ]]; then
     GITHASH="${BASH_REMATCH[3]}"
 fi
 
-if [[ $TAG == tip ]] ; then
-    Extra="-tip"
-    TAG=$(git describe --tags --abbrev=1000 HEAD^2)
-fi
-
-if [[ $BASE == tip ]] ; then
-    MajorV="tip"
-    MinorV=$(whoami)
-    PatchV=$AHEAD
-    Extra="-tip"
-    Prepart=""
-elif [[ $BASE =~ $semver_re ]] ; then
+if [[ $BASE =~ $semver_re ]] ; then
     MajorV=${BASH_REMATCH[1]}
     MinorV=${BASH_REMATCH[2]}
     PatchV=${BASH_REMATCH[3]}
