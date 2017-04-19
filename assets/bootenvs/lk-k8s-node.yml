@@ -1,6 +1,6 @@
 ---
 Name: lk-k8s-node
-Description: "Docker's linuxkit k8s node"
+Description: "Docker's linuxkit kubernetes node iso bootenv"
 OnlyUnknown: false
 OS:
   Name: "lk-k8s-node"
@@ -10,8 +10,8 @@ Initrds:
   - "initrd.img"
 BootParams: "console=ttyS0 console=tty0 page_poison=1"
 Templates:
-  - Name: pxelinux
-    Path: pxelinux.cfg/default
+  - Name: "pxelinux"
+    Path: "pxelinux.cfg/{{.Machine.HexAddress}}"
     Contents: |
       DEFAULT discovery
       PROMPT 0
@@ -21,8 +21,8 @@ Templates:
         INITRD {{.Env.JoinInitrds "tftp"}}
         APPEND {{.BootParams}}
         IPAPPEND 2
-  - Name: elilo
-    Path: elilo.conf
+  - Name: "elilo"
+    Path: "{{.Machine.HexAddress}}.conf"
     Contents: |
       delay=2
       timeout=20
@@ -30,12 +30,12 @@ Templates:
       image={{.Env.PathFor "tftp" .Env.Kernel}}
       initrd={{.Env.JoinInitrds "tftp"}}
       append={{.BootParams}}
-  - Name: ipxe
-    Path: default.ipxe
+  - Name: "ipxe"
+    Path: "{{.Machine.Address}}.ipxe"
     Contents: |
       #!ipxe
-      chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe && exit || goto sledgehammer
-      :sledgehammer
       kernel {{.Env.PathFor "http" .Env.Kernel}} {{.BootParams}} BOOTIF=01-${netX/mac:hexhyp}
-      initrd {{.Env.PathFor "http" (index .Env.Initrds 0)}}
+      {{ range $initrd := .Env.Initrds }}
+      initrd {{$.Env.PathFor "http" $initrd}}
+      {{ end }}
       boot
