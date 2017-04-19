@@ -41,10 +41,9 @@ type Machine struct {
 	// If this field is not present or blank, the global default bootenv
 	// will be used instead.
 	BootEnv string
-	// Any additional parameters that may be needed to expand templates
-	// for BootEnv, as documented by that boot environment's
-	// RequiredParams and OptionalParams.
-	Params map[string]interface{}
+	// An array of profiles to apply to this machine in order when looking
+	// for a parameter during rendering.
+	Profiles []string
 	// Errors keeps hold of any errors that happen while writing out
 	// rendered templates for the current BootEnv.  This field should be
 	// checked any time the boot environment is changed to verify that
@@ -91,6 +90,65 @@ func (n *Machine) Key() string {
 	return n.UUID()
 }
 
+func (n *Machine) HasProfile(name string) bool {
+	for _, e := range n.Profiles {
+		if e == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (n *Machine) getProfile(key string) *Profile {
+	if o, found := n.p.fetchOne(n.p.NewProfile(), key); found {
+		p := AsProfile(o)
+		return p
+	}
+	return nil
+}
+
+func (n *Machine) GetParams() map[string]interface{} {
+	p := n.getProfile(n.MachineProfileName())
+	if p == nil {
+		return map[string]interface{}{}
+	}
+	return p.Params
+}
+
+func (n *Machine) SetParams(values map[string]interface{}) error {
+	e := &Error{Code: 409, Type: ValidationError, o: n}
+	if p := n.getProfile(n.MachineProfileName()); p != nil {
+		p.Params = values
+		_, e2 := n.p.save(p)
+		e.Merge(e2)
+	} else {
+		e.Errorf("Can not find the machine profile\n")
+	}
+
+	return e.OrNil()
+}
+
+func (n *Machine) GetParam(key string, searchProfiles bool) (interface{}, bool) {
+	mm := n.GetParams()
+	if v, found := mm[key]; found {
+		return v, true
+	}
+	if searchProfiles {
+		for _, e := range n.Profiles {
+			if p := n.getProfile(e); p != nil {
+				if v, ok := p.Params[key]; ok {
+					return v, true
+				}
+			}
+		}
+	}
+	return nil, false
+}
+
+func (n *Machine) MachineProfileName() string {
+	return n.Key()
+}
+
 func (n *Machine) New() store.KeySaver {
 	res := &Machine{Name: n.Name, Uuid: n.Uuid, p: n.p}
 	return store.KeySaver(res)
@@ -110,6 +168,18 @@ func (n *Machine) OnCreate() error {
 			return e
 		}
 	}
+
+	o, found := n.p.fetchOne(n.p.NewProfile(), n.MachineProfileName())
+	if !found {
+		o = n.p.NewProfile()
+		mp := AsProfile(o)
+		mp.Name = n.MachineProfileName()
+		_, err := n.p.Create(mp)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -172,7 +242,6 @@ func (n *Machine) BeforeDelete() error {
 	b, found := n.p.fetchOne(n.p.NewBootEnv(), n.BootEnv)
 	if !found {
 		e.Errorf("Unable to find boot environment %s", n.BootEnv)
-		return e
 	}
 	n.toRemove = n.p.NewRenderData(n, AsBootEnv(b))
 	n.toRemove.render(e)
@@ -181,6 +250,11 @@ func (n *Machine) BeforeDelete() error {
 
 func (n *Machine) AfterDelete() {
 	e := &Error{}
+	mp, found := n.p.fetchOne(n.p.NewProfile(), n.MachineProfileName())
+	if found {
+		_, e2 := n.p.Remove(mp)
+		e.Merge(e2)
+	}
 	if n.toRemove != nil {
 		n.toRemove.remove(e)
 		n.toRemove = nil

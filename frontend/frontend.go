@@ -47,7 +47,7 @@ type DTI interface {
 	NewReservation() *backend.Reservation
 	NewSubnet() *backend.Subnet
 	NewUser() *backend.User
-	NewParam() *backend.Param
+	NewProfile() *backend.Profile
 
 	Pref(string) (string, error)
 	Prefs() map[string]string
@@ -171,13 +171,13 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 	me.InitFileApi()
 	me.InitTemplateApi()
 	me.InitMachineApi()
+	me.InitProfileApi()
 	me.InitLeaseApi()
 	me.InitReservationApi()
 	me.InitSubnetApi()
 	me.InitUserApi()
 	me.InitInterfaceApi()
 	me.InitPrefApi()
-	me.InitParamApi()
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("swagger.json")
@@ -252,11 +252,11 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	if !assureContentType(c, "application/json") {
 		return false
 	}
-	err := &backend.Error{Type: "API_ERROR", Code: http.StatusBadRequest}
 	marshalErr := c.Bind(&val)
 	if marshalErr == nil {
 		return true
 	}
+	err := &backend.Error{Type: "API_ERROR", Code: http.StatusBadRequest}
 	err.Merge(marshalErr)
 	c.JSON(err.Code, err)
 	return false
@@ -279,6 +279,7 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	res, ok := f.dt.FetchOne(ref, key)
 	if ok {
+		// TODO: This should really be done before the fetch - it may have issue with HexAddr-based things.
 		if !assureAuth(c, f.Logger, ref.Prefix(), "get", res.Key()) {
 			return
 		}

@@ -11,11 +11,13 @@ import (
 )
 
 const (
-	tmplDefault = `Machine: 
+	tmplIncluded = `Machine: 
 Name = {{.Machine.Name}}
 HexAddress = {{.Machine.HexAddress}}
 ShortName = {{.Machine.ShortName}}
-FooParam = {{.Param "foo"}}
+FooParam = {{.Param "foo"}}`
+
+	tmplDefault = `{{template "included" .}}
 
 BootEnv:
 Name = {{.Env.Name}}
@@ -74,9 +76,10 @@ func TestRenderData(t *testing.T) {
 	badBootEnv := &BootEnv{p: dt, Name: "bad", Templates: []TemplateInfo{{Name: "ipxe", Path: "machines/{{.Machine.UUID}}/file", ID: "nothing"}}, BootParams: "{{.Param \"cow\"}}"}
 
 	objs := []crudTest{
-		{"Create test parameter with no value", dt.create, &Param{Name: "test"}, true},
-		{"Update test with a value", dt.update, &Param{Name: "test", Value: "foreal"}, true},
+		{"Update global profile to have test with a value", dt.update, &Profile{Name: "global", Params: map[string]interface{}{"test": "foreal"}}, true},
+		{"create test profile to have test with a value", dt.create, &Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true},
 
+		{"Create included template", dt.create, &Template{p: dt, ID: "included", Contents: tmplIncluded}, true},
 		{"Create default template", dt.create, &Template{p: dt, ID: "default", Contents: tmplDefault}, true},
 		{"Create nothing template", dt.create, &Template{p: dt, ID: "nothing", Contents: tmplNothing}, true},
 		{"Create default bootenv", dt.create, defaultBootEnv, true},
@@ -91,7 +94,6 @@ func TestRenderData(t *testing.T) {
 	machine.Name = "Test Name"
 	machine.Address = net.ParseIP("192.168.124.11")
 	machine.BootEnv = "default"
-	machine.Params = map[string]interface{}{"foo": "bar"}
 	created, err := dt.create(machine)
 	if !created {
 		t.Errorf("Failed to create new test machine: %v", err)
@@ -99,6 +101,10 @@ func TestRenderData(t *testing.T) {
 	} else {
 		t.Logf("Created new test machine")
 	}
+	pp := machine.GetParams()
+	pp["foo"] = "bar"
+	machine.SetParams(pp)
+
 	genLoc := path.Join("/", "machines", machine.UUID(), "file")
 	out, err := dt.FS.Open(genLoc, nil)
 	if err != nil || out == nil {
@@ -114,11 +120,9 @@ func TestRenderData(t *testing.T) {
 		t.Logf("BootEnv default without fred rendered properly for test machine")
 	}
 
-	machine.Params = map[string]interface{}{"foo": "bar", "fred": "fred = fred"}
-	saved, err := dt.save(machine)
-	if !saved {
-		t.Errorf("Failed to save test machine with new bootenv: %v", err)
-	}
+	pp = machine.GetParams()
+	pp["fred"] = "fred = fred"
+	machine.SetParams(pp)
 	out, err = dt.FS.Open(genLoc, nil)
 	if err != nil {
 		t.Errorf("Failed to get tmeplate for %s: %v", genLoc, err)
@@ -133,7 +137,7 @@ func TestRenderData(t *testing.T) {
 	}
 
 	machine.BootEnv = "nothing"
-	saved, err = dt.save(machine)
+	saved, err := dt.save(machine)
 	if !saved {
 		t.Errorf("Failed to save test machine with new bootenv: %v", err)
 	}
@@ -306,6 +310,29 @@ func TestRenderData(t *testing.T) {
 	ok = rd.ParamExists("test")
 	if !ok {
 		t.Errorf("ParamExists test should return true when machine has foo defined in RenderData\n")
+	}
+
+	// Test a machine profile parameter
+	machine.Profiles = []string{"test"}
+	saved, err = dt.save(machine)
+	if !saved {
+		t.Errorf("Failed to save test machine with new profile list: %v", err)
+	}
+	d, e = rd.Param("test")
+	if e != nil {
+		t.Errorf("Param test should NOT return an error: %v\n", e)
+	}
+	s, ok = d.(string)
+	if !ok {
+		t.Errorf("Parameter test should have been a string\n")
+	} else {
+		if s != "fred" {
+			t.Errorf("Parameter test should have been fred: %s\n", s)
+		}
+	}
+	ok = rd.ParamExists("test")
+	if !ok {
+		t.Errorf("ParamExists test should return true when machine profile has test defined in RenderData\n")
 	}
 
 	s, e = rd.BootParams()

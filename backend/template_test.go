@@ -15,7 +15,7 @@ func TestTemplateCrud(t *testing.T) {
 		{"Create Valid Nonempty Template", dt.create, &Template{p: dt, ID: "test2", Contents: "{{ .Foo }}"}, true},
 		{"Create Duplicate Template", dt.create, &Template{p: dt, ID: "test1"}, false},
 		{"Create Invalid Template", dt.create, &Template{p: dt, ID: "test4", Contents: "{{ .Bar }"}, false},
-
+		{"Create Template that refers to another template", dt.create, &Template{p: dt, ID: "test3", Contents: `{{template "test2"}}`}, true},
 		{"Update Valid Contents", dt.update, &Template{p: dt, ID: "test1", Contents: "{{ .Bar }}"}, true},
 		{"Update Invalid Contents", dt.update, &Template{p: dt, ID: "test1", Contents: "{{}"}, false},
 		{"Update ID", dt.update, &Template{p: dt, ID: "test5"}, false},
