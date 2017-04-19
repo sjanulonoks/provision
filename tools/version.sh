@@ -4,8 +4,6 @@ tag_re='([^-]+)-([^-]+)-g([^ ]+)'
 semver_re='v([0-9]+).([0-9]+).([0-9]+)'
 stable_re='^stable-'
 
-set -x
-
 TAG=$(git describe --tags --abbrev=1000)
 if [[ $TAG =~ $tag_re ]]; then
     BASE="${BASH_REMATCH[1]}"
