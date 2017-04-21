@@ -183,6 +183,21 @@ type DataTracker struct {
 	tmplMux           *sync.Mutex
 }
 
+func (p *DataTracker) lockEnts(ents ...string) ([]*dtobjs, func()) {
+	res := make([]*dtobjs, len(ents))
+	s := sort.StringSlice(ents)
+	sort.Sort(sort.Reverse(s))
+	for i := range s {
+		res[i] = p.lockFor(ents[i])
+	}
+	unlocker := func() {
+		for i := len(res) - 1; i >= 0; i-- {
+			res[i].Unlock()
+		}
+	}
+	return res, unlocker
+}
+
 func (p *DataTracker) LocalIP(remote net.IP) string {
 	if localIP := LocalFor(remote); localIP != nil {
 		return localIP.String()
