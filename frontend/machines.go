@@ -216,7 +216,7 @@ func (f *Frontend) InitMachineApi() {
 					Model: ref.Prefix(),
 					Key:   uuid,
 				}
-				err.Errorf("%s GET: %s: Not Found", err.Model, err.Key)
+				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
 				c.JSON(err.Code, err)
 				return
 			}
@@ -253,7 +253,7 @@ func (f *Frontend) InitMachineApi() {
 					Model: ref.Prefix(),
 					Key:   uuid,
 				}
-				err.Errorf("%s GET: %s: Not Found", err.Model, err.Key)
+				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
 				c.JSON(err.Code, err)
 				return
 			}
