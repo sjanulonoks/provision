@@ -242,6 +242,7 @@ func (n *Machine) BeforeDelete() error {
 	b, found := n.p.fetchOne(n.p.NewBootEnv(), n.BootEnv)
 	if !found {
 		e.Errorf("Unable to find boot environment %s", n.BootEnv)
+		return e
 	}
 	n.toRemove = n.p.NewRenderData(n, AsBootEnv(b))
 	n.toRemove.render(e)
