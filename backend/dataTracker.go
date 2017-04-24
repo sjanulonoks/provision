@@ -15,7 +15,6 @@ import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
-	"github.com/digitalrebar/digitalrebar/go/rebar-api/api"
 )
 
 var (
@@ -167,8 +166,6 @@ type DataTracker struct {
 	StaticPort, ApiPort int
 	Logger              *log.Logger
 	FS                  *FileSystem
-	RebarClient         *api.Client
-
 	// Note the lack of mutexes for these maps.
 	// We should be able to get away with not locking them
 	// by only ever writing to them at DataTracker create time,
@@ -250,13 +247,12 @@ func (p *DataTracker) loadData(refObj store.KeySaver) {
 
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.SimpleStore,
-	fileRoot, commandURL, addr string,
+	fileRoot, addr string,
 	staticPort, apiPort int,
 	logger *log.Logger,
 	defaultPrefs map[string]string) *DataTracker {
 	res := &DataTracker{
 		FileRoot:          fileRoot,
-		CommandURL:        commandURL,
 		StaticPort:        staticPort,
 		ApiPort:           apiPort,
 		OurAddress:        addr,

@@ -107,10 +107,6 @@ func (r *RenderData) ProvisionerURL() string {
 	return r.p.FileURL(r.remoteIP)
 }
 
-func (r *RenderData) CommandURL() string {
-	return r.p.CommandURL
-}
-
 func (r *RenderData) ApiURL() string {
 	return r.p.ApiURL(r.remoteIP)
 }

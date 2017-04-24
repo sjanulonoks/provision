@@ -57,7 +57,6 @@ type ProgOpts struct {
 	DisableProvisioner  bool   `long:"disable-provisioner" description:"Disable provisioner"`
 	DisableDHCP         bool   `long:"disable-dhcp" description:"Disable DHCP"`
 	DhcpInterfaces      string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
-	CommandURL          string `long:"endpoint" description:"DigitalRebar Endpoint" env:"EXTERNAL_REBAR_ENDPOINT"`
 	DefaultBootEnv      string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"sledgehammer"`
 	UnknownBootEnv      string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
 	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
@@ -119,7 +118,6 @@ func Server(c_opts *ProgOpts) {
 
 	dt := backend.NewDataTracker(backendStore,
 		c_opts.FileRoot,
-		c_opts.CommandURL,
 		c_opts.OurAddress,
 		c_opts.StaticPort,
 		c_opts.ApiPort,
