@@ -14,7 +14,7 @@ tags:
   - name: Subnets
   - name: Reservations
   - name: Prefs
-  - name: Params
   - name: Leases
   - name: Machines
+  - name: Profiles
   - name: Users

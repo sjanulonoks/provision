@@ -14,7 +14,6 @@ import (
 // per-machine are marked machine-only and named after the machine.
 //
 // These can be assigned to a machine's profile list.
-
 // swagger:model
 type Profile struct {
 	// The name of the profile.  THis must be unique across all
@@ -37,10 +36,6 @@ type Profile struct {
 	MachineOnly bool
 
 	p *DataTracker
-
-	// used during AfterSave() and AfterRemove() to handle boot environment changes.
-	toRemove *RenderData
-	toRender *RenderData
 }
 
 func (p *Profile) Backend() store.SimpleStore {
