@@ -41,10 +41,13 @@ type Machine struct {
 	// If this field is not present or blank, the global default bootenv
 	// will be used instead.
 	BootEnv string
-	// Any additional parameters that may be needed to expand templates
-	// for BootEnv, as documented by that boot environment's
-	// RequiredParams and OptionalParams.
-	Params map[string]interface{}
+	// An array of profiles to apply to this machine in order when looking
+	// for a parameter during rendering.
+	Profiles []string
+	//
+	// The Machine specific Profile Data - only used for the map (name and other
+	// fields not used
+	Profile Profile
 	// Errors keeps hold of any errors that happen while writing out
 	// rendered templates for the current BootEnv.  This field should be
 	// checked any time the boot environment is changed to verify that
@@ -89,6 +92,56 @@ func (n *Machine) Path() string {
 
 func (n *Machine) Key() string {
 	return n.UUID()
+}
+
+func (n *Machine) HasProfile(name string) bool {
+	for _, e := range n.Profiles {
+		if e == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (n *Machine) getProfile(key string) *Profile {
+	if o, found := n.p.fetchOne(n.p.NewProfile(), key); found {
+		p := AsProfile(o)
+		return p
+	}
+	return nil
+}
+
+func (n *Machine) GetParams() map[string]interface{} {
+	m := n.Profile.Params
+	if m == nil {
+		m = map[string]interface{}{}
+	}
+	return m
+}
+
+func (n *Machine) SetParams(values map[string]interface{}) error {
+	n.Profile.Params = values
+	e := &Error{Code: 409, Type: ValidationError, o: n}
+	_, e2 := n.p.save(n)
+	e.Merge(e2)
+	return e.OrNil()
+}
+
+func (n *Machine) GetParam(key string, searchProfiles bool) (interface{}, bool) {
+	mm := n.GetParams()
+	if v, found := mm[key]; found {
+		return v, true
+	}
+	if searchProfiles {
+		for _, e := range n.Profiles {
+			if p := n.getProfile(e); p != nil {
+				if v, ok := p.Params[key]; ok {
+					return v, true
+				}
+			}
+		}
+	}
+	return nil, false
 }
 
 func (n *Machine) New() store.KeySaver {

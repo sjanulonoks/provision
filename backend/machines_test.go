@@ -86,5 +86,4 @@ func TestMachineCrud(t *testing.T) {
 	for _, test := range patchTests {
 		test.test(t, machine)
 	}
-
 }

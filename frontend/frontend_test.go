@@ -108,12 +108,12 @@ func (tas TestAuthSource) GetUser(username string) (u *backend.User) {
 
 func (dt *LocalDTI) NewBootEnv() *backend.BootEnv         { return &backend.BootEnv{} }
 func (dt *LocalDTI) NewMachine() *backend.Machine         { return &backend.Machine{} }
+func (dt *LocalDTI) NewProfile() *backend.Profile         { return &backend.Profile{} }
 func (dt *LocalDTI) NewTemplate() *backend.Template       { return &backend.Template{} }
 func (dt *LocalDTI) NewLease() *backend.Lease             { return &backend.Lease{} }
 func (dt *LocalDTI) NewReservation() *backend.Reservation { return &backend.Reservation{} }
 func (dt *LocalDTI) NewSubnet() *backend.Subnet           { return &backend.Subnet{} }
 func (dt *LocalDTI) NewUser() *backend.User               { return &backend.User{} }
-func (dt *LocalDTI) NewParam() *backend.Param             { return &backend.Param{} }
 
 func testFrontend() *LocalDTI {
 	return testFrontendDev("")
@@ -169,9 +169,10 @@ func (dt *LocalDTI) ValidateError(t *testing.T, ap string, mess string) {
 	}
 	if len(err.Messages) != 1 {
 		t.Errorf("Error messages should be length one, but is: %v\n", len(err.Messages))
-	}
-	if err.Messages[0] != mess {
-		t.Errorf("Error mess should be: %v, but is %v\n", mess, err.Messages[0])
+	} else {
+		if err.Messages[0] != mess {
+			t.Errorf("Error mess should be: %v, but is %v\n", mess, err.Messages[0])
+		}
 	}
 }
 

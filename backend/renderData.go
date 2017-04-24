@@ -170,14 +170,16 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 // ParamExists is a helper function for determining the existence of a machine parameter.
 func (r *RenderData) ParamExists(key string) bool {
 	if r.Machine != nil {
-		_, ok := r.Machine.Params[key]
+		_, ok := r.Machine.GetParam(key, true)
 		if ok {
 			return ok
 		}
 	}
-	param := r.p.load("parameters", key)
-	if param != nil {
-		return true
+	if o, found := r.p.fetchOne(r.p.NewProfile(), r.p.globalProfileName); found {
+		p := AsProfile(o)
+		if _, ok := p.Params[key]; ok {
+			return true
+		}
 	}
 	return false
 }
@@ -185,14 +187,16 @@ func (r *RenderData) ParamExists(key string) bool {
 // Param is a helper function for extracting a parameter from Machine.Params
 func (r *RenderData) Param(key string) (interface{}, error) {
 	if r.Machine != nil {
-		res, ok := r.Machine.Params[key]
+		v, ok := r.Machine.GetParam(key, true)
 		if ok {
-			return res, nil
+			return v, nil
 		}
 	}
-	param := r.p.load("parameters", key)
-	if param != nil {
-		return AsParam(param).Value, nil
+	if o, found := r.p.fetchOne(r.p.NewProfile(), r.p.globalProfileName); found {
+		p := AsProfile(o)
+		if v, ok := p.Params[key]; ok {
+			return v, nil
+		}
 	}
 	return nil, fmt.Errorf("No such machine parameter %s", key)
 }
@@ -201,16 +205,13 @@ func (r *RenderData) render(e *Error) {
 	r.Lock()
 	defer r.Unlock()
 	var missingParams []string
-	if len(r.Env.RequiredParams) > 0 && (r.Machine == nil || r.Machine.Params == nil) {
+	if len(r.Env.RequiredParams) > 0 && r.Machine == nil {
 		e.Errorf("Machine is nil or does not have params")
 		return
 	}
 	for _, param := range r.Env.RequiredParams {
-		if _, ok := r.Machine.Params[param]; !ok {
-			globalParam := r.p.load("parameters", param)
-			if globalParam == nil {
-				missingParams = append(missingParams, param)
-			}
+		if !r.ParamExists(param) {
+			missingParams = append(missingParams, param)
 		}
 	}
 	if len(missingParams) > 0 {

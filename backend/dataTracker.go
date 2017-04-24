@@ -173,13 +173,14 @@ type DataTracker struct {
 	// We should be able to get away with not locking them
 	// by only ever writing to them at DataTracker create time,
 	// and only ever reading from them afterwards.
-	backends       map[string]store.SimpleStore
-	objs           map[string]*dtobjs
-	defaultPrefs   map[string]string
-	defaultBootEnv string
-	tokenManager   *JwtManager
-	rootTemplate   *template.Template
-	tmplMux        *sync.Mutex
+	backends          map[string]store.SimpleStore
+	objs              map[string]*dtobjs
+	defaultPrefs      map[string]string
+	defaultBootEnv    string
+	globalProfileName string
+	tokenManager      *JwtManager
+	rootTemplate      *template.Template
+	tmplMux           *sync.Mutex
 }
 
 func (p *DataTracker) LocalIP(remote net.IP) string {
@@ -239,20 +240,22 @@ func NewDataTracker(backend store.SimpleStore,
 	logger *log.Logger,
 	defaultPrefs map[string]string) *DataTracker {
 	res := &DataTracker{
-		FileRoot:     fileRoot,
-		CommandURL:   commandURL,
-		StaticPort:   staticPort,
-		ApiPort:      apiPort,
-		OurAddress:   addr,
-		Logger:       logger,
-		backends:     map[string]store.SimpleStore{},
-		defaultPrefs: defaultPrefs,
-		FS:           NewFS(fileRoot, logger),
-		tokenManager: NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
-		tmplMux:      &sync.Mutex{},
+		FileRoot:          fileRoot,
+		CommandURL:        commandURL,
+		StaticPort:        staticPort,
+		ApiPort:           apiPort,
+		OurAddress:        addr,
+		Logger:            logger,
+		backends:          map[string]store.SimpleStore{},
+		defaultPrefs:      defaultPrefs,
+		FS:                NewFS(fileRoot, logger),
+		tokenManager:      NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
+		tmplMux:           &sync.Mutex{},
+		globalProfileName: "global",
 	}
 	objs := []store.KeySaver{
 		&Machine{p: res},
+		&Profile{p: res},
 		&User{p: res},
 		&Template{p: res},
 		&BootEnv{p: res},
@@ -260,7 +263,6 @@ func NewDataTracker(backend store.SimpleStore,
 		&Reservation{p: res},
 		&Lease{p: res},
 		&Pref{p: res},
-		&Param{p: res},
 	}
 	res.makeBackends(backend, objs)
 	res.objs = map[string]*dtobjs{}
@@ -282,6 +284,11 @@ func NewDataTracker(backend store.SimpleStore,
 	}
 	if _, ok := res.fetchOne(ignoreBoot, ignoreBoot.Name); !ok {
 		res.Save(ignoreBoot)
+	}
+	if _, ok := res.fetchOne(res.NewProfile(), res.globalProfileName); !ok {
+		gp := AsProfile(res.NewProfile())
+		gp.Name = "global"
+		res.Save(gp)
 	}
 	users := res.objs["users"]
 	if len(users.d) == 0 {
@@ -447,6 +454,8 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 	switch ref.(type) {
 	case *Machine:
 		res = p.NewMachine()
+	case *Profile:
+		res = p.NewProfile()
 	case *User:
 		res = p.NewUser()
 	case *Template:
@@ -459,8 +468,6 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 		res = p.NewReservation()
 	case *Subnet:
 		res = p.NewSubnet()
-	case *Param:
-		res = p.NewParam()
 	case *Pref:
 		res = p.NewPref()
 	default:

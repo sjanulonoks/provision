@@ -89,6 +89,8 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 		res = dt.NewUser()
 	case "machines":
 		res = dt.NewMachine()
+	case "profiles":
+		res = dt.NewProfile()
 	case "templates":
 		res = dt.NewTemplate()
 	case "bootenvs":
@@ -131,6 +133,7 @@ func TestBackingStorePersistence(t *testing.T) {
 		"templates",
 		"bootenvs",
 		"machines",
+		"profiles",
 		"subnets",
 		"reservations",
 		"leases",
@@ -161,6 +164,8 @@ func TestBackingStorePersistence(t *testing.T) {
 			items, cnt = dt.fetchAll(dt.NewBootEnv()), 2
 		case "machines":
 			items, cnt = dt.fetchAll(dt.NewMachine()), 1
+		case "profiles":
+			items, cnt = dt.fetchAll(dt.NewProfile()), 2
 		case "leases":
 			items, cnt = dt.fetchAll(dt.NewLease()), 1
 		case "reservations":
