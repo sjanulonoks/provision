@@ -83,9 +83,6 @@ func (p *Profile) BeforeDelete() error {
 	// Make sure no machine is using this profile.
 	machines := AsMachines(p.p.unlockedFetchAll(p.p.NewMachine().Prefix()))
 	for _, m := range machines {
-		if p.Name == m.MachineProfileName() {
-			e.Errorf("Machine %s is using machine specific profile %s", m.UUID(), p.Name)
-		}
 		if m.HasProfile(p.Name) {
 			e.Errorf("Machine %s is using profile %s", m.UUID(), p.Name)
 		}

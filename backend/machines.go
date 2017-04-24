@@ -44,6 +44,10 @@ type Machine struct {
 	// An array of profiles to apply to this machine in order when looking
 	// for a parameter during rendering.
 	Profiles []string
+	//
+	// The Machine specific Profile Data - only used for the map (name and other
+	// fields not used
+	Profile Profile
 	// Errors keeps hold of any errors that happen while writing out
 	// rendered templates for the current BootEnv.  This field should be
 	// checked any time the boot environment is changed to verify that
@@ -108,23 +112,18 @@ func (n *Machine) getProfile(key string) *Profile {
 }
 
 func (n *Machine) GetParams() map[string]interface{} {
-	p := n.getProfile(n.MachineProfileName())
-	if p == nil {
-		return map[string]interface{}{}
+	m := n.Profile.Params
+	if m == nil {
+		m = map[string]interface{}{}
 	}
-	return p.Params
+	return m
 }
 
 func (n *Machine) SetParams(values map[string]interface{}) error {
+	n.Profile.Params = values
 	e := &Error{Code: 409, Type: ValidationError, o: n}
-	if p := n.getProfile(n.MachineProfileName()); p != nil {
-		p.Params = values
-		_, e2 := n.p.save(p)
-		e.Merge(e2)
-	} else {
-		e.Errorf("Can not find the machine profile\n")
-	}
-
+	_, e2 := n.p.save(n)
+	e.Merge(e2)
 	return e.OrNil()
 }
 
@@ -143,10 +142,6 @@ func (n *Machine) GetParam(key string, searchProfiles bool) (interface{}, bool) 
 		}
 	}
 	return nil, false
-}
-
-func (n *Machine) MachineProfileName() string {
-	return n.Key()
 }
 
 func (n *Machine) New() store.KeySaver {
@@ -168,18 +163,6 @@ func (n *Machine) OnCreate() error {
 			return e
 		}
 	}
-
-	o, found := n.p.fetchOne(n.p.NewProfile(), n.MachineProfileName())
-	if !found {
-		o = n.p.NewProfile()
-		mp := AsProfile(o)
-		mp.Name = n.MachineProfileName()
-		_, err := n.p.Create(mp)
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -251,11 +234,6 @@ func (n *Machine) BeforeDelete() error {
 
 func (n *Machine) AfterDelete() {
 	e := &Error{}
-	mp, found := n.p.fetchOne(n.p.NewProfile(), n.MachineProfileName())
-	if found {
-		_, e2 := n.p.Remove(mp)
-		e.Merge(e2)
-	}
 	if n.toRemove != nil {
 		n.toRemove.remove(e)
 		n.toRemove = nil

@@ -165,7 +165,7 @@ func TestBackingStorePersistence(t *testing.T) {
 		case "machines":
 			items, cnt = dt.fetchAll(dt.NewMachine()), 1
 		case "profiles":
-			items, cnt = dt.fetchAll(dt.NewProfile()), 3
+			items, cnt = dt.fetchAll(dt.NewProfile()), 2
 		case "leases":
 			items, cnt = dt.fetchAll(dt.NewLease()), 1
 		case "reservations":
