@@ -15,10 +15,9 @@ import (
 type LeaseNAK error
 
 func findLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, err error) {
-	leases := dt.lockFor("leases")
-	reservations := dt.lockFor("reservations")
-	defer leases.Unlock()
-	defer reservations.Unlock()
+	ents, unlocker := dt.lockEnts("leases", "reservations")
+	reservations, leases := ents[0], ents[1]
+	defer unlocker()
 	hexreq := Hexaddr(req.To4())
 	idx, found := leases.find(hexreq)
 	if !found {
@@ -205,12 +204,9 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, r
 }
 
 func findOrCreateLease(dt *DataTracker, strat, token string, req net.IP, via []net.IP) *Lease {
-	leases := dt.lockFor("leases")
-	reservations := dt.lockFor("reservations")
-	subnets := dt.lockFor("subnets")
-	defer leases.Unlock()
-	defer reservations.Unlock()
-	defer subnets.Unlock()
+	ents, unlocker := dt.lockEnts("subnets", "reservations", "leases")
+	leases, reservations, subnets := ents[2], ents[1], ents[0]
+	defer unlocker()
 	lease := findViaReservation(leases, reservations, strat, token, req)
 	if lease == nil {
 		lease = findViaSubnet(leases, subnets, reservations, strat, token, req, via)

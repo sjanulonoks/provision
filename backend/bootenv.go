@@ -14,10 +14,8 @@ import (
 	"strings"
 	"sync"
 	"text/template"
-	"time"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
-	"github.com/digitalrebar/digitalrebar/go/rebar-api/api"
 )
 
 // TemplateInfo holds information on the templates in the boot
@@ -435,133 +433,6 @@ func (b *BootEnv) BeforeDelete() error {
 
 func (b *BootEnv) List() []*BootEnv {
 	return AsBootEnvs(b.p.FetchAll(b))
-}
-
-func (b *BootEnv) AfterSave() {
-	b.rebuildRebarData()
-}
-
-func (b *BootEnv) AfterDelete() {
-	b.rebuildRebarData()
-}
-
-func (b *BootEnv) rebuildRebarData() {
-	var err error
-	if b.p.RebarClient == nil {
-		return
-	}
-	preferredOses := map[string]int{
-		"centos-7.3.1611": 0,
-		"centos-7.2.1511": 1,
-		"centos-7.1.1503": 2,
-		"ubuntu-16.04":    3,
-		"ubuntu-14.04":    4,
-		"ubuntu-15.04":    5,
-		"debian-8":        6,
-		"centos-6.8":      7,
-		"centos-6.6":      8,
-		"debian-7":        9,
-		"redhat-6.5":      10,
-		"ubuntu-12.04":    11,
-	}
-
-	attrValOSes := make(map[string]bool)
-	attrValOS := "STRING"
-	attrPref := 1000
-
-	if !b.Available {
-		return
-	}
-
-	bes := b.List()
-
-	if bes == nil || len(bes) == 0 {
-		b.p.Logger.Printf("No boot environments, nothing to do")
-		return
-	}
-
-	for _, be := range bes {
-		if !strings.HasSuffix(be.Name, "-install") {
-			continue
-		}
-		if !be.Available {
-			continue
-		}
-		attrValOSes[be.OS.Name] = true
-		numPref, ok := preferredOses[be.OS.Name]
-		if !ok {
-			numPref = 999
-		}
-		if numPref < attrPref {
-			attrValOS = be.OS.Name
-			attrPref = numPref
-		}
-	}
-
-	deployment := &api.Deployment{}
-	if err := b.p.RebarClient.Fetch(deployment, "system"); err != nil {
-		b.p.Logger.Printf("Failed to load system deployment: %v", err)
-		return
-	}
-
-	role := &api.Role{}
-	if err := b.p.RebarClient.Fetch(role, "provisioner-service"); err != nil {
-		b.p.Logger.Printf("Failed to fetch provisioner-service: %v", err)
-		return
-	}
-
-	var tgt api.Attriber
-	for {
-		drs := []*api.DeploymentRole{}
-		matcher := make(map[string]interface{})
-		matcher["role_id"] = role.ID
-		matcher["deployment_id"] = deployment.ID
-		dr := &api.DeploymentRole{}
-		if err := b.p.RebarClient.Match(b.p.RebarClient.UrlPath(dr), matcher, &drs); err != nil {
-			b.p.Logger.Printf("Failed to find deployment role to update: %v", err)
-			return
-		}
-		if len(drs) != 0 {
-			tgt = drs[0]
-			break
-		}
-		b.p.Logger.Printf("Waiting for provisioner-service (%v) to show up in system(%v)", role.ID, deployment.ID)
-		b.p.Logger.Printf("drs: %#v, err: %#v", drs, err)
-		time.Sleep(5 * time.Second)
-	}
-
-	attrib := &api.Attrib{}
-	attrib.SetId("provisioner-available-oses")
-	attrib, err = b.p.RebarClient.GetAttrib(tgt, attrib, "")
-	if err != nil {
-		b.p.Logger.Printf("Failed to fetch provisioner-available-oses: %v", err)
-		return
-	}
-	attrib.Value = attrValOSes
-	if err := b.p.RebarClient.SetAttrib(tgt, attrib, ""); err != nil {
-		b.p.Logger.Printf("Failed to update provisioner-available-oses: %v", err)
-		return
-	}
-
-	attrib = &api.Attrib{}
-	attrib.SetId("provisioner-default-os")
-	attrib, err = b.p.RebarClient.GetAttrib(tgt, attrib, "")
-	if err != nil {
-		b.p.Logger.Printf("Failed to get default OS: %v:", err)
-		return
-	}
-	attrib.Value = attrValOS
-	if err := b.p.RebarClient.SetAttrib(tgt, attrib, ""); err != nil {
-		b.p.Logger.Printf("Failed to set default OS: %v", err)
-		return
-	}
-
-	if err := b.p.RebarClient.Commit(tgt); err != nil {
-		b.p.Logger.Printf("Failed to commit changes: %v", err)
-		return
-	}
-
-	return
 }
 
 func (p *DataTracker) NewBootEnv() *BootEnv {

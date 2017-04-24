@@ -15,7 +15,6 @@ import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
-	"github.com/digitalrebar/digitalrebar/go/rebar-api/api"
 )
 
 var (
@@ -167,8 +166,6 @@ type DataTracker struct {
 	StaticPort, ApiPort int
 	Logger              *log.Logger
 	FS                  *FileSystem
-	RebarClient         *api.Client
-
 	// Note the lack of mutexes for these maps.
 	// We should be able to get away with not locking them
 	// by only ever writing to them at DataTracker create time,
@@ -181,6 +178,25 @@ type DataTracker struct {
 	tokenManager      *JwtManager
 	rootTemplate      *template.Template
 	tmplMux           *sync.Mutex
+}
+
+// This grabs the requested dtobj locks in reverse alphabetical
+// order to give everything a consistent locking order and allow
+// for templates to lock bootenvs when a template change necessitates
+// a bootenv template cache rebuild.
+func (p *DataTracker) lockEnts(ents ...string) ([]*dtobjs, func()) {
+	res := make([]*dtobjs, len(ents))
+	s := sort.StringSlice(ents)
+	sort.Sort(sort.Reverse(s))
+	for i := range s {
+		res[i] = p.lockFor(ents[i])
+	}
+	unlocker := func() {
+		for i := len(res) - 1; i >= 0; i-- {
+			res[i].Unlock()
+		}
+	}
+	return res, unlocker
 }
 
 func (p *DataTracker) LocalIP(remote net.IP) string {
@@ -235,13 +251,12 @@ func (p *DataTracker) loadData(refObj store.KeySaver) {
 
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.SimpleStore,
-	fileRoot, commandURL, addr string,
+	fileRoot, addr string,
 	staticPort, apiPort int,
 	logger *log.Logger,
 	defaultPrefs map[string]string) *DataTracker {
 	res := &DataTracker{
 		FileRoot:          fileRoot,
-		CommandURL:        commandURL,
 		StaticPort:        staticPort,
 		ApiPort:           apiPort,
 		OurAddress:        addr,

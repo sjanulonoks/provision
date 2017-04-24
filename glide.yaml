@@ -16,7 +16,6 @@ import:
   - go/common/service
   - go/common/store
   - go/common/version
-  - go/rebar-api/api
 - package: github.com/hashicorp/consul
   subpackages:
   - api

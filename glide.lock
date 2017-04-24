@@ -32,10 +32,6 @@ imports:
   - go/common/service
   - go/common/store
   - go/common/version
-  - go/rebar-api/api
-  - go/rebar-api/datatypes
-  - go/rebar-api/datatypes/dhcp
-  - go/rebar-api/datatypes/provisioner
 - name: github.com/elazarl/go-bindata-assetfs
   version: 30f82fa23fd844bd5bb1e5f216db87fd77b5eb43
 - name: github.com/elithrar/simple-scrypt

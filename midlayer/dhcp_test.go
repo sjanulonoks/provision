@@ -58,7 +58,6 @@ func TestMain(m *testing.M) {
 	}
 	dataTracker = backend.NewDataTracker(bs,
 		tmpDir,
-		"CURL",
 		"127.0.0.1",
 		8091,
 		8092,

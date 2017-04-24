@@ -28,7 +28,6 @@ RenderData:
 ProvisionerAddress = {{.ProvisionerAddress}}
 ProvisionerURL = {{.ProvisionerURL}}
 ApiURL = {{.ApiURL}}
-CommandURL = {{.CommandURL}}
 BootParams = {{.BootParams}}`
 	tmplDefaultRenderedWithoutFred = `Machine: 
 Name = Test Name
@@ -45,7 +44,6 @@ RenderData:
 ProvisionerAddress = 127.0.0.1
 ProvisionerURL = http://127.0.0.1:8091
 ApiURL = https://127.0.0.1:8092
-CommandURL = CURL
 BootParams = default`
 	tmplDefaultRenderedWithFred = `Machine: 
 Name = Test Name
@@ -62,7 +60,6 @@ RenderData:
 ProvisionerAddress = 127.0.0.1
 ProvisionerURL = http://127.0.0.1:8091
 ApiURL = https://127.0.0.1:8092
-CommandURL = CURL
 BootParams = default`
 	tmplNothing = `Nothing`
 )
