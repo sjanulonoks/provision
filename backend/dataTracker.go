@@ -180,6 +180,10 @@ type DataTracker struct {
 	tmplMux           *sync.Mutex
 }
 
+// This grabs the requested dtobj locks in reverse alphabetical
+// order to give everything a consistent locking order and allow
+// for templates to lock bootenvs when a template change necessitates
+// a bootenv template cache rebuild.
 func (p *DataTracker) lockEnts(ents ...string) ([]*dtobjs, func()) {
 	res := make([]*dtobjs, len(ents))
 	s := sort.StringSlice(ents)
