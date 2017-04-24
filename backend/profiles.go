@@ -7,19 +7,14 @@ import (
 // Profile represents a set of key/values to use in
 // template expansion.
 //
-// There are two types of special profile lists
-// global and per machine.
-//
-// global is named 'global'
-// per-machine are marked machine-only and named after the machine.
+// There is one special profile named 'global' that acts
+// as a global set of parameters for the system.
 //
 // These can be assigned to a machine's profile list.
 // swagger:model
 type Profile struct {
-	// The name of the profile.  THis must be unique across all
-	// profiles. By convention for machine specific,
-	// it is the FQDN of the machine, these are created at machine
-	// construction and deletion time.
+	// The name of the profile.  This must be unique across all
+	// profiles.
 	//
 	// required: true
 	// swagger:strfmt hostname
@@ -31,9 +26,6 @@ type Profile struct {
 	// for BootEnv, as documented by that boot environment's
 	// RequiredParams and OptionalParams.
 	Params map[string]interface{}
-	//
-	// Is this a machine-only, profile
-	MachineOnly bool
 
 	p *DataTracker
 }
