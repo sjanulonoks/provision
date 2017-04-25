@@ -1,9 +1,11 @@
 package backend
 
 import (
+	"math/big"
 	"net"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 )
 
 // Reservation tracks persistent DHCP IP address reservations.
@@ -32,6 +34,76 @@ type Reservation struct {
 	// required: true
 	Strategy string
 	p        *DataTracker
+}
+
+func (l *Reservation) Indexes() map[string]index.Maker {
+	fix := AsReservation
+	return map[string]index.Maker{
+		"Addr": index.Make(
+			func(i, j store.KeySaver) bool {
+				n, o := big.Int{}, big.Int{}
+				n.SetBytes(fix(i).Addr.To16())
+				o.SetBytes(fix(j).Addr.To16())
+				return n.Cmp(&o) == -1
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				addr := &big.Int{}
+				addr.SetBytes(fix(ref).Addr.To16())
+				return func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).Addr.To16())
+						return o.Cmp(addr) != -1
+					},
+					func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).Addr.To16())
+						return o.Cmp(addr) == 1
+					}
+			}),
+		"Token": index.Make(
+			func(i, j store.KeySaver) bool { return fix(i).Token < fix(j).Token },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				token := fix(ref).Token
+				return func(s store.KeySaver) bool {
+						return fix(s).Token >= token
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Token > token
+					}
+			}),
+		"Strategy": index.Make(
+			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				strategy := fix(ref).Strategy
+				return func(s store.KeySaver) bool {
+						return fix(s).Strategy >= strategy
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Strategy > strategy
+					}
+			}),
+		"NextServer": index.Make(
+			func(i, j store.KeySaver) bool {
+				n, o := big.Int{}, big.Int{}
+				n.SetBytes(fix(i).NextServer.To16())
+				o.SetBytes(fix(j).NextServer.To16())
+				return n.Cmp(&o) == -1
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				addr := &big.Int{}
+				addr.SetBytes(fix(ref).NextServer.To16())
+				return func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).NextServer.To16())
+						return o.Cmp(addr) != -1
+					},
+					func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).NextServer.To16())
+						return o.Cmp(addr) == 1
+					}
+			}),
+	}
 }
 
 func (r *Reservation) Prefix() string {

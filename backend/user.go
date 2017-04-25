@@ -2,6 +2,7 @@ package backend
 
 import (
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 	sc "github.com/elithrar/simple-scrypt"
 )
 
@@ -21,6 +22,23 @@ type User struct {
 
 func (u *User) Prefix() string {
 	return "users"
+}
+
+func (p *User) Indexes() map[string]index.Maker {
+	fix := AsUser
+	return map[string]index.Maker{
+		"Name": index.Make(
+			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				refName := fix(ref).Name
+				return func(s store.KeySaver) bool {
+						return fix(s).Name >= refName
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Name > refName
+					}
+			}),
+	}
 }
 
 func (u *User) Key() string {

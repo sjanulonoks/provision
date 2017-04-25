@@ -16,6 +16,7 @@ import (
 	"text/template"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 )
 
 // TemplateInfo holds information on the templates in the boot
@@ -152,6 +153,63 @@ type BootEnv struct {
 	p              *DataTracker
 	rootTemplate   *template.Template
 	tmplMux        sync.Mutex
+}
+
+func (b *BootEnv) Indexes() map[string]index.Maker {
+	fix := AsBootEnv
+	return map[string]index.Maker{
+		"Name": index.Make(
+			func(i, j store.KeySaver) bool {
+				return fix(i).Name < fix(j).Name
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				name := fix(ref).Name
+				return func(s store.KeySaver) bool {
+						return fix(s).Name >= name
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Name > name
+					}
+			}),
+		"Available": index.Make(
+			func(i, j store.KeySaver) bool {
+				return !fix(i).Available && fix(j).Available
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				avail := fix(ref).Available
+				return func(s store.KeySaver) bool {
+						if avail {
+							return fix(ref).Available
+						}
+						return true
+					},
+					func(s store.KeySaver) bool {
+						if !avail {
+							return fix(ref).Available
+						}
+						return false
+					}
+			}),
+		"OnlyUnknown": index.Make(
+			func(i, j store.KeySaver) bool {
+				return !fix(i).OnlyUnknown && fix(j).OnlyUnknown
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				avail := fix(ref).Available
+				return func(s store.KeySaver) bool {
+						if avail {
+							return fix(ref).OnlyUnknown
+						}
+						return true
+					},
+					func(s store.KeySaver) bool {
+						if !avail {
+							return fix(ref).OnlyUnknown
+						}
+						return false
+					}
+			}),
+	}
 }
 
 func (b *BootEnv) Backend() store.SimpleStore {

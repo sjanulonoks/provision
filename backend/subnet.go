@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 	dhcp "github.com/krolaw/dhcp4"
 )
 
@@ -219,6 +220,93 @@ type Subnet struct {
 	p              *DataTracker
 	nextLeasableIP net.IP
 	sn             *net.IPNet
+}
+
+func (s *Subnet) Indexes() map[string]index.Maker {
+	fix := AsSubnet
+	return map[string]index.Maker{
+		"Name": index.Make(
+			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				refName := fix(ref).Name
+				return func(s store.KeySaver) bool {
+						return fix(s).Name >= refName
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Name > refName
+					}
+			}),
+		"Strategy": index.Make(
+			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				strategy := fix(ref).Strategy
+				return func(s store.KeySaver) bool {
+						return fix(s).Strategy >= strategy
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Strategy > strategy
+					}
+			}),
+		"NextServer": index.Make(
+			func(i, j store.KeySaver) bool {
+				n, o := big.Int{}, big.Int{}
+				n.SetBytes(fix(i).NextServer.To16())
+				o.SetBytes(fix(j).NextServer.To16())
+				return n.Cmp(&o) == -1
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				addr := &big.Int{}
+				addr.SetBytes(fix(ref).NextServer.To16())
+				return func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).NextServer.To16())
+						return o.Cmp(addr) != -1
+					},
+					func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).NextServer.To16())
+						return o.Cmp(addr) == 1
+					}
+			}),
+		"Subnet": index.Make(
+			func(i, j store.KeySaver) bool {
+				a, _, errA := net.ParseCIDR(fix(i).Subnet)
+				b, _, errB := net.ParseCIDR(fix(j).Subnet)
+				if errA != nil || errB != nil {
+					fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet, fix(j).Subnet)
+				}
+				n, o := big.Int{}, big.Int{}
+				n.SetBytes(a.To16())
+				o.SetBytes(b.To16())
+				return n.Cmp(&o) == -1
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				cidr, _, err := net.ParseCIDR(fix(ref).Subnet)
+				if err != nil {
+					fix(ref).p.Logger.Panicf("Illegal subnet %s: %v", fix(ref).Subnet, err)
+				}
+				addr := &big.Int{}
+				addr.SetBytes(cidr.To16())
+				return func(s store.KeySaver) bool {
+						cidr, _, err := net.ParseCIDR(fix(s).Subnet)
+						if err != nil {
+							fix(s).p.Logger.Panicf("Illegal subnet %s: %v", fix(s).Subnet, err)
+						}
+						o := big.Int{}
+						o.SetBytes(cidr.To16())
+						return o.Cmp(addr) != -1
+					},
+					func(s store.KeySaver) bool {
+						cidr, _, err := net.ParseCIDR(fix(s).Subnet)
+						if err != nil {
+							fix(s).p.Logger.Panicf("Illegal subnet %s: %v", fix(s).Subnet, err)
+						}
+						o := big.Int{}
+						o.SetBytes(cidr.To16())
+						return o.Cmp(addr) == 1
+					}
+			}),
+	}
 }
 
 func (s *Subnet) subnet() *net.IPNet {

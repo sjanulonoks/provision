@@ -14,6 +14,7 @@ import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/backend/index"
 	"github.com/gin-gonic/gin"
 )
 
@@ -62,6 +63,11 @@ func (dt *LocalDTI) FetchOne(store.KeySaver, string) (store.KeySaver, bool) {
 }
 func (dt *LocalDTI) FetchAll(ref store.KeySaver) []store.KeySaver {
 	return dt.ListValue
+}
+
+func (dt *LocalDTI) Filter(ref store.KeySaver, filters ...index.Filter) []store.KeySaver {
+	idx := index.New(dt.ListValue)
+	return index.All(filters...)(idx).Items()
 }
 func (dt *LocalDTI) GetInterfaces() ([]*backend.Interface, error) {
 	return dt.GIValue, dt.GIError

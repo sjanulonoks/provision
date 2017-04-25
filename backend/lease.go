@@ -1,10 +1,12 @@
 package backend
 
 import (
+	"math/big"
 	"net"
 	"time"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 )
 
 var hexDigit = []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'}
@@ -45,6 +47,67 @@ type Lease struct {
 	Strategy string
 
 	p *DataTracker
+}
+
+func (l *Lease) Indexes() map[string]index.Maker {
+	fix := AsLease
+	return map[string]index.Maker{
+		"Addr": index.Make(
+			func(i, j store.KeySaver) bool {
+				n, o := big.Int{}, big.Int{}
+				n.SetBytes(fix(i).Addr.To16())
+				o.SetBytes(fix(j).Addr.To16())
+				return n.Cmp(&o) == -1
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				addr := &big.Int{}
+				addr.SetBytes(fix(ref).Addr.To16())
+				return func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).Addr.To16())
+						return o.Cmp(addr) != -1
+					},
+					func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).Addr.To16())
+						return o.Cmp(addr) == 1
+					}
+			}),
+		"Token": index.Make(
+			func(i, j store.KeySaver) bool { return fix(i).Token < fix(j).Token },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				token := fix(ref).Token
+				return func(s store.KeySaver) bool {
+						return fix(s).Token >= token
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Token > token
+					}
+			}),
+		"Strategy": index.Make(
+			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				strategy := fix(ref).Strategy
+				return func(s store.KeySaver) bool {
+						return fix(s).Strategy >= strategy
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Strategy > strategy
+					}
+			}),
+		"ExpireTime": index.Make(
+			func(i, j store.KeySaver) bool { return fix(i).ExpireTime.Before(fix(j).ExpireTime) },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				expireTime := fix(ref).ExpireTime
+				return func(s store.KeySaver) bool {
+						ttime := fix(s).ExpireTime
+						return ttime.Equal(expireTime) || ttime.After(expireTime)
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).ExpireTime.After(expireTime)
+					}
+			}),
+	}
 }
 
 func (l *Lease) Prefix() string {

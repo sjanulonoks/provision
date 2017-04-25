@@ -11,6 +11,7 @@ import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/embedded"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-gonic/gin"
@@ -38,7 +39,8 @@ type DTI interface {
 	Save(store.KeySaver) (store.KeySaver, error)
 	Patch(store.KeySaver, string, jsonpatch2.Patch) (store.KeySaver, error)
 	FetchOne(store.KeySaver, string) (store.KeySaver, bool)
-	FetchAll(ref store.KeySaver) []store.KeySaver
+	FetchAll(store.KeySaver) []store.KeySaver
+	Filter(store.KeySaver, ...index.Filter) []store.KeySaver
 
 	NewBootEnv() *backend.BootEnv
 	NewMachine() *backend.Machine
@@ -61,6 +63,10 @@ type DTI interface {
 
 type Sanitizable interface {
 	Sanitize()
+}
+
+type Indexable interface {
+	Indexes() map[string]index.Maker
 }
 
 type Frontend struct {
@@ -266,7 +272,7 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
 		return
 	}
-	arr := f.dt.FetchAll(ref)
+	arr := f.dt.Filter(ref)
 	for _, res := range arr {
 		s, ok := res.(Sanitizable)
 		if ok {

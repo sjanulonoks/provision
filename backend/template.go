@@ -6,6 +6,7 @@ import (
 	"text/template"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 )
 
 // Template represents a template that will be associated with a boot
@@ -25,6 +26,23 @@ type Template struct {
 	// required: true
 	Contents string
 	p        *DataTracker
+}
+
+func (p *Template) Indexes() map[string]index.Maker {
+	fix := AsTemplate
+	return map[string]index.Maker{
+		"ID": index.Make(
+			func(i, j store.KeySaver) bool { return fix(i).ID < fix(j).ID },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				refID := fix(ref).ID
+				return func(s store.KeySaver) bool {
+						return fix(s).ID >= refID
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).ID > refID
+					}
+			}),
+	}
 }
 
 func (t *Template) Prefix() string {

@@ -15,6 +15,7 @@ import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 )
 
 var (
@@ -90,7 +91,7 @@ func (dt *dtobjs) find(key string) (int, bool) {
 func (dt *dtobjs) subset(lower, upper func(string) bool) []store.KeySaver {
 	i := sort.Search(len(dt.d), func(i int) bool { return lower(dt.d[i].Key()) })
 	j := sort.Search(len(dt.d), func(i int) bool { return upper(dt.d[i].Key()) })
-	if i == len(dt.d) {
+	if i == j {
 		return []store.KeySaver{}
 	}
 	res := make([]store.KeySaver, j-i)
@@ -169,7 +170,6 @@ type dtSetter interface {
 // a dataTracker.
 type DataTracker struct {
 	FileRoot            string
-	CommandURL          string
 	OurAddress          string
 	StaticPort, ApiPort int
 	Logger              *log.Logger
@@ -550,6 +550,21 @@ func (p *DataTracker) FetchAll(ref store.KeySaver) []store.KeySaver {
 	return ret
 }
 
+//FetchIndex returns an index that contains the results of running
+// the passed filters on the cached objects.
+func (p *DataTracker) Filter(ref store.KeySaver, filters ...index.Filter) []store.KeySaver {
+	prefix := ref.Prefix()
+	objs := p.lockFor(prefix)
+	idx := index.New(objs.d)
+	res := index.All(filters...)(idx).Items()
+	ret := make([]store.KeySaver, len(res))
+	for i := range res {
+		ret[i] = p.Clone(res[i])
+	}
+	objs.Unlock()
+	return ret
+}
+
 func (p *DataTracker) lockedGet(prefix, key string) (*dtobjs, int, bool) {
 	mux := p.lockFor(prefix)
 	idx, found := mux.find(key)
@@ -763,6 +778,20 @@ func (p *DataTracker) GetToken(tokenString string) (*DrpCustomClaims, error) {
 
 func (p *DataTracker) SealClaims(claims *DrpCustomClaims) (string, error) {
 	return claims.Seal(p.tokenManager)
+}
+
+func (p *DataTracker) Backup() ([]byte, error) {
+	keys := make([]string, len(p.objs))
+	for k := range p.objs {
+		keys = append(keys, k)
+	}
+	_, unlocker := p.lockEnts(keys...)
+	defer unlocker()
+	res := map[string][]store.KeySaver{}
+	for _, k := range keys {
+		res[k] = p.objs[k].d
+	}
+	return json.Marshal(res)
 }
 
 func (p *DataTracker) NewToken(id string, ttl int, scope, action, specific string) (string, error) {
