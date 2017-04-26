@@ -2,19 +2,19 @@
 
 set -e
 
-DEFAULT_RS_VERSION="stable"
+DEFAULT_DRP_VERSION="stable"
 
 usage() {
         echo
-	echo "Usage: $0 [--rs-version=<Version to install>] [--isolated] [--ipaddr=<ip>] <install|remove>"
+	echo "Usage: $0 [--drp-version=<Version to install>] [--isolated] [--ipaddr=<ip>] <install|remove>"
         echo
         echo "Options:"
         echo "  --debug=[true|false] # Enables debug output"
         echo "  --isolated # Sets up the current directory as a place to the cli and provision"
         echo "  --ipaddr=<ip> # The IP to use for the system identified IP.  The system will attempt to discover the value"
         echo "                # if not specified"
-        echo "  --rs-version=<string>  # Version identifier if downloading.  stable, tip, or specific version label."
-        echo "                         # Defaults to $DEFAULT_RS_VERSION"
+        echo "  --drp-version=<string>  # Version identifier if downloading.  stable, tip, or specific version label."
+        echo "                         # Defaults to $DEFAULT_DRP_VERSION"
         echo
         echo "  install    # Sets up an insolated or system enabled install.  Outputs nexts steps"
         echo "  remove     # Removes the system enabled install.  Requires no other flags"
@@ -27,7 +27,7 @@ usage() {
 	exit 1
 }
 
-RS_VERSION=$DEFAULT_RS_VERSION
+DRP_VERSION=$DEFAULT_DRP_VERSION
 ISOLATED=false
 args=()
 while (( $# > 0 )); do
@@ -192,9 +192,9 @@ case $1 in
                  # We aren't a build tree, but are we extracted install yet?
                  # If not, get the requested version.
                  if [[ ! -e sha256sums || $force ]] ; then
-                     echo "Installing Version $RS_VERSION of Digital Rebar Provision"
-                     curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$RS_VERSION/dr-provision.zip
-                     curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$RS_VERSION/dr-provision.sha256
+                     echo "Installing Version $DRP_VERSION of Digital Rebar Provision"
+                     curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$DRP_VERSION/dr-provision.zip
+                     curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$DRP_VERSION/dr-provision.sha256
 
                      $shasum -c dr-provision.sha256
                      $tar -xf dr-provision.zip
@@ -219,8 +219,8 @@ case $1 in
                  ln -s $binpath/drpcli drpcli
                  ln -s $binpath/dr-provision dr-provision
 
-                 echo "Run the following commands to start up dr-provision in a local isolated way."
-                 echo "The server will store information and server files in the drp-data directory."
+                 echo "# Run the following commands to start up dr-provision in a local isolated way."
+                 echo "# The server will store information and serve files from the drp-data directory."
                  echo
 
                  if [[ $IPADDR == "" ]] ; then
@@ -256,6 +256,9 @@ case $1 in
                  fi
 
                  echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar &"
+                 echo
+                 echo "# Once dr-provision is started, this commmand will gather and upload the tools required to"
+                 echo "# do discovery-based machine management"
                  echo
                  echo "tools/discovery-load.sh"
                  echo
