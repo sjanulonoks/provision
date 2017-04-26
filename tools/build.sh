@@ -40,6 +40,9 @@ glide install
 rm -rf client models embedded/assets/swagger.json
 go generate server/assets.go
 
+# Update cli docs if needed. - does change date.
+go build -o drpcli-docs cmds/drpcli-docs.go
+
 . tools/version.sh
 
 echo "Version = $Prepart$MajorV.$MinorV.$PatchV$Extra-$GITHASH"
