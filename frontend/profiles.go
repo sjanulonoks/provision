@@ -1,6 +1,8 @@
 package frontend
 
 import (
+	"net/http"
+
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
@@ -20,6 +22,13 @@ type ProfilesResponse struct {
 	Body []*backend.Profile
 }
 
+// ProfileParamsResponse return on a successful GET of all Profile's Params
+// swagger:response
+type ProfileParamsResponse struct {
+	// in: body
+	Body map[string]interface{}
+}
+
 // ProfileBodyParameter used to inject a Profile
 // swagger:parameters createProfile putProfile
 type ProfileBodyParameter struct {
@@ -37,11 +46,19 @@ type ProfilePatchBodyParameter struct {
 }
 
 // ProfilePathParameter used to name a Profile in the path
-// swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile
+// swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile getProfileParams postProfileParams
 type ProfilePathParameter struct {
 	// in: path
 	// required: true
 	Name string `json:"name"`
+}
+
+// ProfileParamsBodyParameter used to set Profile Params
+// swagger:parameters postProfileParams
+type ProfileParamsBodyParameter struct {
+	// in: body
+	// required: true
+	Body map[string]interface{}
 }
 
 func (f *Frontend) InitProfileApi() {
@@ -147,4 +164,83 @@ func (f *Frontend) InitProfileApi() {
 			f.Remove(c, b)
 
 		})
+
+	// swagger:route GET /profiles/{name}/params Profiles getProfileParams
+	//
+	// List profile params Profile
+	//
+	// List Profile parms for a Profile specified by {name}
+	//
+	//     Responses:
+	//       200: ProfileParamsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/profiles/:name/params",
+		func(c *gin.Context) {
+			name := c.Param(`name`)
+			ref := f.dt.NewProfile()
+			if !assureAuth(c, f.Logger, ref.Prefix(), "get", name) {
+				return
+			}
+			res, ok := f.dt.FetchOne(ref, name)
+			if !ok {
+				err := &backend.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: ref.Prefix(),
+					Key:   name,
+				}
+				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
+				c.JSON(err.Code, err)
+				return
+			}
+			p := backend.AsProfile(res).GetParams()
+			c.JSON(http.StatusOK, p)
+		})
+
+	// swagger:route POST /profiles/{name}/params Profiles postProfileParams
+	//
+	// Set/Replace all the Parameters for a profile specified by {name}
+	//
+	//     Responses:
+	//       200: ProfileParamsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/profiles/:name/params",
+		func(c *gin.Context) {
+			var val map[string]interface{}
+			if !assureDecode(c, &val) {
+				return
+			}
+			name := c.Param(`name`)
+			ref := f.dt.NewProfile()
+			if !assureAuth(c, f.Logger, ref.Prefix(), "get", name) {
+				return
+			}
+			res, ok := f.dt.FetchOne(ref, name)
+			if !ok {
+				err := &backend.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: ref.Prefix(),
+					Key:   name,
+				}
+				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
+				c.JSON(err.Code, err)
+				return
+			}
+			m := backend.AsProfile(res)
+
+			err := m.SetParams(val)
+			if err != nil {
+				be, _ := err.(*backend.Error)
+				c.JSON(be.Code, be)
+			} else {
+				c.JSON(http.StatusOK, val)
+			}
+		})
+
 }
