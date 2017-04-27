@@ -17,7 +17,6 @@ type Profile struct {
 	// profiles.
 	//
 	// required: true
-	// swagger:strfmt hostname
 	Name string
 	// A description of this profile.  This can contain any reference
 	// information for humans you want associated with the profile.
@@ -40,6 +39,30 @@ func (p *Profile) Prefix() string {
 
 func (p *Profile) Key() string {
 	return p.Name
+}
+
+func (p *Profile) GetParams() map[string]interface{} {
+	m := p.Params
+	if m == nil {
+		m = map[string]interface{}{}
+	}
+	return m
+}
+
+func (p *Profile) SetParams(values map[string]interface{}) error {
+	p.Params = values
+	e := &Error{Code: 409, Type: ValidationError, o: p}
+	_, e2 := p.p.save(p)
+	e.Merge(e2)
+	return e.OrNil()
+}
+
+func (p *Profile) GetParam(key string, searchProfiles bool) (interface{}, bool) {
+	mm := p.GetParams()
+	if v, found := mm[key]; found {
+		return v, true
+	}
+	return nil, false
 }
 
 func (p *Profile) New() store.KeySaver {

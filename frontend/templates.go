@@ -141,6 +141,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	f.ApiGroup.DELETE("/templates/:id",
 		func(c *gin.Context) {
 			b := f.dt.NewTemplate()

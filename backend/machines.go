@@ -135,7 +135,7 @@ func (n *Machine) GetParam(key string, searchProfiles bool) (interface{}, bool) 
 	if searchProfiles {
 		for _, e := range n.Profiles {
 			if p := n.getProfile(e); p != nil {
-				if v, ok := p.Params[key]; ok {
+				if v, ok := p.GetParam(key, false); ok {
 					return v, true
 				}
 			}
