@@ -144,13 +144,17 @@ func Server(c_opts *ProgOpts) {
 	}
 	if !c_opts.DisableProvisioner {
 		logger.Printf("Starting TFTP server")
-		if err = midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), dt.FS.TftpResponder(), logger); err != nil {
+		if svc, err := midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), dt.FS.TftpResponder(), logger); err != nil {
 			logger.Fatalf("Error starting TFTP server: %v", err)
+		} else {
+			services = append(services, svc)
 		}
 
 		logger.Printf("Starting static file server")
-		if err = midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), dt.FS, logger); err != nil {
+		if svc, err := midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), dt.FS, logger); err != nil {
 			logger.Fatalf("Error starting static file server: %v", err)
+		} else {
+			services = append(services, svc)
 		}
 	}
 
@@ -164,6 +168,7 @@ func Server(c_opts *ProgOpts) {
 	}
 
 	srv := &http.Server{Addr: fmt.Sprintf(":%d", c_opts.ApiPort), Handler: fe.MgmtApi}
+	services = append(services, srv)
 
 	go func() {
 		// Handle SIGINT and SIGTERM.
@@ -173,11 +178,10 @@ func Server(c_opts *ProgOpts) {
 
 		// Stop the service gracefully.
 		for _, svc := range services {
-			svc.Stop()
-		}
-		logger.Println("Shutting down server...")
-		if err := srv.Shutdown(context.Background()); err != nil {
-			logger.Fatalf("could not shutdown: %v", err)
+			logger.Println("Shutting down server...")
+			if err := svc.Shutdown(context.Background()); err != nil {
+				logger.Printf("could not shutdown: %v", err)
+			}
 		}
 	}()
 
@@ -185,7 +189,10 @@ func Server(c_opts *ProgOpts) {
 	if err = srv.ListenAndServeTLS(c_opts.TlsCertFile, c_opts.TlsKeyFile); err != http.ErrServerClosed {
 		// Stop the service gracefully.
 		for _, svc := range services {
-			svc.Stop()
+			logger.Println("Shutting down server...")
+			if err := svc.Shutdown(context.Background()); err != http.ErrServerClosed {
+				logger.Printf("could not shutdown: %v", err)
+			}
 		}
 		logger.Fatalf("Error running API service: %v\n", err)
 	}

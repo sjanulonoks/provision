@@ -1,6 +1,7 @@
 package midlayer
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -416,13 +417,14 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 	return nil
 }
 
-func (h *DhcpHandler) Stop() {
+func (h *DhcpHandler) Shutdown(ctx context.Context) error {
 	close(h.ch)
 	h.waitGroup.Wait()
+	return nil
 }
 
 type Service interface {
-	Stop()
+	Shutdown(context.Context) error
 }
 
 func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string, dhcpPort int) (Service, error) {

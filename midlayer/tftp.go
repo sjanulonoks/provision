@@ -2,6 +2,7 @@ package midlayer
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log"
 	"net"
@@ -11,14 +12,23 @@ import (
 	"github.com/pin/tftp"
 )
 
-func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error), logger *log.Logger) error {
+type TftpHandler struct {
+	srv *tftp.Server
+}
+
+func (h *TftpHandler) Shutdown(ctx context.Context) error {
+	h.srv.Shutdown()
+	return nil
+}
+
+func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error), logger *log.Logger) (Service, error) {
 	a, err := net.ResolveUDPAddr("udp", listen)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	conn, err := net.ListenUDP("udp", a)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	svr := tftp.NewServer(func(filename string, rf io.ReaderFrom) error {
 		var local net.IP
@@ -59,6 +69,9 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 		return nil
 	}, nil)
 
+	th := &TftpHandler{srv: svr}
+
 	go svr.Serve(conn)
-	return nil
+
+	return th, nil
 }
