@@ -26,10 +26,13 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/digitalrebar/digitalrebar/go/common/client"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
@@ -135,29 +138,62 @@ func Server(c_opts *ProgOpts) {
 
 	fe := frontend.NewFrontend(dt, logger, c_opts.FileRoot, c_opts.DevUI, nil)
 
+	services := make([]midlayer.Service, 0, 0)
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)
 	}
 	if !c_opts.DisableProvisioner {
 		logger.Printf("Starting TFTP server")
-		if err = midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), dt.FS.TftpResponder(), logger); err != nil {
+		if svc, err := midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), dt.FS.TftpResponder(), logger); err != nil {
 			logger.Fatalf("Error starting TFTP server: %v", err)
+		} else {
+			services = append(services, svc)
 		}
 
 		logger.Printf("Starting static file server")
-		if err = midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), dt.FS, logger); err != nil {
+		if svc, err := midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), dt.FS, logger); err != nil {
 			logger.Fatalf("Error starting static file server: %v", err)
+		} else {
+			services = append(services, svc)
 		}
 	}
 
 	if !c_opts.DisableDHCP {
 		logger.Printf("Starting DHCP server")
-		if err = midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.DhcpPort); err != nil {
+		if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.DhcpPort); err != nil {
 			logger.Fatalf("Error starting DHCP server: %v", err)
+		} else {
+			services = append(services, svc)
 		}
 	}
+
+	srv := &http.Server{Addr: fmt.Sprintf(":%d", c_opts.ApiPort), Handler: fe.MgmtApi}
+	services = append(services, srv)
+
+	go func() {
+		// Handle SIGINT and SIGTERM.
+		ch := make(chan os.Signal)
+		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+		log.Println(<-ch)
+
+		// Stop the service gracefully.
+		for _, svc := range services {
+			logger.Println("Shutting down server...")
+			if err := svc.Shutdown(context.Background()); err != nil {
+				logger.Printf("could not shutdown: %v", err)
+			}
+		}
+	}()
+
 	logger.Printf("Starting API server")
-	if err = http.ListenAndServeTLS(fmt.Sprintf(":%d", c_opts.ApiPort), c_opts.TlsCertFile, c_opts.TlsKeyFile, fe.MgmtApi); err != nil {
-		logger.Fatalf("Error running API service: %v", err)
+	if err = srv.ListenAndServeTLS(c_opts.TlsCertFile, c_opts.TlsKeyFile); err != http.ErrServerClosed {
+		// Stop the service gracefully.
+		for _, svc := range services {
+			logger.Println("Shutting down server...")
+			if err := svc.Shutdown(context.Background()); err != http.ErrServerClosed {
+				logger.Printf("could not shutdown: %v", err)
+			}
+		}
+		logger.Fatalf("Error running API service: %v\n", err)
 	}
 }

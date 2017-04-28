@@ -8,10 +8,10 @@ import (
 	"github.com/digitalrebar/provision/backend"
 )
 
-func ServeStatic(listenAt string, responder http.Handler, logger *log.Logger) error {
+func ServeStatic(listenAt string, responder http.Handler, logger *log.Logger) (*http.Server, error) {
 	conn, err := net.Listen("tcp", listenAt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	svr := &http.Server{
 		Addr:    listenAt,
@@ -27,8 +27,10 @@ func ServeStatic(listenAt string, responder http.Handler, logger *log.Logger) er
 	}
 	go func() {
 		if err := svr.Serve(conn); err != nil {
-			logger.Fatalf("Static HTTP server error %v", err)
+			if err != http.ErrServerClosed {
+				logger.Fatalf("Static HTTP server error %v", err)
+			}
 		}
 	}()
-	return nil
+	return svr, nil
 }
