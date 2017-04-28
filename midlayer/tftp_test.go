@@ -1,3 +1,9 @@
+// +build !race
+//
+// The TFTP server has a potential race between starting and shutting down.  This will never get hit in our
+// code, it is possible.
+//
+
 package midlayer
 
 import (
