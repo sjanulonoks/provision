@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/ipv4"
@@ -30,6 +31,9 @@ func MacStrategy(p dhcp.Packet, options dhcp.Options) string {
 }
 
 type DhcpHandler struct {
+	ch        chan bool
+	waitGroup *sync.WaitGroup
+
 	ifs    []string
 	port   int
 	conn   *ipv4.PacketConn
@@ -209,6 +213,8 @@ func (h *DhcpHandler) listenOn(testAddr net.IP) bool {
 }
 
 func (h *DhcpHandler) Serve() error {
+	defer h.waitGroup.Done()
+
 	l, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", h.port))
 	if err != nil {
 		return err
@@ -220,8 +226,19 @@ func (h *DhcpHandler) Serve() error {
 	}
 	buf := make([]byte, 16384) // account for non-Ethernet devices maybe being used.
 	for {
+		select {
+		case <-h.ch:
+			h.Printf("stopping listening on DHCP\n")
+			l.Close()
+			return nil
+		default:
+		}
+		h.conn.SetDeadline(time.Now().Add(1e9))
 		h.cm = nil
 		cnt, control, srcAddr, err := h.conn.ReadFrom(buf)
+		if err, ok := err.(net.Error); ok && err.Timeout() {
+			continue
+		}
 		if err != nil {
 			return err
 		}
@@ -399,21 +416,33 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 	return nil
 }
 
-func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string, dhcpPort int) error {
+func (h *DhcpHandler) Stop() {
+	close(h.ch)
+	h.waitGroup.Wait()
+}
+
+type Service interface {
+	Stop()
+}
+
+func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string, dhcpPort int) (Service, error) {
 	ifs := []string{}
 	if dhcpIfs != "" {
 		ifs = strings.Split(dhcpIfs, ",")
 	}
 	handler := &DhcpHandler{
-		ifs:    ifs,
-		bk:     dhcpInfo,
-		port:   dhcpPort,
-		strats: []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
+		ch:        make(chan bool),
+		waitGroup: &sync.WaitGroup{},
+		ifs:       ifs,
+		bk:        dhcpInfo,
+		port:      dhcpPort,
+		strats:    []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
 	}
+	handler.waitGroup.Add(1)
 	go func() {
 		if err := handler.Serve(); err != nil {
 			dhcpInfo.Logger.Fatalf("DHCP handler died: %v", err)
 		}
 	}()
-	return nil
+	return handler, nil
 }
