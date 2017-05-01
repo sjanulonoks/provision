@@ -32,15 +32,14 @@ func MacStrategy(p dhcp.Packet, options dhcp.Options) string {
 }
 
 type DhcpHandler struct {
-	ch        chan bool
 	waitGroup *sync.WaitGroup
-
-	ifs    []string
-	port   int
-	conn   *ipv4.PacketConn
-	bk     *backend.DataTracker
-	cm     *ipv4.ControlMessage
-	strats []*Strategy
+	closing   bool
+	ifs       []string
+	port      int
+	conn      *ipv4.PacketConn
+	bk        *backend.DataTracker
+	cm        *ipv4.ControlMessage
+	strats    []*Strategy
 }
 
 func (h *DhcpHandler) buildOptions(p dhcp.Packet, l *backend.Lease) (dhcp.Options, time.Duration, net.IP) {
@@ -215,25 +214,9 @@ func (h *DhcpHandler) listenOn(testAddr net.IP) bool {
 
 func (h *DhcpHandler) Serve() error {
 	defer h.waitGroup.Done()
-
-	l, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", h.port))
-	if err != nil {
-		return err
-	}
-	defer l.Close()
-	h.conn = ipv4.NewPacketConn(l)
-	if err := h.conn.SetControlMessage(ipv4.FlagInterface, true); err != nil {
-		return err
-	}
+	defer h.conn.Close()
 	buf := make([]byte, 16384) // account for non-Ethernet devices maybe being used.
 	for {
-		select {
-		case <-h.ch:
-			h.Printf("stopping listening on DHCP\n")
-			l.Close()
-			return nil
-		default:
-		}
 		h.conn.SetReadDeadline(time.Now().Add(time.Second))
 		h.cm = nil
 		cnt, control, srcAddr, err := h.conn.ReadFrom(buf)
@@ -418,8 +401,11 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 }
 
 func (h *DhcpHandler) Shutdown(ctx context.Context) error {
-	close(h.ch)
+	h.Printf("Shutting down DHCP handler")
+	h.closing = true
+	h.conn.Close()
 	h.waitGroup.Wait()
+	h.Printf("DHCP handler shut down")
 	return nil
 }
 
@@ -433,16 +419,26 @@ func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string, dhcpPort in
 		ifs = strings.Split(dhcpIfs, ",")
 	}
 	handler := &DhcpHandler{
-		ch:        make(chan bool),
 		waitGroup: &sync.WaitGroup{},
 		ifs:       ifs,
 		bk:        dhcpInfo,
 		port:      dhcpPort,
 		strats:    []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
 	}
+
+	l, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", handler.port))
+	if err != nil {
+		return nil, err
+	}
+	handler.conn = ipv4.NewPacketConn(l)
+	if err := handler.conn.SetControlMessage(ipv4.FlagInterface, true); err != nil {
+		l.Close()
+		return nil, err
+	}
 	handler.waitGroup.Add(1)
 	go func() {
-		if err := handler.Serve(); err != nil {
+		err := handler.Serve()
+		if !handler.closing {
 			dhcpInfo.Logger.Fatalf("DHCP handler died: %v", err)
 		}
 	}()
