@@ -234,7 +234,7 @@ func (h *DhcpHandler) Serve() error {
 			return nil
 		default:
 		}
-		h.conn.SetDeadline(time.Now().Add(1e9))
+		h.conn.SetReadDeadline(time.Now().Add(1e9))
 		h.cm = nil
 		cnt, control, srcAddr, err := h.conn.ReadFrom(buf)
 		if err, ok := err.(net.Error); ok && err.Timeout() {
