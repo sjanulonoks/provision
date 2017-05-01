@@ -1,0 +1,8 @@
+Name: dr-integration
+Params:
+  join_dr: true
+  CommandURL: https://70.113.106.34
+  rebar-machine_key: machine-install:e94e76b0a70a6e99d3611a7bf719f8aa8464f201b84373c63a054cb6d0a5c865f8860ea6b23c169d3d1c1754e0d951066d47e46d768331402fe97b03fa8eec61
+# Optionally, ntp servers can be specified
+#  ntp_serv#ers:
+#    - 1.1.1.1

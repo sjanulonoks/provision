@@ -1,0 +1,4 @@
+Name: update-drp
+Params:
+  # Specifies the next bootenv to set on the machine. if unspecified, use local.
+  next_boot_env: local

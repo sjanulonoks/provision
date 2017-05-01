@@ -15,73 +15,27 @@
 #
 
 set -x
-exec 2>&1
 exec >>/target/root/post-install.log
-
-{{if .ParamExists "access_keys"}}
-mkdir -p /target/root/.ssh
-cat >/target/root/.ssh/authorized_keys <<EOF
-### BEGIN GENERATED CONTENT
-{{ range $key := .Param "access_keys" }}{{$key}}{{ end }}
-### END GENERATED CONTENT
-EOF
-echo "PermitRootLogin without-password" >> /target/etc/ssh/sshd_config
-echo "AcceptEnv http_proxy https_proxy no_proxy" >> /target/etc/ssh/sshd_config
-{{end}}
-
-{{if .ParamExists "proxy-servers"}}
-echo "Acquire::http::Proxy \"{{index (.Param "proxy-servers") 0 "url"}}\";" >/target/etc/apt/apt.conf.d/00-proxy
-
-# Setup a proxy for the environment
-echo "http_proxy={{index (.Param "proxy-servers") 0 "url"}}" >> /target/etc/environment
-echo "https_proxy={{index (.Param "proxy-servers") 0 "url"}}" >> /target/etc/environment
-echo "no_proxy=127.0.0.1,localhost,::1,{{index (.Param "proxy-servers") 0 "address"}}" >> /target/etc/environment
-
-# Setup bash proxy env
-mkdir -p /etc/profile.d
-echo "http_proxy={{index (.Param "proxy-servers") 0 "url"}}" >> /target/etc/profile.d/proxy.sh
-echo "https_proxy={{index (.Param "proxy-servers") 0 "url"}}" >>  /target/etc/profile.d/proxy.sh
-echo "no_proxy=127.0.0.1,localhost,::1,{{index (.Param "proxy-servers") 0 "address"}}" >> /target/etc/profile.d/proxy.sh
-{{end}}
+exec 2>&1
 
 mount /proc /target/proc
 
-cat > /target/update_system2.sh <<"EOF"
+cat > /target/update_system2.sh <<'EOF2341'
 #!/bin/bash
 set -x
 export PS4='${BASH_SOURCE}@${LINENO}(${FUNCNAME[0]}): '
-export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true
-export LC_ALL=C LANGUAGE=C LANG=C
-repofile=/etc/apt/sources.list
-repocontents=()
-if wget -O - {{.Env.InstallUrl}}/dists/stable/Release &>/dev/null; then
-    repocontents+=('deb {{.Env.InstallUrl}} stable restricted')
-fi
 
-printf "%s\n" "${repocontents[@]}" > "$repofile"
-apt-get -y --force-yes update
-apt-get -y --force-yes remove apparmor
-apt-get -y --force-yes install ntpdate curl
+{{ template "set-hostname.tmpl" . }}
+{{ template "web-proxy.tmpl" . }}
+{{ template "ubuntu-drp-only-repos.tmpl" . }}
+{{ template "root-remote-access.tmpl" . }}
+{{ template "join-to-dr.tmpl" . }}
 
-HOSTNAME="{{.Machine.Name}}"
-if [ -f /etc/sysconfig/network ] ; then
-      sed -i -e "s/HOSTNAME=.*/HOSTNAME=${HOSTNAME}/" /etc/sysconfig/network
-fi
-echo "${HOSTNAME#*.}" >/etc/domainname
-echo "$HOSTNAME" >/etc/hostname
-hostname "$HOSTNAME"
-export HOSTNAME
+{{ template "update-drp-local.tmpl" . }}
 
-# Tell dr-provision we are done
-(cd /bin; curl -s -f -L -o drpcli "{{.ProvisionerURL}}/files/drpcli.amd64.linux"; chmod 755 drpcli)
-export RS_ENDPOINT="{{.ApiURL}}"
-# This will contain a token appropriate for the path being
-# used below.  Either a create or update/show token
-export RS_TOKEN="{{.GenerateToken}}"
-drpcli machines update "{{.Machine.UUID}}" '{"BootEnv": "local"}'
-
-EOF
+EOF2341
 
 chmod +x /target/update_system2.sh
 chroot /target /update_system2.sh
 sync
+
