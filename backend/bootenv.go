@@ -431,6 +431,18 @@ func (b *BootEnv) BeforeDelete() error {
 	return e.OrNil()
 }
 
+func (b *BootEnv) AfterDelete() {
+	if b.OnlyUnknown {
+		err := &Error{o: b}
+		rts := b.Render(nil, err)
+		if err.ContainsError() {
+			b.Errors = err.Messages
+		} else {
+			rts.deregister(b.p.FS)
+		}
+	}
+}
+
 func (b *BootEnv) List() []*BootEnv {
 	return AsBootEnvs(b.p.FetchAll(b))
 }
@@ -449,4 +461,67 @@ func AsBootEnvs(o []store.KeySaver) []*BootEnv {
 		res[i] = AsBootEnv(o[i])
 	}
 	return res
+}
+
+func (b *BootEnv) Render(m *Machine, e *Error) renderers {
+	var missingParams []string
+	if len(b.RequiredParams) > 0 && m == nil {
+		e.Errorf("Machine is nil or does not have params")
+		return nil
+	}
+	r := newRenderData(b.p, m, b)
+	for _, param := range b.RequiredParams {
+		if !r.ParamExists(param) {
+			missingParams = append(missingParams, param)
+		}
+	}
+	if len(missingParams) > 0 {
+		e.Errorf("missing required machine params for %s:\n %v", m.Name, missingParams)
+	}
+	rts := make(renderers, len(b.Templates))
+
+	for i := range b.Templates {
+		ti := &b.Templates[i]
+
+		// first, render the path
+		buf := &bytes.Buffer{}
+		if err := ti.pathTmpl.Execute(buf, r); err != nil {
+			e.Errorf("Error rendering template %s path %s: %v",
+				ti.Name,
+				ti.Path,
+				err)
+			continue
+		}
+		tmplPath := path.Clean("/" + buf.String())
+		rts[i] = newRenderedTemplate(r, ti.id(), tmplPath)
+	}
+	return renderers(rts)
+}
+
+func (b *BootEnv) followUpSave() {
+	if b.OnlyUnknown {
+		err := &Error{o: b}
+		rts := b.Render(nil, err)
+		if err.ContainsError() {
+			b.Errors = err.Messages
+		} else {
+			rts.register(b.p.FS)
+		}
+		return
+	}
+	machines := b.p.lockFor("machines")
+	defer machines.Unlock()
+	for i := range machines.d {
+		machine := AsMachine(machines.d[i])
+		if machine.BootEnv != b.Name {
+			continue
+		}
+		err := &Error{o: b}
+		rts := b.Render(machine, err)
+		if err.ContainsError() {
+			machine.Errors = err.Messages
+		} else {
+			rts.register(b.p.FS)
+		}
+	}
 }

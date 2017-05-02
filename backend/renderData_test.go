@@ -152,7 +152,7 @@ func TestRenderData(t *testing.T) {
 	}
 
 	// Test the render functions directly.
-	rd := dt.NewRenderData(nil, nil)
+	rd := newRenderData(dt, nil, nil)
 
 	// Test ParseUrl - independent of Machine and Env
 	s, e := rd.ParseUrl("scheme", "http://192.168.0.%31:8080/")
@@ -261,7 +261,7 @@ func TestRenderData(t *testing.T) {
 	}
 
 	// Tests with machine and bootenv (has bad BootParams)
-	rd = dt.NewRenderData(machine, badBootEnv)
+	rd = newRenderData(dt, machine, badBootEnv)
 	_, e = rd.Param("bogus")
 	if e == nil {
 		t.Errorf("Param should return an error when machine is not defined in RenderData\n")
