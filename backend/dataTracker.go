@@ -50,6 +50,14 @@ chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 	}
 )
 
+type followUpSaver interface {
+	followUpSave()
+}
+
+type followUpDeleter interface {
+	followUpDelete()
+}
+
 // dtobjs is an in-memory cache of all the objects we could
 // reference. The implementation of this may need to change from
 // storing a slice of things to a more elaborate datastructure at some
@@ -178,6 +186,8 @@ type DataTracker struct {
 	tokenManager      *JwtManager
 	rootTemplate      *template.Template
 	tmplMux           *sync.Mutex
+	thunks            []func()
+	thunkMux          *sync.Mutex
 }
 
 // This grabs the requested dtobj locks in reverse alphabetical
@@ -267,6 +277,8 @@ func NewDataTracker(backend store.SimpleStore,
 		tokenManager:      NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
 		tmplMux:           &sync.Mutex{},
 		globalProfileName: "global",
+		thunks:            make([]func(), 0),
+		thunkMux:          &sync.Mutex{},
 	}
 	objs := []store.KeySaver{
 		&Machine{p: res},
@@ -323,7 +335,7 @@ func NewDataTracker(backend store.SimpleStore,
 			continue
 		}
 		err := &Error{o: machine}
-		res.NewRenderData(machine, AsBootEnv(be)).render(err)
+		AsBootEnv(be).Render(machine, err).register(res.FS)
 		if err.containsError {
 			logger.Printf("Error rendering machine %s at startup:", machine.UUID())
 			logger.Println(err.Error())
@@ -435,8 +447,7 @@ func (p *DataTracker) RenderUnknown() error {
 		err.Errorf("BootEnv %s cannot be used for the unknownBootEnv", env.Name)
 		return err
 	}
-	r := p.NewRenderData(nil, env)
-	r.render(err)
+	env.Render(nil, err).register(p.FS)
 	return err.OrNil()
 }
 
@@ -590,6 +601,9 @@ func (p *DataTracker) create(ref store.KeySaver) (bool, error) {
 func (p *DataTracker) Create(ref store.KeySaver) (store.KeySaver, error) {
 	created, err := p.create(ref)
 	if created {
+		if fs, ok := ref.(followUpSaver); ok {
+			fs.followUpSave()
+		}
 		return p.Clone(ref), err
 	}
 	return ref, err
@@ -624,6 +638,10 @@ func (p *DataTracker) Remove(ref store.KeySaver) (store.KeySaver, error) {
 	if !removed {
 		return p.Clone(ref), err
 	}
+	if fs, ok := ref.(followUpDeleter); ok {
+		fs.followUpDelete()
+	}
+
 	return ref, err
 }
 
@@ -658,6 +676,9 @@ func (p *DataTracker) Patch(ref store.KeySaver, key string, patch jsonpatch2.Pat
 			return toSave, err
 		}
 		mux.d[idx] = toSave
+		if fs, ok := ref.(followUpSaver); ok {
+			fs.followUpSave()
+		}
 		return p.Clone(toSave), nil
 	}
 	err := &Error{
@@ -698,6 +719,9 @@ func (p *DataTracker) update(ref store.KeySaver) (bool, error) {
 func (p *DataTracker) Update(ref store.KeySaver) (store.KeySaver, error) {
 	updated, err := p.update(ref)
 	if updated {
+		if fs, ok := ref.(followUpSaver); ok {
+			fs.followUpSave()
+		}
 		return p.Clone(ref), err
 	}
 	return ref, err
@@ -726,6 +750,9 @@ func (p *DataTracker) save(ref store.KeySaver) (bool, error) {
 func (p *DataTracker) Save(ref store.KeySaver) (store.KeySaver, error) {
 	saved, err := p.save(ref)
 	if saved {
+		if fs, ok := ref.(followUpSaver); ok {
+			fs.followUpSave()
+		}
 		return p.Clone(ref), err
 	}
 	return ref, err

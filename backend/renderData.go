@@ -8,26 +8,80 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
 )
 
-// RenderTemplate is the result of rendering a BootEnv template
-type renderedTemplate struct {
-	// Path is the absolute path that the Template will be rendered to.
-	path string
-	// Template is the template that will rendered
-	tmpl string
-	// Vars holds the variables that will be used during template expansion.
-	Vars *RenderData
+type renderer struct {
+	path  string
+	write func(net.IP) (*bytes.Reader, error)
 }
 
-func (r *renderedTemplate) write() (*bytes.Reader, error) {
-	buf := bytes.Buffer{}
-	tmpl := r.Vars.Env.rootTemplate.Lookup(r.tmpl)
-	if err := tmpl.Execute(&buf, r.Vars); err != nil {
-		return nil, err
+func (r renderer) register(fs *FileSystem) {
+	fs.addDynamic(r.path, r.write)
+}
+
+func (r renderer) deregister(fs *FileSystem) {
+	fs.delDynamic(r.path)
+}
+
+type renderers []renderer
+
+func (r renderers) register(fs *FileSystem) {
+	if r == nil || len(r) == 0 {
+		return
 	}
-	return bytes.NewReader(buf.Bytes()), nil
+	for _, rt := range r {
+		rt.register(fs)
+	}
+}
+
+func (r renderers) deregister(fs *FileSystem) {
+	if r == nil || len(r) == 0 {
+		return
+	}
+	for _, rt := range r {
+		rt.deregister(fs)
+	}
+}
+
+func newRenderedTemplate(r *RenderData,
+	tmplKey,
+	path string) renderer {
+	p := r.p
+	var mKey, eKey string
+	eKey = r.Env.Key()
+	if r.Machine != nil {
+		mKey = r.Machine.Key()
+	}
+	return renderer{
+		path: path,
+		write: func(remoteIP net.IP) (*bytes.Reader, error) {
+			objs, unlocker := p.lockEnts("machines", "bootenvs")
+			defer unlocker()
+			var rd *RenderData
+			var bootenv *BootEnv
+			var machine *Machine
+			bidx, bfound := objs[1].find(eKey)
+			if !bfound {
+				return nil, fmt.Errorf("Bootenv %s has vanished!", eKey)
+			}
+			bootenv = AsBootEnv(objs[1].d[bidx])
+			if !bootenv.OnlyUnknown {
+				midx, mfound := objs[0].find(mKey)
+				if !mfound {
+					return nil, fmt.Errorf("Machine %s has vanished!", mKey)
+				}
+				machine = AsMachine(objs[0].d[midx])
+			}
+			rd = newRenderData(p, machine, bootenv)
+			rd.remoteIP = remoteIP
+			buf := bytes.Buffer{}
+			tmpl := bootenv.rootTemplate.Lookup(tmplKey)
+			if err := tmpl.Execute(&buf, rd); err != nil {
+				return nil, err
+			}
+			return bytes.NewReader(buf.Bytes()), nil
+		},
+	}
 }
 
 type rMachine struct {
@@ -80,15 +134,13 @@ func (b *rBootEnv) JoinInitrds(proto string) string {
 // RenderData is the struct that is passed to templates as a source of
 // parameters and useful methods.
 type RenderData struct {
-	sync.Mutex
-	Machine           *rMachine // The Machine that the template is being rendered for.
-	Env               *rBootEnv // The boot environment that provided the template.
-	renderedTemplates []renderedTemplate
-	p                 *DataTracker
-	remoteIP          net.IP
+	Machine  *rMachine // The Machine that the template is being rendered for.
+	Env      *rBootEnv // The boot environment that provided the template.
+	p        *DataTracker
+	remoteIP net.IP
 }
 
-func (p *DataTracker) NewRenderData(m *Machine, e *BootEnv) *RenderData {
+func newRenderData(p *DataTracker, m *Machine, e *BootEnv) *RenderData {
 	res := &RenderData{p: p}
 	if m != nil {
 		res.Machine = &rMachine{Machine: m, renderData: res}
@@ -195,51 +247,4 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 		}
 	}
 	return nil, fmt.Errorf("No such machine parameter %s", key)
-}
-
-func (r *RenderData) render(e *Error) {
-	r.Lock()
-	defer r.Unlock()
-	var missingParams []string
-	if len(r.Env.RequiredParams) > 0 && r.Machine == nil {
-		e.Errorf("Machine is nil or does not have params")
-		return
-	}
-	for _, param := range r.Env.RequiredParams {
-		if !r.ParamExists(param) {
-			missingParams = append(missingParams, param)
-		}
-	}
-	if len(missingParams) > 0 {
-		e.Errorf("missing required machine params for %s:\n %v", r.Machine.Name, missingParams)
-		return
-	}
-	r.renderedTemplates = make([]renderedTemplate, len(r.Env.Templates))
-
-	for i := range r.Env.Templates {
-		ti := &r.Env.Templates[i]
-		rt := renderedTemplate{tmpl: ti.id(), Vars: r}
-
-		// first, render the path
-		buf := &bytes.Buffer{}
-		if err := ti.pathTmpl.Execute(buf, r); err != nil {
-			e.Errorf("Error rendering template %s path %s: %v",
-				ti.Name,
-				ti.Path,
-				err)
-		} else {
-			rt.path = path.Clean("/" + buf.String())
-		}
-		r.renderedTemplates[i] = rt
-		r.p.FS.addDynamic(rt.path, &rt)
-	}
-
-}
-
-func (r *RenderData) remove(e *Error) {
-	r.Lock()
-	defer r.Unlock()
-	for _, rt := range r.renderedTemplates {
-		r.p.FS.delDynamic(rt.path)
-	}
 }

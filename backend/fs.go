@@ -19,7 +19,7 @@ type FileSystem struct {
 	sync.Mutex
 	lower    string
 	logger   *log.Logger
-	dynamics map[string]*renderedTemplate
+	dynamics map[string]func(net.IP) (*bytes.Reader, error)
 }
 
 // NewFS creates a new initialized filesystem that will fall back to
@@ -29,7 +29,7 @@ func NewFS(backingFSPath string, logger *log.Logger) *FileSystem {
 	return &FileSystem{
 		lower:    backingFSPath,
 		logger:   logger,
-		dynamics: map[string]*renderedTemplate{},
+		dynamics: map[string]func(net.IP) (*bytes.Reader, error){},
 	}
 }
 
@@ -47,10 +47,7 @@ func (fs *FileSystem) Open(p string, remoteIP net.IP) (*bytes.Reader, error) {
 	if !ok {
 		return nil, nil
 	}
-	res.Vars.Lock()
-	defer res.Vars.Unlock()
-	res.Vars.remoteIP = remoteIP
-	return res.write()
+	return res(remoteIP)
 }
 
 // ServeHTTP implements http.Handler for the FileSystem.
@@ -97,7 +94,7 @@ func (fs *FileSystem) TftpResponder() func(string, net.IP) (io.Reader, error) {
 	}
 }
 
-func (fs *FileSystem) addDynamic(path string, t *renderedTemplate) {
+func (fs *FileSystem) addDynamic(path string, t func(net.IP) (*bytes.Reader, error)) {
 	fs.Lock()
 	fs.dynamics[path] = t
 	fs.Unlock()

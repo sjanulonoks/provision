@@ -56,8 +56,8 @@ type Machine struct {
 	p      *DataTracker
 
 	// used during AfterSave() and AfterRemove() to handle boot environment changes.
-	toRemove *RenderData
-	toRender *RenderData
+	toRemove renderers
+	toRender renderers
 }
 
 func (n *Machine) Backend() store.SimpleStore {
@@ -188,7 +188,7 @@ func (n *Machine) BeforeSave() error {
 		} else if env.OnlyUnknown {
 			e.Errorf("BootEnv %s does not allow Machine assignments, it has the OnlyUnknown flag.", env.Name)
 		} else {
-			n.toRender = n.p.NewRenderData(n, env)
+			n.toRender = env.Render(n, e)
 		}
 	}
 	return e.OrNil()
@@ -199,8 +199,7 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	old := AsMachine(oldThing)
 	be, found := n.p.fetchOne(n.p.NewBootEnv(), old.BootEnv)
 	if found {
-		n.toRemove = n.p.NewRenderData(n, AsBootEnv(be))
-		n.toRemove.render(e)
+		n.toRemove = AsBootEnv(be).Render(n, e)
 	}
 	return e.OrNil()
 }
@@ -208,11 +207,11 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 func (n *Machine) AfterSave() {
 	e := &Error{}
 	if n.toRemove != nil {
-		n.toRemove.remove(e)
+		n.toRemove.deregister(n.p.FS)
 		n.toRemove = nil
 	}
 	if n.toRender != nil {
-		n.toRender.render(e)
+		n.toRender.register(n.p.FS)
 		n.toRender = nil
 	}
 	if e.containsError {
@@ -227,15 +226,14 @@ func (n *Machine) BeforeDelete() error {
 		e.Errorf("Unable to find boot environment %s", n.BootEnv)
 		return e
 	}
-	n.toRemove = n.p.NewRenderData(n, AsBootEnv(b))
-	n.toRemove.render(e)
+	n.toRemove = AsBootEnv(b).Render(n, e)
 	return e.OrNil()
 }
 
 func (n *Machine) AfterDelete() {
 	e := &Error{}
 	if n.toRemove != nil {
-		n.toRemove.remove(e)
+		n.toRemove.deregister(n.p.FS)
 		n.toRemove = nil
 	}
 	if e.containsError {
