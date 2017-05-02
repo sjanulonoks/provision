@@ -22,7 +22,7 @@ esac
 tmpdir="$(mktemp -d /tmp/rs-bundle-XXXXXXXX)"
 cp -a bin "$tmpdir"
 mkdir -p "$tmpdir/assets"
-cp -a assets/startup assets/templates assets/bootenvs "$tmpdir/assets"
+cp -a assets/startup assets/templates assets/bootenvs assets/profiles "$tmpdir/assets"
 mkdir -p "$tmpdir/tools"
 cp -a tools/install.sh tools/discovery-load.sh "$tmpdir/tools"
 (
