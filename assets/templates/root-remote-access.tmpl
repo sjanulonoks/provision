@@ -23,7 +23,9 @@
 mkdir -p /root/.ssh
 cat >/root/.ssh/authorized_keys <<EOFSSHACCESS
 ### BEGIN GENERATED CONTENT
-{{ range $key := .Param "access_keys" }}{{$key}}{{ end }}
+{{ range $key := .Param "access_keys" }}
+{{$key}}
+{{ end }}
 ### END GENERATED CONTENT
 EOFSSHACCESS
 echo "PermitRootLogin {{if .ParamExists "access_ssh_root_mode"}}{{.Param "access_ssh_root_mode"}}{{else}}without-password{{end}}" >> /etc/ssh/sshd_config

@@ -1,5 +1,5 @@
 {{ if .ParamExists "join_dr" }}
-{{ if eq (.Params "join_dr") true }}
+{{ if eq (.Param "join_dr") true }}
 #
 # This template joins the node to a 
 # Digital Rebar instance.  The node has a service
@@ -98,9 +98,6 @@ export REBAR_ENDPOINT="{{ .Param "CommandURL" }}"
 put_alive() {
     echo "Setting node alive=$1"
     rebar nodes update "$REBAR_UUID" "{\"alive\": $1, \"bootenv\": \"local\"}"
-    while [[ $(rebar nodes get "$REBAR_UUID" attrib provisioner-active-bootstate |jq -r '.value') != local ]]; do
-        sleep 1
-    done
 }
 
 # Force time (some OS already have this done)q
@@ -168,9 +165,11 @@ if ! rebar nodes exists "${REBAR_UUID}" ; then
     }   
 fi
 
-# does the rebar-managed-role exist?
-if ! grep -q rebar-managed-node < <(rebar nodes roles $REBAR_UUID); then
-    rebar nodes bind $REBAR_UUID to rebar-managed-node && \
+# does the rebar-joined-node exist?
+rebar nodes roles $REBAR_UUID | grep -q rebar-joined-node
+RC=$?
+if [[ $RC -ne 0 ]] ; then
+    rebar nodes bind $REBAR_UUID to rebar-joined-node && \
     rebar nodes commit $REBAR_UUID || {
         echo "We could not commit the node!"
         exit 1
