@@ -72,6 +72,8 @@ Templates:
       export PS4="${BASH_SOURCE}@${LINENO}(${FUNCNAME[0]}): "
       cp /usr/share/zoneinfo/GMT /etc/localtime
 
+      {{ template "root-remote-access.tmpl" . }}
+
       # Set up just enough infrastructure to let the jigs work.
       # Allow client to pass http proxy environment variables
       echo "AcceptEnv http_proxy https_proxy no_proxy" >> /etc/ssh/sshd_config
