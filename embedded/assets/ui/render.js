@@ -1003,7 +1003,7 @@ class Prefs extends React.Component {
             <tr key={i}>
               <td>{val}</td>
               <td>
-              {( val.indexOf("BootEnv") > 0
+              {( val.indexOf("BootEnv") > 0 && val != "debugBootEnv"
                 ?  <select
                     name={val}
                     type="bool"
