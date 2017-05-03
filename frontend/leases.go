@@ -118,6 +118,7 @@ func (f *Frontend) InitLeaseApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       406: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/leases/:address",
 		func(c *gin.Context) {

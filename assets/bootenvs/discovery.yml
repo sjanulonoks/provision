@@ -85,6 +85,8 @@ Templates:
           chmod 755 /usr/bin/drpcli
       fi
 
+      {{ template "root-remote-access.tmpl" . }}
+
       # This will contain a token appropriate for the path being
       # used below.  Either a create or update/show token
       export RS_TOKEN="{{.GenerateToken}}"
