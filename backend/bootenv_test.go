@@ -33,6 +33,17 @@ func TestBootEnvCrud(t *testing.T) {
 		test.Test(t)
 	}
 
+	// List test.
+	b := dt.NewBootEnv()
+	bes := b.List()
+	if bes != nil {
+		if len(bes) != 5 {
+			t.Errorf("List function should have returned: 5, but got %d\n", len(bes))
+		}
+	} else {
+		t.Errorf("List function returned nil!!")
+	}
+
 	// We need a Machine that refers to one of our BootEnvs to
 	// test proper delete restrictions
 	machine := &Machine{p: dt, Name: "test 1", BootEnv: "available", Uuid: uuid.NewRandom()}

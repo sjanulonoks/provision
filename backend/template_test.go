@@ -42,4 +42,14 @@ func TestTemplateCrud(t *testing.T) {
 		test.Test(t)
 	}
 
+	// List test.
+	tmp := dt.NewTemplate()
+	bes := tmp.List()
+	if bes != nil {
+		if len(bes) != 2 {
+			t.Errorf("List function should have returned: 2, but got %d\n", len(bes))
+		}
+	} else {
+		t.Errorf("List function returned nil!!")
+	}
 }

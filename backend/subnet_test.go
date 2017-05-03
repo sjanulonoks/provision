@@ -28,6 +28,16 @@ func TestSubnetCrud(t *testing.T) {
 	for _, test := range createTests {
 		test.Test(t)
 	}
+	// List test.
+	b := dt.NewSubnet()
+	bes := b.List()
+	if bes != nil {
+		if len(bes) != 1 {
+			t.Errorf("List function should have returned: 1, but got %d\n", len(bes))
+		}
+	} else {
+		t.Errorf("List function returned nil!!")
+	}
 }
 
 func TestSubnetFinders(t *testing.T) {
