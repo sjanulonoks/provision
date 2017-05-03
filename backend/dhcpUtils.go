@@ -54,7 +54,7 @@ func findLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, 
 	lease.Strategy = strat
 	lease.Token = token
 	lease.ExpireTime = time.Now().Add(2 * time.Second)
-	lease.p.Logger.Printf("Found our lease for strat: %s token %s, will use it", strat, token)
+	lease.p.Infof("debugDhcp", "Found our lease for strat: %s token %s, will use it", strat, token)
 	return
 }
 
@@ -115,12 +115,12 @@ func findViaReservation(leases, reservations *dtobjs, strat, token string, req n
 		if lease.Token == reservation.Token &&
 			lease.Strategy == reservation.Strategy {
 			// This is our lease.  Renew it.
-			lease.p.Logger.Printf("Reservation for %s has a lease, using it.", lease.Addr.String())
+			lease.p.Infof("debugDhcp", "Reservation for %s has a lease, using it.", lease.Addr.String())
 			return
 		}
 		if lease.Expired() {
 			// The lease has expired.  Take it over
-			lease.p.Logger.Printf("Reservation for %s is taking over an expired lease", lease.Addr.String())
+			lease.p.Infof("debugDhcp", "Reservation for %s is taking over an expired lease", lease.Addr.String())
 			lease.Token = token
 			lease.Strategy = strat
 			return
@@ -128,7 +128,7 @@ func findViaReservation(leases, reservations *dtobjs, strat, token string, req n
 		// The lease has not expired, and it is not ours.
 		// We have no choice but to fall through to subnet code until
 		// the current lease has expired.
-		reservation.p.Logger.Printf("Reservation %s (%s:%s): A lease exists for that address, has been handed out to %s:%s", reservation.Addr, reservation.Strategy, reservation.Token, lease.Strategy, lease.Token)
+		reservation.p.Infof("debugDhcp", "Reservation %s (%s:%s): A lease exists for that address, has been handed out to %s:%s", reservation.Addr, reservation.Strategy, reservation.Token, lease.Strategy, lease.Token)
 		lease = nil
 		return
 	}
@@ -188,10 +188,10 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, r
 		usedAddrs[currReservations[i].Key()] = currReservations[i]
 	}
 	if lease != nil {
-		subnet.p.Logger.Printf("Subnet %s: handing out existing lease for %s to %s:%s", subnet.Name, lease.Addr, strat, token)
+		subnet.p.Infof("debugDhcp", "Subnet %s: handing out existing lease for %s to %s:%s", subnet.Name, lease.Addr, strat, token)
 		return lease
 	}
-	subnet.p.Logger.Printf("Subnet %s: %s:%s is in my range, attempting lease creation.", subnet.Name, strat, token)
+	subnet.p.Infof("debugDhcp", "Subnet %s: %s:%s is in my range, attempting lease creation.", subnet.Name, strat, token)
 	lease, _ = subnet.next(usedAddrs, token, req)
 	if lease != nil {
 		if _, found := leases.find(lease.Key()); !found {
@@ -199,7 +199,7 @@ func findViaSubnet(leases, subnets, reservations *dtobjs, strat, token string, r
 		}
 		return lease
 	}
-	subnet.p.Logger.Printf("Subnet %s: No lease for %s:%s, it gets no IP from us", subnet.Name, strat, token)
+	subnet.p.Infof("debugDhcp", "Subnet %s: No lease for %s:%s, it gets no IP from us", subnet.Name, strat, token)
 	return nil
 }
 

@@ -65,6 +65,10 @@ type ProgOpts struct {
 	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
 	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
 
+	DebugBootEnv  int `long:"debug-bootenv" description:"Debug level for the BootEnv System - 0 = off, 1 = info, 2 = debug" default:"0"`
+	DebugDhcp     int `long:"debug-dhcp" description:"Debug level for the DHCP Server - 0 = off, 1 = info, 2 = debug" default:"0"`
+	DebugRenderer int `long:"debug-renderer" description:"Debug level for the Template Renderer - 0 = off, 1 = info, 2 = debug" default:"0"`
+
 	TlsKeyFile  string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
 	TlsCertFile string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
 }
@@ -126,6 +130,9 @@ func Server(c_opts *ProgOpts) {
 		c_opts.ApiPort,
 		logger,
 		map[string]string{
+			"debugBootEnv":        fmt.Sprintf("%d", c_opts.DebugBootEnv),
+			"debugDhcp":           fmt.Sprintf("%d", c_opts.DebugDhcp),
+			"debugRenderer":       fmt.Sprintf("%d", c_opts.DebugRenderer),
 			"defaultBootEnv":      c_opts.DefaultBootEnv,
 			"unknownBootEnv":      c_opts.UnknownBootEnv,
 			"knownTokenTimeout":   fmt.Sprintf("%d", c_opts.KnownTokenTimeout),

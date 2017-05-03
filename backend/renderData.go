@@ -72,6 +72,11 @@ func newRenderedTemplate(r *RenderData,
 				}
 				machine = AsMachine(objs[0].d[midx])
 			}
+			mStr := "All"
+			if machine != nil {
+				mStr = machine.Name
+			}
+			p.Infof("debugRenderer", "Rendering %s for %s booting %s\n", tmplKey, mStr, bootenv.Name)
 			rd = newRenderData(p, machine, bootenv)
 			rd.remoteIP = remoteIP
 			buf := bytes.Buffer{}
