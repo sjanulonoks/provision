@@ -265,14 +265,14 @@ func (b *BootEnv) setDT(p *DataTracker) {
 func (b *BootEnv) explodeIso(e *Error) {
 	// Only work on things that are requested.
 	if b.OS.IsoFile == "" {
-		b.p.Logger.Printf("Explode ISO: Skipping %s becausing no iso image specified\n", b.Name)
+		b.p.Infof("debugBootEnv", "Explode ISO: Skipping %s becausing no iso image specified\n", b.Name)
 		return
 	}
 	// Have we already exploded this?  If file exists, then good!
 	canaryPath := b.localPathFor("." + b.OS.Name + ".rebar_canary")
 	buf, err := ioutil.ReadFile(canaryPath)
 	if err == nil && len(buf) != 0 && string(bytes.TrimSpace(buf)) == b.OS.IsoSha256 {
-		b.p.Logger.Printf("Explode ISO: canary file %s, in place and has proper SHA256\n", canaryPath)
+		b.p.Infof("debugBootEnv", "Explode ISO: canary file %s, in place and has proper SHA256\n", canaryPath)
 		return
 	}
 
@@ -317,8 +317,8 @@ func (b *BootEnv) explodeIso(e *Error) {
 		e.Errorf("Command output:\n%s", string(out))
 
 	} else {
-		b.p.Logger.Printf("Explode ISO: %s exploded to %s", b.OS.IsoFile, isoPath)
-		b.p.Logger.Printf("Explode ISO Log:\n%s", string(out))
+		b.p.Infof("debugBootEnv", "Explode ISO: %s exploded to %s", b.OS.IsoFile, isoPath)
+		b.p.Debugf("debugBootEnv", "Explode ISO Log:\n%s", string(out))
 	}
 	return
 }

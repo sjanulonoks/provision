@@ -319,7 +319,7 @@ func NewDataTracker(backend store.SimpleStore,
 	}
 	users := res.objs["users"]
 	if len(users.d) == 0 {
-		logger.Printf("Creating rocketskates user")
+		res.Infof("debugBootEnv", "Creating rocketskates user")
 		user := &User{p: res, Name: "rocketskates"}
 		if err := user.ChangePassword("r0cketsk8ts"); err != nil {
 			logger.Fatalf("Failed to create rocketskates user: %v", err)
@@ -410,12 +410,11 @@ func (p *DataTracker) SetPrefs(prefs map[string]string) error {
 			if benvCheck(name, val) != nil && savePref(name, val) {
 				err.Merge(p.RenderUnknown())
 			}
-		case "unknownTokenTimeout":
-			if intCheck(name, val) {
-				savePref(name, val)
-			}
-			continue
-		case "knownTokenTimeout":
+		case "unknownTokenTimeout",
+			"knownTokenTimeout",
+			"debugDhcp",
+			"debugRenderer",
+			"debugBootEnv":
 			if intCheck(name, val) {
 				savePref(name, val)
 			}
@@ -768,4 +767,34 @@ func (p *DataTracker) SealClaims(claims *DrpCustomClaims) (string, error) {
 
 func (p *DataTracker) NewToken(id string, ttl int, scope, action, specific string) (string, error) {
 	return NewClaim(id, ttl).Add(scope, action, specific).Seal(p.tokenManager)
+}
+
+func (p *DataTracker) Printf(f string, args ...interface{}) {
+	p.Logger.Printf(f, args...)
+}
+func (p *DataTracker) Infof(pref, f string, args ...interface{}) {
+	pref, e := p.Pref(pref)
+	debugLevel := 0
+	if e == nil {
+		d2, e := strconv.Atoi(pref)
+		if e == nil {
+			debugLevel = d2
+		}
+	}
+	if debugLevel > 0 {
+		p.Logger.Printf(f, args...)
+	}
+}
+func (p *DataTracker) Debugf(pref, f string, args ...interface{}) {
+	pref, e := p.Pref(pref)
+	debugLevel := 0
+	if e == nil {
+		d2, e := strconv.Atoi(pref)
+		if e == nil {
+			debugLevel = d2
+		}
+	}
+	if debugLevel > 0 {
+		p.Logger.Printf(f, args...)
+	}
 }

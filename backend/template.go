@@ -87,11 +87,11 @@ func (t *Template) AfterSave() {
 	defer t.p.tmplMux.Unlock()
 	root, err := t.p.rootTemplate.Clone()
 	if err != nil {
-		t.p.Logger.Printf("Error cloning shared template namespace: %v", err)
+		t.p.Printf("Error cloning shared template namespace: %v", err)
 		return
 	}
 	if err := t.parse(root); err != nil {
-		t.p.Logger.Printf("Parse error for template %s: %v", t.ID, err)
+		t.p.Printf("Parse error for template %s: %v", t.ID, err)
 		return
 	}
 	bootEnvs := t.p.lockFor("bootenvs")

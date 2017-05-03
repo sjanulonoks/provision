@@ -55,7 +55,7 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet, l *backend.Lease) (dhcp.Option
 	srcOpts := map[int]string{}
 	for c, v := range p.ParseOptions() {
 		srcOpts[int(c)] = backend.ConvertByteToOptionValue(c, v)
-		h.Printf("Recieved option: %v: %v", c, srcOpts[int(c)])
+		h.Debugf("Received option: %v: %v", c, srcOpts[int(c)])
 	}
 	rt := make([]byte, 4)
 	binary.BigEndian.PutUint32(rt, leaseTime/2)
@@ -111,7 +111,13 @@ func (h *DhcpHandler) Strategy(name string) StrategyFunc {
 }
 
 func (h *DhcpHandler) Printf(f string, args ...interface{}) {
-	h.bk.Logger.Printf(f, args...)
+	h.bk.Printf(f, args...)
+}
+func (h *DhcpHandler) Infof(f string, args ...interface{}) {
+	h.bk.Infof("debugDhcp", f, args...)
+}
+func (h *DhcpHandler) Debugf(f string, args ...interface{}) {
+	h.bk.Debugf("debugDhcp", f, args...)
 }
 
 func (h *DhcpHandler) nak(p dhcp.Packet, addr net.IP) dhcp.Packet {
@@ -254,7 +260,7 @@ func (h *DhcpHandler) Serve() error {
 				}
 			}
 			if !canProcess {
-				h.Printf("DHCP: Completly ignoring packet from %s", tgtIf.Name)
+				h.Infof("DHCP: Completly ignoring packet from %s", tgtIf.Name)
 				continue
 			}
 		}
@@ -279,7 +285,7 @@ func (h *DhcpHandler) Serve() error {
 }
 
 func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options dhcp.Options) (res dhcp.Packet) {
-	h.Printf("Recieved DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s chaddr %s",
+	h.Infof("Received DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s chaddr %s",
 		msgType.String(),
 		xid(p),
 		p.CIAddr(),
@@ -294,58 +300,58 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 	case dhcp.Decline:
 		leaseThing, ok := h.bk.FetchOne(lease, backend.Hexaddr(req))
 		if !ok {
-			h.Printf("%s: Asked to decline a lease we didn't issue by %s, ignoring", xid(p), req)
+			h.Infof("%s: Asked to decline a lease we didn't issue by %s, ignoring", xid(p), req)
 			return nil
 		}
 		lease := backend.AsLease(leaseThing)
 		stratfn := h.Strategy(lease.Strategy)
 		if stratfn != nil && stratfn(p, options) == lease.Token {
-			h.Printf("%s: Lease for %s declined, invalidating.", xid(p), lease.Addr)
+			h.Infof("%s: Lease for %s declined, invalidating.", xid(p), lease.Addr)
 			lease.Invalidate()
 			h.bk.Save(lease)
 		} else {
-			h.Printf("%s: Recieved spoofed decline for %s, ignoring", xid(p), lease.Addr)
+			h.Infof("%s: Received spoofed decline for %s, ignoring", xid(p), lease.Addr)
 		}
 		return nil
 	case dhcp.Release:
 		leaseThing, ok := h.bk.FetchOne(lease, backend.Hexaddr(req))
 		if !ok {
-			h.Printf("%s: Asked to release a lease we didn't issue by %s, ignoring", xid(p), req)
+			h.Infof("%s: Asked to release a lease we didn't issue by %s, ignoring", xid(p), req)
 			return nil
 		}
 		lease := backend.AsLease(leaseThing)
 		stratfn := h.Strategy(lease.Strategy)
 		if stratfn != nil && stratfn(p, options) == lease.Token {
-			h.Printf("%s: Lease for %s released, expiring.", xid(p), lease.Addr)
+			h.Infof("%s: Lease for %s released, expiring.", xid(p), lease.Addr)
 			lease.Expire()
 			h.bk.Save(lease)
 		} else {
-			h.Printf("%s: Recieved spoofed release for %s, ignoring", xid(p), lease.Addr)
+			h.Infof("%s: Received spoofed release for %s, ignoring", xid(p), lease.Addr)
 		}
 		return nil
 	case dhcp.Request:
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
 		if ok && !h.listenOn(server) {
-			h.Printf("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
+			h.Infof("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
 			return nil
 		}
 		if !req.IsGlobalUnicast() {
-			h.Printf("%s: NAK'ing invalid requested IP %s", xid(p), req)
+			h.Infof("%s: NAK'ing invalid requested IP %s", xid(p), req)
 			return h.nak(p, h.respondFrom(req))
 		}
 		for _, s := range h.strats {
 			lease, err = backend.FindLease(h.bk, s.Name, s.GenToken(p, options), req)
 			if err != nil {
 				if lease != nil {
-					h.Printf("%s: %s already leased to %s:%s: %s",
+					h.Infof("%s: %s already leased to %s:%s: %s",
 						xid(p),
 						req,
 						lease.Strategy,
 						lease.Token,
 						err)
 				} else {
-					h.Printf("%s: %s is no longer able to be leased: %s",
+					h.Infof("%s: %s is no longer able to be leased: %s",
 						xid(p),
 						req,
 						err)
@@ -358,10 +364,10 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		}
 		if lease == nil {
 			if reqState == reqInitReboot {
-				h.Printf("%s: No lease for %s in database, client in INIT-REBOOT.  Ignoring request.", xid(p), req)
+				h.Infof("%s: No lease for %s in database, client in INIT-REBOOT.  Ignoring request.", xid(p), req)
 				return nil
 			} else {
-				h.Printf("%s: No lease for %s in database, NAK'ing", xid(p), req)
+				h.Infof("%s: No lease for %s in database, NAK'ing", xid(p), req)
 				return h.nak(p, h.respondFrom(req))
 			}
 		}
@@ -374,7 +380,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		if nextServer.IsGlobalUnicast() {
 			reply.SetSIAddr(nextServer)
 		}
-		h.Printf("%s: Request handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr))
+		h.Infof("%s: Request handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr))
 		return reply
 	case dhcp.Discover:
 		for _, s := range h.strats {
@@ -392,7 +398,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 					lease.Addr,
 					duration,
 					opts.SelectOrderOrAll(opts[dhcp.OptionParameterRequestList]))
-				h.Printf("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr))
+				h.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr))
 				return reply
 			}
 		}
