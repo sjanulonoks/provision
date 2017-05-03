@@ -105,6 +105,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       406: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/bootenvs/:name",
 		func(c *gin.Context) {
