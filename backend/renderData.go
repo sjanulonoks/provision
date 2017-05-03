@@ -84,6 +84,7 @@ func newRenderedTemplate(r *RenderData,
 			if err := tmpl.Execute(&buf, rd); err != nil {
 				return nil, err
 			}
+			p.Debugf("debugRenderer", "Content:\n%s\n", string(buf.Bytes()))
 			return bytes.NewReader(buf.Bytes()), nil
 		},
 	}
