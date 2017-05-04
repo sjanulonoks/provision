@@ -44,6 +44,21 @@ type BootEnvPathParameter struct {
 	Name string `json:"name"`
 }
 
+// BootEnvListPathParameter used to limit lists of BootEnv by path options
+// swagger:parameters listBootEnvs
+type BootEnvListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	Available bool
+	// in: query
+	OnlyUnknown bool
+	// in: Name
+	Name string
+}
+
 func (f *Frontend) InitBootEnvApi() {
 	// swagger:route GET /bootenvs BootEnvs listBootEnvs
 	//

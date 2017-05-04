@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/VictorLowther/jsonpatch2"
@@ -268,11 +269,72 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	return false
 }
 
+func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string) []index.Filter {
+	filters := []index.Filter{}
+
+	var indexes map[string]index.Maker
+	if indexer, ok := ref.(Indexable); ok {
+		indexes = indexer.Indexes()
+	} else {
+		indexes = map[string]index.Maker{}
+	}
+
+	for k, vs := range params {
+		if k == "offset" || k == "limit" || k == "sort" {
+			continue
+		}
+
+		if maker, ok := indexes[k]; ok {
+			filters = append(filters, index.Sort(maker))
+			subfilters := []index.Filter{}
+			for _, v := range vs {
+				subfilters = append(subfilters, index.Eq(v))
+			}
+			filters = append(filters, index.Any(subfilters...))
+		} else {
+			f.Logger.Printf("GREG: ERROR: filter not found: %s\n", k)
+		}
+	}
+
+	if vs, ok := params["sort"]; ok {
+		for _, piece := range vs {
+			if maker, ok := indexes[piece]; ok {
+				filters = append(filters, index.Sort(maker))
+			} else {
+				f.Logger.Printf("GREG: ERROR: not sortable: %s\n", piece)
+			}
+		}
+	} else {
+		filters = append(filters, index.Native())
+	}
+
+	// offset and limit must be last
+	if vs, ok := params["offset"]; ok {
+		num, err := strconv.Atoi(vs[0])
+		if err == nil {
+			filters = append(filters, index.Offset(num))
+		} else {
+			f.Logger.Printf("GREG: ERROR: offset not valid: %v\n", err)
+		}
+	}
+	if vs, ok := params["limit"]; ok {
+		num, err := strconv.Atoi(vs[0])
+		if err == nil {
+			filters = append(filters, index.Limit(num))
+		} else {
+			f.Logger.Printf("GREG: ERROR: limit not valid: %v\n", err)
+		}
+	}
+
+	return filters
+}
+
 func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
 		return
 	}
-	arr, err := f.dt.Filter(ref)
+	filters := f.processFilters(ref, c.Request.URL.Query())
+	arr, err := f.dt.Filter(ref, filters...)
 	if err != nil {
 		res := &backend.Error{
 			Code:  http.StatusNotAcceptable,

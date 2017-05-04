@@ -26,8 +26,15 @@ func TestBootEnvList(t *testing.T) {
 		t.Errorf("Response should be an empty list, but got: %d\n", len(list))
 	}
 
-	localDTI.ListValue = []store.KeySaver{&backend.BootEnv{Name: "fred"}}
-	req, _ = http.NewRequest("GET", "/api/v3/bootenvs", nil)
+	localDTI.ListValue = []store.KeySaver{
+		&backend.BootEnv{Name: "susan"},
+		&backend.BootEnv{Name: "john"},
+		&backend.BootEnv{Name: "fred"},
+		&backend.BootEnv{Name: "jenny"},
+		&backend.BootEnv{Name: "tess"},
+	}
+
+	req, _ = http.NewRequest("GET", "/api/v3/bootenvs?offset=0&limit=1&Name=susan&Name=tess", nil)
 	w = localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusOK)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
@@ -36,8 +43,8 @@ func TestBootEnvList(t *testing.T) {
 	if len(list) != 1 {
 		t.Errorf("Response should be a list of 1, but got: %d\n", len(list))
 	}
-	if list[0].Name != "fred" {
-		t.Errorf("Response[0] is not named fred, %v\n", list[0].Name)
+	if list[0].Name != "susan" {
+		t.Errorf("Response[0] is not named susan, %v\n", list[0].Name)
 	}
 }
 
