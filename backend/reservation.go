@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"fmt"
 	"math/big"
 	"net"
 
@@ -59,6 +60,13 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 						o.SetBytes(fix(s).Addr.To16())
 						return o.Cmp(addr) == 1
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				addr := net.ParseIP(s)
+				if addr == nil {
+					return nil, fmt.Errorf("Invalid Address: %s", s)
+				}
+				return &Reservation{Addr: addr}, nil
 			}),
 		"Token": index.Make(
 			func(i, j store.KeySaver) bool { return fix(i).Token < fix(j).Token },
@@ -70,6 +78,9 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).Token > token
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Reservation{Token: s}, nil
 			}),
 		"Strategy": index.Make(
 			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
@@ -81,6 +92,9 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).Strategy > strategy
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Reservation{Strategy: s}, nil
 			}),
 		"NextServer": index.Make(
 			func(i, j store.KeySaver) bool {
@@ -102,6 +116,13 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 						o.SetBytes(fix(s).NextServer.To16())
 						return o.Cmp(addr) == 1
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				addr := net.ParseIP(s)
+				if addr == nil {
+					return nil, fmt.Errorf("Invalid Address: %s", s)
+				}
+				return &Reservation{NextServer: addr}, nil
 			}),
 	}
 }

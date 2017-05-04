@@ -28,6 +28,9 @@ func (p *Pref) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).Name > refName
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Pref{Name: s}, nil
 			}),
 	}
 }

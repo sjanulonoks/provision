@@ -41,6 +41,9 @@ func (p *Template) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).ID > refID
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Template{ID: s}, nil
 			}),
 	}
 }

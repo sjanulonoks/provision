@@ -2,6 +2,7 @@ package backend
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/big"
 	"net"
 	"sort"
@@ -235,6 +236,9 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).Name > refName
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Subnet{Name: s}, nil
 			}),
 		"Strategy": index.Make(
 			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
@@ -246,6 +250,9 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).Strategy > strategy
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Subnet{Strategy: s}, nil
 			}),
 		"NextServer": index.Make(
 			func(i, j store.KeySaver) bool {
@@ -267,6 +274,13 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 						o.SetBytes(fix(s).NextServer.To16())
 						return o.Cmp(addr) == 1
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				addr := net.ParseIP(s)
+				if addr == nil {
+					return nil, fmt.Errorf("Invalid Address: %s", s)
+				}
+				return &Subnet{NextServer: addr}, nil
 			}),
 		"Subnet": index.Make(
 			func(i, j store.KeySaver) bool {
@@ -305,6 +319,12 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 						o.SetBytes(cidr.To16())
 						return o.Cmp(addr) == 1
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				if _, _, err := net.ParseCIDR(s); err != nil {
+					return nil, fmt.Errorf("Invalid subnet CIDR: %s", s)
+				}
+				return &Subnet{Subnet: s}, nil
 			}),
 	}
 }

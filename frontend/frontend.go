@@ -40,7 +40,7 @@ type DTI interface {
 	Patch(store.KeySaver, string, jsonpatch2.Patch) (store.KeySaver, error)
 	FetchOne(store.KeySaver, string) (store.KeySaver, bool)
 	FetchAll(store.KeySaver) []store.KeySaver
-	Filter(store.KeySaver, ...index.Filter) []store.KeySaver
+	Filter(store.KeySaver, ...index.Filter) ([]store.KeySaver, error)
 
 	NewBootEnv() *backend.BootEnv
 	NewMachine() *backend.Machine
@@ -272,7 +272,17 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
 		return
 	}
-	arr := f.dt.Filter(ref)
+	arr, err := f.dt.Filter(ref)
+	if err != nil {
+		res := &backend.Error{
+			Code:  http.StatusNotAcceptable,
+			Type:  "API_ERROR",
+			Model: ref.Prefix(),
+		}
+		res.Merge(err)
+		c.JSON(res.Code, res)
+		return
+	}
 	for _, res := range arr {
 		s, ok := res.(Sanitizable)
 		if ok {

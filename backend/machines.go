@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"fmt"
 	"math/big"
 	"net"
 	"path"
@@ -75,6 +76,13 @@ func (n *Machine) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).Uuid.String() > refUuid
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				id := uuid.Parse(s)
+				if id == nil {
+					return nil, fmt.Errorf("Invalid UUID: %s", s)
+				}
+				return &Machine{Uuid: id}, nil
 			}),
 		"Name": index.Make(
 			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
@@ -86,6 +94,9 @@ func (n *Machine) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).Name > refName
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Machine{Name: s}, nil
 			}),
 		"BootEnv": index.Make(
 			func(i, j store.KeySaver) bool { return fix(i).BootEnv < fix(j).BootEnv },
@@ -97,6 +108,9 @@ func (n *Machine) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).BootEnv > refBootEnv
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Machine{BootEnv: s}, nil
 			}),
 		"Address": index.Make(
 			func(i, j store.KeySaver) bool {
@@ -118,6 +132,13 @@ func (n *Machine) Indexes() map[string]index.Maker {
 						o.SetBytes(fix(s).Address.To16())
 						return o.Cmp(addr) == 1
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				addr := net.ParseIP(s)
+				if addr == nil {
+					return nil, fmt.Errorf("Invalid address: %s", s)
+				}
+				return &Machine{Address: addr}, nil
 			}),
 	}
 }

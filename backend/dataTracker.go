@@ -550,19 +550,23 @@ func (p *DataTracker) FetchAll(ref store.KeySaver) []store.KeySaver {
 	return ret
 }
 
-//FetchIndex returns an index that contains the results of running
-// the passed filters on the cached objects.
-func (p *DataTracker) Filter(ref store.KeySaver, filters ...index.Filter) []store.KeySaver {
+// Filter returns an index that contains the results of running the
+// passed filters on the cached objects.
+func (p *DataTracker) Filter(ref store.KeySaver, filters ...index.Filter) ([]store.KeySaver, error) {
 	prefix := ref.Prefix()
 	objs := p.lockFor(prefix)
+	defer objs.Unlock()
 	idx := index.New(objs.d)
-	res := index.All(filters...)(idx).Items()
+	idx, err := index.All(filters...)(idx)
+	if err != nil {
+		return nil, err
+	}
+	res := idx.Items()
 	ret := make([]store.KeySaver, len(res))
 	for i := range res {
 		ret[i] = p.Clone(res[i])
 	}
-	objs.Unlock()
-	return ret
+	return ret, nil
 }
 
 func (p *DataTracker) lockedGet(prefix, key string) (*dtobjs, int, bool) {

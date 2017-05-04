@@ -65,9 +65,10 @@ func (dt *LocalDTI) FetchAll(ref store.KeySaver) []store.KeySaver {
 	return dt.ListValue
 }
 
-func (dt *LocalDTI) Filter(ref store.KeySaver, filters ...index.Filter) []store.KeySaver {
+func (dt *LocalDTI) Filter(ref store.KeySaver, filters ...index.Filter) ([]store.KeySaver, error) {
 	idx := index.New(dt.ListValue)
-	return index.All(filters...)(idx).Items()
+	idx, err := index.All(filters...)(idx)
+	return idx.Items(), err
 }
 func (dt *LocalDTI) GetInterfaces() ([]*backend.Interface, error) {
 	return dt.GIValue, dt.GIError

@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"errors"
+	"fmt"
 	"math/big"
 	"net"
 	"time"
@@ -72,6 +74,13 @@ func (l *Lease) Indexes() map[string]index.Maker {
 						o.SetBytes(fix(s).Addr.To16())
 						return o.Cmp(addr) == 1
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				ip := net.ParseIP(s)
+				if ip == nil {
+					return nil, errors.New("Addr must be an IP address")
+				}
+				return &Lease{Addr: ip}, nil
 			}),
 		"Token": index.Make(
 			func(i, j store.KeySaver) bool { return fix(i).Token < fix(j).Token },
@@ -83,6 +92,9 @@ func (l *Lease) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).Token > token
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Lease{Token: s}, nil
 			}),
 		"Strategy": index.Make(
 			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
@@ -94,6 +106,9 @@ func (l *Lease) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).Strategy > strategy
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Lease{Strategy: s}, nil
 			}),
 		"ExpireTime": index.Make(
 			func(i, j store.KeySaver) bool { return fix(i).ExpireTime.Before(fix(j).ExpireTime) },
@@ -106,6 +121,13 @@ func (l *Lease) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).ExpireTime.After(expireTime)
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				t := &time.Time{}
+				if err := t.UnmarshalText([]byte(s)); err != nil {
+					return nil, fmt.Errorf("ExpireTime is not valid: %v", err)
+				}
+				return &Lease{ExpireTime: *t}, nil
 			}),
 	}
 }

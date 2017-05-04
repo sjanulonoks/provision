@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -170,6 +171,9 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 					func(s store.KeySaver) bool {
 						return fix(s).Name > name
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &BootEnv{Name: s}, nil
 			}),
 		"Available": index.Make(
 			func(i, j store.KeySaver) bool {
@@ -189,25 +193,49 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 						}
 						return false
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				res := &BootEnv{}
+				switch s {
+				case "true":
+					res.Available = true
+				case "false":
+					res.Available = false
+				default:
+					return nil, errors.New("Availale must be true or false")
+				}
+				return res, nil
 			}),
 		"OnlyUnknown": index.Make(
 			func(i, j store.KeySaver) bool {
 				return !fix(i).OnlyUnknown && fix(j).OnlyUnknown
 			},
 			func(ref store.KeySaver) (gte, gt index.Test) {
-				avail := fix(ref).Available
+				unknown := fix(ref).OnlyUnknown
 				return func(s store.KeySaver) bool {
-						if avail {
+						if unknown {
 							return fix(ref).OnlyUnknown
 						}
 						return true
 					},
 					func(s store.KeySaver) bool {
-						if !avail {
+						if !unknown {
 							return fix(ref).OnlyUnknown
 						}
 						return false
 					}
+			},
+			func(s string) (store.KeySaver, error) {
+				res := &BootEnv{}
+				switch s {
+				case "true":
+					res.OnlyUnknown = true
+				case "false":
+					res.OnlyUnknown = false
+				default:
+					return nil, errors.New("OnlyUnknown must be true or false")
+				}
+				return res, nil
 			}),
 	}
 }
