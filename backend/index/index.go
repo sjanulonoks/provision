@@ -338,6 +338,9 @@ func Select(t Test) Filter {
 // Offset returns a filter that returns all but the first n items
 func Offset(num int) Filter {
 	return func(i *Index) (*Index, error) {
+		if num >= len(i.objs) {
+			return i.cp([]store.KeySaver{}), nil
+		}
 		return i.cp(i.objs[num:]), nil
 	}
 }
@@ -345,6 +348,9 @@ func Offset(num int) Filter {
 // Limit returns a filter that returns the first n items
 func Limit(num int) Filter {
 	return func(i *Index) (*Index, error) {
+		if num > len(i.objs) {
+			return i, nil
+		}
 		return i.cp(i.objs[:num]), nil
 	}
 }
