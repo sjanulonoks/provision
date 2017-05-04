@@ -109,13 +109,8 @@ func (i *Index) subset(lower, upper Test) *Index {
 	}
 	totalCount := len(i.objs)
 	start := s.Search(totalCount, func(j int) bool { return lower(i.objs[j]) })
-	var objs []store.KeySaver
-	if start == totalCount {
-		objs = []store.KeySaver{}
-	} else {
-		objs = i.objs[start:s.Search(totalCount, func(j int) bool { return upper(i.objs[j]) })]
-	}
-	return i.cp(objs)
+	end := s.Search(totalCount, func(j int) bool { return upper(i.objs[j]) })
+	return i.cp(i.objs[start:end])
 }
 
 // Filter is a function that takes an index, does stuff with it, and
@@ -231,10 +226,10 @@ func Except(lower, upper string) Filter {
 		if err != nil {
 			return i, err
 		}
-		_, lTest := i.Tests(lRef)
-		uTest, _ := i.Tests(uRef)
-		lowerParts := i.subset(alwaysFalse, lTest)
-		upperParts := i.subset(uTest, alwaysTrue)
+		lTest, _ := i.Tests(lRef)
+		_, uTest := i.Tests(uRef)
+		lowerParts := i.subset(alwaysTrue, lTest)
+		upperParts := i.subset(uTest, alwaysFalse)
 		lowerParts.objs = append(lowerParts.objs, upperParts.objs...)
 		return lowerParts, nil
 	}
@@ -249,7 +244,7 @@ func Lt(ref string) Filter {
 			return i, err
 		}
 		upper, _ := i.Tests(refTest)
-		return i.subset(alwaysFalse, upper), nil
+		return i.subset(alwaysTrue, upper), nil
 	}
 }
 
@@ -262,7 +257,7 @@ func Lte(ref string) Filter {
 			return i, err
 		}
 		_, upper := i.Tests(refTest)
-		return i.subset(alwaysFalse, upper), nil
+		return i.subset(alwaysTrue, upper), nil
 	}
 }
 
@@ -288,7 +283,7 @@ func Gte(ref string) Filter {
 			return i, err
 		}
 		lower, _ := i.Tests(refTest)
-		return i.subset(lower, alwaysTrue), nil
+		return i.subset(lower, alwaysFalse), nil
 	}
 }
 
@@ -301,7 +296,7 @@ func Gt(ref string) Filter {
 			return i, err
 		}
 		_, lower := i.Tests(refTest)
-		return i.subset(lower, alwaysTrue), nil
+		return i.subset(lower, alwaysFalse), nil
 	}
 }
 
@@ -314,8 +309,8 @@ func Ne(ref string) Filter {
 			return i, err
 		}
 		lower, upper := i.Tests(refTest)
-		lowerParts := i.subset(alwaysFalse, lower)
-		upperParts := i.subset(upper, alwaysTrue)
+		lowerParts := i.subset(alwaysTrue, lower)
+		upperParts := i.subset(upper, alwaysFalse)
 		lowerParts.objs = append(lowerParts.objs, upperParts.objs...)
 		return lowerParts, nil
 	}
