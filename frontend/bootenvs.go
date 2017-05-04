@@ -55,7 +55,7 @@ type BootEnvListPathParameter struct {
 	Available bool
 	// in: query
 	OnlyUnknown bool
-	// in: Name
+	// in: query
 	Name string
 }
 

@@ -44,6 +44,23 @@ type SubnetPathParameter struct {
 	Name string `json:"name"`
 }
 
+// SubnetListPathParameter used to limit lists of Subnet by path options
+// swagger:parameters listSubnets
+type SubnetListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	Strategy string
+	// in: query
+	NextServer string
+	// in: query
+	Subnet string
+	// in: query
+	Name string
+}
+
 func (f *Frontend) InitSubnetApi() {
 	// swagger:route GET /subnets Subnets listSubnets
 	//

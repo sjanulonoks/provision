@@ -44,6 +44,17 @@ type TemplatePathParameter struct {
 	Name string `json:"name"`
 }
 
+// TemplateListPathParameter used to limit lists of Template by path options
+// swagger:parameters listTemplates
+type TemplateListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	ID string
+}
+
 func (f *Frontend) InitTemplateApi() {
 	// swagger:route GET /templates Templates listTemplates
 	//

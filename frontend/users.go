@@ -84,6 +84,17 @@ type UserTokenQuerySpecificParameter struct {
 	Specific string `json:"specific"`
 }
 
+// UserListPathParameter used to limit lists of User by path options
+// swagger:parameters listUsers
+type UserListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	Name string
+}
+
 func (f *Frontend) InitUserApi() {
 	// swagger:route GET /users Users listUsers
 	//

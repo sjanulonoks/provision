@@ -61,6 +61,17 @@ type ProfileParamsBodyParameter struct {
 	Body map[string]interface{}
 }
 
+// ProfileListPathParameter used to limit lists of Profile by path options
+// swagger:parameters listProfiles
+type ProfileListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	Name string
+}
+
 func (f *Frontend) InitProfileApi() {
 	// swagger:route GET /profiles Profiles listProfiles
 	//

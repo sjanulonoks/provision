@@ -63,6 +63,23 @@ type MachineParamsBodyParameter struct {
 	Body map[string]interface{}
 }
 
+// MachineListPathParameter used to limit lists of Machine by path options
+// swagger:parameters listMachines
+type MachineListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	Uuid string
+	// in: query
+	Name string
+	// in: query
+	BootEnv string
+	// in: query
+	Address string
+}
+
 func (f *Frontend) InitMachineApi() {
 	// swagger:route GET /machines Machines listMachines
 	//

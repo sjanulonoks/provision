@@ -49,6 +49,23 @@ type ReservationPathParameter struct {
 	Address string `json:"address"`
 }
 
+// ReservationListPathParameter used to limit lists of Reservation by path options
+// swagger:parameters listReservations
+type ReservationListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	Addr string
+	// in: query
+	Token string
+	// in: query
+	Strategy string
+	// in: query
+	NextServer string
+}
+
 func (f *Frontend) InitReservationApi() {
 	// swagger:route GET /reservations Reservations listReservations
 	//

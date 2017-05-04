@@ -49,6 +49,23 @@ type LeasePathParameter struct {
 	Address string `json:"address"`
 }
 
+// LeaseListPathParameter used to limit lists of Lease by path options
+// swagger:parameters listLeases
+type LeaseListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	Addr string
+	// in: query
+	Token string
+	// in: query
+	Strategy string
+	// in: query
+	ExpireTime string
+}
+
 func (f *Frontend) InitLeaseApi() {
 	// swagger:route GET /leases Leases listLeases
 	//
