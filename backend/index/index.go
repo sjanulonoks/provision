@@ -1,6 +1,7 @@
 package index
 
 import (
+	"errors"
 	s "sort"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
@@ -338,6 +339,9 @@ func Select(t Test) Filter {
 // Offset returns a filter that returns all but the first n items
 func Offset(num int) Filter {
 	return func(i *Index) (*Index, error) {
+		if num < 0 {
+			return i, errors.New("Offset cannot be negative")
+		}
 		if num >= len(i.objs) {
 			return i.cp([]store.KeySaver{}), nil
 		}
@@ -348,6 +352,9 @@ func Offset(num int) Filter {
 // Limit returns a filter that returns the first n items
 func Limit(num int) Filter {
 	return func(i *Index) (*Index, error) {
+		if num < 0 {
+			return i, errors.New("Limit cannot be negative")
+		}
 		if num > len(i.objs) {
 			return i, nil
 		}
