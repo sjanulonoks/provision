@@ -52,9 +52,9 @@ type BootEnvListPathParameter struct {
 	// in: query
 	Limit int `json:"limit"`
 	// in: query
-	Available bool
+	Available string
 	// in: query
-	OnlyUnknown bool
+	OnlyUnknown string
 	// in: query
 	Name string
 }
