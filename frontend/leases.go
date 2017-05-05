@@ -77,6 +77,7 @@ func (f *Frontend) InitLeaseApi() {
 	//       200: LeasesResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       406: ErrorResponse
 	f.ApiGroup.GET("/leases",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewLease())

@@ -66,6 +66,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       200: TemplatesResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       406: ErrorResponse
 	f.ApiGroup.GET("/templates",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewTemplate())

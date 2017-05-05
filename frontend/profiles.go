@@ -83,6 +83,7 @@ func (f *Frontend) InitProfileApi() {
 	//       200: ProfilesResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       406: ErrorResponse
 	f.ApiGroup.GET("/profiles",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewProfile())

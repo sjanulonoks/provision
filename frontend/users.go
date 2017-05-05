@@ -106,6 +106,7 @@ func (f *Frontend) InitUserApi() {
 	//       200: UsersResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       406: ErrorResponse
 	f.ApiGroup.GET("/users",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewUser())

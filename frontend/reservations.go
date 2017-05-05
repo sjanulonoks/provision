@@ -77,6 +77,7 @@ func (f *Frontend) InitReservationApi() {
 	//       200: ReservationsResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       406: ErrorResponse
 	f.ApiGroup.GET("/reservations",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewReservation())

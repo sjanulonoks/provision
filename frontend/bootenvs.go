@@ -70,6 +70,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       200: BootEnvsResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       406: ErrorResponse
 	f.ApiGroup.GET("/bootenvs",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewBootEnv())

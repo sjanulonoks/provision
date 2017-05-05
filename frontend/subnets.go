@@ -72,6 +72,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       200: SubnetsResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       406: ErrorResponse
 	f.ApiGroup.GET("/subnets",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewSubnet())

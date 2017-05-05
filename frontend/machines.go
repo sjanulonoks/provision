@@ -91,6 +91,7 @@ func (f *Frontend) InitMachineApi() {
 	//       200: MachinesResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       406: ErrorResponse
 	f.ApiGroup.GET("/machines",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewMachine())
