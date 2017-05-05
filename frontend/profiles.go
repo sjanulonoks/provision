@@ -79,11 +79,31 @@ func (f *Frontend) InitProfileApi() {
 	//
 	// This will show all Profiles by default.
 	//
-	//     Responses:
-	//       200: ProfilesResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
-	//       406: ErrorResponse
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    Name = string
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    Name=fred - returns items named fred
+	//    Name=Lt(fred) - returns items that alphabetically less than fred.
+	//
+	// Responses:
+	//    200: ProfilesResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
 	f.ApiGroup.GET("/profiles",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewProfile())

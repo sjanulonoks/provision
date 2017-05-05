@@ -87,11 +87,35 @@ func (f *Frontend) InitMachineApi() {
 	//
 	// This will show all Machines by default.
 	//
-	//     Responses:
-	//       200: MachinesResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
-	//       406: ErrorResponse
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    Uuid = UUID string
+	//    Name = string
+	//    BootEnv = string
+	//    Address = IP Address
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    Name=fred - returns items named fred
+	//    Name=Lt(fred) - returns items that alphabetically less than fred.
+	//    Name=Lt(fred)&Available=true - returns items with Name less than fred and Available is true
+	//
+	// Responses:
+	//    200: MachinesResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
 	f.ApiGroup.GET("/machines",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewMachine())
