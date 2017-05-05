@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -265,7 +266,54 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	return false
 }
 
-func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string) []index.Filter {
+// This processes the value into a function, if function not specifed, assume Eq.
+// Supported Forms:
+//
+//   Eq(value)
+//   Lt(value)
+//   Lte(value)
+//   Gt(value)
+//   Gte(value)
+//   Ne(value)
+//   Between(valueLower, valueHigher)
+//   Except(valueLower, valueHigher)
+//
+func convertValueToFilter(v string) (index.Filter, error) {
+	args := strings.SplitN(v, "(", 2)
+	switch args[0] {
+	case "Eq":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Eq(subargs[0]), nil
+	case "Lt":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Lt(subargs[0]), nil
+	case "Lte":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Lte(subargs[0]), nil
+	case "Gt":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Gt(subargs[0]), nil
+	case "Gte":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Gte(subargs[0]), nil
+	case "Ne":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Ne(subargs[0]), nil
+	case "Between":
+		subargs := strings.SplitN(args[1], ")", 2)
+		parts := strings.Split(subargs[0], ",")
+		return index.Between(parts[0], parts[1]), nil
+	case "Except":
+		subargs := strings.SplitN(args[1], ")", 2)
+		parts := strings.Split(subargs[0], ",")
+		return index.Except(parts[0], parts[1]), nil
+	default:
+		return index.Eq(v), nil
+	}
+	return nil, fmt.Errorf("Should never get here")
+}
+
+func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string) ([]index.Filter, error) {
 	filters := []index.Filter{}
 
 	var indexes map[string]index.Maker
@@ -276,7 +324,7 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 	}
 
 	for k, vs := range params {
-		if k == "offset" || k == "limit" || k == "sort" {
+		if k == "offset" || k == "limit" || k == "sort" || k == "reverse" {
 			continue
 		}
 
@@ -284,11 +332,15 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 			filters = append(filters, index.Sort(maker))
 			subfilters := []index.Filter{}
 			for _, v := range vs {
-				subfilters = append(subfilters, index.Eq(v))
+				f, err := convertValueToFilter(v)
+				if err != nil {
+					return nil, err
+				}
+				subfilters = append(subfilters, f)
 			}
 			filters = append(filters, index.Any(subfilters...))
 		} else {
-			f.Logger.Printf("GREG: ERROR: filter not found: %s\n", k)
+			return nil, fmt.Errorf("Filter not found: %s", k)
 		}
 	}
 
@@ -297,11 +349,15 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 			if maker, ok := indexes[piece]; ok {
 				filters = append(filters, index.Sort(maker))
 			} else {
-				f.Logger.Printf("GREG: ERROR: not sortable: %s\n", piece)
+				return nil, fmt.Errorf("Not sortable: %s", piece)
 			}
 		}
 	} else {
 		filters = append(filters, index.Native())
+	}
+
+	if _, ok := params["reverse"]; ok {
+		filters = append(filters, index.Reverse())
 	}
 
 	// offset and limit must be last
@@ -310,7 +366,7 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 		if err == nil {
 			filters = append(filters, index.Offset(num))
 		} else {
-			f.Logger.Printf("GREG: ERROR: offset not valid: %v\n", err)
+			return nil, fmt.Errorf("Offset not valid: %v", err)
 		}
 	}
 	if vs, ok := params["limit"]; ok {
@@ -318,25 +374,30 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 		if err == nil {
 			filters = append(filters, index.Limit(num))
 		} else {
-			f.Logger.Printf("GREG: ERROR: limit not valid: %v\n", err)
+			return nil, fmt.Errorf("Limit not valid: %v", err)
 		}
 	}
 
-	return filters
+	return filters, nil
 }
 
 func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
 		return
 	}
-	filters := f.processFilters(ref, c.Request.URL.Query())
+	res := &backend.Error{
+		Code:  http.StatusNotAcceptable,
+		Type:  "API_ERROR",
+		Model: ref.Prefix(),
+	}
+	filters, err := f.processFilters(ref, c.Request.URL.Query())
+	if err != nil {
+		res.Merge(err)
+		c.JSON(res.Code, res)
+		return
+	}
 	arr, err := f.dt.Filter(ref, filters...)
 	if err != nil {
-		res := &backend.Error{
-			Code:  http.StatusNotAcceptable,
-			Type:  "API_ERROR",
-			Model: ref.Prefix(),
-		}
 		res.Merge(err)
 		c.JSON(res.Code, res)
 		return

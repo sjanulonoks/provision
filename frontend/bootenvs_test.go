@@ -15,36 +15,90 @@ func TestBootEnvList(t *testing.T) {
 	localDTI := testFrontend()
 
 	localDTI.ListValue = nil
-	req, _ := http.NewRequest("GET", "/api/v3/bootenvs", nil)
+	validateBEList(t, localDTI, "/api/v3/bootenvs", []string{})
+
+	localDTI.ListValue = []store.KeySaver{
+		&backend.BootEnv{Name: "susan", Available: true},
+		&backend.BootEnv{Name: "john", Available: false},
+		&backend.BootEnv{Name: "fred", Available: true},
+		&backend.BootEnv{Name: "jenny", Available: false},
+		&backend.BootEnv{Name: "tess", Available: true},
+	}
+
+	// This tests the filter frontend, not the bootenvs.
+	req, _ := http.NewRequest("GET", "/api/v3/bootenvs?offset=-1", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusNotAcceptable)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "Offset cannot be negative")
+
+	req, _ = http.NewRequest("GET", "/api/v3/bootenvs?offset=word", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusNotAcceptable)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "Offset not valid: strconv.Atoi: parsing \"word\": invalid syntax")
+
+	req, _ = http.NewRequest("GET", "/api/v3/bootenvs?limit=-1", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusNotAcceptable)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "Limit cannot be negative")
+
+	req, _ = http.NewRequest("GET", "/api/v3/bootenvs?limit=word", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusNotAcceptable)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "Limit not valid: strconv.Atoi: parsing \"word\": invalid syntax")
+
+	req, _ = http.NewRequest("GET", "/api/v3/bootenvs?Fred=1", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusNotAcceptable)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "Filter not found: Fred")
+
+	req, _ = http.NewRequest("GET", "/api/v3/bootenvs?sort=1", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusNotAcceptable)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "Not sortable: 1")
+
+	// Or multiple filters.
+	validateBEList(t, localDTI, "/api/v3/bootenvs?offset=0&limit=1&Name=susan&Name=tess", []string{"susan"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?offset=0&limit=2&Name=susan&Name=tess", []string{"susan", "tess"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?offset=1&limit=2&Name=susan&Name=tess", []string{"tess"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs", []string{"fred", "jenny", "john", "susan", "tess"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?reverse=true", []string{"tess", "susan", "john", "jenny", "fred"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?Name=Between(jenny,susan)", []string{"jenny", "john", "susan"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?Name=Except(jenny,susan)", []string{"fred", "tess"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?Name=Between(jen,tam)", []string{"jenny", "john", "susan"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?Name=Except(jen,tam)", []string{"fred", "tess"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?Name=Lt(susan)", []string{"fred", "jenny", "john"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?Name=Lte(susan)", []string{"fred", "jenny", "john", "susan"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?Name=Gt(susan)", []string{"tess"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?Name=Gte(susan)", []string{"susan", "tess"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?Name=Ne(susan)", []string{"fred", "jenny", "john", "tess"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?sort=Available", []string{"john", "jenny", "susan", "fred", "tess"})
+	validateBEList(t, localDTI, "/api/v3/bootenvs?sort=Name&sort=Available", []string{"jenny", "john", "fred", "susan", "tess"})
+
+}
+
+func validateBEList(t *testing.T, localDTI *LocalDTI, url string, nameOrder []string) {
+	var list []backend.BootEnv
+	req, _ := http.NewRequest("GET", url, nil)
 	w := localDTI.RunTest(req)
 	localDTI.ValidateCode(t, http.StatusOK)
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-
-	var list []backend.BootEnv
 	json.Unmarshal(w.Body.Bytes(), &list)
-	if len(list) != 0 {
-		t.Errorf("Response should be an empty list, but got: %d\n", len(list))
+
+	if len(nameOrder) != len(list) {
+		t.Errorf("%s: Response should be a list of %d, but got: %d\n", url, len(nameOrder), len(list))
+		return
 	}
 
-	localDTI.ListValue = []store.KeySaver{
-		&backend.BootEnv{Name: "susan"},
-		&backend.BootEnv{Name: "john"},
-		&backend.BootEnv{Name: "fred"},
-		&backend.BootEnv{Name: "jenny"},
-		&backend.BootEnv{Name: "tess"},
-	}
-
-	req, _ = http.NewRequest("GET", "/api/v3/bootenvs?offset=0&limit=1&Name=susan&Name=tess", nil)
-	w = localDTI.RunTest(req)
-	localDTI.ValidateCode(t, http.StatusOK)
-	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
-
-	json.Unmarshal(w.Body.Bytes(), &list)
-	if len(list) != 1 {
-		t.Errorf("Response should be a list of 1, but got: %d\n", len(list))
-	}
-	if list[0].Name != "susan" {
-		t.Errorf("Response[0] is not named susan, %v\n", list[0].Name)
+	for i, v := range nameOrder {
+		if list[i].Name != v {
+			t.Errorf("%s: Response[%d] is not named %s, %v\n", url, i, v, list[i].Name)
+		}
 	}
 }
 
