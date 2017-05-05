@@ -27,7 +27,9 @@ func (u *User) Prefix() string {
 func (p *User) Indexes() map[string]index.Maker {
 	fix := AsUser
 	return map[string]index.Maker{
+		"Key": index.MakeKey(),
 		"Name": index.Make(
+			true,
 			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refName := fix(ref).Name
@@ -99,4 +101,8 @@ func (u *User) ChangePassword(newPass string) error {
 
 func (p *DataTracker) NewUser() *User {
 	return &User{p: p}
+}
+
+func (u *User) BeforeSave() error {
+	return index.CheckUnique(u, u.p.objs[u.Prefix()].d)
 }

@@ -159,7 +159,9 @@ type BootEnv struct {
 func (b *BootEnv) Indexes() map[string]index.Maker {
 	fix := AsBootEnv
 	return map[string]index.Maker{
+		"Key": index.MakeKey(),
 		"Name": index.Make(
+			true,
 			func(i, j store.KeySaver) bool {
 				return fix(i).Name < fix(j).Name
 			},
@@ -176,6 +178,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 				return &BootEnv{Name: s}, nil
 			}),
 		"Available": index.Make(
+			false,
 			func(i, j store.KeySaver) bool {
 				return (!fix(i).Available) && fix(j).Available
 			},
@@ -202,6 +205,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 				return res, nil
 			}),
 		"OnlyUnknown": index.Make(
+			false,
 			func(i, j store.KeySaver) bool {
 				return !fix(i).OnlyUnknown && fix(j).OnlyUnknown
 			},
@@ -475,6 +479,9 @@ func (b *BootEnv) BeforeSave() error {
 					iPath)
 			}
 		}
+	}
+	if err := index.CheckUnique(b, b.p.objs[b.Prefix()].d); err != nil {
+		e.Merge(err)
 	}
 	b.Errors = e.Messages
 	b.Available = (len(b.Errors) == 0)

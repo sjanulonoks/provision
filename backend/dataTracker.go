@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"text/template"
 
@@ -588,6 +589,29 @@ func (p *DataTracker) fetchOne(ref store.KeySaver, key string) (store.KeySaver, 
 // FetchOne returns a specific instance from the cached objects of
 // that type.  It should be used instead of store.Load.
 func (p *DataTracker) FetchOne(ref store.KeySaver, key string) (store.KeySaver, bool) {
+	idxer, ok := ref.(index.Indexer)
+	if ok {
+		indexes := idxer.Indexes()
+		for idxName := range indexes {
+			idxKey := strings.TrimPrefix(key, idxName+":")
+			if key == idxKey {
+				continue
+			}
+			if !indexes[idxName].Unique {
+				return nil, false
+			}
+			idx := index.New(p.objs[ref.Prefix()].d)
+			idx, err := index.All(index.Sort(indexes[idxName]), index.Eq(idxKey))(idx)
+			if err != nil {
+				return nil, false
+			}
+			items := idx.Items()
+			if len(items) != 1 {
+				return nil, false
+			}
+			return items[0], true
+		}
+	}
 	res, found := p.fetchOne(ref, key)
 	if !found {
 		return nil, found

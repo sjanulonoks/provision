@@ -193,9 +193,6 @@ func (f *Frontend) InitProfileApi() {
 		func(c *gin.Context) {
 			name := c.Param(`name`)
 			ref := f.dt.NewProfile()
-			if !assureAuth(c, f.Logger, ref.Prefix(), "get", name) {
-				return
-			}
 			res, ok := f.dt.FetchOne(ref, name)
 			if !ok {
 				err := &backend.Error{
@@ -206,6 +203,9 @@ func (f *Frontend) InitProfileApi() {
 				}
 				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
 				c.JSON(err.Code, err)
+				return
+			}
+			if !assureAuth(c, f.Logger, res.Prefix(), "get", res.Key()) {
 				return
 			}
 			p := backend.AsProfile(res).GetParams()
@@ -230,9 +230,6 @@ func (f *Frontend) InitProfileApi() {
 			}
 			name := c.Param(`name`)
 			ref := f.dt.NewProfile()
-			if !assureAuth(c, f.Logger, ref.Prefix(), "get", name) {
-				return
-			}
 			res, ok := f.dt.FetchOne(ref, name)
 			if !ok {
 				err := &backend.Error{
@@ -245,8 +242,10 @@ func (f *Frontend) InitProfileApi() {
 				c.JSON(err.Code, err)
 				return
 			}
+			if !assureAuth(c, f.Logger, res.Prefix(), "get", res.Key()) {
+				return
+			}
 			m := backend.AsProfile(res)
-
 			err := m.SetParams(val)
 			if err != nil {
 				be, _ := err.(*backend.Error)

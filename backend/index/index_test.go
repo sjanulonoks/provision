@@ -28,6 +28,7 @@ func (t testThing) Backend() store.SimpleStore {
 func (t testThing) Indexes() map[string]Maker {
 	return map[string]Maker{
 		"Base": Make(
+			true,
 			func(i, j store.KeySaver) bool {
 				return i.(testThing) < j.(testThing)
 			},

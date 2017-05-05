@@ -226,7 +226,9 @@ type Subnet struct {
 func (s *Subnet) Indexes() map[string]index.Maker {
 	fix := AsSubnet
 	return map[string]index.Maker{
+		"Key": index.MakeKey(),
 		"Name": index.Make(
+			true,
 			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refName := fix(ref).Name
@@ -241,6 +243,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 				return &Subnet{Name: s}, nil
 			}),
 		"Strategy": index.Make(
+			false,
 			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				strategy := fix(ref).Strategy
@@ -255,6 +258,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 				return &Subnet{Strategy: s}, nil
 			}),
 		"NextServer": index.Make(
+			false,
 			func(i, j store.KeySaver) bool {
 				n, o := big.Int{}, big.Int{}
 				n.SetBytes(fix(i).NextServer.To16())
@@ -283,6 +287,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 				return &Subnet{NextServer: addr}, nil
 			}),
 		"Subnet": index.Make(
+			true,
 			func(i, j store.KeySaver) bool {
 				a, _, errA := net.ParseCIDR(fix(i).Subnet)
 				b, _, errB := net.ParseCIDR(fix(j).Subnet)
@@ -521,6 +526,9 @@ func (s *Subnet) BeforeSave() error {
 		if subnets[i].subnet().Contains(s.subnet().IP) {
 			e.Errorf("Overlaps subnet %s", subnets[i].Name)
 		}
+	}
+	if err := index.CheckUnique(s, s.p.objs[s.Prefix()].d); err != nil {
+		e.Merge(err)
 	}
 	return e.OrNil()
 }

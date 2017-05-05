@@ -40,7 +40,9 @@ type Reservation struct {
 func (l *Reservation) Indexes() map[string]index.Maker {
 	fix := AsReservation
 	return map[string]index.Maker{
+		"Key": index.MakeKey(),
 		"Addr": index.Make(
+			false,
 			func(i, j store.KeySaver) bool {
 				n, o := big.Int{}, big.Int{}
 				n.SetBytes(fix(i).Addr.To16())
@@ -69,6 +71,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 				return &Reservation{Addr: addr}, nil
 			}),
 		"Token": index.Make(
+			false,
 			func(i, j store.KeySaver) bool { return fix(i).Token < fix(j).Token },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				token := fix(ref).Token
@@ -83,6 +86,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 				return &Reservation{Token: s}, nil
 			}),
 		"Strategy": index.Make(
+			false,
 			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				strategy := fix(ref).Strategy
@@ -97,6 +101,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 				return &Reservation{Strategy: s}, nil
 			}),
 		"NextServer": index.Make(
+			false,
 			func(i, j store.KeySaver) bool {
 				n, o := big.Int{}, big.Int{}
 				n.SetBytes(fix(i).NextServer.To16())
@@ -219,6 +224,9 @@ func (r *Reservation) BeforeSave() error {
 			e.Errorf("Reservation %s alreay has Strategy %s: Token %s", reservations[i].Key(), r.Strategy, r.Token)
 			break
 		}
+	}
+	if err := index.CheckUnique(r, r.p.objs[r.Prefix()].d); err != nil {
+		e.Merge(err)
 	}
 	return e.OrNil()
 }

@@ -33,7 +33,9 @@ type Profile struct {
 func (p *Profile) Indexes() map[string]index.Maker {
 	fix := AsProfile
 	return map[string]index.Maker{
+		"Key": index.MakeKey(),
 		"Name": index.Make(
+			true,
 			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refName := fix(ref).Name
@@ -147,4 +149,8 @@ func AsProfiles(o []store.KeySaver) []*Profile {
 		res[i] = AsProfile(o[i])
 	}
 	return res
+}
+
+func (p *Profile) BeforeSave() error {
+	return index.CheckUnique(p, p.p.objs[p.Prefix()].d)
 }

@@ -160,16 +160,15 @@ func (f *Frontend) InitUserApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/users/:name/token",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "users", "token", c.Param(`name`)) {
-				return
-			}
-			_, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
+			user, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
 			if !ok {
 				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
 				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound, s))
 				return
 			}
-
+			if !assureAuth(c, f.Logger, user.Prefix(), "token", user.Key()) {
+				return
+			}
 			sttl, _ := c.GetQuery("ttl")
 			ttl := 3600
 			if sttl != "" {

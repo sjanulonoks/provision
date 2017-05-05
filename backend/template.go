@@ -31,7 +31,9 @@ type Template struct {
 func (p *Template) Indexes() map[string]index.Maker {
 	fix := AsTemplate
 	return map[string]index.Maker{
+		"Key": index.MakeKey(),
 		"ID": index.Make(
+			true,
 			func(i, j store.KeySaver) bool { return fix(i).ID < fix(j).ID },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refID := fix(ref).ID
@@ -93,6 +95,10 @@ func (t *Template) BeforeSave() error {
 	}
 	if err := t.parse(root); err != nil {
 		e.Errorf("Parse error for template %s: %v", t.ID, err)
+		return e
+	}
+	if err := index.CheckUnique(t, t.p.objs[t.Prefix()].d); err != nil {
+		e.Merge(err)
 		return e
 	}
 	bootEnvs := t.p.lockFor("bootenvs")

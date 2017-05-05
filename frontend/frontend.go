@@ -66,10 +66,6 @@ type Sanitizable interface {
 	Sanitize()
 }
 
-type Indexable interface {
-	Indexes() map[string]index.Maker
-}
-
 type Frontend struct {
 	Logger     *log.Logger
 	FileRoot   string
@@ -273,7 +269,7 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 	filters := []index.Filter{}
 
 	var indexes map[string]index.Maker
-	if indexer, ok := ref.(Indexable); ok {
+	if indexer, ok := ref.(index.Indexer); ok {
 		indexes = indexer.Indexes()
 	} else {
 		indexes = map[string]index.Maker{}

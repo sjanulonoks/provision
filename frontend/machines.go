@@ -224,9 +224,6 @@ func (f *Frontend) InitMachineApi() {
 		func(c *gin.Context) {
 			uuid := c.Param(`uuid`)
 			ref := f.dt.NewMachine()
-			if !assureAuth(c, f.Logger, ref.Prefix(), "get", uuid) {
-				return
-			}
 			res, ok := f.dt.FetchOne(ref, uuid)
 			if !ok {
 				err := &backend.Error{
@@ -237,6 +234,9 @@ func (f *Frontend) InitMachineApi() {
 				}
 				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
 				c.JSON(err.Code, err)
+				return
+			}
+			if !assureAuth(c, f.Logger, res.Prefix(), "get", res.Key()) {
 				return
 			}
 			p := backend.AsMachine(res).GetParams()
@@ -261,9 +261,6 @@ func (f *Frontend) InitMachineApi() {
 			}
 			uuid := c.Param(`uuid`)
 			ref := f.dt.NewMachine()
-			if !assureAuth(c, f.Logger, ref.Prefix(), "get", uuid) {
-				return
-			}
 			res, ok := f.dt.FetchOne(ref, uuid)
 			if !ok {
 				err := &backend.Error{
@@ -276,6 +273,10 @@ func (f *Frontend) InitMachineApi() {
 				c.JSON(err.Code, err)
 				return
 			}
+			if !assureAuth(c, f.Logger, res.Prefix(), "get", res.Key()) {
+				return
+			}
+
 			m := backend.AsMachine(res)
 
 			err := m.SetParams(val)

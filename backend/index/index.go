@@ -2,10 +2,15 @@ package index
 
 import (
 	"errors"
+	"fmt"
 	s "sort"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
+
+type Indexer interface {
+	Indexes() map[string]Maker
+}
 
 // Tester is a function that tests to see if an item matches a condition
 type Test func(store.KeySaver) bool
@@ -38,9 +43,10 @@ type Filler func(string) (store.KeySaver, error)
 // Fill, which takes a string from a query parameter and turns it into
 // a store.KeySaver that has the appropriate slot filled.
 type Maker struct {
-	Less  Less
-	Tests TestMaker
-	Fill  Filler
+	Unique bool
+	Less   Less
+	Tests  TestMaker
+	Fill   Filler
 }
 
 // Index declares a struct field that can be indexed for a given
@@ -55,8 +61,58 @@ type Index struct {
 
 // Make takes a Less function, a TestMaker function, and a Filler
 // function and returns a Maker.
-func Make(less Less, maker TestMaker, filler Filler) Maker {
-	return Maker{Less: less, Tests: maker, Fill: filler}
+func Make(unique bool, less Less, maker TestMaker, filler Filler) Maker {
+	return Maker{Unique: unique, Less: less, Tests: maker, Fill: filler}
+}
+
+type fake string
+
+func (f fake) Prefix() string             { return "fake" }
+func (f fake) Key() string                { return string(f) }
+func (f fake) New() store.KeySaver        { return f }
+func (f fake) Backend() store.SimpleStore { return nil }
+
+func MakeKey() Maker {
+	return Maker{
+		Unique: true,
+		Less: func(i, j store.KeySaver) bool {
+			return i.Key() < j.Key()
+		},
+		Tests: func(ref store.KeySaver) (gte, gt Test) {
+			key := ref.Key()
+			return func(s store.KeySaver) bool { return s.Key() >= key },
+				func(s store.KeySaver) bool { return s.Key() > key }
+		},
+		Fill: func(s string) (store.KeySaver, error) {
+			return fake(s), nil
+		},
+	}
+}
+
+func CheckUnique(s store.KeySaver, objs []store.KeySaver) error {
+	testObj, ok := s.(Indexer)
+	if !ok {
+		return nil
+	}
+	for idxName, maker := range testObj.Indexes() {
+		if !maker.Unique {
+			continue
+		}
+		idx, err := All(Sort(maker), Subset(maker.Tests(s)))(New(objs))
+		if err != nil {
+			return err
+		}
+		switch len(idx.objs) {
+		case 0:
+			continue
+		case 1:
+			if idx.objs[0].Key() == s.Key() {
+				continue
+			}
+		}
+		return fmt.Errorf("%s:%s violates unique index %s", s.Prefix(), s.Key(), idxName)
+	}
+	return nil
 }
 
 // New returns a new Index that is populated with a copy of the

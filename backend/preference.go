@@ -18,7 +18,9 @@ type Pref struct {
 func (p *Pref) Indexes() map[string]index.Maker {
 	fix := AsPref
 	return map[string]index.Maker{
+		"Key": index.MakeKey(),
 		"Name": index.Make(
+			true,
 			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refName := fix(ref).Name
@@ -61,4 +63,8 @@ func AsPref(v store.KeySaver) *Pref {
 
 func (p *DataTracker) NewPref() *Pref {
 	return &Pref{p: p}
+}
+
+func (p *Pref) BeforeSave() error {
+	return index.CheckUnique(p, p.p.objs[p.Prefix()].d)
 }

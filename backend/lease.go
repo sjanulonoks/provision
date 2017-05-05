@@ -54,7 +54,9 @@ type Lease struct {
 func (l *Lease) Indexes() map[string]index.Maker {
 	fix := AsLease
 	return map[string]index.Maker{
+		"Key": index.MakeKey(),
 		"Addr": index.Make(
+			false,
 			func(i, j store.KeySaver) bool {
 				n, o := big.Int{}, big.Int{}
 				n.SetBytes(fix(i).Addr.To16())
@@ -83,6 +85,7 @@ func (l *Lease) Indexes() map[string]index.Maker {
 				return &Lease{Addr: ip}, nil
 			}),
 		"Token": index.Make(
+			false,
 			func(i, j store.KeySaver) bool { return fix(i).Token < fix(j).Token },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				token := fix(ref).Token
@@ -97,6 +100,7 @@ func (l *Lease) Indexes() map[string]index.Maker {
 				return &Lease{Token: s}, nil
 			}),
 		"Strategy": index.Make(
+			false,
 			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				strategy := fix(ref).Strategy
@@ -111,6 +115,7 @@ func (l *Lease) Indexes() map[string]index.Maker {
 				return &Lease{Strategy: s}, nil
 			}),
 		"ExpireTime": index.Make(
+			false,
 			func(i, j store.KeySaver) bool { return fix(i).ExpireTime.Before(fix(j).ExpireTime) },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				expireTime := fix(ref).ExpireTime
@@ -243,6 +248,10 @@ func (l *Lease) OnChange(oldThing store.KeySaver) error {
 
 func (l *Lease) Expired() bool {
 	return l.ExpireTime.Before(time.Now())
+}
+
+func (l *Lease) BeforeSave() error {
+	return index.CheckUnique(l, l.p.objs[l.Prefix()].d)
 }
 
 func (l *Lease) Expire() {
