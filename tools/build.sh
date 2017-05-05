@@ -41,7 +41,7 @@ rm -rf client models embedded/assets/swagger.json
 go generate server/assets.go
 
 # Update cli docs if needed. - does change date.
-go build -o drpcli-docs cmds/drpcli-docs.go
+go build -o drpcli-docs cmds/drpcli-docs/drpcli-docs.go
 
 . tools/version.sh
 
@@ -64,8 +64,8 @@ for arch in "${arches[@]}"; do
             echo "Building binaries for ${arch} ${os}"
             binpath="bin/$os/$arch"
             mkdir -p "$binpath"
-            go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision.go
-            go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli.go
+            go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision/dr-provision.go
+            go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli/drpcli.go
         )
         done
 done
