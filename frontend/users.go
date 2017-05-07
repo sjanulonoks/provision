@@ -84,6 +84,17 @@ type UserTokenQuerySpecificParameter struct {
 	Specific string `json:"specific"`
 }
 
+// UserListPathParameter used to limit lists of User by path options
+// swagger:parameters listUsers
+type UserListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	Name string
+}
+
 func (f *Frontend) InitUserApi() {
 	// swagger:route GET /users Users listUsers
 	//
@@ -91,10 +102,31 @@ func (f *Frontend) InitUserApi() {
 	//
 	// This will show all Users by default.
 	//
-	//     Responses:
-	//       200: UsersResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    Name = string
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    Name=fred - returns items named fred
+	//    Name=Lt(fred) - returns items that alphabetically less than fred.
+	//
+	// Responses:
+	//    200: UsersResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
 	f.ApiGroup.GET("/users",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewUser())
@@ -148,16 +180,15 @@ func (f *Frontend) InitUserApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/users/:name/token",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "users", "token", c.Param(`name`)) {
-				return
-			}
-			_, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
+			user, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
 			if !ok {
 				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
 				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound, s))
 				return
 			}
-
+			if !assureAuth(c, f.Logger, user.Prefix(), "token", user.Key()) {
+				return
+			}
 			sttl, _ := c.GetQuery("ttl")
 			ttl := 3600
 			if sttl != "" {

@@ -61,6 +61,17 @@ type ProfileParamsBodyParameter struct {
 	Body map[string]interface{}
 }
 
+// ProfileListPathParameter used to limit lists of Profile by path options
+// swagger:parameters listProfiles
+type ProfileListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	Name string
+}
+
 func (f *Frontend) InitProfileApi() {
 	// swagger:route GET /profiles Profiles listProfiles
 	//
@@ -68,10 +79,31 @@ func (f *Frontend) InitProfileApi() {
 	//
 	// This will show all Profiles by default.
 	//
-	//     Responses:
-	//       200: ProfilesResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    Name = string
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    Name=fred - returns items named fred
+	//    Name=Lt(fred) - returns items that alphabetically less than fred.
+	//
+	// Responses:
+	//    200: ProfilesResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
 	f.ApiGroup.GET("/profiles",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewProfile())
@@ -181,9 +213,6 @@ func (f *Frontend) InitProfileApi() {
 		func(c *gin.Context) {
 			name := c.Param(`name`)
 			ref := f.dt.NewProfile()
-			if !assureAuth(c, f.Logger, ref.Prefix(), "get", name) {
-				return
-			}
 			res, ok := f.dt.FetchOne(ref, name)
 			if !ok {
 				err := &backend.Error{
@@ -194,6 +223,9 @@ func (f *Frontend) InitProfileApi() {
 				}
 				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
 				c.JSON(err.Code, err)
+				return
+			}
+			if !assureAuth(c, f.Logger, res.Prefix(), "get", res.Key()) {
 				return
 			}
 			p := backend.AsProfile(res).GetParams()
@@ -218,9 +250,6 @@ func (f *Frontend) InitProfileApi() {
 			}
 			name := c.Param(`name`)
 			ref := f.dt.NewProfile()
-			if !assureAuth(c, f.Logger, ref.Prefix(), "get", name) {
-				return
-			}
 			res, ok := f.dt.FetchOne(ref, name)
 			if !ok {
 				err := &backend.Error{
@@ -233,8 +262,10 @@ func (f *Frontend) InitProfileApi() {
 				c.JSON(err.Code, err)
 				return
 			}
+			if !assureAuth(c, f.Logger, res.Prefix(), "get", res.Key()) {
+				return
+			}
 			m := backend.AsProfile(res)
-
 			err := m.SetParams(val)
 			if err != nil {
 				be, _ := err.(*backend.Error)

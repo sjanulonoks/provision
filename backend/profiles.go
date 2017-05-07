@@ -2,6 +2,7 @@ package backend
 
 import (
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 )
 
 // Profile represents a set of key/values to use in
@@ -27,6 +28,29 @@ type Profile struct {
 	Params map[string]interface{}
 
 	p *DataTracker
+}
+
+func (p *Profile) Indexes() map[string]index.Maker {
+	fix := AsProfile
+	return map[string]index.Maker{
+		"Key": index.MakeKey(),
+		"Name": index.Make(
+			true,
+			"string",
+			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				refName := fix(ref).Name
+				return func(s store.KeySaver) bool {
+						return fix(s).Name >= refName
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Name > refName
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Profile{Name: s}, nil
+			}),
+	}
 }
 
 func (p *Profile) Backend() store.SimpleStore {
@@ -126,4 +150,8 @@ func AsProfiles(o []store.KeySaver) []*Profile {
 		res[i] = AsProfile(o[i])
 	}
 	return res
+}
+
+func (p *Profile) BeforeSave() error {
+	return index.CheckUnique(p, p.p.objs[p.Prefix()].d)
 }

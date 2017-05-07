@@ -1,9 +1,12 @@
 package backend
 
 import (
+	"fmt"
+	"math/big"
 	"net"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 )
 
 // Reservation tracks persistent DHCP IP address reservations.
@@ -32,6 +35,105 @@ type Reservation struct {
 	// required: true
 	Strategy string
 	p        *DataTracker
+}
+
+func (l *Reservation) Indexes() map[string]index.Maker {
+	fix := AsReservation
+	return map[string]index.Maker{
+		"Key": index.MakeKey(),
+		"Addr": index.Make(
+			false,
+			"IP Address",
+			func(i, j store.KeySaver) bool {
+				n, o := big.Int{}, big.Int{}
+				n.SetBytes(fix(i).Addr.To16())
+				o.SetBytes(fix(j).Addr.To16())
+				return n.Cmp(&o) == -1
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				addr := &big.Int{}
+				addr.SetBytes(fix(ref).Addr.To16())
+				return func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).Addr.To16())
+						return o.Cmp(addr) != -1
+					},
+					func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).Addr.To16())
+						return o.Cmp(addr) == 1
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				addr := net.ParseIP(s)
+				if addr == nil {
+					return nil, fmt.Errorf("Invalid Address: %s", s)
+				}
+				return &Reservation{Addr: addr}, nil
+			}),
+		"Token": index.Make(
+			false,
+			"string",
+			func(i, j store.KeySaver) bool { return fix(i).Token < fix(j).Token },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				token := fix(ref).Token
+				return func(s store.KeySaver) bool {
+						return fix(s).Token >= token
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Token > token
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Reservation{Token: s}, nil
+			}),
+		"Strategy": index.Make(
+			false,
+			"string",
+			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				strategy := fix(ref).Strategy
+				return func(s store.KeySaver) bool {
+						return fix(s).Strategy >= strategy
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Strategy > strategy
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Reservation{Strategy: s}, nil
+			}),
+		"NextServer": index.Make(
+			false,
+			"IP Address",
+			func(i, j store.KeySaver) bool {
+				n, o := big.Int{}, big.Int{}
+				n.SetBytes(fix(i).NextServer.To16())
+				o.SetBytes(fix(j).NextServer.To16())
+				return n.Cmp(&o) == -1
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				addr := &big.Int{}
+				addr.SetBytes(fix(ref).NextServer.To16())
+				return func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).NextServer.To16())
+						return o.Cmp(addr) != -1
+					},
+					func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).NextServer.To16())
+						return o.Cmp(addr) == 1
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				addr := net.ParseIP(s)
+				if addr == nil {
+					return nil, fmt.Errorf("Invalid Address: %s", s)
+				}
+				return &Reservation{NextServer: addr}, nil
+			}),
+	}
 }
 
 func (r *Reservation) Prefix() string {
@@ -126,6 +228,9 @@ func (r *Reservation) BeforeSave() error {
 			e.Errorf("Reservation %s alreay has Strategy %s: Token %s", reservations[i].Key(), r.Strategy, r.Token)
 			break
 		}
+	}
+	if err := index.CheckUnique(r, r.p.objs[r.Prefix()].d); err != nil {
+		e.Merge(err)
 	}
 	return e.OrNil()
 }

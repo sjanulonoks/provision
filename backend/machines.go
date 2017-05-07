@@ -1,11 +1,14 @@
 package backend
 
 import (
+	"fmt"
+	"math/big"
 	"net"
 	"path"
 	"strings"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 	"github.com/pborman/uuid"
 )
 
@@ -58,6 +61,95 @@ type Machine struct {
 	// used during AfterSave() and AfterRemove() to handle boot environment changes.
 	toRemove renderers
 	toRender renderers
+}
+
+func (n *Machine) Indexes() map[string]index.Maker {
+	fix := AsMachine
+	return map[string]index.Maker{
+		"Key": index.MakeKey(),
+		"Uuid": index.Make(
+			true,
+			"UUID string",
+			func(i, j store.KeySaver) bool { return fix(i).Uuid.String() < fix(j).Uuid.String() },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				refUuid := fix(ref).Uuid.String()
+				return func(s store.KeySaver) bool {
+						return fix(s).Uuid.String() >= refUuid
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Uuid.String() > refUuid
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				id := uuid.Parse(s)
+				if id == nil {
+					return nil, fmt.Errorf("Invalid UUID: %s", s)
+				}
+				return &Machine{Uuid: id}, nil
+			}),
+		"Name": index.Make(
+			true,
+			"string",
+			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				refName := fix(ref).Name
+				return func(s store.KeySaver) bool {
+						return fix(s).Name >= refName
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Name > refName
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Machine{Name: s}, nil
+			}),
+		"BootEnv": index.Make(
+			false,
+			"string",
+			func(i, j store.KeySaver) bool { return fix(i).BootEnv < fix(j).BootEnv },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				refBootEnv := fix(ref).BootEnv
+				return func(s store.KeySaver) bool {
+						return fix(s).BootEnv >= refBootEnv
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).BootEnv > refBootEnv
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Machine{BootEnv: s}, nil
+			}),
+		"Address": index.Make(
+			false,
+			"IP Address",
+			func(i, j store.KeySaver) bool {
+				n, o := big.Int{}, big.Int{}
+				n.SetBytes(fix(i).Address.To16())
+				o.SetBytes(fix(j).Address.To16())
+				return n.Cmp(&o) == -1
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				addr := &big.Int{}
+				addr.SetBytes(fix(ref).Address.To16())
+				return func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).Address.To16())
+						return o.Cmp(addr) != -1
+					},
+					func(s store.KeySaver) bool {
+						o := big.Int{}
+						o.SetBytes(fix(s).Address.To16())
+						return o.Cmp(addr) == 1
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				addr := net.ParseIP(s)
+				if addr == nil {
+					return nil, fmt.Errorf("Invalid address: %s", s)
+				}
+				return &Machine{Address: addr}, nil
+			}),
+	}
 }
 
 func (n *Machine) Backend() store.SimpleStore {
@@ -190,6 +282,9 @@ func (n *Machine) BeforeSave() error {
 		} else {
 			n.toRender = env.Render(n, e)
 		}
+	}
+	if err := index.CheckUnique(n, n.p.objs[n.Prefix()].d); err != nil {
+		e.Merge(err)
 	}
 	return e.OrNil()
 }

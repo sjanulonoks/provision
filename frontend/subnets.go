@@ -44,6 +44,23 @@ type SubnetPathParameter struct {
 	Name string `json:"name"`
 }
 
+// SubnetListPathParameter used to limit lists of Subnet by path options
+// swagger:parameters listSubnets
+type SubnetListPathParameter struct {
+	// in: query
+	Offest int `json:"offset"`
+	// in: query
+	Limit int `json:"limit"`
+	// in: query
+	Strategy string
+	// in: query
+	NextServer string
+	// in: query
+	Subnet string
+	// in: query
+	Name string
+}
+
 func (f *Frontend) InitSubnetApi() {
 	// swagger:route GET /subnets Subnets listSubnets
 	//
@@ -51,10 +68,35 @@ func (f *Frontend) InitSubnetApi() {
 	//
 	// This will show all Subnets by default.
 	//
-	//     Responses:
-	//       200: SubnetsResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    Name = string
+	//    NextServer = IP Address
+	//    Subnet = CIDR Address
+	//    Strategy = string
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    Name=fred - returns items named fred
+	//    Name=Lt(fred) - returns items that alphabetically less than fred.
+	//    Name=Lt(fred)&Available=true - returns items with Name less than fred and Available is true
+	//
+	// Responses:
+	//    200: SubnetsResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
 	f.ApiGroup.GET("/subnets",
 		func(c *gin.Context) {
 			f.List(c, f.dt.NewSubnet())

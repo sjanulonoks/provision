@@ -6,6 +6,7 @@ import (
 	"text/template"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 )
 
 // Template represents a template that will be associated with a boot
@@ -25,6 +26,29 @@ type Template struct {
 	// required: true
 	Contents string
 	p        *DataTracker
+}
+
+func (p *Template) Indexes() map[string]index.Maker {
+	fix := AsTemplate
+	return map[string]index.Maker{
+		"Key": index.MakeKey(),
+		"ID": index.Make(
+			true,
+			"string",
+			func(i, j store.KeySaver) bool { return fix(i).ID < fix(j).ID },
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				refID := fix(ref).ID
+				return func(s store.KeySaver) bool {
+						return fix(s).ID >= refID
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).ID > refID
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &Template{ID: s}, nil
+			}),
+	}
 }
 
 func (t *Template) Prefix() string {
@@ -72,6 +96,10 @@ func (t *Template) BeforeSave() error {
 	}
 	if err := t.parse(root); err != nil {
 		e.Errorf("Parse error for template %s: %v", t.ID, err)
+		return e
+	}
+	if err := index.CheckUnique(t, t.p.objs[t.Prefix()].d); err != nil {
+		e.Merge(err)
 		return e
 	}
 	bootEnvs := t.p.lockFor("bootenvs")

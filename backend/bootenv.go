@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,6 +17,7 @@ import (
 	"text/template"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/provision/backend/index"
 )
 
 // TemplateInfo holds information on the templates in the boot
@@ -152,6 +154,87 @@ type BootEnv struct {
 	p              *DataTracker
 	rootTemplate   *template.Template
 	tmplMux        sync.Mutex
+}
+
+func (b *BootEnv) Indexes() map[string]index.Maker {
+	fix := AsBootEnv
+	return map[string]index.Maker{
+		"Key": index.MakeKey(),
+		"Name": index.Make(
+			true,
+			"string",
+			func(i, j store.KeySaver) bool {
+				return fix(i).Name < fix(j).Name
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				name := fix(ref).Name
+				return func(s store.KeySaver) bool {
+						return fix(s).Name >= name
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Name > name
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				return &BootEnv{Name: s}, nil
+			}),
+		"Available": index.Make(
+			false,
+			"boolean",
+			func(i, j store.KeySaver) bool {
+				return (!fix(i).Available) && fix(j).Available
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				avail := fix(ref).Available
+				return func(s store.KeySaver) bool {
+						v := fix(s).Available
+						return v || (v && avail)
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Available && !avail
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				res := &BootEnv{}
+				switch s {
+				case "true":
+					res.Available = true
+				case "false":
+					res.Available = false
+				default:
+					return nil, errors.New("Availale must be true or false")
+				}
+				return res, nil
+			}),
+		"OnlyUnknown": index.Make(
+			false,
+			"boolean",
+			func(i, j store.KeySaver) bool {
+				return !fix(i).OnlyUnknown && fix(j).OnlyUnknown
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				unknown := fix(ref).OnlyUnknown
+				return func(s store.KeySaver) bool {
+						v := fix(s).OnlyUnknown
+						return v || (v && unknown)
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).OnlyUnknown && !unknown
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				res := &BootEnv{}
+				switch s {
+				case "true":
+					res.OnlyUnknown = true
+				case "false":
+					res.OnlyUnknown = false
+				default:
+					return nil, errors.New("OnlyUnknown must be true or false")
+				}
+				return res, nil
+			}),
+	}
 }
 
 func (b *BootEnv) Backend() store.SimpleStore {
@@ -399,6 +482,9 @@ func (b *BootEnv) BeforeSave() error {
 					iPath)
 			}
 		}
+	}
+	if err := index.CheckUnique(b, b.p.objs[b.Prefix()].d); err != nil {
+		e.Merge(err)
 	}
 	b.Errors = e.Messages
 	b.Available = (len(b.Errors) == 0)

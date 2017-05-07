@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/embedded"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-gonic/gin"
@@ -38,7 +41,8 @@ type DTI interface {
 	Save(store.KeySaver) (store.KeySaver, error)
 	Patch(store.KeySaver, string, jsonpatch2.Patch) (store.KeySaver, error)
 	FetchOne(store.KeySaver, string) (store.KeySaver, bool)
-	FetchAll(ref store.KeySaver) []store.KeySaver
+	FetchAll(store.KeySaver) []store.KeySaver
+	Filter(store.KeySaver, ...index.Filter) ([]store.KeySaver, error)
 
 	NewBootEnv() *backend.BootEnv
 	NewMachine() *backend.Machine
@@ -262,11 +266,142 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	return false
 }
 
+// This processes the value into a function, if function not specifed, assume Eq.
+// Supported Forms:
+//
+//   Eq(value)
+//   Lt(value)
+//   Lte(value)
+//   Gt(value)
+//   Gte(value)
+//   Ne(value)
+//   Between(valueLower, valueHigher)
+//   Except(valueLower, valueHigher)
+//
+func convertValueToFilter(v string) (index.Filter, error) {
+	args := strings.SplitN(v, "(", 2)
+	switch args[0] {
+	case "Eq":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Eq(subargs[0]), nil
+	case "Lt":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Lt(subargs[0]), nil
+	case "Lte":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Lte(subargs[0]), nil
+	case "Gt":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Gt(subargs[0]), nil
+	case "Gte":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Gte(subargs[0]), nil
+	case "Ne":
+		subargs := strings.SplitN(args[1], ")", 2)
+		return index.Ne(subargs[0]), nil
+	case "Between":
+		subargs := strings.SplitN(args[1], ")", 2)
+		parts := strings.Split(subargs[0], ",")
+		return index.Between(parts[0], parts[1]), nil
+	case "Except":
+		subargs := strings.SplitN(args[1], ")", 2)
+		parts := strings.Split(subargs[0], ",")
+		return index.Except(parts[0], parts[1]), nil
+	default:
+		return index.Eq(v), nil
+	}
+	return nil, fmt.Errorf("Should never get here")
+}
+
+func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string) ([]index.Filter, error) {
+	filters := []index.Filter{}
+
+	var indexes map[string]index.Maker
+	if indexer, ok := ref.(index.Indexer); ok {
+		indexes = indexer.Indexes()
+	} else {
+		indexes = map[string]index.Maker{}
+	}
+
+	for k, vs := range params {
+		if k == "offset" || k == "limit" || k == "sort" || k == "reverse" {
+			continue
+		}
+
+		if maker, ok := indexes[k]; ok {
+			filters = append(filters, index.Sort(maker))
+			subfilters := []index.Filter{}
+			for _, v := range vs {
+				f, err := convertValueToFilter(v)
+				if err != nil {
+					return nil, err
+				}
+				subfilters = append(subfilters, f)
+			}
+			filters = append(filters, index.Any(subfilters...))
+		} else {
+			return nil, fmt.Errorf("Filter not found: %s", k)
+		}
+	}
+
+	if vs, ok := params["sort"]; ok {
+		for _, piece := range vs {
+			if maker, ok := indexes[piece]; ok {
+				filters = append(filters, index.Sort(maker))
+			} else {
+				return nil, fmt.Errorf("Not sortable: %s", piece)
+			}
+		}
+	} else {
+		filters = append(filters, index.Native())
+	}
+
+	if _, ok := params["reverse"]; ok {
+		filters = append(filters, index.Reverse())
+	}
+
+	// offset and limit must be last
+	if vs, ok := params["offset"]; ok {
+		num, err := strconv.Atoi(vs[0])
+		if err == nil {
+			filters = append(filters, index.Offset(num))
+		} else {
+			return nil, fmt.Errorf("Offset not valid: %v", err)
+		}
+	}
+	if vs, ok := params["limit"]; ok {
+		num, err := strconv.Atoi(vs[0])
+		if err == nil {
+			filters = append(filters, index.Limit(num))
+		} else {
+			return nil, fmt.Errorf("Limit not valid: %v", err)
+		}
+	}
+
+	return filters, nil
+}
+
 func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
 		return
 	}
-	arr := f.dt.FetchAll(ref)
+	res := &backend.Error{
+		Code:  http.StatusNotAcceptable,
+		Type:  "API_ERROR",
+		Model: ref.Prefix(),
+	}
+	filters, err := f.processFilters(ref, c.Request.URL.Query())
+	if err != nil {
+		res.Merge(err)
+		c.JSON(res.Code, res)
+		return
+	}
+	arr, err := f.dt.Filter(ref, filters...)
+	if err != nil {
+		res.Merge(err)
+		c.JSON(res.Code, res)
+		return
+	}
 	for _, res := range arr {
 		s, ok := res.(Sanitizable)
 		if ok {

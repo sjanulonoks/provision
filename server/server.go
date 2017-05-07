@@ -43,34 +43,29 @@ import (
 )
 
 type ProgOpts struct {
-	VersionFlag bool `long:"version" description:"Print Version and exit"`
-
-	BackEndType string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"directory"`
-	DataRoot    string `long:"data-root" description:"Location we should store runtime information in" default:"/var/lib/dr-provision"`
-
-	OurAddress string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
-	StaticPort int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
-	TftpPort   int    `long:"tftp-port" description:"Port for the TFTP server to listen on" default:"69"`
-	ApiPort    int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
-	DhcpPort   int    `long:"dhcp-port" description:"Port for the DHCP server to listen on" default:"67"`
-
-	FileRoot string `long:"file-root" description:"Root of filesystem we should manage" default:"/var/lib/tftpboot"`
-	DevUI    string `long:"dev-ui" description:"Root of UI Pages for Development"`
-
+	VersionFlag         bool   `long:"version" description:"Print Version and exit"`
 	DisableProvisioner  bool   `long:"disable-provisioner" description:"Disable provisioner"`
 	DisableDHCP         bool   `long:"disable-dhcp" description:"Disable DHCP"`
+	StaticPort          int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
+	TftpPort            int    `long:"tftp-port" description:"Port for the TFTP server to listen on" default:"69"`
+	ApiPort             int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
+	DhcpPort            int    `long:"dhcp-port" description:"Port for the DHCP server to listen on" default:"67"`
+	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
+	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
+	BackEndType         string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"directory"`
+	DataRoot            string `long:"data-root" description:"Location we should store runtime information in" default:"/var/lib/dr-provision"`
+	OurAddress          string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
+	FileRoot            string `long:"file-root" description:"Root of filesystem we should manage" default:"/var/lib/tftpboot"`
+	DevUI               string `long:"dev-ui" description:"Root of UI Pages for Development"`
 	DhcpInterfaces      string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
 	DefaultBootEnv      string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"sledgehammer"`
 	UnknownBootEnv      string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
-	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
-	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
 
-	DebugBootEnv  int `long:"debug-bootenv" description:"Debug level for the BootEnv System - 0 = off, 1 = info, 2 = debug" default:"0"`
-	DebugDhcp     int `long:"debug-dhcp" description:"Debug level for the DHCP Server - 0 = off, 1 = info, 2 = debug" default:"0"`
-	DebugRenderer int `long:"debug-renderer" description:"Debug level for the Template Renderer - 0 = off, 1 = info, 2 = debug" default:"0"`
-
-	TlsKeyFile  string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
-	TlsCertFile string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
+	DebugBootEnv  int    `long:"debug-bootenv" description:"Debug level for the BootEnv System - 0 = off, 1 = info, 2 = debug" default:"0"`
+	DebugDhcp     int    `long:"debug-dhcp" description:"Debug level for the DHCP Server - 0 = off, 1 = info, 2 = debug" default:"0"`
+	DebugRenderer int    `long:"debug-renderer" description:"Debug level for the Template Renderer - 0 = off, 1 = info, 2 = debug" default:"0"`
+	TlsKeyFile    string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
+	TlsCertFile   string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
 }
 
 func mkdir(d string, logger *log.Logger) {
