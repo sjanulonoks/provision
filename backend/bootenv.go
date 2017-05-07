@@ -162,6 +162,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 		"Key": index.MakeKey(),
 		"Name": index.Make(
 			true,
+			"string",
 			func(i, j store.KeySaver) bool {
 				return fix(i).Name < fix(j).Name
 			},
@@ -179,6 +180,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 			}),
 		"Available": index.Make(
 			false,
+			"boolean",
 			func(i, j store.KeySaver) bool {
 				return (!fix(i).Available) && fix(j).Available
 			},
@@ -206,6 +208,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 			}),
 		"OnlyUnknown": index.Make(
 			false,
+			"boolean",
 			func(i, j store.KeySaver) bool {
 				return !fix(i).OnlyUnknown && fix(j).OnlyUnknown
 			},

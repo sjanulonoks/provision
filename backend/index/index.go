@@ -44,6 +44,7 @@ type Filler func(string) (store.KeySaver, error)
 // a store.KeySaver that has the appropriate slot filled.
 type Maker struct {
 	Unique bool
+	Type   string
 	Less   Less
 	Tests  TestMaker
 	Fill   Filler
@@ -60,9 +61,9 @@ type Index struct {
 }
 
 // Make takes a Less function, a TestMaker function, and a Filler
-// function and returns a Maker.
-func Make(unique bool, less Less, maker TestMaker, filler Filler) Maker {
-	return Maker{Unique: unique, Less: less, Tests: maker, Fill: filler}
+// function and returns a Maker.  t is a textual type identifier for docs/helps
+func Make(unique bool, t string, less Less, maker TestMaker, filler Filler) Maker {
+	return Maker{Unique: unique, Type: t, Less: less, Tests: maker, Fill: filler}
 }
 
 type fake string

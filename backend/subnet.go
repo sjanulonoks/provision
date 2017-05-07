@@ -229,6 +229,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 		"Key": index.MakeKey(),
 		"Name": index.Make(
 			true,
+			"string",
 			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refName := fix(ref).Name
@@ -244,6 +245,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 			}),
 		"Strategy": index.Make(
 			false,
+			"string",
 			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				strategy := fix(ref).Strategy
@@ -259,6 +261,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 			}),
 		"NextServer": index.Make(
 			false,
+			"IP Address",
 			func(i, j store.KeySaver) bool {
 				n, o := big.Int{}, big.Int{}
 				n.SetBytes(fix(i).NextServer.To16())
@@ -288,6 +291,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 			}),
 		"Subnet": index.Make(
 			true,
+			"CIDR Address",
 			func(i, j store.KeySaver) bool {
 				a, _, errA := net.ParseCIDR(fix(i).Subnet)
 				b, _, errB := net.ParseCIDR(fix(j).Subnet)

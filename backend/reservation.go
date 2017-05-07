@@ -43,6 +43,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 		"Key": index.MakeKey(),
 		"Addr": index.Make(
 			false,
+			"IP Address",
 			func(i, j store.KeySaver) bool {
 				n, o := big.Int{}, big.Int{}
 				n.SetBytes(fix(i).Addr.To16())
@@ -72,6 +73,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 			}),
 		"Token": index.Make(
 			false,
+			"string",
 			func(i, j store.KeySaver) bool { return fix(i).Token < fix(j).Token },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				token := fix(ref).Token
@@ -87,6 +89,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 			}),
 		"Strategy": index.Make(
 			false,
+			"string",
 			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				strategy := fix(ref).Strategy
@@ -102,6 +105,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 			}),
 		"NextServer": index.Make(
 			false,
+			"IP Address",
 			func(i, j store.KeySaver) bool {
 				n, o := big.Int{}, big.Int{}
 				n.SetBytes(fix(i).NextServer.To16())

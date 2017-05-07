@@ -21,6 +21,7 @@ func (p *Pref) Indexes() map[string]index.Maker {
 		"Key": index.MakeKey(),
 		"Name": index.Make(
 			true,
+			"string",
 			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refName := fix(ref).Name

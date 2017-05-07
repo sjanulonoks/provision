@@ -34,6 +34,7 @@ func (p *Template) Indexes() map[string]index.Maker {
 		"Key": index.MakeKey(),
 		"ID": index.Make(
 			true,
+			"string",
 			func(i, j store.KeySaver) bool { return fix(i).ID < fix(j).ID },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refID := fix(ref).ID

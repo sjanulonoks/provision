@@ -69,6 +69,7 @@ func (n *Machine) Indexes() map[string]index.Maker {
 		"Key": index.MakeKey(),
 		"Uuid": index.Make(
 			true,
+			"UUID string",
 			func(i, j store.KeySaver) bool { return fix(i).Uuid.String() < fix(j).Uuid.String() },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refUuid := fix(ref).Uuid.String()
@@ -88,6 +89,7 @@ func (n *Machine) Indexes() map[string]index.Maker {
 			}),
 		"Name": index.Make(
 			true,
+			"string",
 			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refName := fix(ref).Name
@@ -103,6 +105,7 @@ func (n *Machine) Indexes() map[string]index.Maker {
 			}),
 		"BootEnv": index.Make(
 			false,
+			"string",
 			func(i, j store.KeySaver) bool { return fix(i).BootEnv < fix(j).BootEnv },
 			func(ref store.KeySaver) (gte, gt index.Test) {
 				refBootEnv := fix(ref).BootEnv
@@ -118,6 +121,7 @@ func (n *Machine) Indexes() map[string]index.Maker {
 			}),
 		"Address": index.Make(
 			false,
+			"IP Address",
 			func(i, j store.KeySaver) bool {
 				n, o := big.Int{}, big.Int{}
 				n.SetBytes(fix(i).Address.To16())
