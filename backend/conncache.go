@@ -22,6 +22,8 @@ func a2i(n net.IP) *big.Int {
 var addrCache = []cacheLine{}
 var addrCacheMux = &sync.RWMutex{}
 
+var connCacheTimeout = time.Minute
+
 // AddToCache adds a new remote -> local IP address mapping to the
 // connection cache.  If the remote address is already in the cache,
 // its corresponding local address is updates and the mapping is
@@ -77,11 +79,11 @@ func init() {
 	go func() {
 		// Garbage collection loop for the address cache.
 		for {
-			time.Sleep(time.Minute)
+			time.Sleep(connCacheTimeout)
 			addrCacheMux.Lock()
 			toRemove := []int{}
 			for idx := range addrCache {
-				if !addrCache[idx].unused {
+				if addrCache[idx].unused {
 					toRemove = append(toRemove, idx)
 				} else {
 					addrCache[idx].unused = true
