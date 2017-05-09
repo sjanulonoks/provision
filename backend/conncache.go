@@ -79,7 +79,12 @@ func init() {
 	go func() {
 		// Garbage collection loop for the address cache.
 		for {
-			time.Sleep(connCacheTimeout)
+			addrCacheMux.Lock()
+			t := connCacheTimeout
+			addrCacheMux.Unlock()
+
+			time.Sleep(t)
+
 			addrCacheMux.Lock()
 			toRemove := []int{}
 			for idx := range addrCache {
