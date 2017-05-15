@@ -20,9 +20,19 @@ d-i mirror/protocol string http
 d-i mirror/http/hostname string http.us.debian.org
 d-i mirror/http/directory string /debian
 {{else}}
+{{ if .ParamExists "local_repo" }}
+{{ if eq (.Param "local_repo") true }}
 d-i mirror/protocol string {{.ParseUrl "scheme" .Env.InstallUrl}}
 d-i mirror/http/hostname string {{.ParseUrl "host" .Env.InstallUrl}}
 d-i mirror/http/directory string {{.ParseUrl "path" .Env.InstallUrl}}
+{{else}}
+d-i mirror/http/hostname string archive.ubuntu.com
+d-i mirror/http/directory string /ubuntu
+{{end}}
+{{else}}
+d-i mirror/http/hostname string archive.ubuntu.com
+d-i mirror/http/directory string /ubuntu
+{{end}}
 {{end}}
 {{if .ParamExists "proxy-servers"}}
 d-i mirror/http/proxy string {{index (.Param "proxy-servers") 0 "url"}}
