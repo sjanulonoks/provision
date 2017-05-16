@@ -128,8 +128,9 @@ ensure_packages() {
             fi
         fi
         if ! which 7z &>/dev/null; then
-            echo "Installing bsdtar"
+            echo "Installing 7z"
             if [[ $OS_FAMILY == rhel ]] ; then
+                sudo yum install -y epel-release
                 sudo yum install -y p7zip
             elif [[ $OS_FAMILY == debian ]] ; then
                 sudo apt-get install -y p7zip-full
