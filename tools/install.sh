@@ -104,7 +104,7 @@ ensure_packages() {
         VER=$(tar -h | grep "bsdtar " | awk '{ print $2 }' | awk -F. '{ print $1 }')
         if [[ $VER != 3 ]] ; then
             echo "Please update tar to greater than 3.0.0"
-            echo 
+            echo
             echo "E.g: "
             echo "  brew install libarchive --force"
             echo "  brew link libarchive --force"
@@ -251,8 +251,10 @@ case $1 in
                  if [[ $OS_FAMILY == darwin ]]; then
                      bcast=$(netstat -rn | grep "255.255.255.255 " | awk '{ print $6 }')
                      if [[ $bcast == "" && $IPADDR ]] ; then
-                             echo "# No broadcast route set - this is required for Darwin."
+                             echo "# No broadcast route set - this is required for Darwin < 10.9."
                              echo "sudo route add 255.255.255.255 $IPADDR"
+                             echo "# No broadcast route set - this is required for Darwin > 10.9."
+                             echo "sudo route -n add -net 255.255.255.255 $IPADDR"
                      fi
                  fi
 
@@ -269,4 +271,3 @@ case $1 in
      *)
          echo "Unknown action \"$1\". Please use 'install' or 'remove'";;
 esac
-
