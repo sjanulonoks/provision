@@ -310,3 +310,65 @@ func TestUserToken(t *testing.T) {
 		t.Errorf("Returned User token was not correct: %v %v\n", "fredtoken", bet.Token)
 	}
 }
+
+func TestUserPutPassword(t *testing.T) {
+	localDTI := testFrontend()
+
+	localDTI.GetValue = nil
+	localDTI.GetBool = false
+	req, _ := http.NewRequest("PUT", "/api/v3/users/fred/password", nil)
+	req.Header.Set("Content-Type", "text/html")
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusNotFound)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "User GET: fred: Not Found")
+
+	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.GetBool = true
+	req, _ = http.NewRequest("PUT", "/api/v3/users/fred/password", nil)
+	req.Header.Set("Content-Type", "text/html")
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "Invalid content type: text/html")
+
+	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.GetBool = true
+	req, _ = http.NewRequest("PUT", "/api/v3/users/fred/password", strings.NewReader(`{  `))
+	req.Header.Set("Content-Type", "application/json")
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "unexpected EOF")
+
+	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.GetBool = true
+	req, _ = http.NewRequest("PUT", "/api/v3/users/fred/password", strings.NewReader(`{  `))
+	req.Header.Set("Content-Type", "application/json")
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "unexpected EOF")
+
+	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.GetBool = true
+	req, _ = http.NewRequest("PUT", "/api/v3/users/fred/password", strings.NewReader(`{ "Password": 5 }`))
+	req.Header.Set("Content-Type", "application/json")
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusBadRequest)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	localDTI.ValidateError(t, "API_ERROR", "json: cannot unmarshal number into Go struct field UserPassword.Password of type string")
+
+	localDTI.GetValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.GetBool = true
+	req, _ = http.NewRequest("PUT", "/api/v3/users/fred/password", strings.NewReader(`{ "Password": "cow" }`))
+	req.Header.Set("Content-Type", "application/json")
+	w := localDTI.RunTest(req)
+	localDTI.ValidateCode(t, http.StatusOK)
+	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
+	var be backend.User
+	json.Unmarshal(w.Body.Bytes(), &be)
+	if be.Name != "fred" {
+		t.Errorf("Returned User was not correct: %v %v\n", "fred", be.Name)
+	}
+}
