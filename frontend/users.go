@@ -36,6 +36,11 @@ type UserToken struct {
 	Token string
 }
 
+// swagger:model
+type UserPassword struct {
+	Password string
+}
+
 // UserBodyParameter used to inject a User
 // swagger:parameters createUser putUser
 type UserBodyParameter struct {
@@ -52,8 +57,16 @@ type UserPatchBodyParameter struct {
 	Body jsonpatch2.Patch
 }
 
+// UserPutPassword used to set the User's password
+// swagger:parameters putUserPassword
+type UserPutPasswordParameter struct {
+	// in: body
+	// required: true
+	Body UserPassword
+}
+
 // UserPathParameter used to name a User in the path
-// swagger:parameters getUser putUser patchUser deleteUser getUserToken
+// swagger:parameters getUser putUser patchUser deleteUser getUserToken putUserPassword
 type UserPathParameter struct {
 	// in: path
 	// required: true
@@ -255,6 +268,52 @@ func (f *Frontend) InitUserApi() {
 	f.ApiGroup.PUT("/users/:name",
 		func(c *gin.Context) {
 			f.Update(c, f.dt.NewUser(), c.Param(`name`))
+		})
+
+	// swagger:route PUT /users/{name}/password Users putUserPassword
+	//
+	// Set the password for a user.
+	//
+	// Update a User specified by {name} using a JSON User
+	//
+	//     Responses:
+	//       200: UserResponse
+	//       400: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       422: ErrorResponse
+	f.ApiGroup.PUT("/users/:name/password",
+		func(c *gin.Context) {
+			obj, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
+			if !ok {
+				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
+				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound, s))
+				return
+			}
+			user, _ := obj.(*backend.User)
+			if !assureAuth(c, f.Logger, user.Prefix(), "password", user.Key()) {
+				return
+			}
+			var userPassword UserPassword
+			if !assureDecode(c, &userPassword) {
+				return
+			}
+
+			if err := user.ChangePassword(userPassword.Password); err != nil {
+				be, ok := err.(*backend.Error)
+				if ok {
+					c.JSON(be.Code, be)
+				} else {
+					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				}
+			} else {
+				obj, _ = f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
+				s, _ := obj.(Sanitizable)
+				s.Sanitize()
+				c.JSON(http.StatusOK, obj)
+			}
+
 		})
 
 	// swagger:route DELETE /users/{name} Users deleteUser

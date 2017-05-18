@@ -96,7 +96,9 @@ func (u *User) ChangePassword(newPass string) error {
 		return err
 	}
 	u.PasswordHash = ph
-	_, err = store.Save(u)
+	if u.p != nil {
+		_, err = u.p.save(u)
+	}
 	return err
 }
 
