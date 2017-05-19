@@ -139,15 +139,20 @@ ensure_packages() {
     fi
 }
 
+family=386
+if [[ $(uname -m) == x86_64 ]] ; then
+        family=amd64
+fi
+
 case $(uname -s) in
     Darwin)
-        binpath="bin/darwin/amd64"
+        binpath="bin/darwin/$family"
         bindest="/usr/local/bin"
         tar="command bsdtar"
         # Someday, handle adding all the launchd stuff we will need.
         shasum="command shasum -a 256";;
     Linux)
-        binpath="bin/linux/amd64"
+        binpath="bin/linux/$family"
         bindest="/usr/local/bin"
         tar="command bsdtar"
         if [[ -d /etc/systemd/system ]]; then

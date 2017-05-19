@@ -11,6 +11,7 @@ assets/ipxe.pxe
 assets/jq
 assets/ldlinux.c32
 assets/libutil.c32
+assets/libcom32.c32
 assets/lpxelinux.0
 assets/pxechn.c32
 assets/wimboot

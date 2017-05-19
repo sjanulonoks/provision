@@ -44,6 +44,7 @@ for f in ipxe.efi ipxe.pxe jq bootx64.efi lpxelinux.0 esxi.0 wimboot; do
             for s in syslinux-6.03/bios/com32/elflink/ldlinux/ldlinux.c32 \
                          syslinux-6.03/bios/core/lpxelinux.0 \
                          syslinux-6.03/bios/com32/modules/pxechn.c32 \
+                         syslinux-6.03/bios/com32/lib/libcom32.c32 \
                          syslinux-6.03/bios/com32/libutil/libutil.c32; do
                 tar xOJf syslinux-6.03.tar.xz "$s">"${s##*/}"
             done
