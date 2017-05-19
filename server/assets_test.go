@@ -33,6 +33,7 @@ func TestExtractAssets(t *testing.T) {
 		"libutil.c32",
 		"lpxelinux.0",
 		"pxechn.c32",
+		"libcom32.c32",
 		"wimboot",
 	}
 
