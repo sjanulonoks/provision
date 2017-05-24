@@ -616,7 +616,12 @@ class Token extends React.Component {
   render() {
     return (
       <div>
-        <div>Username:Password (or Token):</div>
+        <div style={{padding: "10px"}}>
+          <h2>Auth Token</h2>
+          <div style={{fontSize: "12px", color: "#444"}}>
+            username:password or api token
+          </div>
+        </div>
         <div>
           <input
             type="text"
@@ -626,8 +631,8 @@ class Token extends React.Component {
             value={this.state.token}
             onChange={this.handleChange} />
         </div>
-        <div>
-          <strong>{this.getCodeName()}</strong>
+        <div style={{padding: "10px", fontWeight: "bold", color: "#a00"}}>
+          {this.getCodeName()}
         </div>
       </div>
     );
