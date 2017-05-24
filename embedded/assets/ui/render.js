@@ -580,7 +580,7 @@ class Token extends React.Component {
       if(token.includes(":")) {
         var name = token.split(":")[0];
         $.ajax({
-          url: "../api/v3/users/" + name + "/token",
+          url: "../api/v3/users/" + name + "/token?ttl=" + (8 * 60 * 60), // 8 hours in seconds
           type: "GET",
           dataType: "json",
           success(data) {
