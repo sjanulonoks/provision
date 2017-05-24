@@ -1564,13 +1564,19 @@ class Page extends React.Component {
   update() {
     var page = this;
     console.log("Updating");
+    console.log(this);
     $.getJSON("../api/v3/bootenvs", data => {
-      console.log("refs", page.refs, data);
-      page.setState({bootenvs: data});
-      _.each(page.refs, ref => {
-        console.log("Ref", ref, page.refs[ref]);
-        page.refs[ref].update();
-      })
+      var bootenvs = [];
+      // filter bootenvs
+      for(var key in data) {
+        if (data[key].Available)
+          bootenvs.push(data[key].Name)
+      }
+
+      // update each ref
+      page.setState({bootenvs: bootenvs}, () =>
+        _.each(page.refs, ref => ref.update())
+      );
     }).fail(() => {
     });
   }
