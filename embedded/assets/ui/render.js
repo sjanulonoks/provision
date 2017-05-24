@@ -1285,6 +1285,7 @@ class BootEnv extends React.Component {
                           onChange={(e)=>this.changeTemplate(e, i)}/>
                       </td>
                       <td>
+                        <button onClick={(e)=>$.getJSON("../api/v3/templates/" + val.ID, d=>alert(JSON.stringify(d, 0, "  ")))}>View</button>
                         <button onClick={(e)=>this.removeTemplate(e, i)}>Remove</button>
                       </td>
                     </tr>
