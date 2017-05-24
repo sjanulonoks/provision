@@ -3,6 +3,21 @@
 /* License: Apache v2 */
 /* jshint esversion: 6 */
 
+function debounce(func, wait, immediate) {
+  var timeout;
+  return function() {
+    var context = this, args = arguments;
+    var later = function() {
+      timeout = null;
+      if (!immediate) func.apply(context, args);
+    };
+    var callNow = immediate && !timeout;
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+    if (callNow) func.apply(context, args);
+  };
+};
+
 class Subnet extends React.Component {
 
   constructor(props) {
@@ -214,6 +229,7 @@ class Subnets extends React.Component {
     };
 
     this.componentDidMount = this.componentDidMount.bind(this);
+    this.update = this.update.bind(this);
     this.addSubnet = this.addSubnet.bind(this);
     this.updateSubnet = this.updateSubnet.bind(this);
     this.removeSubnet = this.removeSubnet.bind(this);
@@ -260,6 +276,10 @@ class Subnets extends React.Component {
 
   // get the subnets and interfaces once this component mounts
   componentDidMount() {
+    this.update();
+  }
+
+  update() {
     this.getSubnets().then(data => {
       this.setState({
         subnets: Object.keys(data.subnets).map(k => data.subnets[k]),
@@ -440,7 +460,7 @@ class Subnets extends React.Component {
   render() {
     $('#subnetCount').text(this.state.subnets.length);
     return (
-    <div>
+    <div id="subnets" style={{paddingTop: '51px'}}>
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
         <span>Subnets</span>
         <span>
@@ -523,34 +543,67 @@ class Token extends React.Component {
     return codes[this.state.code] || "Code " + this.state.code;
   }
 
-  // get the page and intferfaces once this component mounts
+  // update the token once this component mounts
   componentDidMount() {
     if (location.search.startsWith("?token=")) {
       var t = location.search.substring(7);
       this.setState({token: t});
       this.setToken(t);
+    } else if (localStorage.DrAuthToken) {
+      this.setToken(localStorage.DrAuthToken);
     }
   }
 
+  // tests a token for authenticity
   setToken(token) {
     var bootenvs = []
     var send_token = "Bearer " + token;
-    if (token.length < 80)
+    let Token = this;
+
+    if (token.includes(":")) // tokens are in base64 otherwise and will not include colons
       send_token = "Basic " + btoa(token);
+    else
+      localStorage.DrAuthToken = token;
+
     $.ajaxSetup({
-      headers : {
-        'Authorization' : send_token
+      headers: {
+        Authorization: send_token
       }
     });
+
     $.getJSON("../api/v3/bootenvs", data => {
       for(var key in data) {
         if (data[key].Available)
           bootenvs.push(data[key].Name)
       }
+
+      if(token.includes(":")) {
+        var name = token.split(":")[0];
+        $.ajax({
+          url: "../api/v3/users/" + name + "/token?ttl=" + (8 * 60 * 60), // 8 hours in seconds
+          type: "GET",
+          dataType: "json",
+          success(data) {
+            localStorage.DrAuthToken = data.Token;
+            $.ajaxSetup({
+              headers: {
+                Authorization: "Bearer " + data.Token
+              }
+            });
+          },
+          error(xhr, status, error) {
+            Token.setState({code: xhr.status});
+            localStorage.DrAuthToken = "";
+            Token.props.onAccessChange(false, []);
+          }
+        });
+      }
+
       this.setState({code: 200, token: token});
       this.props.onAccessChange(true, bootenvs);
-    }).fail((jqXHR, textStatus, errorThrown) => {
-      this.setState({code: jqXHR.status, token: token});
+    }).fail((xhr, status, error) => {
+      localStorage.DrAuthToken = "";
+      this.setState({code: xhr.status, token: token});
       this.props.onAccessChange(false, bootenvs);
     });
   }
@@ -563,15 +616,24 @@ class Token extends React.Component {
   render() {
     return (
       <div>
-        Username:Password (or Token): 
-        <input
-          type="text"
-          name="token"
-          size="15"
-          placeholder="user:password"
-          value={this.state.token}
-          onChange={this.handleChange} />
-        <strong>{this.getCodeName()}</strong>
+        <div style={{padding: "10px"}}>
+          <h2>Auth Token</h2>
+          <div style={{fontSize: "12px", color: "#444"}}>
+            username:password or api token
+          </div>
+        </div>
+        <div>
+          <input
+            type="text"
+            name="token"
+            size="15"
+            placeholder="user:password"
+            value={this.state.token}
+            onChange={this.handleChange} />
+        </div>
+        <div style={{padding: "10px", fontWeight: "bold", color: "#a00"}}>
+          {this.getCodeName()}
+        </div>
       </div>
     );
   }
@@ -708,6 +770,7 @@ class Machines extends React.Component {
     };
 
     this.componentDidMount = this.componentDidMount.bind(this);
+    this.update = this.update.bind(this);
     this.addMachine = this.addMachine.bind(this);
     this.changeMachine = this.changeMachine.bind(this);
     this.removeMachine = this.removeMachine.bind(this);
@@ -735,6 +798,10 @@ class Machines extends React.Component {
 
   // get the machine once this component mounts
   componentDidMount() {
+    this.update();
+  }
+
+  update() {
     this.getMachines().then(data => {
       this.setState({
         machines: data.machines
@@ -863,7 +930,7 @@ class Machines extends React.Component {
   render() {
     $('#machineCount').text(this.state.machines.length);
     return (
-    <div>
+    <div id="machines" style={{paddingTop: '51px'}}>
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
         <span>Machines</span>
         <span>
@@ -915,6 +982,7 @@ class Prefs extends React.Component {
     };
 
     this.componentDidMount = this.componentDidMount.bind(this);
+    this.update = this.update.bind(this);
     this.changePrefs = this.changePrefs.bind(this);
     this.updatePrefs = this.updatePrefs.bind(this);
     this.handleChange = this.handleChange.bind(this);
@@ -935,6 +1003,10 @@ class Prefs extends React.Component {
 
   // get the machine once this component mounts
   componentDidMount() {
+    this.update();
+  }
+
+  update() {
     this.getPrefs().then(data => {
       this.setState({
         prefs: data.prefs
@@ -1247,6 +1319,7 @@ class BootEnvs extends React.Component {
     };
 
     this.componentDidMount = this.componentDidMount.bind(this);
+    this.update = this.update.bind(this);
     this.addBootEnv = this.addBootEnv.bind(this);
     this.updateBootEnv = this.updateBootEnv.bind(this);
     this.removeBootEnv = this.removeBootEnv.bind(this);
@@ -1271,6 +1344,10 @@ class BootEnvs extends React.Component {
 
   // get the bootenvs once this component mounts
   componentDidMount() {
+    this.update();
+  }
+
+  update() {
     this.getBootEnvs().then(data => {
       this.setState({
         bootenvs: data.bootenvs,
@@ -1426,7 +1503,7 @@ class BootEnvs extends React.Component {
   render() {
     $('#bootenvCount').text(this.state.bootenvs.length);
     return (
-    <div>
+    <div id="bootenvs" style={{paddingTop: '51px'}}>
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
         <span>Boot Environments</span>
         <span>
@@ -1476,11 +1553,26 @@ class Page extends React.Component {
     };
 
     this.onAccessChange = this.onAccessChange.bind(this);
+    this.update = this.update.bind(this);
     //this.handleChange = this.handleChange.bind(this);
   }
   
   // get the page and interfaces once this component mounts
   componentDidMount() {
+  }
+
+  update() {
+    var page = this;
+    console.log("Updating");
+    $.getJSON("../api/v3/bootenvs", data => {
+      console.log("refs", page.refs, data);
+      page.setState({bootenvs: data});
+      _.each(page.refs, ref => {
+        console.log("Ref", ref, page.refs[ref]);
+        page.refs[ref].update();
+      })
+    }).fail(() => {
+    });
   }
 
   // called when an input changes
@@ -1491,24 +1583,25 @@ class Page extends React.Component {
   render() {
     const access = this.state.access;
     const bootenvs = this.state.bootenvs;
+    $('#navcontrols').css("display", access ? "flex" : "none");
     if (access) {
       return (
         <div id="swagger-ui-container" className="swagger-ui-wrap">
           <Subnets
-            style={{paddingTop: '51px'}}
+            ref="subnets"
             onAccessChange={this.onAccessChange} />
           <hr/>
           <BootEnvs
-            style={{paddingTop: '51px'}}
+            ref="bootenvs"
             onAccessChange={this.onAccessChange} />
           <hr/>
           <Prefs
-            style={{paddingTop: '51px'}}
+            ref="prefs"
             bootenvs={bootenvs}
             onAccessChange={this.onAccessChange} />
           <hr/>
           <Machines
-            style={{paddingTop: '51px'}}
+            ref="machines"
             bootenvs={bootenvs}
             onAccessChange={this.onAccessChange} />
         </div>
@@ -1526,4 +1619,4 @@ class Page extends React.Component {
   }
 }
 
-ReactDOM.render(<Page />, page);
+window.Provisioner = ReactDOM.render(<Page />, page);
