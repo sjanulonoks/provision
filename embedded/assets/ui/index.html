@@ -41,7 +41,7 @@
 
         <div style="flex-grow: 1;"></div>
         <div id="navcontrols" style="display: none; flex-direction: column; justify-content: center; align-items: center;">
-          <div>
+          <div style="margin-bottom: 2px;">
             <a class="nav-link" href="#subnets">
               Subnets: <span id="subnetCount">0</span>,
             </a>
@@ -53,8 +53,8 @@
             </a>
           </div>
           <div>
-            <a style="font-size: .8em;" class="nav-link" onclick="window.Provisioner.update()">Refresh</a>
-            <a style="font-size: .8em;" class="nav-link" onclick="localStorage.DrAuthToken='';window.Provisioner.setState({access:false, token:''})">Logout</a>
+            <a class="header__btn" onclick="window.Provisioner.update()">Refresh</a>
+            <a class="header__btn" onclick="localStorage.DrAuthToken='';window.Provisioner.setState({access:false, token:''})">Logout</a>
           </div>
         </div>
       </div>
