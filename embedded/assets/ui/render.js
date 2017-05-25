@@ -462,7 +462,7 @@ class Subnets extends React.Component {
     return (
     <div id="subnets" style={{paddingTop: '51px'}}>
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
-        <span>Subnets</span>
+        <span className="section-head">Subnets</span>
         <span>
           <a target="_blank" href="http://provision.readthedocs.io/en/latest/doc/ui.html#subnets">UI Help</a> | <a target="_blank" href="/swagger-ui/#/subnets">API Help</a>
         </span>
@@ -932,7 +932,7 @@ class Machines extends React.Component {
     return (
     <div id="machines" style={{paddingTop: '51px'}}>
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
-        <span>Machines</span>
+        <span className="section-head">Machines</span>
         <span>
           <a target="_blank" href="http://provision.readthedocs.io/en/latest/doc/ui.html#machines">UI Help</a> | <a target="_blank" href="/swagger-ui/#/machines">API Help</a>
         </span>
@@ -1057,7 +1057,7 @@ class Prefs extends React.Component {
     return (
     <div>
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
-      <span>Preferences</span>
+      <span className="section-head">Preferences</span>
       <span>
         <a target="_blank" href="http://provision.readthedocs.io/en/latest/doc/ui.html#prefs">UI Help</a> | <a target="_blank" href="/swagger-ui/#/prefs">API Help</a>
       </span>
@@ -1506,7 +1506,7 @@ class BootEnvs extends React.Component {
     return (
     <div id="bootenvs" style={{paddingTop: '51px'}}>
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
-        <span>Boot Environments</span>
+        <span className="section-head">Boot Environments</span>
         <span>
           <a target="_blank" href="http://provision.readthedocs.io/en/latest/doc/ui.html#bootenvs">UI Help</a> | <a target="_blank" href="/swagger-ui/#/bootenvs">API Help</a>
         </span>
