@@ -5,7 +5,7 @@ OnlyUnknown: false
 OS:
   Name: "lk-k8s-master"
   IsoFile: "kube-master.iso"
-Kernel: vmlinuz64
+Kernel: kernel
 Initrds:
   - "initrd.img"
 BootParams: "console=ttyS0 console=tty0 page_poison=1"
