@@ -201,7 +201,7 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 	// Server UI with flag to run from local files instead of assets
 	if len(devUI) == 0 {
 		mgmtApi.StaticFS("/ui",
-			&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "ui"})
+			&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "ui/public"})
 	} else {
 		logger.Printf("DEV: Running UI from %s\n", devUI)
 		mgmtApi.Static("/ui", devUI)
