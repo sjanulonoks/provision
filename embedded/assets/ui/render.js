@@ -148,7 +148,7 @@ class Subnet extends React.Component {
             <input
               type="text"
               name="ActiveStart"
-              size="12"
+              size="15"
               placeholder="10.0.0.0"
               value={subnet.ActiveStart}
               onChange={this.handleChange}/>
@@ -156,7 +156,7 @@ class Subnet extends React.Component {
             <input
               type="text"
               name="ActiveEnd"
-              size="12"
+              size="15"
               placeholder="10.0.0.255"
               value={subnet.ActiveEnd}
               onChange={this.handleChange}/>
@@ -292,10 +292,25 @@ class Subnets extends React.Component {
   // called to create a new subnet
   // allows some data other than defaults to be passed in
   addSubnet(template) {
-    var ip;
+
+    function applyCIDR(cidr, ip) {
+      var rangeMin = ip.split('.');
+      var rangeMax = [];
+      for(var i = 0; i < 4; i++) {
+        var n = Math.min(cidr, 8);
+        rangeMin[i] &= (256 - Math.pow(2, 8 - n));
+        rangeMax[i] = rangeMin[i] + Math.pow(2, 8 - n) - 1;
+        cidr -= n;
+      }
+      return [rangeMin.join('.'), rangeMax.join('.')];
+    }
+
+    var ip, range;
     if (template.IP) {
       var fq = template.IP.indexOf('/');
       ip = template.IP.substring(0,fq);
+      var cidr = parseInt(template.IP.split('/')[1]);
+      var range = applyCIDR(cidr, ip);
     }
     var subnet = {
       _new: true,
@@ -303,9 +318,9 @@ class Subnets extends React.Component {
       ActiveLeaseTime: 60,
       ReservedLeaseTime: 7200,
       OnlyReservations: false,
-      ActiveStart: (ip ? ip+'0' : ''),
+      ActiveStart: (ip ? range[0] : ''),
       Subnet: '',
-      ActiveEnd: (ip ? ip+'9' : ''),
+      ActiveEnd: (ip ? range[1] : ''),
       Strategy: "MAC",
       NextServer: (ip || ''),
       Options: [
