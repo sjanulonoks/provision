@@ -284,9 +284,8 @@ class Subnets extends React.Component {
       this.setState({
         subnets: Object.keys(data.subnets).map(k => data.subnets[k]),
         interfaces: Object.keys(data.interfaces).map(k => data.interfaces[k])
-      }, err => {
-        // rejected ?? 
       });
+    }, err => {
     });
   }
 
@@ -571,46 +570,57 @@ class Token extends React.Component {
       }
     });
 
-    $.getJSON("../api/v3/bootenvs", data => {
-      for(var key in data) {
-        if (data[key].Available)
-          bootenvs.push(data[key].Name)
-      }
+    $.ajax({
+      url: '../api/v3/bootenvs',
+      type: 'GET',
+      async: true,
+      success(data) {
+        for(var key in data) {
+          if (data[key].Available)
+            bootenvs.push(data[key].Name)
+        }
 
-      if(token.includes(":")) {
-        var name = token.split(":")[0];
-        $.ajax({
-          url: "../api/v3/users/" + name + "/token?ttl=" + (8 * 60 * 60), // 8 hours in seconds
-          type: "GET",
-          dataType: "json",
-          success(data) {
-            localStorage.DrAuthToken = data.Token;
-            $.ajaxSetup({
-              headers: {
-                Authorization: "Bearer " + data.Token
-              }
-            });
-          },
-          error(xhr, status, error) {
-            Token.setState({code: xhr.status});
-            localStorage.DrAuthToken = "";
-            Token.props.onAccessChange(false, []);
-          }
-        });
-      }
+        if(token.includes(":")) {
+          var name = token.split(":")[0];
+          $.ajax({
+            url: "../api/v3/users/" + name + "/token?ttl=" + (8 * 60 * 60), // 8 hours in seconds
+            type: "GET",
+            dataType: "json",
+            async: true,
+            success(data) {
+              localStorage.DrAuthToken = data.Token;
+              $.ajaxSetup({
+                headers: {
+                  Authorization: "Bearer " + data.Token
+                }
+              });
+            },
+            error(xhr, status, error) {
+              Token.setState({code: xhr.status});
+              localStorage.DrAuthToken = "";
+              Token.props.onAccessChange(false, []);
+            }
+          });
+        }
 
-      this.setState({code: 200, token: token});
-      this.props.onAccessChange(true, bootenvs);
-    }).fail((xhr, status, error) => {
-      localStorage.DrAuthToken = "";
-      this.setState({code: xhr.status, token: token});
-      this.props.onAccessChange(false, bootenvs);
+        Token.setState({code: 200});
+        Token.props.onAccessChange(true, bootenvs);
+      },
+      fail(xhr, status, error) {
+        localStorage.DrAuthToken = "";
+        Token.setState({code: xhr.status});
+        Token.props.onAccessChange(false, bootenvs);
+      }
     });
-  }
+}
 
   // called when an input changes
   handleChange(event) {
-    this.setToken(event.target.value);
+    let token = event.target.value;
+    this.setState({token: token});
+    clearTimeout(this.tokenTimeout);
+    let setToken = this.setToken;
+    this.tokenTimeout = setTimeout(()=>{setToken(token)}, 500);
   }
 
   render() {
@@ -805,17 +815,9 @@ class Machines extends React.Component {
     this.getMachines().then(data => {
       this.setState({
         machines: data.machines
-      }, err => {
-        // rejected ?? 
       });
-    });
-  }
-
-  // called to create a new machine
-  // allows some data other than defaults to be passed in
-  addMachine() {
-    var machine = {
-      Name: "",
+    }, err => {
+    Name: "",
       Address: "0.0.0.0",
       BootEnv: "ignore",
       Description: "",
@@ -1010,17 +1012,9 @@ class Prefs extends React.Component {
     this.getPrefs().then(data => {
       this.setState({
         prefs: data.prefs
-      }, err => {
-        // rejected ??
       });
-    });
-  }
-
-  // makes the put request to update the param
-  updatePrefs() {
-    var prefs = this.state.prefs;
-
-    $.ajax({
+    }, err => {
+    ajax({
       type: "POST",
       dataType: "json",
       contentType: "application/json",
@@ -1336,15 +1330,8 @@ class BootEnvs extends React.Component {
         resolve({
           bootenvs: data,
         });
-      }).fail(() => {
-        reject("Failed getting BootEnvs");
-      });
-
-    });
-  }
-
-  // get the bootenvs once this component mounts
-  componentDidMount() {
+      }).fail(err => {
+      entDidMount() {
     this.update();
   }
 
@@ -1352,17 +1339,9 @@ class BootEnvs extends React.Component {
     this.getBootEnvs().then(data => {
       this.setState({
         bootenvs: data.bootenvs,
-      }, err => {
-        // rejected ?? 
-      });
-    });
-  }
-
-  // called to create a new subnet
-  // allows some data other than defaults to be passed in
-  addBootEnv(template) {
-    var bootenv = {
-      _new: true,
+      })
+    }, err => {
+    _new: true,
       Name: '',
       Description: '',
       OS: {
