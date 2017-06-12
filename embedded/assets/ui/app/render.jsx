@@ -3,6 +3,9 @@
 /* License: Apache v2 */
 /* jshint esversion: 6 */
 
+const React = require('react/react');
+const ReactDOM = require('react-dom');
+
 function debounce(func, wait, immediate) {
   var timeout;
   return function() {
@@ -89,7 +92,7 @@ class Subnet extends React.Component {
   render() {
     var subnet = JSON.parse(JSON.stringify(this.props.subnet));
     return (
-      <tbody 
+      <tbody
         className={
           (subnet.updating ? 'updating-content' : '') + " " + (subnet._expand ? "expanded" : "")}
         style={{
@@ -1620,4 +1623,4 @@ class Page extends React.Component {
   }
 }
 
-window.Provisioner = ReactDOM.render(<Page />, page);
+window.Provisioner = ReactDOM.render(<Page/>, document.getElementById('page'));
