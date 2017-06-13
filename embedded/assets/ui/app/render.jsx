@@ -3,6 +3,9 @@
 /* License: Apache v2 */
 /* jshint esversion: 6 */
 
+const React = require('react/react');
+const ReactDOM = require('react-dom');
+
 function debounce(func, wait, immediate) {
   var timeout;
   return function() {
@@ -89,7 +92,7 @@ class Subnet extends React.Component {
   render() {
     var subnet = JSON.parse(JSON.stringify(this.props.subnet));
     return (
-      <tbody 
+      <tbody
         className={
           (subnet.updating ? 'updating-content' : '') + " " + (subnet._expand ? "expanded" : "")}
         style={{
@@ -831,8 +834,15 @@ class Machines extends React.Component {
       this.setState({
         machines: data.machines
       });
-    }, err => {
-    Name: "",
+    }, err => { 
+    });
+  }
+
+ // called to create a new machine
+ // allows some data other than defaults to be passed in
+  addMachine() {
+    var machine = {
+      Name: "",
       Address: "0.0.0.0",
       BootEnv: "ignore",
       Description: "",
@@ -1029,7 +1039,14 @@ class Prefs extends React.Component {
         prefs: data.prefs
       });
     }, err => {
-    ajax({
+    });
+  }
+
+  // makes the put request to update the param
+  updatePrefs() {
+    var prefs = this.state.prefs;
+
+    $.ajax({
       type: "POST",
       dataType: "json",
       contentType: "application/json",
@@ -1346,7 +1363,12 @@ class BootEnvs extends React.Component {
           bootenvs: data,
         });
       }).fail(err => {
-      entDidMount() {
+        reject("Failed getting BootEnvs");
+      });
+    });
+  }
+
+  componentDidMount() {
     this.update();
   }
 
@@ -1354,9 +1376,16 @@ class BootEnvs extends React.Component {
     this.getBootEnvs().then(data => {
       this.setState({
         bootenvs: data.bootenvs,
-      })
+      });
     }, err => {
-    _new: true,
+    });
+  }
+
+  // called to create a new subnet    
+  // allows some data other than defaults to be passed in   
+  addBootEnv(template) {    
+    var bootenv = {   
+      _new: true,
       Name: '',
       Description: '',
       OS: {
@@ -1620,4 +1649,4 @@ class Page extends React.Component {
   }
 }
 
-window.Provisioner = ReactDOM.render(<Page />, page);
+window.Provisioner = ReactDOM.render(<Page/>, document.getElementById('page'));
