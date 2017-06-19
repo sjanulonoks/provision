@@ -3,9 +3,6 @@
 /* License: Apache v2 */
 /* jshint esversion: 6 */
 
-const React = require('react/react');
-const ReactDOM = require('react-dom');
-
 function debounce(func, wait, immediate) {
   var timeout;
   return function() {
@@ -538,10 +535,35 @@ class Token extends React.Component {
 
   constructor(props) {
     super(props);
+    this.xhr = undefined;
+    this.STATES = {
+      STANDBY: 0,
+      WAITING: 1,
+      AUTHORIZED: 2,
+      DONE: 3,
+      ERROR: 4,
+    };
+
+    this.icons = [
+      'mood',
+      'hourglass_empty',
+      'security',
+      'done_all',
+      'close'
+    ];
+
+    this.messages = [
+      '',
+      'Signing In',
+      'Getting Token',
+      'Done!',
+      'Error'
+    ];
 
     this.state = {
-      token: "",
-      code: 1
+      token: '',
+      code: 1,
+      requestState: this.STATES.STANDBY,
     };
 
     this.handleChange = this.handleChange.bind(this);
@@ -582,60 +604,74 @@ class Token extends React.Component {
     else
       localStorage.DrAuthToken = token;
 
+    if(typeof this.xhr !== 'undefined') {
+      this.xhr.abort();
+      this.xhr = undefined;
+    }
+
     $.ajaxSetup({
       headers: {
         Authorization: send_token
       }
     });
 
-    $.ajax({
+    this.xhr = $.ajax({
       url: '../api/v3/bootenvs',
       type: 'GET',
-      async: true,
-      success(data) {
-        for(var key in data) {
-          if (data[key].Available)
-            bootenvs.push(data[key].Name)
-        }
-
-        if(token.includes(":")) {
-          var name = token.split(":")[0];
-          $.ajax({
-            url: "../api/v3/users/" + name + "/token?ttl=" + (8 * 60 * 60), // 8 hours in seconds
-            type: "GET",
-            dataType: "json",
-            async: true,
-            success(data) {
-              localStorage.DrAuthToken = data.Token;
-              $.ajaxSetup({
-                headers: {
-                  Authorization: "Bearer " + data.Token
-                }
-              });
-            },
-            error(xhr, status, error) {
-              Token.setState({code: xhr.status});
-              localStorage.DrAuthToken = "";
-              Token.props.onAccessChange(false, []);
-            }
-          });
-        }
-
-        Token.setState({code: 200});
-        Token.props.onAccessChange(true, bootenvs);
-      },
-      fail(xhr, status, error) {
-        localStorage.DrAuthToken = "";
-        Token.setState({code: xhr.status});
-        Token.props.onAccessChange(false, bootenvs);
+      async: true
+    }).then((data) => {
+      for(var key in data) {
+        if (data[key].Available)
+          bootenvs.push(data[key].Name)
       }
+
+
+      if(token.includes(":")) {
+        Token.setState({requestState: Token.STATES.AUTHORIZED});
+
+        var name = token.split(":")[0];
+        Token.xhr = $.ajax({
+          url: "../api/v3/users/" + name + "/token?ttl=" + (8 * 60 * 60), // 8 hours in seconds
+          type: "GET",
+          dataType: "json",
+          async: true,
+          success(data) {
+
+            localStorage.DrAuthToken = data.Token;
+            $.ajaxSetup({
+              headers: {
+                Authorization: "Bearer " + data.Token
+              }
+            });
+            Token.setState({code: 200, requestState: Token.STATES.DONE});
+            Token.xhr = undefined;
+            Token.props.onAccessChange(true, bootenvs);
+          },
+          error(xhr, status, error) {
+            Token.xhr = undefined;
+            Token.setState({code: xhr.status, requestState: Token.STATES.ERROR});
+            localStorage.DrAuthToken = "";
+            Token.props.onAccessChange(false, []);
+          }
+        });
+      } else {
+        Token.xhr = undefined;
+        Token.setState({code: 200, requestState: Token.STATES.DONE});
+        Token.props.onAccessChange(true, bootenvs);
+      }
+    }, (xhr, status, error) => {
+      localStorage.DrAuthToken = "";
+      Token.xhr = undefined;
+      console.log(error);
+      Token.setState({code: xhr.status, requestState: Token.STATES.ERROR});
+      Token.props.onAccessChange(false, bootenvs);
     });
-}
+  }
 
   // called when an input changes
   handleChange(event) {
     let token = event.target.value;
-    this.setState({token: token});
+    this.setState({token: token, requestState: this.STATES.WAITING});
     clearTimeout(this.tokenTimeout);
     let setToken = this.setToken;
     this.tokenTimeout = setTimeout(()=>{setToken(token)}, 500);
@@ -659,8 +695,12 @@ class Token extends React.Component {
             value={this.state.token}
             onChange={this.handleChange} />
         </div>
-        <div style={{padding: "10px", fontWeight: "bold", color: "#a00"}}>
-          {this.getCodeName()}
+        <div style={{padding: "10px", display: "flex", alignItems: "center", justifyContent: "center"}}>
+          <i className="material-icons">{this.icons[this.state.requestState]}</i>
+          {(this.state.requestState == this.STATES.ERROR ?
+            (<span style={{color: "#a00"}}>{this.getCodeName()}</span>) : 
+            (<span>{this.messages[this.state.requestState]}</span>)
+          )}
         </div>
       </div>
     );
