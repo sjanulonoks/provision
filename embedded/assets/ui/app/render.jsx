@@ -683,7 +683,7 @@ class Token extends React.Component {
         <div style={{padding: "10px"}}>
           <h2>Auth Token</h2>
           <div style={{fontSize: "12px", color: "#444"}}>
-            username:password or api token
+            username:password or api token, default is <code style={{textDecoration: 'underline'}}>rocketskates:r0cketsk8ts</code>
           </div>
         </div>
         <div>
@@ -695,7 +695,7 @@ class Token extends React.Component {
             value={this.state.token}
             onChange={this.handleChange} />
         </div>
-        <div style={{padding: "10px", display: "flex", alignItems: "center", justifyContent: "center"}}>
+        <div style={{padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
           <i className="material-icons">{this.icons[this.state.requestState]}</i>
           {(this.state.requestState == this.STATES.ERROR ?
             (<span style={{color: "#a00"}}>{this.getCodeName()}</span>) : 
