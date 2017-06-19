@@ -58,6 +58,11 @@ h2 a:not(.header_btn) {
   color: #547f00 !important;
 }
 
+h2 {
+  align-items: center;
+  display: flex;
+}
+
 .header__btn {
   background-color: #547f00;
   border-radius: 4px;
@@ -123,4 +128,73 @@ tbody.expanded > tr:last-child {
 
 footer {
   color: #444;
+}
+
+button {
+  background-color: #547f00;
+  border: none;
+  border-radius: 2px;
+  box-shadow: 0 1px 2px #999;
+  color: #fff;
+  padding: 4px;
+  margin: 4px;
+  text-transform: uppercase;
+}
+
+button.icon-button {
+  border-radius: 50%;
+  position: relative !important;
+
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;  /* Preferred icon size */
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-feature-settings: 'liga';
+          font-feature-settings: 'liga';
+}
+
+button:focus {
+  outline: none;
+}
+
+button:active {
+  background-color: #33691E
+}
+
+button:hover {
+  box-shadow: 0 2px 4px #999;
+}
+
+button:hover > .tooltip {
+  display: block;
+}
+
+button > .tooltip {
+  background-color: #000;
+  background-color: rgba(0, 0, 0, 0.8);
+  border-radius: 2px;
+  color: #fff;
+  content: attr(data-tooltip);
+  display: none;
+  font-family: Droid Sans, sans-serif;
+  font-size: 14px;
+  left: 50%;
+  margin: 4px;
+  padding: 8px;
+  pointer-events: none;
+  position: absolute;
+  top: 100%;
+  transform: translateX(-50%);
+  z-index: 999;
 }
