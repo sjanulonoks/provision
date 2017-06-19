@@ -91,8 +91,18 @@ a.nav-link:hover {
   opacity: 0.6;
 }
 
-tbody.expanded > tr:last-child {
-  background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.1));
+table {
+  position: relative;
+}
+
+tbody.expanded::after {
+  background-color: #fff;
+  bottom: 0;
+  content: '';
+  height: 4px;
+  left: 0;
+  position: absolute;
+  width: 100%;
 }
 
 .input-table td {
@@ -197,4 +207,17 @@ button > .tooltip {
   top: 100%;
   transform: translateX(-50%);
   z-index: 999;
+}
+
+input, select {
+  background-color: #fff;
+  border: none;
+  border-bottom: 2px solid #ccc;
+  color: #222;
+  padding: 2px;
+}
+
+input:focus, select:focus {
+  border-bottom: 2px solid #22f;
+  outline: none;
 }
