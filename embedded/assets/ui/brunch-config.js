@@ -11,6 +11,12 @@ module.exports = {
       joinTo: {
         'build.js': /^app/,
         'vendor.js': /^(node_modules)/,
+      },
+      order: {
+        before: [
+          'node_modules/react/dist/react.min.js',
+          'node_modules/react-dom/dist/react-dom.min.js'
+        ]
       }
     },
     stylesheets: {
