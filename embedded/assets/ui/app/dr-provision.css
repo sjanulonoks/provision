@@ -10,7 +10,7 @@
        url(css/font/MaterialIcons-Regular.ttf) format('truetype');
 }
 
-.material-icons {
+.material-icons, button.icon-button {
   font-family: 'Material Icons';
   font-weight: normal;
   font-style: normal;
@@ -154,24 +154,6 @@ button {
 button.icon-button {
   border-radius: 50%;
   position: relative !important;
-
-  font-family: 'Material Icons';
-  font-weight: normal;
-  font-style: normal;
-  font-size: 24px;  /* Preferred icon size */
-  display: inline-block;
-  line-height: 1;
-  text-transform: none;
-  letter-spacing: normal;
-  word-wrap: normal;
-  white-space: nowrap;
-  direction: ltr;
-
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-font-feature-settings: 'liga';
-          font-feature-settings: 'liga';
 }
 
 button:focus {
@@ -218,6 +200,126 @@ input, select {
 }
 
 input:focus, select:focus {
-  border-bottom: 2px solid #22f;
+  border-bottom: 2px solid #55f;
   outline: none;
+}
+
+.login-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin: auto;
+  max-width: 400px;
+  padding: 40px;
+}
+
+.login-tabs {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  margin: auto;
+  position: relative;
+}
+
+.login-tabs .tab {
+  align-items: center;
+  border: 2px solid transparent;
+  border-bottom: none;
+  color: #ccc;
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  padding: 4px;
+  z-index: 5;
+}
+
+.login-tabs i {
+  padding-right: 4px;
+}
+
+.login-tabs .active {
+  border-color: #ccc;
+  color: #999;
+  transform: translateX(0);
+}
+
+.login-tabs .active::after {
+  background-color: #fff;
+  content: '';
+  height: 4px;
+  position: absolute;
+  top: 100%;
+  width: 100%;
+  z-index: 5;
+}
+
+.login-input {
+  align-items: center;
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: center;
+  margin-bottom: 8px;
+  margin-top: 8px;
+}
+
+.login-inputs {
+  border-top: 2px solid #ccc;
+  transform: translateX(0);
+}
+
+.login-input input ~ i {
+  color: #ccc;
+  margin-right: 8px;
+}
+
+.login-input input:focus ~ i {
+  color: #55f;
+}
+
+.login-inputs::before, .login-inputs::after {
+  background: linear-gradient(to bottom, #ccc, transparent);
+  content: '';
+  height: 40px;
+  position: absolute;
+  top: 0;
+  width: 2px;
+}
+
+.login-inputs::before {
+  left: 0;
+}
+
+.login-inputs::after {
+  right: 0;
+}
+
+.login-hint {
+  color: #aaa;
+  font-size: 12px;
+  font-style: italic;
+  margin: 10px;
+}
+
+.login-hint a {
+  color: #aaa;
+}
+
+.welcome-box {
+  border-top: thin solid #ccc;
+  padding: 20px;
+}
+
+.welcome-box h1 {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  margin-top: 8px;
+}
+
+.card {
+  box-shadow: 0 2px 4px #999;
+  display: block;
+  margin: 8px auto;
+  max-width: 400px;
 }

@@ -167,17 +167,17 @@ class Subnet extends React.Component {
           </td>
           <td style={{border: 'thin solid black !important'}}>
             {subnet._new || subnet._edited ? 
-            <button onClick={this.update} className='icon-button'>
+            <button onClick={this.update} className="icon-button">
               save
-              <span className='tooltip'>{subnet._new ? 'Add' : 'Save'}</span>
+              <span className="tooltip">{subnet._new ? 'Add' : 'Save'}</span>
             </button> : ''}
-            <button onClick={this.remove} className='icon-button'>
+            <button onClick={this.remove} className="icon-button">
               delete
-              <span className='tooltip'>Remove</span>
+              <span className="tooltip">Remove</span>
             </button>
-            <button onClick={this.props.copy} className='icon-button'>
+            <button onClick={this.props.copy} className="icon-button">
               content_copy
-              <span className='tooltip'>Copy</span>
+              <span className="tooltip">Copy</span>
             </button>
           </td>
         </tr>
@@ -220,10 +220,10 @@ class Subnet extends React.Component {
               </table>
             </div>): <span/>}
             {subnet._error && <div>
-              <h2><span className='material-icons'>error</span>{subnet._errorMessage}</h2>
+              <h2><span className="material-icons">error</span>{subnet._errorMessage}</h2>
             </div>}
             <div className="expand" onClick={this.toggleExpand}>
-              {subnet._expand ? <span className='material-icons'>expand_less</span> : <span className='material-icons'>expand_more</span>}
+              {subnet._expand ? <span className="material-icons">expand_less</span> : <span className="material-icons">expand_more</span>}
             </div>
           </td>
         </tr>
@@ -575,6 +575,9 @@ class Token extends React.Component {
 
     this.state = {
       token: '',
+      username: '',
+      password: '',
+      useToken: false,
       code: 1,
       requestState: this.STATES.STANDBY,
     };
@@ -599,9 +602,10 @@ class Token extends React.Component {
   componentDidMount() {
     if (location.search.startsWith("?token=")) {
       var t = location.search.substring(7);
-      this.setState({token: t});
+      this.setState({token: t, useToken: true});
       this.setToken(t);
     } else if (localStorage.DrAuthToken) {
+      this.setState({useToken: true});
       this.setToken(localStorage.DrAuthToken);
     }
   }
@@ -609,13 +613,14 @@ class Token extends React.Component {
   // tests a token for authenticity
   setToken(token) {
     var bootenvs = []
-    var send_token = "Bearer " + token;
+    var send_token = 'Bearer ' + token;
     let Token = this;
 
-    if (token.includes(":")) // tokens are in base64 otherwise and will not include colons
-      send_token = "Basic " + btoa(token);
+    if (token.includes(':')) // tokens are in base64 otherwise and will not include colons
+      send_token = 'Basic ' + btoa(token);
     else
       localStorage.DrAuthToken = token;
+    console.log(token);
 
     if(typeof this.xhr !== 'undefined') {
       this.xhr.abort();
@@ -683,37 +688,90 @@ class Token extends React.Component {
 
   // called when an input changes
   handleChange(event) {
-    let token = event.target.value;
-    this.setState({token: token, requestState: this.STATES.WAITING});
+    let state = this.state;
+    state.requestState = this.STATES.WAITING
+    state[event.target.name] = event.target.value;
+    this.setState(state);
+    let token = this.state.useToken ? this.state.token : this.state.username + ':' + this.state.password;
     clearTimeout(this.tokenTimeout);
     let setToken = this.setToken;
     this.tokenTimeout = setTimeout(()=>{setToken(token)}, 500);
   }
 
   render() {
+    let Token = this;
     return (
       <div>
-        <div style={{padding: "10px"}}>
-          <h2>Auth Token</h2>
-          <div style={{fontSize: "12px", color: "#444"}}>
-            username:password or api token, default is <code style={{textDecoration: 'underline', cursor: 'pointer'}} onClick={()=>this.setToken("rocketskates:r0cketsk8ts")}>rocketskates:r0cketsk8ts</code>
+        <div className="login-box">
+          <div className="login-tabs">
+            <div className={'tab ' + (this.state.useToken ? '' : 'active')} onClick={()=>this.setState({useToken: false})}>
+              <i className="material-icons">person</i>
+              Login
+            </div>
+            <div className={'tab ' + (this.state.useToken ? 'active' : '')} onClick={()=>this.setState({useToken: true})}>
+              <i className="material-icons">vpn_key</i>
+              Token
+            </div>
           </div>
-        </div>
-        <div>
-          <input
-            type="text"
-            name="token"
-            size="15"
-            placeholder="user:password"
-            value={this.state.token}
-            onChange={this.handleChange} />
-        </div>
-        <div style={{padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-          <i className="material-icons">{this.icons[this.state.requestState]}</i>
-          {(this.state.requestState == this.STATES.ERROR ?
-            (<span style={{color: "#a00"}}>{this.getCodeName()}</span>) : 
-            (<span>{this.messages[this.state.requestState]}</span>)
+          {this.state.useToken ? (
+            <div className="login-inputs">
+              <div className="login-input">
+                <input
+                  type="text"
+                  name="token"
+                  size="15"
+                  placeholder="Token"
+                  value={this.state.token}
+                  onChange={this.handleChange} />
+                <i className="material-icons">vpn_key</i>
+              </div>
+              <div className="login-hint">
+                <span>Tokens are generated via the </span>
+                <a target="_blank" href="http://provision.readthedocs.io/en/stable/doc/cli/drpcli_users_token.html">drpcli binary</a>
+                <span> or API</span>
+              </div>
+            </div>
+          ) : (
+            <div className="login-inputs">
+              <div className="login-input">
+                <input
+                  type="text"
+                  name="username"
+                  size="15"
+                  placeholder="Username"
+                  value={this.state.username}
+                  onChange={this.handleChange} />
+                <i className="material-icons">person</i>
+              </div>
+              <div className="login-input">
+                <input
+                  type="password"
+                  name="password"
+                  size="15"
+                  placeholder="Password"
+                  value={this.state.password}
+                  onChange={this.handleChange} />
+                <i className="material-icons">lock</i>
+              </div>
+              <div className="login-hint">
+                <span>Default credentials are </span>
+                <code style={{textDecoration: 'underline', cursor: 'pointer'}}
+                  onClick={()=>{
+                    Token.setState({username:'rocketskates',password:'r0cketsk8ts'});
+                    Token.setToken('rocketskates:r0cketsk8ts')
+                  }}>
+                  rocketskates:r0cketsk8ts
+                </code>
+              </div>
+            </div>
           )}
+          <div style={{padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+            <i className="material-icons">{this.icons[this.state.requestState]}</i>
+            {(this.state.requestState == this.STATES.ERROR ?
+              (<span style={{color: "#a00"}}>{this.getCodeName()}</span>) : 
+              (<span>{this.messages[this.state.requestState]}</span>)
+            )}
+          </div>
         </div>
       </div>
     );
@@ -763,7 +821,7 @@ class Machine extends React.Component {
     var machine = JSON.parse(JSON.stringify(this.props.machine));
     return (
       <tbody 
-        className={(machine.updating ? 'updating-content' : '') + " " + (machine._expand ? "expanded" : "")}
+        className={(machine.updating ? 'updating-content' : '') + " " + (machine._expand ? 'expanded' : '')}
         style={{
           position: "relative",
           backgroundColor: (machine._error ? '#fdd' : (machine._new ? "#dfd" : (machine._edited ? "#eee" : "#fff"))),
@@ -817,13 +875,13 @@ class Machine extends React.Component {
           </td>
           <td>
             {machine._new || machine._edited ? 
-            <button onClick={this.update} className='icon-button'>
+            <button onClick={this.update} className="icon-button">
               save
-              <span className='tooltip'>{machine._new ? 'Add' : 'Save'}</span>
+              <span className="tooltip">{machine._new ? 'Add' : 'Save'}</span>
             </button> : ''}
-            <button onClick={this.remove} className='icon-button'>
+            <button onClick={this.remove} className="icon-button">
               delete
-              <span className='tooltip'>Remove</span>
+              <span className="tooltip">Remove</span>
             </button>
           </td>
         </tr>
@@ -831,7 +889,7 @@ class Machine extends React.Component {
           <td colSpan="6">
             {machine._expand ? (<div>
               {machine._error && <div>
-                <h2><span className='material-icons'>error</span>{machine._errorMessage}</h2>
+                <h2><span className="material-icons">error</span>{machine._errorMessage}</h2>
               </div>}
               <h2>Template Errors</h2>
               {(machine.Errors ? machines.Errors : "none.")}
@@ -839,7 +897,7 @@ class Machine extends React.Component {
               {(machine.Params ? machines.Params : "none.")}
             </div>): <span/>}
             <div className="expand" onClick={this.toggleExpand}>
-              {machine._expand ? <span className='material-icons'>expand_less</span> : <span className='material-icons'>expand_more</span>}
+              {machine._expand ? <span className="material-icons">expand_less</span> : <span className="material-icons">expand_more</span>}
             </div>
           </td>
         </tr>
@@ -1179,9 +1237,9 @@ class Prefs extends React.Component {
               )}
               </td>
               <td>
-                {(this.state.updated && Object.keys(this.state.prefs).length-1 == i ? <button onClick={this.updatePrefs} className='icon-button'>
+                {(this.state.updated && Object.keys(this.state.prefs).length-1 == i ? <button onClick={this.updatePrefs} className="icon-button">
                   save
-                  <span className='tooltip'>Save</span>
+                  <span className="tooltip">Save</span>
                 </button> : '')}
               </td>
             </tr>
@@ -1289,18 +1347,18 @@ class BootEnv extends React.Component {
           </td>
           <td>
             {bootenv._new || bootenv._edited ? 
-            <button onClick={this.update} className='icon-button'>
+            <button onClick={this.update} className="icon-button">
               save
-              <span className='tooltip'>{bootenv._new ? 'Add' : 'Save'}</span>
+              <span className="tooltip">{bootenv._new ? 'Add' : 'Save'}</span>
             </button> : ''}
 
-            <button onClick={this.remove} className='icon-button'>
+            <button onClick={this.remove} className="icon-button">
               delete
-              <span className='tooltip'>Remove</span>
+              <span className="tooltip">Remove</span>
             </button>
-            <button onClick={this.props.copy} className='icon-button'>
+            <button onClick={this.props.copy} className="icon-button">
               content_copy
-              <span className='tooltip'>Copy</span>
+              <span className="tooltip">Copy</span>
             </button>
           </td>
         </tr>
@@ -1383,13 +1441,13 @@ class BootEnv extends React.Component {
                           onChange={(e)=>this.changeTemplate(e, i)}/>
                       </td>
                       <td>
-                        <button onClick={(e)=>$.getJSON("../api/v3/templates/" + val.ID, d=>alert(JSON.stringify(d, 0, "  ")))} className='icon-button'>
+                        <button onClick={(e)=>$.getJSON("../api/v3/templates/" + val.ID, d=>alert(JSON.stringify(d, 0, "  ")))} className="icon-button">
                           open_in_new
-                          <span className='tooltip'>Preview</span>
+                          <span className="tooltip">Preview</span>
                         </button>
-                        <button onClick={(e)=>this.removeTemplate(e, i)} className='icon-button'>
+                        <button onClick={(e)=>this.removeTemplate(e, i)} className="icon-button">
                           delete
-                          <span className='tooltip'>Remove</span>
+                          <span className="tooltip">Remove</span>
                         </button>
                       </td>
                     </tr>
@@ -1403,10 +1461,10 @@ class BootEnv extends React.Component {
               </table>
             </div>): <span/>}
             {bootenv._error && <div>
-              <h2><span className='material-icons'>error</span>{bootenv._errorMessage}</h2>
+              <h2><span className="material-icons">error</span>{bootenv._errorMessage}</h2>
             </div>}
             <div className="expand" onClick={this.toggleExpand}>
-              {bootenv._expand ? <span className='material-icons'>expand_less</span> : <span className='material-icons'>expand_more</span>}
+              {bootenv._expand ? <span className="material-icons">expand_less</span> : <span className="material-icons">expand_more</span>}
             </div>
           </td>
         </tr>
