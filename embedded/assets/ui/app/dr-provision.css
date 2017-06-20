@@ -1,3 +1,41 @@
+@font-face {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: 400;
+  src: url(css/font/MaterialIcons-Regular.eot); /* For IE6-8 */
+  src: local('Material Icons'),
+       local('MaterialIcons-Regular'),
+       url(css/font/MaterialIcons-Regular.woff2) format('woff2'),
+       url(css/font/MaterialIcons-Regular.woff) format('woff'),
+       url(css/font/MaterialIcons-Regular.ttf) format('truetype');
+}
+
+.material-icons {
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;  /* Preferred icon size */
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+
+  /* Support for all WebKit browsers. */
+  -webkit-font-smoothing: antialiased;
+  /* Support for Safari and Chrome. */
+  text-rendering: optimizeLegibility;
+
+  /* Support for Firefox. */
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Support for IE. */
+  -webkit-font-feature-settings: 'liga';
+          font-feature-settings: 'liga';
+}
+
 body {
   font-family: Droid Sans, sans-serif;
 }
@@ -18,6 +56,11 @@ a.nav-link {
 
 h2 a:not(.header_btn) {
   color: #547f00 !important;
+}
+
+h2 {
+  align-items: center;
+  display: flex;
 }
 
 .header__btn {
@@ -48,8 +91,18 @@ a.nav-link:hover {
   opacity: 0.6;
 }
 
-tbody.expanded > tr:last-child {
-  background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.1));
+table {
+  position: relative;
+}
+
+tbody.expanded::after {
+  background-color: #fff;
+  bottom: 0;
+  content: '';
+  height: 4px;
+  left: 0;
+  position: absolute;
+  width: 100%;
 }
 
 .input-table td {
@@ -85,4 +138,86 @@ tbody.expanded > tr:last-child {
 
 footer {
   color: #444;
+}
+
+button {
+  background-color: #547f00;
+  border: none;
+  border-radius: 2px;
+  box-shadow: 0 1px 2px #999;
+  color: #fff;
+  padding: 4px;
+  margin: 4px;
+  text-transform: uppercase;
+}
+
+button.icon-button {
+  border-radius: 50%;
+  position: relative !important;
+
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;  /* Preferred icon size */
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-feature-settings: 'liga';
+          font-feature-settings: 'liga';
+}
+
+button:focus {
+  outline: none;
+}
+
+button:active {
+  background-color: #33691E
+}
+
+button:hover {
+  box-shadow: 0 2px 4px #999;
+}
+
+button:hover > .tooltip {
+  display: block;
+}
+
+button > .tooltip {
+  background-color: #000;
+  background-color: rgba(0, 0, 0, 0.8);
+  border-radius: 2px;
+  color: #fff;
+  content: attr(data-tooltip);
+  display: none;
+  font-family: Droid Sans, sans-serif;
+  font-size: 14px;
+  left: 50%;
+  margin: 4px;
+  padding: 8px;
+  pointer-events: none;
+  position: absolute;
+  top: 100%;
+  transform: translateX(-50%);
+  z-index: 999;
+}
+
+input, select {
+  background-color: #fff;
+  border: none;
+  border-bottom: 2px solid #ccc;
+  color: #222;
+  padding: 2px;
+}
+
+input:focus, select:focus {
+  border-bottom: 2px solid #22f;
+  outline: none;
 }

@@ -3,9 +3,6 @@
 /* License: Apache v2 */
 /* jshint esversion: 6 */
 
-const React = require('react/react');
-const ReactDOM = require('react-dom');
-
 function debounce(func, wait, immediate) {
   var timeout;
   return function() {
@@ -148,27 +145,40 @@ class Subnet extends React.Component {
               &nbsp;seconds
           </td>
           <td>
-            <input
-              type="text"
-              name="ActiveStart"
-              size="15"
-              placeholder="10.0.0.0"
-              value={subnet.ActiveStart}
-              onChange={this.handleChange}/>
-            ...
-            <input
-              type="text"
-              name="ActiveEnd"
-              size="15"
-              placeholder="10.0.0.255"
-              value={subnet.ActiveEnd}
-              onChange={this.handleChange}/>
+            <div>
+              <input
+                type="text"
+                name="ActiveStart"
+                size="15"
+                placeholder="10.0.0.0"
+                value={subnet.ActiveStart}
+                onChange={this.handleChange}/>
+              ...
+            </div>
+            <div>
+              <input
+                type="text"
+                name="ActiveEnd"
+                size="15"
+                placeholder="10.0.0.255"
+                value={subnet.ActiveEnd}
+                onChange={this.handleChange}/>
+            </div>
           </td>
-          <td>
-            {subnet._new ? <button onClick={this.update}>Add</button> :
-            (subnet._edited ? <button onClick={this.update}>Update</button> : '')}
-            <button onClick={this.remove}>Remove</button>
-            <button onClick={this.props.copy}>Copy</button>
+          <td style={{border: 'thin solid black !important'}}>
+            {subnet._new || subnet._edited ? 
+            <button onClick={this.update} className='icon-button'>
+              save
+              <span className='tooltip'>{subnet._new ? 'Add' : 'Save'}</span>
+            </button> : ''}
+            <button onClick={this.remove} className='icon-button'>
+              delete
+              <span className='tooltip'>Remove</span>
+            </button>
+            <button onClick={this.props.copy} className='icon-button'>
+              content_copy
+              <span className='tooltip'>Copy</span>
+            </button>
           </td>
         </tr>
         <tr>
@@ -210,10 +220,10 @@ class Subnet extends React.Component {
               </table>
             </div>): <span/>}
             {subnet._error && <div>
-              <h2>{subnet._errorMessage}</h2>
+              <h2><span className='material-icons'>error</span>{subnet._errorMessage}</h2>
             </div>}
             <div className="expand" onClick={this.toggleExpand}>
-              {subnet._expand ? <span>&#x25B4;</span> : <span>&#x25BE;</span>}
+              {subnet._expand ? <span className='material-icons'>expand_less</span> : <span className='material-icons'>expand_more</span>}
             </div>
           </td>
         </tr>
@@ -410,7 +420,7 @@ class Subnets extends React.Component {
       // If our error is from the backend
       if(err.responseText) {
         var response = JSON.parse(err.responseText);
-        subnet._errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
+        subnet._errorMessage = " (" + err.status + "): " + response.Messages.join(", ");
       } else { // maybe the backend is down
         subnet._errorMessage = err.status;
       }
@@ -454,7 +464,7 @@ class Subnets extends React.Component {
       // If our error is from the backend
       if(err.responseText) {      
         var response = JSON.parse(err.responseText);
-        subnet._errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
+        subnet._errorMessage = " (" + err.status + "): " + response.Messages.join(", ");
       } else { // maybe the backend is down
         subnet._errorMessage = err.status;
       }
@@ -538,10 +548,35 @@ class Token extends React.Component {
 
   constructor(props) {
     super(props);
+    this.xhr = undefined;
+    this.STATES = {
+      STANDBY: 0,
+      WAITING: 1,
+      AUTHORIZED: 2,
+      DONE: 3,
+      ERROR: 4,
+    };
+
+    this.icons = [
+      'mood',
+      'hourglass_empty',
+      'security',
+      'done_all',
+      'close'
+    ];
+
+    this.messages = [
+      '',
+      'Signing In',
+      'Getting Token',
+      'Done!',
+      'Error'
+    ];
 
     this.state = {
-      token: "",
-      code: 1
+      token: '',
+      code: 1,
+      requestState: this.STATES.STANDBY,
     };
 
     this.handleChange = this.handleChange.bind(this);
@@ -582,60 +617,74 @@ class Token extends React.Component {
     else
       localStorage.DrAuthToken = token;
 
+    if(typeof this.xhr !== 'undefined') {
+      this.xhr.abort();
+      this.xhr = undefined;
+    }
+
     $.ajaxSetup({
       headers: {
         Authorization: send_token
       }
     });
 
-    $.ajax({
+    this.xhr = $.ajax({
       url: '../api/v3/bootenvs',
       type: 'GET',
-      async: true,
-      success(data) {
-        for(var key in data) {
-          if (data[key].Available)
-            bootenvs.push(data[key].Name)
-        }
-
-        if(token.includes(":")) {
-          var name = token.split(":")[0];
-          $.ajax({
-            url: "../api/v3/users/" + name + "/token?ttl=" + (8 * 60 * 60), // 8 hours in seconds
-            type: "GET",
-            dataType: "json",
-            async: true,
-            success(data) {
-              localStorage.DrAuthToken = data.Token;
-              $.ajaxSetup({
-                headers: {
-                  Authorization: "Bearer " + data.Token
-                }
-              });
-            },
-            error(xhr, status, error) {
-              Token.setState({code: xhr.status});
-              localStorage.DrAuthToken = "";
-              Token.props.onAccessChange(false, []);
-            }
-          });
-        }
-
-        Token.setState({code: 200});
-        Token.props.onAccessChange(true, bootenvs);
-      },
-      fail(xhr, status, error) {
-        localStorage.DrAuthToken = "";
-        Token.setState({code: xhr.status});
-        Token.props.onAccessChange(false, bootenvs);
+      async: true
+    }).then((data) => {
+      for(var key in data) {
+        if (data[key].Available)
+          bootenvs.push(data[key].Name)
       }
+
+
+      if(token.includes(":")) {
+        Token.setState({requestState: Token.STATES.AUTHORIZED});
+
+        var name = token.split(":")[0];
+        Token.xhr = $.ajax({
+          url: "../api/v3/users/" + name + "/token?ttl=" + (8 * 60 * 60), // 8 hours in seconds
+          type: "GET",
+          dataType: "json",
+          async: true,
+          success(data) {
+
+            localStorage.DrAuthToken = data.Token;
+            $.ajaxSetup({
+              headers: {
+                Authorization: "Bearer " + data.Token
+              }
+            });
+            Token.setState({code: 200, requestState: Token.STATES.DONE});
+            Token.xhr = undefined;
+            Token.props.onAccessChange(true, bootenvs);
+          },
+          error(xhr, status, error) {
+            Token.xhr = undefined;
+            Token.setState({code: xhr.status, requestState: Token.STATES.ERROR});
+            localStorage.DrAuthToken = "";
+            Token.props.onAccessChange(false, []);
+          }
+        });
+      } else {
+        Token.xhr = undefined;
+        Token.setState({code: 200, requestState: Token.STATES.DONE});
+        Token.props.onAccessChange(true, bootenvs);
+      }
+    }, (xhr, status, error) => {
+      localStorage.DrAuthToken = "";
+      Token.xhr = undefined;
+      console.log(error);
+      Token.setState({code: xhr.status, requestState: Token.STATES.ERROR});
+      Token.props.onAccessChange(false, bootenvs);
     });
-}
+  }
 
   // called when an input changes
   handleChange(event) {
     let token = event.target.value;
-    this.setState({token: token});
+    this.setState({token: token, requestState: this.STATES.WAITING});
     clearTimeout(this.tokenTimeout);
     let setToken = this.setToken;
     this.tokenTimeout = setTimeout(()=>{setToken(token)}, 500);
@@ -647,7 +696,7 @@ class Token extends React.Component {
         <div style={{padding: "10px"}}>
           <h2>Auth Token</h2>
           <div style={{fontSize: "12px", color: "#444"}}>
-            username:password or api token
+            username:password or api token, default is <code style={{textDecoration: 'underline', cursor: 'pointer'}} onClick={()=>this.setToken("rocketskates:r0cketsk8ts")}>rocketskates:r0cketsk8ts</code>
           </div>
         </div>
         <div>
@@ -659,8 +708,12 @@ class Token extends React.Component {
             value={this.state.token}
             onChange={this.handleChange} />
         </div>
-        <div style={{padding: "10px", fontWeight: "bold", color: "#a00"}}>
-          {this.getCodeName()}
+        <div style={{padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+          <i className="material-icons">{this.icons[this.state.requestState]}</i>
+          {(this.state.requestState == this.STATES.ERROR ?
+            (<span style={{color: "#a00"}}>{this.getCodeName()}</span>) : 
+            (<span>{this.messages[this.state.requestState]}</span>)
+          )}
         </div>
       </div>
     );
@@ -763,16 +816,22 @@ class Machine extends React.Component {
               : "not set" )}
           </td>
           <td>
-            {machine._new ? <button onClick={this.update}>Add</button> :
-            (machine._edited ? <button onClick={this.update}>Update</button> : '')}
-            <button onClick={this.remove}>Remove</button>
+            {machine._new || machine._edited ? 
+            <button onClick={this.update} className='icon-button'>
+              save
+              <span className='tooltip'>{machine._new ? 'Add' : 'Save'}</span>
+            </button> : ''}
+            <button onClick={this.remove} className='icon-button'>
+              delete
+              <span className='tooltip'>Remove</span>
+            </button>
           </td>
         </tr>
         <tr>
           <td colSpan="6">
             {machine._expand ? (<div>
               {machine._error && <div>
-                <h2>API Error: {machine._errorMessage}</h2>
+                <h2><span className='material-icons'>error</span>{machine._errorMessage}</h2>
               </div>}
               <h2>Template Errors</h2>
               {(machine.Errors ? machines.Errors : "none.")}
@@ -780,7 +839,7 @@ class Machine extends React.Component {
               {(machine.Params ? machines.Params : "none.")}
             </div>): <span/>}
             <div className="expand" onClick={this.toggleExpand}>
-              {machine._expand ? <span>&#x25B4;</span> : <span>&#x25BE;</span>}
+              {machine._expand ? <span className='material-icons'>expand_less</span> : <span className='material-icons'>expand_more</span>}
             </div>
           </td>
         </tr>
@@ -894,7 +953,7 @@ class Machines extends React.Component {
       // If our error is from the backend
       if(err.responseText) {
         var response = JSON.parse(err.responseText);
-        machine._errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
+        machine._errorMessage = " (" + err.status + "): " + response.Messages.join(", ");
       } else { // maybe the backend is down
         machine._errorMessage = err.status;
       }
@@ -934,7 +993,7 @@ class Machines extends React.Component {
       // If our error is from the backend
       if(err.responseText) {
         var response = JSON.parse(err.responseText);
-        machine._errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
+        machine._errorMessage = " (" + err.status + "): " + response.Messages.join(", ");
       } else { // maybe the backend is down
         machine._errorMessage = err.status;
       }
@@ -1120,7 +1179,10 @@ class Prefs extends React.Component {
               )}
               </td>
               <td>
-                {(this.state.updated && Object.keys(this.state.prefs).length-1 == i ? <button onClick={this.updatePrefs}>Update</button> : '')}
+                {(this.state.updated && Object.keys(this.state.prefs).length-1 == i ? <button onClick={this.updatePrefs} className='icon-button'>
+                  save
+                  <span className='tooltip'>Save</span>
+                </button> : '')}
               </td>
             </tr>
           )}
@@ -1226,10 +1288,20 @@ class BootEnv extends React.Component {
             <a href={bootenv.OS.IsoUrl}>{bootenv.OS.IsoFile}</a>
           </td>
           <td>
-            {bootenv._new ? <button onClick={this.update}>Add</button> :
-            (bootenv._edited ? <button onClick={this.update}>Update</button> : '')}
-            <button onClick={this.remove}>Remove</button>
-            <button onClick={this.props.copy}>Copy</button>
+            {bootenv._new || bootenv._edited ? 
+            <button onClick={this.update} className='icon-button'>
+              save
+              <span className='tooltip'>{bootenv._new ? 'Add' : 'Save'}</span>
+            </button> : ''}
+
+            <button onClick={this.remove} className='icon-button'>
+              delete
+              <span className='tooltip'>Remove</span>
+            </button>
+            <button onClick={this.props.copy} className='icon-button'>
+              content_copy
+              <span className='tooltip'>Copy</span>
+            </button>
           </td>
         </tr>
         <tr>
@@ -1311,8 +1383,14 @@ class BootEnv extends React.Component {
                           onChange={(e)=>this.changeTemplate(e, i)}/>
                       </td>
                       <td>
-                        <button onClick={(e)=>$.getJSON("../api/v3/templates/" + val.ID, d=>alert(JSON.stringify(d, 0, "  ")))}>View</button>
-                        <button onClick={(e)=>this.removeTemplate(e, i)}>Remove</button>
+                        <button onClick={(e)=>$.getJSON("../api/v3/templates/" + val.ID, d=>alert(JSON.stringify(d, 0, "  ")))} className='icon-button'>
+                          open_in_new
+                          <span className='tooltip'>Preview</span>
+                        </button>
+                        <button onClick={(e)=>this.removeTemplate(e, i)} className='icon-button'>
+                          delete
+                          <span className='tooltip'>Remove</span>
+                        </button>
                       </td>
                     </tr>
                   )}
@@ -1325,10 +1403,10 @@ class BootEnv extends React.Component {
               </table>
             </div>): <span/>}
             {bootenv._error && <div>
-              <h2>{bootenv._errorMessage}</h2>
+              <h2><span className='material-icons'>error</span>{bootenv._errorMessage}</h2>
             </div>}
             <div className="expand" onClick={this.toggleExpand}>
-              {bootenv._expand ? <span>&#x25B4;</span> : <span>&#x25BE;</span>}
+              {bootenv._expand ? <span className='material-icons'>expand_less</span> : <span className='material-icons'>expand_more</span>}
             </div>
           </td>
         </tr>
@@ -1460,7 +1538,7 @@ class BootEnvs extends React.Component {
       // If our error is from the backend
       if(err.responseText) {
         var response = JSON.parse(err.responseText);
-        bootenv._errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
+        bootenv._errorMessage = " (" + err.status + "): " + response.Messages.join(", ");
       } else { // maybe the backend is down
         bootenv._errorMessage = err.status;
       }
@@ -1504,7 +1582,7 @@ class BootEnvs extends React.Component {
       // If our error is from the backend
       if(err.responseText) {      
         var response = JSON.parse(err.responseText);
-        subnet._errorMessage = "Error (" + err.status + "): " + response.Messages.join(", ");
+        subnet._errorMessage = " (" + err.status + "): " + response.Messages.join(", ");
       } else { // maybe the backend is down
         subnet._errorMessage = err.status;
       }
