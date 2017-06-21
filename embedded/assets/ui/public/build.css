@@ -10,7 +10,7 @@
        url(css/font/MaterialIcons-Regular.ttf) format('truetype');
 }
 
-.material-icons {
+.material-icons, button.icon-button {
   font-family: 'Material Icons';
   font-weight: normal;
   font-style: normal;
@@ -181,24 +181,22 @@ button {
 button.icon-button {
   border-radius: 50%;
   position: relative !important;
+}
 
-  font-family: 'Material Icons';
-  font-weight: normal;
-  font-style: normal;
-  font-size: 24px;  /* Preferred icon size */
-  display: inline-block;
-  line-height: 1;
-  text-transform: none;
-  letter-spacing: normal;
-  word-wrap: normal;
-  white-space: nowrap;
-  direction: ltr;
-
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-font-feature-settings: 'liga';
-          font-feature-settings: 'liga';
+.icon-buttons {
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-pack: end;
+      -ms-flex-pack: end;
+          justify-content: flex-end;
 }
 
 button:focus {
@@ -247,6 +245,242 @@ input, select {
 }
 
 input:focus, select:focus {
-  border-bottom: 2px solid #22f;
+  border-bottom: 2px solid #55f;
   outline: none;
+}
+
+.login-box {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  margin: auto;
+  max-width: 400px;
+  padding: 40px;
+}
+
+.login-tabs {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-pack: start;
+      -ms-flex-pack: start;
+          justify-content: flex-start;
+  margin: auto;
+  position: relative;
+}
+
+.login-tabs .tab {
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  border: 2px solid transparent;
+  border-bottom: none;
+  color: #ccc;
+  cursor: pointer;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  padding: 4px;
+  z-index: 5;
+}
+
+.login-tabs i {
+  padding-right: 4px;
+}
+
+.login-tabs .active {
+  border-color: #ccc;
+  color: #999;
+  -webkit-transform: translateX(0);
+          transform: translateX(0);
+}
+
+.login-tabs .active::after {
+  background-color: #fff;
+  content: '';
+  height: 4px;
+  left: 0;
+  position: absolute;
+  top: 100%;
+  width: 100%;
+  z-index: 5;
+}
+
+.login-input {
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: reverse;
+      -ms-flex-direction: row-reverse;
+          flex-direction: row-reverse;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  margin-bottom: 8px;
+  margin-top: 8px;
+}
+
+.login-inputs {
+  border-top: 2px solid #ccc;
+  -webkit-transform: translateX(0);
+          transform: translateX(0);
+}
+
+.login-input input ~ i {
+  color: #ccc;
+  margin-right: 8px;
+}
+
+.login-input input:focus ~ i {
+  color: #55f;
+}
+
+.login-inputs::before, .login-inputs::after {
+  background: -webkit-gradient(linear, left top, left bottom, from(#ccc), to(transparent));
+  background: linear-gradient(to bottom, #ccc, transparent);
+  content: '';
+  height: 40px;
+  position: absolute;
+  top: 0;
+  width: 2px;
+}
+
+.login-inputs::before {
+  left: 0;
+}
+
+.login-inputs::after {
+  right: 0;
+}
+
+.login-hint {
+  color: #aaa;
+  font-size: 12px;
+  font-style: italic;
+  margin: 10px;
+}
+
+.login-hint a {
+  color: #547f00;
+}
+
+.welcome-box {
+  border-top: thin solid #ccc;
+  color: #333;
+  max-width: 800px;
+  padding: 20px;
+}
+
+.welcome-box h1 {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 16px;
+  margin-top: 16px;
+}
+
+.welcome-box p {
+  line-height: 24px;
+  margin-bottom: 16px;
+  margin-top: 16px;
+}
+
+.welcome-box a {
+  color: #547f00;
+}
+
+.welcome-menu {
+  -webkit-box-align: start;
+      -ms-flex-align: start;
+          align-items: flex-start;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+}
+
+.welcome-menu section{
+  margin: 20px;
+}
+
+.welcome-menu header {
+  margin: 10px;
+}
+
+.welcome-menu section, .welcome-menu article {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+}
+
+.welcome-menu header {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.welcome-menu article a i {
+  margin-right: 4px;
+  padding: 4px;
+}
+
+.welcome-menu article a span {
+  text-decoration: underline;
+}
+
+.welcome-menu article a {
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+          flex-grow: 1;
+  text-align: left;
+  text-decoration: none;
+  width: 100%;
+}
+
+.card {
+  -webkit-box-shadow: 0 2px 4px #999;
+          box-shadow: 0 2px 4px #999;
+  display: block;
+  margin: 8px auto;
+  max-width: 400px;
 }
