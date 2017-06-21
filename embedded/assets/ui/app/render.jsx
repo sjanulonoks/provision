@@ -165,7 +165,7 @@ class Subnet extends React.Component {
                 onChange={this.handleChange}/>
             </div>
           </td>
-          <td style={{border: 'thin solid black !important'}}>
+          <td style={{border: 'thin solid black !important'}} className="icon-buttons">
             {subnet._new || subnet._edited ? 
             <button onClick={this.update} className="icon-button">
               save
@@ -935,7 +935,7 @@ class Machine extends React.Component {
               </div>
               : "not set" )}
           </td>
-          <td>
+          <td className="icon-buttons">
             {machine._new || machine._edited ? 
             <button onClick={this.update} className="icon-button">
               save
@@ -1298,7 +1298,7 @@ class Prefs extends React.Component {
                     onChange={this.handleChange} />
               )}
               </td>
-              <td>
+              <td className="icon-buttons">
                 {(this.state.updated && Object.keys(this.state.prefs).length-1 == i ? <button onClick={this.updatePrefs} className="icon-button">
                   save
                   <span className="tooltip">Save</span>
@@ -1407,7 +1407,7 @@ class BootEnv extends React.Component {
           <td>
             <a href={bootenv.OS.IsoUrl}>{bootenv.OS.IsoFile}</a>
           </td>
-          <td>
+          <td className="icon-buttons">
             {bootenv._new || bootenv._edited ? 
             <button onClick={this.update} className="icon-button">
               save
@@ -1502,7 +1502,7 @@ class BootEnv extends React.Component {
                           value={val.ID}
                           onChange={(e)=>this.changeTemplate(e, i)}/>
                       </td>
-                      <td>
+                      <td className="icon-buttons">
                         <button onClick={(e)=>$.getJSON("../api/v3/templates/" + val.ID, d=>alert(JSON.stringify(d, 0, "  ")))} className="icon-button">
                           open_in_new
                           <span className="tooltip">Preview</span>
@@ -1671,44 +1671,44 @@ class BootEnvs extends React.Component {
 
   // makes the delete request to remove the subnet or just deletes the new subnet
   removeBootEnv(i) {
-    var subnets = this.state.subnets.concat([]);
-    var subnet = this.state.subnets[i];
-    if(subnet._new) {
-      subnets.splice(i, 1);
+    var bootenvs = this.state.bootenvs.concat([]);
+    var bootenv = this.state.bootenvs[i];
+    if(bootenv._new) {
+      bootenvs.splice(i, 1);
       this.setState({
-        subnets: subnets
+        bootenvs: bootenvs
       });
       return;
     }
-    subnets[i].updating = true;
-    this.setState({subnets: subnets});
+    bootenvs[i].updating = true;
+    this.setState({bootenvs: bootenvs});
 
     $.ajax({
       type: "DELETE",
       dataType: "json",
       contentType: "application/json",
-      url: "/api/v3/subnets/" + subnet.Name,
+      url: "/api/v3/bootenvs/" + bootenv.Name,
     }).done((resp) => {
-            // update the subnets list with our new interface
-      var subnets = this.state.subnets.concat([]);
-      subnets.splice(i, 1);
+            // update the bootenvs list with our new interface
+      var bootenvs = this.state.bootenvs.concat([]);
+      bootenvs.splice(i, 1);
       this.setState({
-        subnets: subnets
+        bootenvs: bootenvs
       });
 
     }).fail((err) => {
-      subnet.updating = false;
-      subnet._error = true;
+      bootenv.updating = false;
+      bootenv._error = true;
       // If our error is from the backend
       if(err.responseText) {      
         var response = JSON.parse(err.responseText);
-        subnet._errorMessage = " (" + err.status + "): " + response.Messages.join(", ");
+        bootenv._errorMessage = " (" + err.status + "): " + response.Messages.join(", ");
       } else { // maybe the backend is down
-        subnet._errorMessage = err.status;
+        bootenv._errorMessage = err.status;
       }
 
       this.setState({
-        subnets: subnets
+        bootenvs: bootenvs
       });
     });
   }
