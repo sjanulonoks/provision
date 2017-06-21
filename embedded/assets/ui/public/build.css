@@ -86,7 +86,7 @@ h2 {
   text-decoration: none;
 }
 
-.header__btn:hover {
+.header__btn:hover, .header__btn:focus {
   background-color: #33691E;
   cursor: pointer;
 }
@@ -95,7 +95,7 @@ h2 {
   font-weight: bold;
 }
 
-a.nav-link:hover {
+a.nav-link:hover, a.nav-link:focus {
   text-decoration: underline;
 }
 
@@ -199,20 +199,17 @@ button.icon-button {
           justify-content: flex-end;
 }
 
-button:focus {
-  outline: none;
-}
-
 button:active {
   background-color: #33691E
 }
 
-button:hover {
+button:hover, button:focus {
+  outline: none;
   -webkit-box-shadow: 0 2px 4px #999;
           box-shadow: 0 2px 4px #999;
 }
 
-button:hover > .tooltip {
+button:hover > .tooltip, button:focus > .tooltip {
   display: block;
 }
 
