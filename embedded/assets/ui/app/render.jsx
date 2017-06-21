@@ -755,7 +755,7 @@ class Token extends React.Component {
               </div>
               <div className="login-hint">
                 <span>Default credentials are </span>
-                <code style={{textDecoration: 'underline', cursor: 'pointer'}}
+                <code style={{textDecoration: 'underline', color: '#547f00', cursor: 'pointer'}}
                   onClick={()=>{
                     Token.setState({username:'rocketskates',password:'r0cketsk8ts'});
                     Token.setToken('rocketskates:r0cketsk8ts')
@@ -770,6 +770,68 @@ class Token extends React.Component {
             {(this.state.requestState == this.STATES.ERROR ?
               (<span style={{color: "#a00"}}>{this.getCodeName()}</span>) : 
               (<span>{this.messages[this.state.requestState]}</span>)
+            )}
+          </div>
+        </div>
+        <div className="welcome-box">
+          <h1>Welcome to Digital Rebar: Provision</h1>
+          <p className="description">
+            <strong>DR Provision </strong> is a APLv2 simple Golang executable that provides a simple yet complete API-driven DHCP/PXE/TFTP provisioning system. It is designed to stand alone or operate as part of the <a href="http://rebar.digital/" target="_blank">Digital Rebar</a> management system. Check out some of the links below for more information!
+          </p>
+          <div className="welcome-menu">
+            {[{
+              name: 'Resources',
+              links: [{
+                name: 'Introduction',
+                href: '',
+                icon: 'book'
+              }, {
+                name: 'Documentation',
+                href: 'http://provision.readthedocs.io/en/stable/',
+                icon: 'info'
+              }, {
+                name: 'Videos',
+                href: 'https://www.youtube.com/playlist?list=PLXPBeIrpXjfilUi7Qj1Sl0UhjxNRSC7nx',
+                icon: 'video_library'
+              }]
+            }, {
+              name: 'Support',
+              links: [{
+                name: 'Gitter',
+                href: 'https://gitter.im/digitalrebar/core',
+                icon: 'forum'
+              }, {
+                name: 'IRC (Freenode)',
+                href: 'https://webchat.freenode.net/?channels=%23digitalrebar&uio=d4',
+                icon: 'chat'
+              }, {
+                name: 'Mailing List',
+                href: 'https://groups.google.com/forum/#!forum/digitalrebar',
+                icon: 'mail'
+              }]
+            }, {
+              name: 'Project',
+              links: [{
+                name: 'Contribute',
+                href: 'https://github.com/digitalrebar/provision',
+                icon: 'code'
+              }, {
+                name: 'Issues Tracker',
+                href: 'https://github.com/digitalrebar/provision/issues',
+                icon: 'directions'
+              }]
+            }].map(section =>
+              <section>
+                <header>{section.name}</header>
+                <article>
+                  {section.links.map(link =>
+                    <a href={link.href} target="_blank" class="welcome-link">
+                      <i className="material-icons">{link.icon}</i>
+                      <span>{link.name}</span>
+                    </a>
+                  )}
+                </article>
+              </section>
             )}
           </div>
         </div>

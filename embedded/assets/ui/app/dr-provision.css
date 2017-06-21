@@ -302,19 +302,75 @@ input:focus, select:focus {
 }
 
 .login-hint a {
-  color: #aaa;
+  color: #547f00;
 }
 
 .welcome-box {
   border-top: thin solid #ccc;
+  color: #333;
+  max-width: 800px;
   padding: 20px;
 }
 
 .welcome-box h1 {
   font-size: 20px;
   font-weight: bold;
-  margin-bottom: 8px;
-  margin-top: 8px;
+  margin-bottom: 16px;
+  margin-top: 16px;
+}
+
+.welcome-box p {
+  line-height: 24px;
+  margin-bottom: 16px;
+  margin-top: 16px;
+}
+
+.welcome-box a {
+  color: #547f00;
+}
+
+.welcome-menu {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+.welcome-menu section{
+  margin: 20px;
+}
+
+.welcome-menu header {
+  margin: 10px;
+}
+
+.welcome-menu section, .welcome-menu article {
+  display: flex;
+  flex-direction: column;
+}
+
+.welcome-menu header {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.welcome-menu article a i {
+  margin-right: 4px;
+  padding: 4px;
+}
+
+.welcome-menu article a span {
+  text-decoration: underline;
+}
+
+.welcome-menu article a {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  flex-grow: 1;
+  text-align: left;
+  text-decoration: none;
+  width: 100%;
 }
 
 .card {
