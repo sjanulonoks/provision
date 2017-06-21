@@ -248,6 +248,7 @@ input:focus, select:focus {
   background-color: #fff;
   content: '';
   height: 4px;
+  left: 0;
   position: absolute;
   top: 100%;
   width: 100%;
