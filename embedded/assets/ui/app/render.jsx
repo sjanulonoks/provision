@@ -1503,7 +1503,7 @@ class BootEnv extends React.Component {
                           onChange={(e)=>this.changeTemplate(e, i)}/>
                       </td>
                       <td className="icon-buttons">
-                        <button onClick={(e)=>$.getJSON("../api/v3/templates/" + val.ID, d=>alert(JSON.stringify(d, 0, "  ")))} className="icon-button">
+                        <button onClick={(e)=>$.getJSON("../api/v3/templates/" + val.ID, this.props.preview)} className="icon-button">
                           open_in_new
                           <span className="tooltip">Preview</span>
                         </button>
@@ -1540,7 +1540,8 @@ class BootEnvs extends React.Component {
     super(props);
 
     this.state = {
-      bootenvs: []
+      bootenvs: [],
+      templatePreview: undefined,
     };
 
     this.componentDidMount = this.componentDidMount.bind(this);
@@ -1549,6 +1550,7 @@ class BootEnvs extends React.Component {
     this.updateBootEnv = this.updateBootEnv.bind(this);
     this.removeBootEnv = this.removeBootEnv.bind(this);
     this.changeBootEnv = this.changeBootEnv.bind(this);
+    this.previewTemplate = this.previewTemplate.bind(this);
   }
   
   // gets the bootenv json from the api
@@ -1566,6 +1568,10 @@ class BootEnvs extends React.Component {
     });
   }
 
+  previewTemplate(templatePreview) {
+    this.setState({templatePreview});
+  }
+
   componentDidMount() {
     this.update();
   }
@@ -1574,6 +1580,7 @@ class BootEnvs extends React.Component {
     this.getBootEnvs().then(data => {
       this.setState({
         bootenvs: data.bootenvs,
+        templatePreview: undefined,
       });
     }, err => {
     });
@@ -1747,6 +1754,7 @@ class BootEnvs extends React.Component {
             update={this.updateBootEnv}
             change={this.changeBootEnv}
             remove={this.removeBootEnv}
+            preview={this.previewTemplate}
             copy={()=>this.addBootEnv(this.state.bootenvs[i])}
             key={i}
             index={i} />
@@ -1759,6 +1767,17 @@ class BootEnvs extends React.Component {
           </tr>
         </tfoot>
       </table>
+      {this.state.templatePreview && <div className="card floating overlay">
+        <div className="card-toolbar">
+          <h2>{this.state.templatePreview.ID || 'No ID Set'}</h2>
+          <button onClick={()=>this.setState({templatePreview: undefined})} className="icon-button flat">
+            close
+          </button>
+        </div>
+        <div className="card-content">
+          <pre>{this.state.templatePreview.Contents || 'No Content'}</pre>
+        </div>
+      </div>}
     </div>
     );
   }
