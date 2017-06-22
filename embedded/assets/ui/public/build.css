@@ -541,3 +541,40 @@ input:focus, select:focus {
   top: 50%;
   z-index: 999;
 }
+
+tbody.error, tbody.new, tbody.edited {
+  border-bottom: thin solid #ddd;
+  position: relative;
+}
+
+tbody.error::before, tbody.new::before, tbody.edited::before {
+  bottom: 8px;
+  font-style: italic;
+  left: 8px;
+  opacity: 0.4;
+  position: absolute;
+}
+
+tbody.error::before {
+  content: 'Error';
+}
+
+tbody.error {
+  background-color: #fdd;
+}
+
+tbody.new::before {
+  content: 'New';
+}
+
+tbody.new {
+  background-color: #dfd;
+}
+
+tbody.edited::before {
+  content: 'Edited';
+}
+
+tbody.edited {
+  background-color: #eee;
+}
