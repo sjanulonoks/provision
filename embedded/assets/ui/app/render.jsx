@@ -1266,23 +1266,33 @@ class Prefs extends React.Component {
                 {val}
               </td>
               <td>
-              {( val.indexOf("BootEnv") > 0 && val != "debugBootEnv"
-                ?  <select
-                    name={val}
-                    type="bool"
-                    value={this.state.prefs[val]}
-                    onChange={this.handleChange}>
-                    { this.props.bootenvs.map((v) =>
-                      <option key={v} value={v}>{v}</option>
-                    )}
-                  </select>
-                : <input
-                    type="text"
-                    name={val}
-                    size="10"
-                    value={this.state.prefs[val]}
-                    onChange={this.handleChange} />
-              )}
+              {( val.indexOf('BootEnv') > 0 && val !== 'debugBootEnv' ? (
+                <select
+                  name={val}
+                  type="bool"
+                  value={this.state.prefs[val]}
+                  onChange={this.handleChange}>
+                  { this.props.bootenvs.map((v) =>
+                    <option key={v} value={v}>{v}</option>
+                  )}
+                </select>
+              ) : (val.indexOf('debug') == 0 ? (
+                <select
+                  name={val}
+                  value={this.state.prefs[val]}
+                  onChange={this.handleChange}>
+                  {['Logging Off', 'Logging Low', 'Logging High'].map((name, i) =>
+                    <option key={i} value={i}>{name}</option>
+                  )}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  name={val}
+                  size="10"
+                  value={this.state.prefs[val]}
+                  onChange={this.handleChange} />
+              )))}
               </td>
               <td className="icon-buttons">
                 {(this.state.updated && Object.keys(this.state.prefs).length-1 == i ? <button onClick={this.updatePrefs} className="icon-button">
