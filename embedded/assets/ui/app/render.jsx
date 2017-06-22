@@ -91,12 +91,7 @@ class Subnet extends React.Component {
     return (
       <tbody
         className={
-          (subnet.updating ? 'updating-content' : '') + " " + (subnet._expand ? "expanded" : "")}
-        style={{
-          position: "relative",
-          backgroundColor: (subnet._error ? '#fdd' : (subnet._new ? "#dfd" : (subnet._edited ? "#eee" : "#fff"))),
-          borderBottom: "thin solid #ddd"
-        }}>
+          (subnet.updating ? 'updating-content' : '') + " " + (subnet._expand ? 'expanded' : '') + ' ' + (subnet._error ? 'error' : (subnet._new ? 'new' : (subnet._edited ? 'edited' : '')))}>
         <tr>
           <td>
             {subnet._new ? <input
@@ -188,7 +183,7 @@ class Subnet extends React.Component {
               <table>
                 <tbody>
                   <tr>
-                    <td style={{textAlign: "right", fontWeight: "bold"}}>Next Server</td>
+                    <td style={{textAlign: 'right', fontWeight: 'bold'}}>Next Server</td>
                     <td>
                       <input
                         type="text"
@@ -205,7 +200,7 @@ class Subnet extends React.Component {
                 <tbody>
                   {subnet.Options.map((val, i) =>
                     <tr key={i}>
-                      <td style={{textAlign: "right", fontWeight: "bold"}}>{this.getCodeName(val.Code)}</td>
+                      <td style={{textAlign: 'right', fontWeight: 'bold'}}>{this.getCodeName(val.Code)}</td>
                       <td>
                         <input
                           type="text"
@@ -883,12 +878,7 @@ class Machine extends React.Component {
     var machine = JSON.parse(JSON.stringify(this.props.machine));
     return (
       <tbody 
-        className={(machine.updating ? 'updating-content' : '') + " " + (machine._expand ? 'expanded' : '')}
-        style={{
-          position: "relative",
-          backgroundColor: (machine._error ? '#fdd' : (machine._new ? "#dfd" : (machine._edited ? "#eee" : "#fff"))),
-          borderBottom: "thin solid #ddd"
-        }}>
+        className={(machine.updating ? 'updating-content' : '') + " " + (machine._expand ? 'expanded' : '') + ' ' + (machine._error ? 'error' : (machine._new ? 'new' : (machine._edited ? 'edited' : '')))}>
         <tr>
           <td>
             <input
@@ -1385,12 +1375,7 @@ class BootEnv extends React.Component {
     var bootenv = JSON.parse(JSON.stringify(this.props.bootenv));
     return (
       <tbody 
-        className={(bootenv.updating ? 'updating-content' : '') + " " + (bootenv._expand ? "expanded" : "")}
-        style={{
-          position: "relative",
-          backgroundColor: (bootenv._error ? '#fdd' : (bootenv._new ? "#dfd" : (bootenv._edited ? "#eee" : "#fff"))),
-          borderBottom: "thin solid #ddd"
-        }}>
+        className={(bootenv.updating ? 'updating-content' : '') + " " + (bootenv._expand ? 'expanded' : '') + ' ' + (bootenv._error ? 'error' : (bootenv._new ? 'new' : (bootenv._edited ? 'edited' : '')))}>
         <tr>
           <td>
             {bootenv._new ? <input
