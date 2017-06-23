@@ -91,6 +91,33 @@ h2 {
   cursor: pointer;
 }
 
+.rotate {
+  -webkit-animation: rotate 0.5s linear infinite;
+          animation: rotate 0.5s linear infinite;
+}
+
+@-webkit-keyframes rotate {
+  0% {
+    -webkit-transform: rotate(0deg);
+            transform: rotate(0deg);
+  }
+  100% {
+    -webkit-transform: rotate(360deg);
+            transform: rotate(360deg);
+  }
+}
+
+@keyframes rotate {
+  0% {
+    -webkit-transform: rotate(0deg);
+            transform: rotate(0deg);
+  }
+  100% {
+    -webkit-transform: rotate(360deg);
+            transform: rotate(360deg);
+  }
+}
+
 .section-head {
   font-weight: bold;
 }
@@ -177,6 +204,8 @@ button {
   padding: 4px;
   margin: 4px;
   text-transform: uppercase;
+  -webkit-transform: translateX(0);
+          transform: translateX(0);
 }
 
 button.icon-button {
@@ -222,7 +251,7 @@ button:hover, button:focus {
           box-shadow: 0 2px 4px #999;
 }
 
-button:hover > .tooltip, button:focus > .tooltip {
+button:not(.rotate):hover > .tooltip, button:not(.rotate):focus > .tooltip {
   display: block;
 }
 
@@ -275,7 +304,18 @@ input:focus, select:focus {
   padding: 40px;
 }
 
-.login-tabs {
+.swagger-ui-wrap {
+  position: relative;
+}
+
+.swagger-ui-wrap .tabs {
+  border-bottom: 2px solid #ccc;
+  margin-left: -20px;
+  margin-top: 20px;
+  width: calc(100% + 40px);
+}
+
+.tabs {
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
@@ -290,7 +330,7 @@ input:focus, select:focus {
   position: relative;
 }
 
-.login-tabs .tab {
+.tabs .tab {
   -webkit-box-align: center;
       -ms-flex-align: center;
           align-items: center;
@@ -312,18 +352,18 @@ input:focus, select:focus {
   z-index: 5;
 }
 
-.login-tabs i {
+.tabs i {
   padding-right: 4px;
 }
 
-.login-tabs .active {
+.tabs .active {
   border-color: #ccc;
   color: #999;
   -webkit-transform: translateX(0);
           transform: translateX(0);
 }
 
-.login-tabs .active::after {
+.tabs .active::after {
   background-color: #fff;
   content: '';
   height: 4px;
@@ -367,7 +407,7 @@ input:focus, select:focus {
   color: #55f;
 }
 
-.login-inputs::before, .login-inputs::after {
+.login-inputs::before, .login-inputs::after, .swagger-ui-wrap .tabs::before, .swagger-ui-wrap .tabs::after {
   background: -webkit-gradient(linear, left top, left bottom, from(#ccc), to(transparent));
   background: linear-gradient(to bottom, #ccc, transparent);
   content: '';
@@ -377,11 +417,15 @@ input:focus, select:focus {
   width: 2px;
 }
 
-.login-inputs::before {
+.swagger-ui-wrap .tabs::before, .swagger-ui-wrap .tabs::after {
+  top: 35px;
+}
+
+.login-inputs::before, .swagger-ui-wrap .tabs::before {
   left: 0;
 }
 
-.login-inputs::after {
+.login-inputs::after, .swagger-ui-wrap .tabs::after {
   right: 0;
 }
 
@@ -541,4 +585,41 @@ input:focus, select:focus {
           transform: translate(-50%, -50%);
   top: 50%;
   z-index: 999;
+}
+
+tbody.error, tbody.new, tbody.edited {
+  border-bottom: thin solid #ddd;
+  position: relative;
+}
+
+tbody.error::before, tbody.new::before, tbody.edited::before {
+  bottom: 8px;
+  font-style: italic;
+  left: 8px;
+  opacity: 0.4;
+  position: absolute;
+}
+
+tbody.error::before {
+  content: 'Error';
+}
+
+tbody.error {
+  background-color: #fdd;
+}
+
+tbody.new::before {
+  content: 'New';
+}
+
+tbody.new {
+  background-color: #dfd;
+}
+
+tbody.edited::before {
+  content: 'Edited';
+}
+
+tbody.edited {
+  background-color: #eee;
 }
