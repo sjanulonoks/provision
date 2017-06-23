@@ -18,6 +18,19 @@ function debounce(func, wait, immediate) {
   };
 };
 
+function rotate(event) {
+  let elem = event.target;
+  if(!$(elem).hasClass('rotate'))
+    $(elem).addClass('rotate');
+
+  if(elem.rotateTimeout)
+    clearTimeout(elem.rotateTimeout);
+
+  elem.rotateTimeout = setTimeout(() => {
+    $(elem).removeClass('rotate');
+  }, 500);
+}
+
 class Subnet extends React.Component {
 
   constructor(props) {
@@ -482,7 +495,7 @@ class Subnets extends React.Component {
   render() {
     $('#subnetCount').text(this.state.subnets.length);
     return (
-    <div id="subnets" style={{paddingTop: '51px'}}>
+    <div id="subnets">
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
         <span className="section-head">Subnets</span>
         <span>
@@ -698,7 +711,7 @@ class Token extends React.Component {
     return (
       <div>
         <div className="login-box">
-          <div className="login-tabs">
+          <div className="tabs">
             <div className={'tab ' + (this.state.useToken ? '' : 'active')} onClick={()=>this.setState({useToken: false})}>
               <i className="material-icons">person</i>
               Login
@@ -1126,7 +1139,7 @@ class Machines extends React.Component {
   render() {
     $('#machineCount').text(this.state.machines.length);
     return (
-    <div id="machines" style={{paddingTop: '51px'}}>
+    <div id="machines">
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
         <span className="section-head">Machines</span>
         <span>
@@ -1717,7 +1730,7 @@ class BootEnvs extends React.Component {
   render() {
     $('#bootenvCount').text(this.state.bootenvs.length);
     return (
-    <div id="bootenvs" style={{paddingTop: '51px'}}>
+    <div id="bootenvs">
       <h2 style={{display: 'flex', justifyContent: 'space-between'}}>
         <span className="section-head">Boot Environments</span>
         <span>
@@ -1775,19 +1788,27 @@ class Page extends React.Component {
 
     this.state = {
       access: false,
+      tab: localStorage.DrLastTab || 'subnets',
       bootenvs: []
     };
 
     this.onAccessChange = this.onAccessChange.bind(this);
     this.update = this.update.bind(this);
+    this.setTab = this.setTab.bind(this);
     //this.handleChange = this.handleChange.bind(this);
+  }
+
+  setTab(tab) {
+    localStorage.DrLastTab = tab;
+    this.setState({tab: tab});
   }
   
   // get the page and interfaces once this component mounts
   componentDidMount() {
   }
 
-  update() {
+  update(event) {
+    rotate(event);
     var page = this;
     console.log("Updating");
     console.log(this);
@@ -1819,23 +1840,42 @@ class Page extends React.Component {
     if (access) {
       return (
         <div id="swagger-ui-container" className="swagger-ui-wrap">
-          <Subnets
-            ref="subnets"
-            onAccessChange={this.onAccessChange} />
-          <hr/>
-          <BootEnvs
-            ref="bootenvs"
-            onAccessChange={this.onAccessChange} />
-          <hr/>
-          <Prefs
-            ref="prefs"
-            bootenvs={bootenvs}
-            onAccessChange={this.onAccessChange} />
-          <hr/>
-          <Machines
-            ref="machines"
-            bootenvs={bootenvs}
-            onAccessChange={this.onAccessChange} />
+          <div className="tabs">
+            <div className={'tab ' + (this.state.tab === 'subnet' ? 'active' : '')} onClick={()=>this.setTab('subnet')}>
+              <i className="material-icons">device_hub</i>
+              Subnets (<span id="subnetCount">0</span>)
+            </div>
+            <div className={'tab ' + (this.state.tab === 'bootenv' ? 'active' : '')} onClick={()=>this.setTab('bootenv')}>
+              <i className="material-icons">album</i>
+              Bootenvs (<span id="bootenvCount">0</span>)
+            </div>
+            <div className={'tab ' + (this.state.tab === 'machine' ? 'active' : '')} onClick={()=>this.setTab('machine')}>
+              <i className="material-icons">dns</i>
+              Machines (<span id="machineCount">0</span>)
+            </div>
+          </div>
+          {/* We make this div display none so it still mounts and has the sub components, it just doesn't render on browsers*/}
+          <div style={{display: this.state.tab === 'subnet' ? 'block' : 'none'}}>
+            <Subnets
+              ref="subnets"
+              onAccessChange={this.onAccessChange} />
+          </div>
+          <div style={{display: this.state.tab === 'bootenv' ? 'block' : 'none'}}>
+            <BootEnvs
+              ref="bootenvs"
+              onAccessChange={this.onAccessChange} />
+            <hr/>
+            <Prefs
+              ref="prefs"
+              bootenvs={bootenvs}
+              onAccessChange={this.onAccessChange} />
+          </div>
+          <div style={{display: this.state.tab === 'machine' ? 'block' : 'none'}}>
+            <Machines
+              ref="machines"
+              bootenvs={bootenvs}
+              onAccessChange={this.onAccessChange} />
+          </div>
         </div>
       );
     }

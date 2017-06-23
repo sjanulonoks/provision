@@ -78,6 +78,19 @@ h2 {
   cursor: pointer;
 }
 
+.rotate {
+  animation: rotate 0.5s linear infinite;
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 .section-head {
   font-weight: bold;
 }
@@ -150,6 +163,7 @@ button {
   padding: 4px;
   margin: 4px;
   text-transform: uppercase;
+  transform: translateX(0);
 }
 
 button.icon-button {
@@ -183,7 +197,7 @@ button:hover, button:focus {
   box-shadow: 0 2px 4px #999;
 }
 
-button:hover > .tooltip, button:focus > .tooltip {
+button:not(.rotate):hover > .tooltip, button:not(.rotate):focus > .tooltip {
   display: block;
 }
 
@@ -228,7 +242,18 @@ input:focus, select:focus {
   padding: 40px;
 }
 
-.login-tabs {
+.swagger-ui-wrap {
+  position: relative;
+}
+
+.swagger-ui-wrap .tabs {
+  border-bottom: 2px solid #ccc;
+  margin-left: -20px;
+  margin-top: 20px;
+  width: calc(100% + 40px);
+}
+
+.tabs {
   display: flex;
   flex-direction: row;
   justify-content: flex-start;
@@ -236,7 +261,7 @@ input:focus, select:focus {
   position: relative;
 }
 
-.login-tabs .tab {
+.tabs .tab {
   align-items: center;
   border: 2px solid transparent;
   border-bottom: none;
@@ -249,17 +274,17 @@ input:focus, select:focus {
   z-index: 5;
 }
 
-.login-tabs i {
+.tabs i {
   padding-right: 4px;
 }
 
-.login-tabs .active {
+.tabs .active {
   border-color: #ccc;
   color: #999;
   transform: translateX(0);
 }
 
-.login-tabs .active::after {
+.tabs .active::after {
   background-color: #fff;
   content: '';
   height: 4px;
@@ -293,7 +318,7 @@ input:focus, select:focus {
   color: #55f;
 }
 
-.login-inputs::before, .login-inputs::after {
+.login-inputs::before, .login-inputs::after, .swagger-ui-wrap .tabs::before, .swagger-ui-wrap .tabs::after {
   background: linear-gradient(to bottom, #ccc, transparent);
   content: '';
   height: 40px;
@@ -302,11 +327,15 @@ input:focus, select:focus {
   width: 2px;
 }
 
-.login-inputs::before {
+.swagger-ui-wrap .tabs::before, .swagger-ui-wrap .tabs::after {
+  top: 35px;
+}
+
+.login-inputs::before, .swagger-ui-wrap .tabs::before {
   left: 0;
 }
 
-.login-inputs::after {
+.login-inputs::after, .swagger-ui-wrap .tabs::after {
   right: 0;
 }
 
