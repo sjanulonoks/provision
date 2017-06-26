@@ -181,6 +181,7 @@ button:active {
 button:hover, button:focus {
   outline: none;
   box-shadow: 0 2px 4px #999;
+  z-index: 3;
 }
 
 button:hover > .tooltip, button:focus > .tooltip {
