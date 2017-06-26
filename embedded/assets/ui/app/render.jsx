@@ -1801,7 +1801,7 @@ class Page extends React.Component {
 
     this.state = {
       access: false,
-      tab: localStorage.DrLastTab || 'subnets',
+      tab: localStorage.DrLastTab || 'subnet',
       bootenvs: []
     };
 
