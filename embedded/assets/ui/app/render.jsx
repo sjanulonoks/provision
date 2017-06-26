@@ -1226,7 +1226,8 @@ class Prefs extends React.Component {
 
   // makes the put request to update the param
   updatePrefs() {
-    var prefs = this.state.prefs;
+    let prefs = this.state.prefs;
+    let Prefs = this;
 
     $.ajax({
       type: "POST",
@@ -1235,12 +1236,12 @@ class Prefs extends React.Component {
       url: "/api/v3/prefs",
       data: JSON.stringify(prefs)
     }).done((resp) => {
-      this.setState({
+      Pref.setState({
         prefs: prefs,
         updated: false
       });
     }).fail((err) => {
-      this.onAccessChange(false);
+      Prefs.props.onAccessChange(false);
     });
   }
 
@@ -1270,36 +1271,41 @@ class Prefs extends React.Component {
         <a target="_blank" href="http://provision.readthedocs.io/en/latest/doc/ui.html#prefs">UI Help</a> | <a target="_blank" href="/swagger-ui/#/prefs">API Help</a>
       </span>
       </h2>
-      <table className="fullwidth input-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Value</th>
-            <th></th>
-          </tr>
-        </thead>
+      <table className="input-table">
         <tbody>
-          {Object.keys(this.state.prefs).map((val, i) =>
+          {Object.keys(this.state.prefs).map((val, i)  =>
             <tr key={i}>
-              <td>{val}</td>
+              <td style={{textAlign: "right", fontWeight: "bold"}}>
+                {val}
+              </td>
               <td>
-              {( val.indexOf("BootEnv") > 0 && val != "debugBootEnv"
-                ?  <select
-                    name={val}
-                    type="bool"
-                    value={this.state.prefs[val]}
-                    onChange={this.handleChange}>
-                    { this.props.bootenvs.map((v) =>
-                      <option key={v} value={v}>{v}</option>
-                    )}
-                  </select>
-                : <input
-                    type="text"
-                    name={val}
-                    size="10"
-                    value={this.state.prefs[val]}
-                    onChange={this.handleChange} />
-              )}
+              {( val.indexOf('BootEnv') > 0 && val !== 'debugBootEnv' ? (
+                <select
+                  name={val}
+                  type="bool"
+                  value={this.state.prefs[val]}
+                  onChange={this.handleChange}>
+                  { this.props.bootenvs.map((v) =>
+                    <option key={v} value={v}>{v}</option>
+                  )}
+                </select>
+              ) : (val.indexOf('debug') == 0 ? (
+                <select
+                  name={val}
+                  value={this.state.prefs[val]}
+                  onChange={this.handleChange}>
+                  {['Logging Off', 'Logging Low', 'Logging High'].map((name, i) =>
+                    <option key={i} value={i}>{name}</option>
+                  )}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  name={val}
+                  size="10"
+                  value={this.state.prefs[val]}
+                  onChange={this.handleChange} />
+              )))}
               </td>
               <td className="icon-buttons">
                 {(this.state.updated && Object.keys(this.state.prefs).length-1 == i ? <button onClick={this.updatePrefs} className="icon-button">
@@ -1400,7 +1406,11 @@ class BootEnv extends React.Component {
               onChange={this.handleChange}/> : bootenv.Name}
           </td>
           <td>
-            {bootenv.Available ? "Yes" : "Error"}
+            {bootenv.Available ? "Yes" : 
+            <span style={{display: 'flex', alignItems: 'center', flexDirection:'row'}}>
+              Error 
+              <i className="material-icons" style={{fontSize: '18px'}}>warning</i>
+            </span>}
           </td>
           <td>
             <a href={bootenv.OS.IsoUrl}>{bootenv.OS.IsoFile}</a>
@@ -1520,6 +1530,9 @@ class BootEnv extends React.Component {
                 </tbody>
               </table>
             </div>): <span/>}
+            {!bootenv.Available && <div>
+              <h2><span className="material-icons">warning</span>{bootenv.Errors.join(', ')}</h2>
+            </div>}
             {bootenv._error && <div>
               <h2><span className="material-icons">error</span>{bootenv._errorMessage}</h2>
             </div>}

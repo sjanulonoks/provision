@@ -195,18 +195,18 @@ button:active {
 button:hover, button:focus {
   outline: none;
   box-shadow: 0 2px 4px #999;
+  z-index: 3;
 }
 
 button:not(.rotate):hover > .tooltip, button:not(.rotate):focus > .tooltip {
   display: block;
 }
 
-button > .tooltip {
+button > .tooltip, span > .tooltip {
   background-color: #000;
   background-color: rgba(0, 0, 0, 0.8);
   border-radius: 2px;
   color: #fff;
-  content: attr(data-tooltip);
   display: none;
   font-family: Droid Sans, sans-serif;
   font-size: 14px;
