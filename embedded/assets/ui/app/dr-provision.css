@@ -183,16 +183,15 @@ button:hover, button:focus {
   box-shadow: 0 2px 4px #999;
 }
 
-button:hover > .tooltip, button:focus > .tooltip {
+button:hover > .tooltip, span:hover > .tooltip, button:focus > .tooltip {
   display: block;
 }
 
-button > .tooltip {
+button > .tooltip, span > .tooltip {
   background-color: #000;
   background-color: rgba(0, 0, 0, 0.8);
   border-radius: 2px;
   color: #fff;
-  content: attr(data-tooltip);
   display: none;
   font-family: Droid Sans, sans-serif;
   font-size: 14px;

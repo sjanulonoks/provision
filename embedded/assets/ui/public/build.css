@@ -222,16 +222,15 @@ button:hover, button:focus {
           box-shadow: 0 2px 4px #999;
 }
 
-button:hover > .tooltip, button:focus > .tooltip {
+button:hover > .tooltip, span:hover > .tooltip, button:focus > .tooltip {
   display: block;
 }
 
-button > .tooltip {
+button > .tooltip, span > .tooltip {
   background-color: #000;
   background-color: rgba(0, 0, 0, 0.8);
   border-radius: 2px;
   color: #fff;
-  content: attr(data-tooltip);
   display: none;
   font-family: Droid Sans, sans-serif;
   font-size: 14px;
@@ -541,4 +540,41 @@ input:focus, select:focus {
           transform: translate(-50%, -50%);
   top: 50%;
   z-index: 999;
+}
+
+tbody.error, tbody.new, tbody.edited {
+  border-bottom: thin solid #ddd;
+  position: relative;
+}
+
+tbody.error::before, tbody.new::before, tbody.edited::before {
+  bottom: 8px;
+  font-style: italic;
+  left: 8px;
+  opacity: 0.4;
+  position: absolute;
+}
+
+tbody.error::before {
+  content: 'Error';
+}
+
+tbody.error {
+  background-color: #fdd;
+}
+
+tbody.new::before {
+  content: 'New';
+}
+
+tbody.new {
+  background-color: #dfd;
+}
+
+tbody.edited::before {
+  content: 'Edited';
+}
+
+tbody.edited {
+  background-color: #eee;
 }
