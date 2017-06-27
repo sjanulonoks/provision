@@ -190,6 +190,8 @@ tbody.expanded::after {
 }
 
 footer {
+  -webkit-box-sizing: border-box;
+          box-sizing: border-box;
   color: #444;
 }
 
@@ -249,6 +251,7 @@ button:hover, button:focus {
   outline: none;
   -webkit-box-shadow: 0 2px 4px #999;
           box-shadow: 0 2px 4px #999;
+  z-index: 3;
 }
 
 button:not(.rotate):hover > .tooltip, button:not(.rotate):focus > .tooltip {
@@ -263,7 +266,7 @@ button > .tooltip, span > .tooltip {
   display: none;
   font-family: Droid Sans, sans-serif;
   font-size: 14px;
-  left: 50%;
+  left: calc(50% - 4px);
   margin: 4px;
   padding: 8px;
   pointer-events: none;
@@ -621,4 +624,27 @@ tbody.edited::before {
 
 tbody.edited {
   background-color: #eee;
+}
+
+#header {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 999;
+}
+
+#header .swagger-ui-wrap {
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
 }

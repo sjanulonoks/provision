@@ -150,6 +150,7 @@ tbody.expanded::after {
 }
 
 footer {
+  box-sizing: border-box;
   color: #444;
 }
 
@@ -496,4 +497,18 @@ tbody.edited::before {
 
 tbody.edited {
   background-color: #eee;
+}
+
+#header {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 999;
+}
+
+#header .swagger-ui-wrap {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
 }
