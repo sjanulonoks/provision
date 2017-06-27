@@ -30,3 +30,48 @@ func TestProfilesCrud(t *testing.T) {
 		t.Errorf("List function returned nil!!")
 	}
 }
+
+func TestProfilesValidation(t *testing.T) {
+	bs := store.NewSimpleMemoryStore()
+	dt := mkDT(bs)
+	tests := []crudTest{
+		{
+			"Create new Parameter",
+			dt.create,
+			&Param{
+				p:    dt,
+				Name: "Bool",
+				Schema: map[string]interface{}{
+					"type": "boolean",
+				},
+			},
+			true},
+		{
+			"Create Passing Profile",
+			dt.create,
+			&Profile{
+				p:    dt,
+				Name: "Bool Profile Pass",
+				Params: map[string]interface{}{
+					"Bool": true,
+				},
+			},
+			true,
+		},
+		{
+			"Create Failing Profile",
+			dt.create,
+			&Profile{
+				p:    dt,
+				Name: "Bool Profile Fail",
+				Params: map[string]interface{}{
+					"Bool": "true",
+				},
+			},
+			false,
+		},
+	}
+	for _, test := range tests {
+		test.Test(t)
+	}
+}

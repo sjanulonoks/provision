@@ -153,5 +153,20 @@ func AsProfiles(o []store.KeySaver) []*Profile {
 }
 
 func (p *Profile) BeforeSave() error {
-	return index.CheckUnique(p, p.p.objs[p.Prefix()].d)
+	if err := index.CheckUnique(p, p.p.objs[p.Prefix()].d); err != nil {
+		return err
+	}
+	if len(p.Params) == 0 {
+		return nil
+	}
+	err := &Error{o: p}
+	ref := &Param{p: p.p}
+	for k, v := range p.Params {
+		param, found := p.p.fetchOne(ref, k)
+		if !found {
+			continue
+		}
+		err.Merge(AsParam(param).Validate(v))
+	}
+	return err.OrNil()
 }
