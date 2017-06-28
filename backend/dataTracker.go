@@ -283,6 +283,7 @@ func NewDataTracker(backend store.SimpleStore,
 	}
 	objs := []store.KeySaver{
 		&Machine{p: res},
+		&Param{p: res},
 		&Profile{p: res},
 		&User{p: res},
 		&Template{p: res},
@@ -480,6 +481,8 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 	switch ref.(type) {
 	case *Machine:
 		res = p.NewMachine()
+	case *Param:
+		res = p.NewParam()
 	case *Profile:
 		res = p.NewProfile()
 	case *User:

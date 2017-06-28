@@ -1,5 +1,5 @@
-hash: c8204001375b979aa497797375b48fd836b628bada3c0a310ea6b9333ec389bb
-updated: 2017-04-25T17:44:08.818191515-05:00
+hash: f2b7f8afb9fc96899eb501cf1519c52b31d313f8242034e919b619ecc6e24d4d
+updated: 2017-06-27T16:36:57.762702218-05:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 71551cef584cae1b2e01c37e8c0e1f1160eedd6f
@@ -111,6 +111,12 @@ imports:
   version: c7b50f49dce1ebe7c627bf0a92c87b633a45bf43
   subpackages:
   - utils
+- name: github.com/xeipuuv/gojsonpointer
+  version: 6fe8760cad3569743d51ddbb243b26f8456742dc
+- name: github.com/xeipuuv/gojsonreference
+  version: e02fc20de94c78484cd5ffb007f8af96be030a45
+- name: github.com/xeipuuv/gojsonschema
+  version: 0c8571ac0ce161a5feb57375a9cdf148c98c0f70
 - name: golang.org/x/crypto
   version: 9a6f0a01987842989747adff311d80750ba25530
   subpackages:
@@ -144,6 +150,6 @@ imports:
   - bson
   - internal/json
 - name: gopkg.in/yaml.v2
-  version: a3f3340b5840cee44f372bddb5880fcbc419b46a
+  version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
   repo: https://github.com/go-yaml/yaml
 testImports: []
