@@ -14,6 +14,42 @@ const (
 	StillInUseError     = "StillInUseError"
 )
 
+// Validation holds information about whether the current model
+// is valid or not.  It is designed to be embedded into structs
+// that need post-operation validation.
+//
+// swagger: model
+type Validation struct {
+	// Validated tracks whether or not the model has been validated.
+	Validated bool
+	// Available tracks whether or not the model passed validation.
+	Available bool
+	// If there are any errors in the validation process, they will be
+	// available here.
+	Errors  []string
+	proceed chan bool
+}
+
+func (v *Validation) canProceed() bool {
+	return <-v.proceed
+}
+
+func (v *Validation) deferred(thunk func() bool) {
+	if v.proceed == nil {
+		v.proceed = make(chan bool)
+	}
+	v.Validated = false
+	go func() {
+		res := thunk()
+		v.Validated = true
+		v.proceed <- res
+	}()
+}
+
+type postValidator interface {
+	canProceed() bool
+}
+
 func validateIP4(e *Error, a net.IP) {
 	if a == nil {
 		e.Errorf("IP Address is nil")

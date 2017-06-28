@@ -15,6 +15,7 @@ func TestBootEnvCrud(t *testing.T) {
 		t.Errorf("Failed to create test OK template: %v", err)
 		return
 	}
+
 	tests := []crudTest{
 		{"Create Bootenv with nonexistent Name", dt.create, &BootEnv{p: dt}, false},
 		{"Create Bootenv with no templates", dt.create, &BootEnv{p: dt, Name: "test 1"}, true},
@@ -43,7 +44,6 @@ func TestBootEnvCrud(t *testing.T) {
 	} else {
 		t.Errorf("List function returned nil!!")
 	}
-
 	// We need a Machine that refers to one of our BootEnvs to
 	// test proper delete restrictions
 	machine := &Machine{p: dt, Name: "test 1", BootEnv: "available", Uuid: uuid.NewRandom()}

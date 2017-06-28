@@ -59,11 +59,11 @@ func TestMachineCrud(t *testing.T) {
 		{"Create named machine", dt.create, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn"}, true},
 		{"Create new machine with same UUID", dt.create, &Machine{p: dt, Uuid: okUUID, Name: "other.fqdn"}, false},
 		{"Create new machine with same name", dt.create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "default.fqdn"}, false},
-		{"Create new machine with invalid bootenv", dt.create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "badenv.fqdn", BootEnv: "blargh"}, false},
+		{"Create new machine with invalid bootenv", dt.create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "badenv.fqdn", BootEnv: "blargh"}, true},
 		{"Create new machine with bad address", dt.create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "badaddr.fqdn", BootEnv: "default", Address: net.ParseIP("127.0.0.1")}, false},
 		{"Create another known-good bootenv", dt.create, &BootEnv{p: dt, Name: "new", Templates: []TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "default"}}}, true},
 		{"Update node with different bootenv", dt.update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "new"}, true},
-		{"Update node with different bootenv", dt.update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "unavailable"}, false},
+		{"Update node with different bootenv", dt.update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "unavailable"}, true},
 		{"Remove machine that does not exist", dt.remove, &Machine{p: dt, Uuid: uuid.NewRandom()}, false},
 		{"Remove machine that does exist", dt.remove, &Machine{p: dt, Uuid: okUUID, BootEnv: "new"}, true},
 		{"Create named machine for patch", dt.create, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn"}, true},
@@ -90,7 +90,7 @@ func TestMachineCrud(t *testing.T) {
 	b := dt.NewMachine()
 	bes := b.List()
 	if bes != nil {
-		if len(bes) != 1 {
+		if len(bes) != 2 {
 			t.Errorf("List function should have returned: 1, but got %d\n", len(bes))
 		}
 	} else {

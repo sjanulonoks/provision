@@ -282,12 +282,13 @@ func NewDataTracker(backend store.SimpleStore,
 		thunkMux:          &sync.Mutex{},
 	}
 	objs := []store.KeySaver{
-		&Machine{p: res},
+		&Task{p: res},
 		&Param{p: res},
 		&Profile{p: res},
 		&User{p: res},
 		&Template{p: res},
 		&BootEnv{p: res},
+		&Machine{p: res},
 		&Subnet{p: res},
 		&Reservation{p: res},
 		&Lease{p: res},
@@ -312,12 +313,12 @@ func NewDataTracker(backend store.SimpleStore,
 		}
 	}
 	if _, ok := res.fetchOne(ignoreBoot, ignoreBoot.Name); !ok {
-		res.Save(ignoreBoot)
+		res.save(ignoreBoot)
 	}
 	if _, ok := res.fetchOne(res.NewProfile(), res.globalProfileName); !ok {
 		gp := AsProfile(res.NewProfile())
 		gp.Name = "global"
-		res.Save(gp)
+		res.save(gp)
 	}
 	users := res.objs["users"]
 	if len(users.d) == 0 {
@@ -499,6 +500,8 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 		res = p.NewSubnet()
 	case *Pref:
 		res = p.NewPref()
+	case *Task:
+		res = p.NewTask()
 	default:
 		panic("Unknown type of KeySaver passed to Clone")
 	}
@@ -622,21 +625,29 @@ func (p *DataTracker) FetchOne(ref store.KeySaver, key string) (store.KeySaver, 
 	return p.Clone(res), found
 }
 
-func (p *DataTracker) create(ref store.KeySaver) (bool, error) {
+func (p *DataTracker) create(ref store.KeySaver) (saved bool, err error) {
 	p.setDT(ref)
 	prefix := ref.Prefix()
 	key := ref.Key()
 	if key == "" {
 		return false, fmt.Errorf("dataTracker create %s: Empty key not allowed", prefix)
 	}
-	mux, _, found := p.lockedGet(prefix, key)
-	defer mux.Unlock()
-	if found {
-		return false, fmt.Errorf("dataTracker create %s: %s already exists", prefix, key)
-	}
-	saved, err := store.Create(ref)
+	saved, err = func() (bool, error) {
+		mux, _, found := p.lockedGet(prefix, key)
+		defer mux.Unlock()
+		if found {
+			return false, fmt.Errorf("dataTracker create %s: %s already exists", prefix, key)
+		}
+		saved, err := store.Create(ref)
+		if saved {
+			mux.add(ref)
+		}
+		return saved, err
+	}()
 	if saved {
-		mux.add(ref)
+		if v, ok := ref.(postValidator); ok {
+			v.canProceed()
+		}
 	}
 	return saved, err
 }
@@ -658,8 +669,8 @@ func (p *DataTracker) remove(ref store.KeySaver) (bool, error) {
 	prefix := ref.Prefix()
 	key := ref.Key()
 	mux, idx, found := p.lockedGet(prefix, key)
-	defer mux.Unlock()
 	if !found {
+		mux.Unlock()
 		err := &Error{
 			Code:  http.StatusNotFound,
 			Key:   key,
@@ -668,9 +679,16 @@ func (p *DataTracker) remove(ref store.KeySaver) (bool, error) {
 		err.Errorf("%s: DELETE %s: Not Found", err.Model, err.Key)
 		return false, err
 	}
-	removed, err := store.Remove(mux.d[idx])
+	item := mux.d[idx]
+	mux.Unlock()
+	removed, err := store.Remove(item)
 	if removed {
-		mux.remove(idx)
+		mux.Lock()
+		idx, found := mux.find(key)
+		if found {
+			mux.remove(idx)
+		}
+		mux.Unlock()
 	}
 	return removed, err
 }
@@ -693,7 +711,6 @@ func (p *DataTracker) Remove(ref store.KeySaver) (store.KeySaver, error) {
 func (p *DataTracker) Patch(ref store.KeySaver, key string, patch jsonpatch2.Patch) (store.KeySaver, error) {
 	prefix := ref.Prefix()
 	mux, idx, found := p.lockedGet(prefix, key)
-	defer mux.Unlock()
 	if !found {
 		err := &Error{
 			Code:  http.StatusNotFound,
@@ -701,6 +718,7 @@ func (p *DataTracker) Patch(ref store.KeySaver, key string, patch jsonpatch2.Pat
 			Model: prefix,
 		}
 		err.Errorf("%s: PATCH %s: Not Found", err.Model, err.Key)
+		mux.Unlock()
 		return nil, err
 	}
 	target := mux.d[idx]
@@ -713,19 +731,26 @@ func (p *DataTracker) Patch(ref store.KeySaver, key string, patch jsonpatch2.Pat
 	if patchErr == nil {
 		toSave := ref.New()
 		if err := json.Unmarshal(resBuf, &toSave); err != nil {
+			mux.Unlock()
 			return nil, err
 		}
 		p.setDT(toSave)
 		saved, err := store.Update(toSave)
 		if !saved {
+			mux.Unlock()
 			return toSave, err
 		}
 		mux.d[idx] = toSave
-		if fs, ok := ref.(followUpSaver); ok {
+		mux.Unlock()
+		if v, ok := toSave.(postValidator); ok {
+			v.canProceed()
+		}
+		if fs, ok := toSave.(followUpSaver); ok {
 			fs.followUpSave()
 		}
 		return p.Clone(toSave), nil
 	}
+	mux.Unlock()
 	err := &Error{
 		Code:  http.StatusNotAcceptable,
 		Key:   key,
@@ -736,26 +761,35 @@ func (p *DataTracker) Patch(ref store.KeySaver, key string, patch jsonpatch2.Pat
 	return nil, err
 }
 
-func (p *DataTracker) update(ref store.KeySaver) (bool, error) {
+func (p *DataTracker) update(ref store.KeySaver) (saved bool, err error) {
 	prefix := ref.Prefix()
 	key := ref.Key()
-	mux, idx, found := p.lockedGet(prefix, key)
-	defer mux.Unlock()
-	if !found {
-		err := &Error{
-			Code:  http.StatusNotFound,
-			Key:   key,
-			Model: prefix,
+	saved, err = func() (bool, error) {
+		mux, idx, found := p.lockedGet(prefix, key)
+		defer mux.Unlock()
+		if !found {
+			err := &Error{
+				Code:  http.StatusNotFound,
+				Key:   key,
+				Model: prefix,
+			}
+			err.Errorf("%s: PUT %s: Not Found", err.Model, err.Key)
+			return false, err
 		}
-		err.Errorf("%s: PUT %s: Not Found", err.Model, err.Key)
-		return false, err
+		p.setDT(ref)
+		var ok bool
+		ok, err = store.Update(ref)
+		if ok {
+			mux.d[idx] = ref
+		}
+		return ok, err
+	}()
+	if saved {
+		if v, ok := ref.(postValidator); ok {
+			v.canProceed()
+		}
 	}
-	p.setDT(ref)
-	ok, err := store.Update(ref)
-	if ok {
-		mux.d[idx] = ref
-	}
-	return ok, err
+	return saved, err
 }
 
 // Update updates the passed thing, and updates the local cache iff
@@ -772,22 +806,30 @@ func (p *DataTracker) Update(ref store.KeySaver) (store.KeySaver, error) {
 	return ref, err
 }
 
-func (p *DataTracker) save(ref store.KeySaver) (bool, error) {
+func (p *DataTracker) save(ref store.KeySaver) (saved bool, err error) {
 	prefix := ref.Prefix()
 	key := ref.Key()
-	mux, idx, found := p.lockedGet(prefix, key)
-	defer mux.Unlock()
-	p.setDT(ref)
-	ok, err := store.Save(ref)
-	if !ok {
-		return ok, err
+	saved, err = func() (bool, error) {
+		mux, idx, found := p.lockedGet(prefix, key)
+		defer mux.Unlock()
+		p.setDT(ref)
+		ok, err := store.Save(ref)
+		if !ok {
+			return ok, err
+		}
+		if found {
+			mux.d[idx] = ref
+		} else {
+			mux.add(ref)
+		}
+		return true, nil
+	}()
+	if saved {
+		if v, ok := ref.(postValidator); ok {
+			v.canProceed()
+		}
 	}
-	if found {
-		mux.d[idx] = ref
-	} else {
-		mux.add(ref)
-	}
-	return ok, err
+	return saved, err
 }
 
 // Save saves the passed thing, updating the local cache iff the save

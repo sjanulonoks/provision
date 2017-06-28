@@ -101,11 +101,10 @@ func TestRenderData(t *testing.T) {
 	pp := machine.GetParams()
 	pp["foo"] = "bar"
 	machine.SetParams(pp)
-
 	genLoc := path.Join("/", "machines", machine.UUID(), "file")
 	out, err := dt.FS.Open(genLoc, nil)
 	if err != nil || out == nil {
-		t.Errorf("Failed to get tmeplate for %s: %v\n%#v", genLoc, err, out)
+		t.Errorf("Failed to get template for %s: %v\n%#v", genLoc, err, out)
 		return
 	}
 	buf, err := ioutil.ReadAll(out)

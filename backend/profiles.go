@@ -14,6 +14,7 @@ import (
 // These can be assigned to a machine's profile list.
 // swagger:model
 type Profile struct {
+	Validation
 	// The name of the profile.  This must be unique across all
 	// profiles.
 	//
@@ -26,8 +27,19 @@ type Profile struct {
 	// for BootEnv, as documented by that boot environment's
 	// RequiredParams and OptionalParams.
 	Params map[string]interface{}
+	// Profiles can also have an associated list of Tasks
+	Tasks []string
 
 	p *DataTracker
+}
+
+func (p *Profile) HasTask(s string) bool {
+	for _, p := range p.Tasks {
+		if p == s {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Profile) Indexes() map[string]index.Maker {
@@ -113,15 +125,15 @@ func (p *Profile) OnCreate() error {
 
 func (p *Profile) BeforeDelete() error {
 	e := &Error{Code: 422, Type: ValidationError, o: p}
-
-	// Make sure no machine is using this profile.
-	machines := AsMachines(p.p.unlockedFetchAll(p.p.NewMachine().Prefix()))
-	for _, m := range machines {
+	objs, unlocker := p.p.lockEnts("machines")
+	defer unlocker()
+	machines := objs[0]
+	for i := range machines.d {
+		m := AsMachine(machines.d[i])
 		if m.HasProfile(p.Name) {
 			e.Errorf("Machine %s is using profile %s", m.UUID(), p.Name)
 		}
 	}
-
 	return e.OrNil()
 }
 
@@ -153,20 +165,36 @@ func AsProfiles(o []store.KeySaver) []*Profile {
 }
 
 func (p *Profile) BeforeSave() error {
-	if err := index.CheckUnique(p, p.p.objs[p.Prefix()].d); err != nil {
-		return err
-	}
-	if len(p.Params) == 0 {
-		return nil
-	}
-	err := &Error{o: p}
-	ref := &Param{p: p.p}
+	err := &Error{Code: 422, Type: ValidationError, o: p}
+	err.Merge(index.CheckUnique(p, p.p.objs[p.Prefix()].d))
+	objs, unlocker := p.p.lockEnts("params")
+	defer unlocker()
 	for k, v := range p.Params {
-		param, found := p.p.fetchOne(ref, k)
+		pIdx, found := objs[0].find(k)
 		if !found {
 			continue
 		}
-		err.Merge(AsParam(param).Validate(v))
+		param := AsParam(objs[0].d[pIdx])
+		err.Merge(param.Validate(v))
 	}
 	return err.OrNil()
+}
+
+func (p *Profile) AfterSave() {
+	p.deferred(func() bool {
+		if len(p.Params) == 0 {
+			return true
+		}
+		objs, unlocker := p.p.lockEnts("tasks", "profiles")
+		defer unlocker()
+		err := &Error{o: p}
+		for i, taskName := range p.Tasks {
+			if _, found := objs[0].find(taskName); !found {
+				err.Errorf("Task %s (at %d) does not exist", taskName, i)
+			}
+		}
+		p.Available = !err.ContainsError()
+		p.Errors = err.Messages
+		return true
+	})
 }

@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -19,41 +18,6 @@ import (
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend/index"
 )
-
-// TemplateInfo holds information on the templates in the boot
-// environment that will be expanded into files.
-//
-// swagger:model
-type TemplateInfo struct {
-	// Name of the template
-	//
-	// required: true
-	Name string
-	// A text/template that specifies how to create
-	// the final path the template should be
-	// written to.
-	//
-	// required: true
-	Path string
-	// The ID of the template that should be expanded.  Either
-	// this or Contents should be set
-	//
-	// required: false
-	ID string
-	// The contents that should be used when this template needs
-	// to be expanded.  Either this or ID should be set.
-	//
-	// required: false
-	Contents string
-	pathTmpl *template.Template
-}
-
-func (ti *TemplateInfo) id() string {
-	if ti.ID == "" {
-		return ti.Name
-	}
-	return ti.ID
-}
 
 // OsInfo holds information about the operating system this BootEnv
 // maps to.  Most of this information is optional for now.
@@ -85,6 +49,7 @@ type OsInfo struct {
 //
 // swagger:model
 type BootEnv struct {
+	Validation
 	// The name of the boot environment.  Boot environments that install
 	// an operating system must end in '-install'.
 	//
@@ -132,28 +97,22 @@ type BootEnv struct {
 	// renderer based upon the Machine.Params
 	//
 	OptionalParams []string
-	// Whether the boot environment is useable.  This can only be set to
-	// `true` if there are no Errors, and if there are any errors
-	// Avaialble will be set to `false`, and will require user
-	// intervention to set it back to `true`.
-	//
-	// required: true
-	Available bool
-	// Any errors that were recorded in the processing of this boot
-	// environment.
-	//
-	// read only: true
-	Errors []string
-	// OnlyUnknown indicates whether this bootenv can be used without a
-	// machine.  Only bootenvs with this flag set to `true` be used for
-	// the unknownBootEnv preference.
-	//
-	// required: true
 	OnlyUnknown    bool
+	// The list of initial machine tasks that the boot environment should get
+	Tasks          []string
 	bootParamsTmpl *template.Template
 	p              *DataTracker
 	rootTemplate   *template.Template
 	tmplMux        sync.Mutex
+}
+
+func (b *BootEnv) HasTask(s string) bool {
+	for _, p := range b.Tasks {
+		if p == s {
+			return true
+		}
+	}
+	return false
 }
 
 func (b *BootEnv) Indexes() map[string]index.Maker {
@@ -254,54 +213,11 @@ func (b *BootEnv) localPathFor(f string) string {
 }
 
 func (b *BootEnv) genRoot(commonRoot *template.Template, e *Error) *template.Template {
-	var res *template.Template
-	var err error
-	if commonRoot == nil {
-		res = template.New("")
-	} else {
-		res, err = commonRoot.Clone()
-	}
-	if err != nil {
-		e.Errorf("Error cloning commonRoot: %v", err)
-		return nil
-	}
-	buf := &bytes.Buffer{}
-	for i := range b.Templates {
-		ti := &b.Templates[i]
-		if ti.Name == "" {
-			e.Errorf("Templates[%d] has no Name", i)
-			continue
+	res := MergeTemplates(commonRoot, b.Templates, e)
+	for i, tmpl := range b.Templates {
+		if tmpl.Path == "" {
+			e.Errorf("Template[%d] needs a Path", i)
 		}
-		if ti.Path == "" {
-			e.Errorf("Templates[%d] has no Path", i)
-			continue
-		} else {
-			pathTmpl, err := template.New(ti.Name).Parse(ti.Path)
-			if err != nil {
-				e.Errorf("Error compiling path template %s (%s): %v",
-					ti.Name,
-					ti.Path,
-					err)
-				continue
-			} else {
-				ti.pathTmpl = pathTmpl.Option("missingkey=error")
-			}
-		}
-		if ti.ID != "" {
-			if res.Lookup(ti.ID) == nil {
-				e.Errorf("Templates[%d]: No common template for %s", i, ti.ID)
-			}
-			continue
-		}
-		if ti.Contents == "" {
-			e.Errorf("Templates[%d] has both an empty ID and contents", i)
-		}
-		fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}\n`, ti.Name, ti.Contents)
-	}
-	_, err = res.Parse(buf.String())
-	if err != nil {
-		e.Errorf("Error parsing inline templates: %v", err)
-		return nil
 	}
 	if b.BootParams != "" {
 		tmpl, err := template.New("machine").Parse(b.BootParams)
@@ -419,95 +335,110 @@ func (b *BootEnv) BeforeSave() error {
 	}
 	b.rootTemplate = root
 	b.tmplMux.Unlock()
-	// Otherwise, we will save the BootEnv, but record
-	// the list of errors and mark it as not available.
-	//
-	// First, we have to have an iPXE template, or a PXELinux and eLILO template, or all three.
-	seenPxeLinux := false
-	seenELilo := false
-	seenIPXE := false
-	for _, template := range b.Templates {
-		if template.Name == "pxelinux" {
-			seenPxeLinux = true
-		}
-		if template.Name == "elilo" {
-			seenELilo = true
-		}
-		if template.Name == "ipxe" {
-			seenIPXE = true
-		}
-	}
-	if !seenIPXE {
-		if !(seenPxeLinux && seenELilo) {
-			e.Errorf("bootenv: Missing elilo or pxelinux template")
-		}
-	}
-	// Make sure the ISO for this bootenv has been exploded locally so that
-	// the boot env can use its contents.
-	if b.OS.IsoFile != "" {
-		b.explodeIso(e)
-	}
-	// If we have a non-empty Kernel, make sure it points at something kernel-ish.
-	if b.Kernel != "" {
-		kPath := b.localPathFor(b.Kernel)
-		kernelStat, err := os.Stat(kPath)
-		if err != nil {
-			e.Errorf("bootenv: %s: missing kernel %s (%s)",
-				b.Name,
-				b.Kernel,
-				kPath)
-		} else if !kernelStat.Mode().IsRegular() {
-			e.Errorf("bootenv: %s: invalid kernel %s (%s)",
-				b.Name,
-				b.Kernel,
-				kPath)
-		}
-	}
-	// Ditto for all the initrds.
-	if len(b.Initrds) > 0 {
-		for _, initrd := range b.Initrds {
-			iPath := b.localPathFor(initrd)
-			initrdStat, err := os.Stat(iPath)
-			if err != nil {
-				e.Errorf("bootenv: %s: missing initrd %s (%s)",
-					b.Name,
-					initrd,
-					iPath)
-				continue
-			}
-			if !initrdStat.Mode().IsRegular() {
-				e.Errorf("bootenv: %s: invalid initrd %s (%s)",
-					b.Name,
-					initrd,
-					iPath)
-			}
-		}
-	}
-	if err := index.CheckUnique(b, b.p.objs[b.Prefix()].d); err != nil {
-		e.Merge(err)
-	}
-	b.Errors = e.Messages
-	b.Available = (len(b.Errors) == 0)
-
 	return nil
+}
+
+func (b *BootEnv) AfterSave() {
+	b.deferred(func() bool {
+		// First, we have to have an iPXE template, or a PXELinux and eLILO template, or all three.
+		e := &Error{}
+		muxes, unlocker := b.p.lockEnts("tasks", "bootenvs")
+		defer unlocker()
+		tasks := muxes[0]
+		seenPxeLinux := false
+		seenELilo := false
+		seenIPXE := false
+		for _, template := range b.Templates {
+			if template.Name == "pxelinux" {
+				seenPxeLinux = true
+			}
+			if template.Name == "elilo" {
+				seenELilo = true
+			}
+			if template.Name == "ipxe" {
+				seenIPXE = true
+			}
+		}
+		if !seenIPXE {
+			if !(seenPxeLinux && seenELilo) {
+				e.Errorf("bootenv: Missing elilo or pxelinux template")
+			}
+		}
+		// Make sure the ISO for this bootenv has been exploded locally so that
+		// the boot env can use its contents.
+		if b.OS.IsoFile != "" {
+			b.explodeIso(e)
+		}
+		// If we have a non-empty Kernel, make sure it points at something kernel-ish.
+		if b.Kernel != "" {
+			kPath := b.localPathFor(b.Kernel)
+			kernelStat, err := os.Stat(kPath)
+			if err != nil {
+				e.Errorf("bootenv: %s: missing kernel %s (%s)",
+					b.Name,
+					b.Kernel,
+					kPath)
+			} else if !kernelStat.Mode().IsRegular() {
+				e.Errorf("bootenv: %s: invalid kernel %s (%s)",
+					b.Name,
+					b.Kernel,
+					kPath)
+			}
+		}
+		// Ditto for all the initrds.
+		if len(b.Initrds) > 0 {
+			for _, initrd := range b.Initrds {
+				iPath := b.localPathFor(initrd)
+				initrdStat, err := os.Stat(iPath)
+				if err != nil {
+					e.Errorf("bootenv: %s: missing initrd %s (%s)",
+						b.Name,
+						initrd,
+						iPath)
+					continue
+				}
+				if !initrdStat.Mode().IsRegular() {
+					e.Errorf("bootenv: %s: invalid initrd %s (%s)",
+						b.Name,
+						initrd,
+						iPath)
+				}
+			}
+		}
+		if err := index.CheckUnique(b, b.p.objs[b.Prefix()].d); err != nil {
+			e.Merge(err)
+		}
+		for _, taskName := range b.Tasks {
+			if _, found := tasks.find(taskName); !found {
+				e.Errorf("Task %s does not exist", taskName)
+			}
+		}
+		b.Errors = e.Messages
+		b.Available = !e.ContainsError()
+		return true
+	})
 }
 
 func (b *BootEnv) BeforeDelete() error {
 	e := &Error{Code: 409, Type: StillInUseError, o: b}
-	var pref string
-	var err error
+	objs, unlocker := b.p.lockEnts("preferences", "machines")
+	defer unlocker()
+	prefs := objs[0]
+	machines := objs[1]
+	prefToFind := ""
 	if b.OnlyUnknown {
-		pref, err = b.p.Pref("unknownBootEnv")
-		if err == nil && pref == b.Name {
-			e.Errorf("BootEnv %s is the active unknownBootEnv, cannot remove it", pref)
-		}
+		prefToFind = "unknownBootEnv"
 	} else {
-		pref, err = b.p.Pref("defaultBootEnv")
-		if err == nil && pref == b.Name {
-			e.Errorf("BootEnv %s is the active defaultBootEnv, cannot remove it", pref)
-		}
-		machines := AsMachines(b.p.FetchAll(b.p.NewMachine()))
-		for _, machine := range machines {
+		prefToFind = "defaultBootEnv"
+	}
+
+	idx, found := prefs.find(prefToFind)
+	if found && AsPref(prefs.d[idx]).Name == b.Name {
+		e.Errorf("BootEnv %s is the active %s, cannot remove it", b.Name, prefToFind)
+	}
+	if !b.OnlyUnknown {
+		for i := range machines.d {
+			machine := AsMachine(machines.d[i])
 			if machine.BootEnv != b.Name {
 				continue
 			}
@@ -549,39 +480,21 @@ func AsBootEnvs(o []store.KeySaver) []*BootEnv {
 	return res
 }
 
+func (b *BootEnv) renderInfo() ([]TemplateInfo, []string) {
+	return b.Templates, b.RequiredParams
+}
+
+func (b *BootEnv) templates() *template.Template {
+	return b.rootTemplate
+}
+
 func (b *BootEnv) Render(m *Machine, e *Error) renderers {
-	var missingParams []string
 	if len(b.RequiredParams) > 0 && m == nil {
 		e.Errorf("Machine is nil or does not have params")
 		return nil
 	}
 	r := newRenderData(b.p, m, b)
-	for _, param := range b.RequiredParams {
-		if !r.ParamExists(param) {
-			missingParams = append(missingParams, param)
-		}
-	}
-	if len(missingParams) > 0 {
-		e.Errorf("missing required machine params for %s:\n %v", m.Name, missingParams)
-	}
-	rts := make(renderers, len(b.Templates))
-
-	for i := range b.Templates {
-		ti := &b.Templates[i]
-
-		// first, render the path
-		buf := &bytes.Buffer{}
-		if err := ti.pathTmpl.Execute(buf, r); err != nil {
-			e.Errorf("Error rendering template %s path %s: %v",
-				ti.Name,
-				ti.Path,
-				err)
-			continue
-		}
-		tmplPath := path.Clean("/" + buf.String())
-		rts[i] = newRenderedTemplate(r, ti.id(), tmplPath)
-	}
-	return renderers(rts)
+	return r.makeRenderers(e)
 }
 
 func (b *BootEnv) followUpSave() {
