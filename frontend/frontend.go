@@ -16,6 +16,7 @@ import (
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/embedded"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -165,6 +166,15 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 	}
 
 	mgmtApi := gin.Default()
+
+	// CORS Support
+	mgmtApi.Use(cors.New(cors.Config{
+		AllowAllOrigins:  true,
+		AllowCredentials: true,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"},
+		AllowHeaders:     []string{"Origin", "X-Requested-With", "Content-Type", "Cookie", "Authorization", "WWW-Authenticate", "X-Return-Attributes"},
+		ExposeHeaders:    []string{"Content-Length", "WWW-Authenticate", "Set-Cookie", "Access-Control-Allow-Headers", "Access-Control-Allow-Credentials", "Access-Control-Allow-Origin", "X-Return-Attributes"},
+	}))
 
 	apiGroup := mgmtApi.Group("/api/v3")
 	apiGroup.Use(userAuth())
