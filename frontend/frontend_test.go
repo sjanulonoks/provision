@@ -210,6 +210,14 @@ func TestRoot(t *testing.T) {
 	localDTI.ValidateCode(t, 301)
 }
 
+func TestUxRedirect(t *testing.T) {
+	localDTI := testFrontend()
+
+	req, _ := http.NewRequest("GET", "/ux", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, 301)
+}
+
 func TestUIBase(t *testing.T) {
 	localDTI := testFrontend()
 
