@@ -1,5 +1,5 @@
 hash: f2b7f8afb9fc96899eb501cf1519c52b31d313f8242034e919b619ecc6e24d4d
-updated: 2017-06-29T17:03:39.239167362-05:00
+updated: 2017-07-05T12:18:32.318776796-05:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 71551cef584cae1b2e01c37e8c0e1f1160eedd6f
@@ -26,6 +26,8 @@ imports:
   version: 0ca9ea5df5451ffdf184b4428c902747c2c11cd7
 - name: github.com/gin-contrib/cors
   version: f894742c196d528a81bd99556ba819bd06d71a4e
+- name: github.com/gin-contrib/location
+  version: 08e715d1e649c331ce65188fff4b276799de6dea
 - name: github.com/gin-gonic/gin
   version: e2212d40c62a98b388a5eb48ecbdcf88534688ba
   subpackages:
