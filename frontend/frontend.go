@@ -17,6 +17,7 @@ import (
 	"github.com/digitalrebar/provision/embedded"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/location"
 	"github.com/gin-gonic/gin"
 )
 
@@ -100,7 +101,7 @@ func NewDefaultAuthSource(dt DTI) (das AuthSource) {
 	return
 }
 
-func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
+func NewFrontend(dt DTI, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {
@@ -176,6 +177,8 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 		ExposeHeaders:    []string{"Content-Length", "WWW-Authenticate", "Set-Cookie", "Access-Control-Allow-Headers", "Access-Control-Allow-Credentials", "Access-Control-Allow-Origin", "X-Return-Attributes"},
 	}))
 
+	mgmtApi.Use(location.Default())
+
 	apiGroup := mgmtApi.Group("/api/v3")
 	apiGroup.Use(userAuth())
 
@@ -219,9 +222,16 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 		mgmtApi.Static("/ui", devUI)
 	}
 
+	mgmtApi.GET("/ux", func(c *gin.Context) {
+		incomingUrl := location.Get(c)
+
+		url := fmt.Sprintf("https://rackn.github.io/provision-ux/#/e/%s", incomingUrl.Host)
+		c.Redirect(http.StatusMovedPermanently, url)
+	})
+
 	// root path, forward to UI
 	mgmtApi.GET("/", func(c *gin.Context) {
-		c.Redirect(302, "/ui/")
+		c.Redirect(http.StatusMovedPermanently, "/ui/")
 	})
 
 	return

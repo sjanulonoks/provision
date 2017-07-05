@@ -132,7 +132,7 @@ func testFrontendDev(devUI string) *LocalDTI {
 
 	localDTI := &LocalDTI{}
 	logger := log.New(os.Stderr, "bootenv-test", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-	localDTI.f = NewFrontend(localDTI, logger, tmpDir, devUI, &TestAuthSource{})
+	localDTI.f = NewFrontend(localDTI, logger, "127.0.0.1", 8092, tmpDir, devUI, &TestAuthSource{})
 
 	return localDTI
 }
@@ -207,7 +207,15 @@ func TestRoot(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", "/", nil)
 	localDTI.RunTest(req)
-	localDTI.ValidateCode(t, 302)
+	localDTI.ValidateCode(t, 301)
+}
+
+func TestUxRedirect(t *testing.T) {
+	localDTI := testFrontend()
+
+	req, _ := http.NewRequest("GET", "/ux", nil)
+	localDTI.RunTest(req)
+	localDTI.ValidateCode(t, 301)
 }
 
 func TestUIBase(t *testing.T) {
