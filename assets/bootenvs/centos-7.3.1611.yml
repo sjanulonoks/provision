@@ -1,5 +1,4 @@
-BootParams: ksdevice=bootif ks={{.Machine.Url}}/compute.ks method={{.Env.InstallUrl}}
-  inst.geoloc=0
+BootParams: ksdevice=bootif ks={{.Machine.Url}}/compute.ks method={{.Env.InstallUrl}} inst.geoloc=0 -- console=ttyS0,115200 console=ttyS1,115200 console=tty0
 Initrds:
 - images/pxeboot/initrd.img
 Kernel: images/pxeboot/vmlinuz
