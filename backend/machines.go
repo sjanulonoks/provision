@@ -33,6 +33,10 @@ type Machine struct {
 	// required: true
 	// swagger:strfmt uuid
 	Uuid uuid.UUID
+	// The UUID of the job that is currently running on the machine.
+	//
+	// swagger:strfmt uuid
+	CurrentJob uuid.UUID
 	// The IPv4 address of the machine that should be used for PXE
 	// purposes.  Note that this field does not directly tie into DHCP
 	// leases or reservations -- the provisioner relies solely on this

@@ -76,6 +76,10 @@ func (t *Task) setDT(dp *DataTracker) {
 	t.p = dp
 }
 
+func (t *Task) List() []*Task {
+	return AsTasks(t.p.FetchAll(t))
+}
+
 func (t *Task) Indexes() map[string]index.Maker {
 	fix := AsTask
 	return map[string]index.Maker{
@@ -144,10 +148,6 @@ func (t *Task) BeforeDelete() error {
 		}
 	}
 	return e.OrNil()
-}
-
-func (t *Task) List() []*Task {
-	return AsTasks(t.p.FetchAll(t))
 }
 
 func (t *Task) renderInfo() ([]TemplateInfo, []string) {
