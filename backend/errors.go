@@ -21,7 +21,7 @@ const (
 // swagger: model
 type Validation struct {
 	// Validated tracks whether or not the model has been validated.
-	// required: true
+	// read only: true
 	Validated bool
 	// Available tracks whether or not the model passed validation.
 	// required: true
