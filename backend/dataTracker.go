@@ -318,7 +318,7 @@ func NewDataTracker(backend store.SimpleStore,
 	if _, ok := res.fetchOne(res.NewProfile(), res.globalProfileName); !ok {
 		gp := AsProfile(res.NewProfile())
 		gp.Name = "global"
-		res.save(gp)
+		res.Create(gp)
 	}
 	users := res.objs["users"]
 	if len(users.d) == 0 {
@@ -549,11 +549,11 @@ func (p *DataTracker) fetchAll(ref store.KeySaver) []store.KeySaver {
 func (p *DataTracker) FetchAll(ref store.KeySaver) []store.KeySaver {
 	prefix := ref.Prefix()
 	res := p.lockFor(prefix)
+	defer res.Unlock()
 	ret := make([]store.KeySaver, len(res.d))
 	for i := range res.d {
 		ret[i] = p.Clone(res.d[i])
 	}
-	res.Unlock()
 	return ret
 }
 

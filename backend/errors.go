@@ -21,11 +21,14 @@ const (
 // swagger: model
 type Validation struct {
 	// Validated tracks whether or not the model has been validated.
+	// required: true
 	Validated bool
 	// Available tracks whether or not the model passed validation.
+	// required: true
 	Available bool
 	// If there are any errors in the validation process, they will be
 	// available here.
+	// read only: true
 	Errors  []string
 	proceed chan bool
 }
@@ -34,6 +37,7 @@ func (v *Validation) canProceed() bool {
 	return <-v.proceed
 }
 
+// The thunk is required to set Validated to true under locks.
 func (v *Validation) deferred(thunk func() bool) {
 	if v.proceed == nil {
 		v.proceed = make(chan bool)
@@ -41,7 +45,6 @@ func (v *Validation) deferred(thunk func() bool) {
 	v.Validated = false
 	go func() {
 		res := thunk()
-		v.Validated = true
 		v.proceed <- res
 	}()
 }

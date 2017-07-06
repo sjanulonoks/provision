@@ -182,11 +182,13 @@ func (p *Profile) BeforeSave() error {
 
 func (p *Profile) AfterSave() {
 	p.deferred(func() bool {
-		if len(p.Params) == 0 {
-			return true
-		}
 		objs, unlocker := p.p.lockEnts("tasks", "profiles")
 		defer unlocker()
+		if len(p.Params) == 0 {
+			p.Available = true
+			p.Validated = true
+			return true
+		}
 		err := &Error{o: p}
 		for i, taskName := range p.Tasks {
 			if _, found := objs[0].find(taskName); !found {
@@ -195,6 +197,7 @@ func (p *Profile) AfterSave() {
 		}
 		p.Available = !err.ContainsError()
 		p.Errors = err.Messages
+		p.Validated = true
 		return true
 	})
 }

@@ -97,7 +97,12 @@ type BootEnv struct {
 	// renderer based upon the Machine.Params
 	//
 	OptionalParams []string
-	OnlyUnknown    bool
+	// OnlyUnknown indicates whether this bootenv can be used without a
+	// machine.  Only bootenvs with this flag set to `true` be used for
+	// the unknownBootEnv preference.
+	//
+	// required: true
+	OnlyUnknown bool
 	// The list of initial machine tasks that the boot environment should get
 	Tasks          []string
 	bootParamsTmpl *template.Template
@@ -415,6 +420,7 @@ func (b *BootEnv) AfterSave() {
 		}
 		b.Errors = e.Messages
 		b.Available = !e.ContainsError()
+		b.Validated = true
 		return true
 	})
 }

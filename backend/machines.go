@@ -341,6 +341,7 @@ func (n *Machine) AfterSave() {
 		}
 		n.Errors = e.Messages
 		n.Available = !e.ContainsError()
+		n.Validated = true
 		return true
 	})
 }

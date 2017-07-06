@@ -18,11 +18,11 @@ func TestBootEnvList(t *testing.T) {
 	validateBEList(t, localDTI, "/api/v3/bootenvs", []string{})
 
 	localDTI.ListValue = []store.KeySaver{
-		&backend.BootEnv{Name: "susan", Available: true},
-		&backend.BootEnv{Name: "john", Available: false},
-		&backend.BootEnv{Name: "fred", Available: true},
-		&backend.BootEnv{Name: "jenny", Available: false},
-		&backend.BootEnv{Name: "tess", Available: true},
+		&backend.BootEnv{Name: "susan", Validation: backend.Validation{Available: true}},
+		&backend.BootEnv{Name: "john", Validation: backend.Validation{Available: false}},
+		&backend.BootEnv{Name: "fred", Validation: backend.Validation{Available: true}},
+		&backend.BootEnv{Name: "jenny", Validation: backend.Validation{Available: false}},
+		&backend.BootEnv{Name: "tess", Validation: backend.Validation{Available: true}},
 	}
 
 	// This tests the filter frontend, not the bootenvs.
