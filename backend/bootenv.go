@@ -303,11 +303,13 @@ func (b *BootEnv) explodeIso(e *Error) {
 	hash := hex.EncodeToString(hasher.Sum(nil))
 	// This will wind up being saved along with the rest of the
 	// hash because explodeIso is called by OnChange before the struct gets saved.
-	if b.OS.IsoSha256 == "" {
-		b.OS.IsoSha256 = hash
-	}
+	/*
+		if b.OS.IsoSha256 == "" {
+			b.OS.IsoSha256 = hash
+		}
+	*/
 
-	if hash != b.OS.IsoSha256 {
+	if b.OS.IsoSha256 != "" && hash != b.OS.IsoSha256 {
 		e.Errorf("Explode ISO: SHA256 bad. actual: %v expected: %v", hash, b.OS.IsoSha256)
 		return
 	}
