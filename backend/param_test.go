@@ -9,6 +9,8 @@ import (
 func TestParamsCrud(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
+	d, unlocker := dt.LockEnts("profiles", "params")
+	defer unlocker()
 	tests := []crudTest{
 		{"Create empty profile", dt.Create, &Param{p: dt}, false},
 		{"Create new profile with name", dt.Create, &Param{p: dt, Name: "Test Param"}, false},
@@ -27,11 +29,10 @@ func TestParamsCrud(t *testing.T) {
 		{"Delete Nonexistent Param", dt.Remove, &Param{p: dt, Name: "Test Param"}, false},
 	}
 	for _, test := range tests {
-		test.Test(t)
+		test.Test(t, d)
 	}
 	// List test.
-	b := dt.NewParam()
-	bes := b.List()
+	bes := d("profiles").Items()
 	if bes != nil {
 		if len(bes) != 1 {
 			t.Errorf("List function should have returned: 1, but got %d\n", len(bes))

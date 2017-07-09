@@ -297,6 +297,7 @@ func (n *Machine) BeforeSave() error {
 	var env, oldEnv *BootEnv
 	if nbFound := bootenvs.Find(n.BootEnv); nbFound == nil {
 		e.Errorf("Bootenv %s does not exist", n.BootEnv)
+		return e
 	} else {
 		env = AsBootEnv(nbFound)
 	}

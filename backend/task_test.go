@@ -9,8 +9,10 @@ import (
 func TestTaskCrud(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
+	d, unlocker := dt.LockEnts("templates", "tasks", "bootenvs")
+	defer unlocker()
 	tmpl := &Template{p: dt, ID: "ok", Contents: "{{ .Env.Name }}"}
-	if ok, err := dt.Create(tmpl); !ok {
+	if ok, err := dt.Create(d, tmpl); !ok {
 		t.Errorf("Failed to create test OK template: %v", err)
 		return
 	}
@@ -26,12 +28,11 @@ func TestTaskCrud(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test.Test(t)
+		test.Test(t, d)
 	}
 
 	// List test.
-	b := dt.NewTask()
-	bes := b.List()
+	bes := d("tasks").Items()
 	if bes != nil {
 		if len(bes) != 3 {
 			t.Errorf("List function should have returned: 5, but got %d\n", len(bes))

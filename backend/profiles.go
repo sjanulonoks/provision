@@ -149,7 +149,7 @@ func AsProfiles(o []store.KeySaver) []*Profile {
 func (p *Profile) BeforeSave() error {
 	err := &Error{Code: 422, Type: ValidationError, o: p}
 	err.Merge(index.CheckUnique(p, p.stores("profiles").Items()))
-	params := p.stores("parameters")
+	params := p.stores("params")
 	for k, v := range p.Params {
 		if pIdx := params.Find(k); pIdx != nil {
 			param := AsParam(pIdx)

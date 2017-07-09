@@ -9,6 +9,8 @@ import (
 func TestPreferences(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
+	d, unlocker := dt.LockEnts("preferences", "bootenvs")
+	defer unlocker()
 	if be, err := dt.Pref("defaultBootEnv"); err != nil {
 		t.Errorf("Expected to get a defaultBootEnv preference, got nothing")
 	} else {
@@ -21,29 +23,28 @@ func TestPreferences(t *testing.T) {
 	}
 	prefs := map[string]string{}
 	prefs["unknownBootEnv"] = "ignore"
-	if err := dt.SetPrefs(prefs); err != nil {
+	if err := dt.SetPrefs(d, prefs); err != nil {
 		t.Errorf("Unexpected error setting prefs: %v", err)
 	} else {
 		t.Logf("Set unknownBootEnv to ignore")
 	}
 	prefs["defaultBootEnv"] = "default"
-	if err := dt.SetPrefs(prefs); err != nil {
+	if err := dt.SetPrefs(d, prefs); err != nil {
 		t.Logf("Expected error setting prefs: %v", err)
 	} else {
 		t.Errorf("Should have failed setting defaultBootEnv to default")
 	}
 	prefs["defaultBootEnv"] = "ignore"
-	if err := dt.SetPrefs(prefs); err != nil {
+	if err := dt.SetPrefs(d, prefs); err != nil {
 		t.Errorf("Unexpected error setting prefs: %v", err)
 	} else {
 		t.Logf("Set defaultBootEnv to ignore")
 	}
 	prefs["foo"] = "bar"
-	if err := dt.SetPrefs(prefs); err != nil {
+	if err := dt.SetPrefs(d, prefs); err != nil {
 		t.Logf("Expected error setting prefs: %v", err)
 	} else {
 		t.Errorf("Should have failed setting foo to bar")
 	}
 	dt.Prefs()
-
 }

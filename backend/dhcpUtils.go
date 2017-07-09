@@ -15,7 +15,7 @@ import (
 // midlayer must NAK the request.
 type LeaseNAK error
 
-func findLease(d Stores, strat, token string, req net.IP) (lease *Lease, err error) {
+func findLease(d Stores, dt *DataTracker, strat, token string, req net.IP) (lease *Lease, err error) {
 	reservations, leases := d("reservations"), d("leases")
 	hexreq := Hexaddr(req.To4())
 	found := leases.Find(hexreq)
@@ -39,7 +39,7 @@ func findLease(d Stores, strat, token string, req net.IP) (lease *Lease, err err
 		if reservation.Strategy != lease.Strategy ||
 			reservation.Token != lease.Token {
 			lease.Invalidate()
-			store.Save(lease)
+			dt.Save(d, lease)
 			err = LeaseNAK(fmt.Errorf("Reservation %s (%s:%s conflicts with %s:%s",
 				reservation.Addr,
 				reservation.Strategy,
@@ -66,7 +66,7 @@ func findLease(d Stores, strat, token string, req net.IP) (lease *Lease, err err
 func FindLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, err error) {
 	d, unlocker := dt.LockEnts("leases", "reservations", "subnets")
 	defer unlocker()
-	lease, err = findLease(d, strat, token, req)
+	lease, err = findLease(d, dt, strat, token, req)
 	if lease != nil && err == nil {
 		subnet := lease.Subnet(d)
 		reservation := lease.Reservation(d)
@@ -85,7 +85,7 @@ func FindLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, 
 	return lease, err
 }
 
-func findViaReservation(leases, reservations *index.Index, strat, token string, req net.IP) (lease *Lease) {
+func findViaReservation(leases, reservations *Store, strat, token string, req net.IP) (lease *Lease) {
 	var reservation *Reservation
 	if req != nil && req.IsGlobalUnicast() {
 		hex := Hexaddr(req)
@@ -145,7 +145,7 @@ func findViaReservation(leases, reservations *index.Index, strat, token string, 
 	return
 }
 
-func findViaSubnet(leases, subnets, reservations *index.Index, strat, token string, req net.IP, vias []net.IP) (lease *Lease) {
+func findViaSubnet(leases, subnets, reservations *Store, strat, token string, req net.IP, vias []net.IP) (lease *Lease) {
 	var subnet *Subnet
 	for _, idx := range subnets.Items() {
 		candidate := AsSubnet(idx)
@@ -165,10 +165,10 @@ func findViaSubnet(leases, subnets, reservations *index.Index, strat, token stri
 	}
 	currLeases, _ := index.Between(
 		Hexaddr(subnet.ActiveStart),
-		Hexaddr(subnet.ActiveEnd))(leases)
+		Hexaddr(subnet.ActiveEnd))(&leases.Index)
 	currReservations, _ := index.Between(
 		Hexaddr(subnet.ActiveStart),
-		Hexaddr(subnet.ActiveEnd))(reservations)
+		Hexaddr(subnet.ActiveEnd))(&reservations.Index)
 	usedAddrs := map[string]store.KeySaver{}
 	for _, i := range currLeases.Items() {
 		currLease := AsLease(i)

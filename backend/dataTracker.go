@@ -68,7 +68,7 @@ type followUpDeleter interface {
 // fantastically efficient.
 type Store struct {
 	sync.Mutex
-	*index.Index
+	index.Index
 	backingStore store.SimpleStore
 }
 
@@ -102,32 +102,44 @@ type DataTracker struct {
 	thunkMux            *sync.Mutex
 }
 
-type Stores func(string) *index.Index
+type Stores func(string) *Store
 
 // LockEnts grabs the requested Store locks a consistent order.
 // It returns a function to get an Index that was requested, and
 // a function that unlocks the taken locks in the right order.
 func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) {
 	sortedEnts := make([]string, len(ents))
-	sortedEnts = append(sortedEnts, ents...)
+	copy(sortedEnts, ents)
 	s := sort.StringSlice(sortedEnts)
 	sort.Sort(sort.Reverse(s))
 	sortedRes := map[string]*Store{}
 	for _, ent := range s {
-		sortedRes[ent] = p.objs[ent]
+		objs, ok := p.objs[ent]
+		if !ok {
+			log.Panicf("Tried to reference nonexistent object type '%s'", ent)
+		}
+		sortedRes[ent] = objs
+	}
+	for _, ent := range s {
 		sortedRes[ent].Lock()
 	}
-	return func(ref string) *index.Index {
+	srMux := &sync.Mutex{}
+	return func(ref string) *Store {
+			srMux.Lock()
 			idx, ok := sortedRes[ref]
+			srMux.Unlock()
 			if !ok {
 				log.Panicf("Tried to access unlocked resource %s", ref)
 			}
-			return idx.Index
+			return idx
 		},
 		func() {
+			srMux.Lock()
 			for i := len(s) - 1; i >= 0; i-- {
 				sortedRes[s[i]].Unlock()
+				delete(sortedRes, s[i])
 			}
+			srMux.Unlock()
 		}
 }
 
@@ -201,7 +213,7 @@ func NewDataTracker(backend store.SimpleStore,
 		if err != nil {
 			res.Logger.Fatalf("dataTracker: Error loading data for %s: %v", prefix, err)
 		}
-		res.objs[prefix].Index = index.Create(storeObjs)
+		res.objs[prefix].Index = *index.Create(storeObjs)
 		if obj.Prefix() == "templates" {
 			buf := &bytes.Buffer{}
 			for _, thing := range res.objs["templates"].Items() {
@@ -216,7 +228,7 @@ func NewDataTracker(backend store.SimpleStore,
 			res.rootTemplate.Option("missingkey=error")
 		}
 	}
-	d, unlocker := res.LockEnts("bootenvs", "preferences", "users", "machines", "profiles")
+	d, unlocker := res.LockEnts("bootenvs", "preferences", "users", "machines", "profiles", "params")
 	defer unlocker()
 	if d("bootenvs").Find(ignoreBoot.Key()) == nil {
 		res.Save(d, ignoreBoot)
@@ -302,14 +314,14 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 		return false
 	}
 	savePref := func(name, val string) bool {
+		p.prefMux.Lock()
+		defer p.prefMux.Unlock()
 		pref := &Pref{p: p, Name: name, Val: val}
 		if _, saveErr := p.Save(d, pref); saveErr != nil {
 			err.Errorf("%s: Failed to save %s: %v", name, val, saveErr)
 			return false
 		}
-		p.prefMux.Lock()
 		p.runningPrefs[name] = val
-		p.prefMux.Unlock()
 		return true
 	}
 	for name, val := range prefs {
@@ -322,7 +334,7 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			}
 		case "unknownBootEnv":
 			if benvCheck(name, val) != nil && savePref(name, val) {
-				err.Merge(p.RenderUnknown())
+				err.Merge(p.RenderUnknown(d))
 			}
 		case "unknownTokenTimeout",
 			"knownTokenTimeout",
@@ -340,9 +352,7 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 	return err.OrNil()
 }
 
-func (p *DataTracker) RenderUnknown() error {
-	d, unlocker := p.LockEnts("bootenvs", "machines", "tasks", "profiles")
-	defer unlocker()
+func (p *DataTracker) RenderUnknown(d Stores) error {
 	pref, e := p.Pref("unknownBootEnv")
 	if e != nil {
 		return e
@@ -503,7 +513,7 @@ func (p *DataTracker) Patch(d Stores, ref store.KeySaver, key string, patch json
 func (p *DataTracker) Update(d Stores, ref store.KeySaver) (saved bool, err error) {
 	prefix := ref.Prefix()
 	key := ref.Key()
-	if d(prefix).Find(key) != nil {
+	if d(prefix).Find(key) == nil {
 		err := &Error{
 			Code:  http.StatusNotFound,
 			Key:   key,

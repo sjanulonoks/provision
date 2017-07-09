@@ -352,6 +352,9 @@ func (b *BootEnv) BeforeSave() error {
 	seenPxeLinux := false
 	seenELilo := false
 	seenIPXE := false
+	if e.ContainsError() {
+		return e
+	}
 	for _, template := range b.Templates {
 		if template.Name == "pxelinux" {
 			seenPxeLinux = true
@@ -367,9 +370,6 @@ func (b *BootEnv) BeforeSave() error {
 		if !(seenPxeLinux && seenELilo) {
 			e.Errorf("bootenv: Missing elilo or pxelinux template")
 		}
-	}
-	if e.ContainsError() {
-		return e
 	}
 	// Make sure the ISO for this bootenv has been exploded locally so that
 	// the boot env can use its contents.

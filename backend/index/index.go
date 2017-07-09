@@ -142,8 +142,12 @@ func (i *Index) Items() []store.KeySaver {
 }
 
 func (i *Index) find(ref store.KeySaver) (int, bool) {
-	idx := s.Search(len(i.objs), func(j int) bool { return i.Less(i.objs[j], ref) })
-	return idx, idx < len(i.objs) && !(i.Less(i.objs[idx], ref) || i.Less(ref, i.objs[idx]))
+	gte, gt := i.Tests(ref)
+	idx := s.Search(len(i.objs), func(j int) bool { return gte(i.objs[j]) })
+	if idx == len(i.objs) {
+		return idx, false
+	}
+	return idx, !gt(i.objs[idx])
 }
 
 func (i *Index) Find(key string) store.KeySaver {
@@ -178,25 +182,27 @@ func (i *Index) Add(items ...store.KeySaver) error {
 		growers = append(growers, obj)
 		growIndexes = append(growIndexes, idx)
 	}
+	// Append new objects.  We do this before growing the slice to minimize the amount of
+	// memory that potentially has to be copied.
+	if len(appenders) > 0 {
+		s.Slice(appenders, func(j, k int) bool { return i.Less(appenders[j], appenders[k]) })
+		i.objs = append(i.objs, appenders...)
+	}
 	// Insert new items in sorted order with minimal data copying
 	if len(growers) > 0 {
 		s.Ints(growIndexes)
 		s.Slice(growers, func(j, k int) bool {
 			return i.Less(growers[j], growers[k])
 		})
-		i.objs = append(i.objs, make([]store.KeySaver, len(growers))...)
 		oldLen := len(i.objs)
-		for j := len(growIndexes); j > 0; j-- {
-			idx := growIndexes[j-1]
-			dest, src := i.objs[idx+j:], i.objs[idx:oldLen]
+		i.objs = append(i.objs, make([]store.KeySaver, len(growers))...)
+		for j := len(growIndexes) - 1; j >= 0; j-- {
+			idx := growIndexes[j]
+			dest, src := i.objs[idx+j+1:], i.objs[idx:oldLen]
 			copy(dest, src)
-			i.objs[idx] = growers[j-1]
+			i.objs[idx+j] = growers[j]
 			oldLen = idx
 		}
-	}
-	if len(appenders) > 0 {
-		s.Slice(appenders, func(j, k int) bool { return i.Less(appenders[j], appenders[k]) })
-		i.objs = append(i.objs, appenders...)
 	}
 	return nil
 }

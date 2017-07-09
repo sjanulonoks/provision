@@ -10,7 +10,7 @@ import (
 func TestBootEnvCrud(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
-	d, unlocker := dt.LockEnts("bootenvs")
+	d, unlocker := dt.LockEnts("bootenvs", "templates", "tasks", "machines", "profiles")
 	defer unlocker()
 	tmpl := &Template{p: dt, ID: "ok", Contents: "{{ .Env.Name }}"}
 	if ok, err := dt.Create(d, tmpl); !ok {

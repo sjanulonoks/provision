@@ -49,6 +49,8 @@ func (p *patchTest) test(t *testing.T, target store.KeySaver) {
 func TestMachineCrud(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
+	d, unlocker := dt.LockEnts("templates", "machines", "tasks", "bootenvs", "profiles")
+	defer unlocker()
 	okUUID := uuid.NewRandom()
 	tests := []crudTest{
 		{"Create known-good Template", dt.Create, &Template{p: dt, ID: "default"}, true},
@@ -59,19 +61,19 @@ func TestMachineCrud(t *testing.T) {
 		{"Create named machine", dt.Create, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn"}, true},
 		{"Create new machine with same UUID", dt.Create, &Machine{p: dt, Uuid: okUUID, Name: "other.fqdn"}, false},
 		{"Create new machine with same name", dt.Create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "default.fqdn"}, false},
-		{"Create new machine with invalid bootenv", dt.Create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "badenv.fqdn", BootEnv: "blargh"}, true},
+		{"Create new machine with invalid bootenv", dt.Create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "badenv.fqdn", BootEnv: "blargh"}, false},
 		{"Create new machine with bad address", dt.Create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "badaddr.fqdn", BootEnv: "default", Address: net.ParseIP("127.0.0.1")}, false},
 		{"Create another known-good bootenv", dt.Create, &BootEnv{p: dt, Name: "new", Templates: []TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "default"}}}, true},
-		{"Update node with different bootenv", dt.update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "new"}, true},
-		{"Update node with different bootenv", dt.update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "unavailable"}, true},
+		{"Update node with different bootenv", dt.Update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "new"}, true},
+		{"Update node with different bootenv", dt.Update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "unavailable"}, false},
 		{"Remove machine that does not exist", dt.Remove, &Machine{p: dt, Uuid: uuid.NewRandom()}, false},
 		{"Remove machine that does exist", dt.Remove, &Machine{p: dt, Uuid: okUUID, BootEnv: "new"}, true},
 		{"Create named machine for patch", dt.Create, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn"}, true},
 	}
 	for _, test := range tests {
-		test.Test(t)
+		test.Test(t, d)
 	}
-	machine := dt.load("machines", okUUID.String())
+	machine := d("machines").Find(okUUID.String())
 	patchTests := []patchTest{
 		{"force replace name pass", true, 0, `[{"op":"replace","path":"/Name","value":"default2"}]`},
 		{"replace name pass", true, 0, `[
@@ -87,10 +89,9 @@ func TestMachineCrud(t *testing.T) {
 		test.test(t, machine)
 	}
 	// List test.
-	b := dt.NewMachine()
-	bes := b.List()
+	bes := d("machines").Items()
 	if bes != nil {
-		if len(bes) != 2 {
+		if len(bes) != 1 {
 			t.Errorf("List function should have returned: 1, but got %d\n", len(bes))
 		}
 	} else {

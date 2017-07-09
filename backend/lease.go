@@ -211,9 +211,6 @@ func (l *Lease) OnCreate() error {
 	if r := l.Reservation(l.stores); r != nil {
 		return nil
 	}
-	if e.containsError {
-		return e
-	}
 	leases := AsLeases(l.stores("leases").Items())
 	for i := range leases {
 		if leases[i].Addr.Equal(l.Addr) {
@@ -224,9 +221,6 @@ func (l *Lease) OnCreate() error {
 			e.Errorf("Lease %s alreay has Strategy %s: Token %s", leases[i].Key(), l.Strategy, l.Token)
 			break
 		}
-	}
-	if e.containsError {
-		return e
 	}
 	if s := l.Subnet(l.stores); s == nil {
 		e.Errorf("Cannot create Lease without a reservation or a subnet")
@@ -253,7 +247,7 @@ func (l *Lease) Expired() bool {
 }
 
 func (l *Lease) BeforeSave() error {
-	return index.CheckUnique(l, l.stores("bootenvs").Items())
+	return index.CheckUnique(l, l.stores("leases").Items())
 }
 
 func (l *Lease) Expire() {
