@@ -16,6 +16,7 @@ import (
 // should manage the boot environment for.
 // swagger:model
 type Machine struct {
+	validate
 	Validation
 	// The name of the machine.  THis must be unique across all
 	// machines, and by convention it is the FQDN of the machine,
@@ -206,10 +207,10 @@ func (n *Machine) HasProfile(name string) bool {
 	return false
 }
 
-func (n *Machine) getProfile(key string) *Profile {
-	if o, found := n.p.fetchOne(n.p.NewProfile(), key); found {
-		p := AsProfile(o)
-		return p
+func (n *Machine) getProfile(d Stores, key string) *Profile {
+	p := d("profiles").Find(key)
+	if p != nil {
+		return AsProfile(p)
 	}
 	return nil
 }
@@ -222,22 +223,22 @@ func (n *Machine) GetParams() map[string]interface{} {
 	return m
 }
 
-func (n *Machine) SetParams(values map[string]interface{}) error {
+func (n *Machine) SetParams(d Stores, values map[string]interface{}) error {
 	n.Profile.Params = values
 	e := &Error{Code: 409, Type: ValidationError, o: n}
-	_, e2 := n.p.save(n)
+	_, e2 := n.p.Save(d, n)
 	e.Merge(e2)
 	return e.OrNil()
 }
 
-func (n *Machine) GetParam(key string, searchProfiles bool) (interface{}, bool) {
+func (n *Machine) GetParam(d Stores, key string, searchProfiles bool) (interface{}, bool) {
 	mm := n.GetParams()
 	if v, found := mm[key]; found {
 		return v, true
 	}
 	if searchProfiles {
 		for _, e := range n.Profiles {
-			if p := n.getProfile(e); p != nil {
+			if p := n.getProfile(d, e); p != nil {
 				if v, ok := p.GetParam(key, false); ok {
 					return v, true
 				}
@@ -256,19 +257,6 @@ func (n *Machine) setDT(p *DataTracker) {
 	n.p = p
 }
 
-func (n *Machine) OnCreate() error {
-	e := &Error{Code: 409, Type: ValidationError, o: n}
-	// We do not allow duplicate machine names
-	machines := AsMachines(n.p.unlockedFetchAll(n.Prefix()))
-	for _, m := range machines {
-		if m.Name == n.Name {
-			e.Errorf("Machine %s is already named %s", m.UUID(), n.Name)
-			return e
-		}
-	}
-	return nil
-}
-
 func (n *Machine) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: n}
 	if n.Uuid == nil {
@@ -281,8 +269,58 @@ func (n *Machine) BeforeSave() error {
 		n.BootEnv = n.p.defaultBootEnv
 	}
 	validateMaybeZeroIP4(e, n.Address)
-	if err := index.CheckUnique(n, n.p.objs[n.Prefix()].d); err != nil {
+	if err := index.CheckUnique(n, n.stores("machines").Items()); err != nil {
 		e.Merge(err)
+	}
+	objs := n.stores
+	tasks := objs("tasks")
+	profiles := objs("profiles")
+	bootenvs := objs("bootenvs")
+	wantedProfiles := map[string]int{}
+	for i, profileName := range n.Profiles {
+		found := profiles.Find(profileName)
+		if found == nil {
+			e.Errorf("Profile %s (at %d) does not exist", profileName, i)
+		} else {
+			if alreadyAt, ok := wantedProfiles[profileName]; ok {
+				e.Errorf("Duplicate profile %s: at %d and %d", profileName, alreadyAt, i)
+			} else {
+				wantedProfiles[profileName] = i
+			}
+		}
+	}
+	for i, taskName := range n.Tasks {
+		if tasks.Find(taskName) == nil {
+			e.Errorf("Task %s (at %d) does not exist", taskName, i)
+		}
+	}
+	var env, oldEnv *BootEnv
+	if nbFound := bootenvs.Find(n.BootEnv); nbFound == nil {
+		e.Errorf("Bootenv %s does not exist", n.BootEnv)
+	} else {
+		env = AsBootEnv(nbFound)
+	}
+	if obFound := bootenvs.Find(n.oldBootEnv); obFound != nil {
+		oldEnv = AsBootEnv(obFound)
+	}
+	if env.OnlyUnknown {
+		e.Errorf("BootEnv %s does not allow Machine assignments, it has the OnlyUnknown flag.", env.Name)
+	}
+	if !env.Available {
+		e.Errorf("Machine %s wants BootEnv %s, which is not available", n.UUID(), n.BootEnv)
+	}
+	if !e.ContainsError() {
+		if oldEnv != nil {
+			if oldEnv.Name != env.Name {
+				oldEnv.Render(objs, n, e).deregister(n.p.FS)
+				env.Render(objs, n, e).register(n.p.FS)
+			}
+		} else {
+			env.Render(objs, n, e).register(n.p.FS)
+		}
+		n.Errors = e.Messages
+		n.Available = !e.ContainsError()
+		n.Validated = true
 	}
 	return e.OrNil()
 }
@@ -292,75 +330,11 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	return nil
 }
 
-func (n *Machine) AfterSave() {
-	n.deferred(func() bool {
-		e := &Error{}
-		objs, unlocker := n.p.lockEnts("tasks", "profiles", "machines", "bootenvs")
-		defer unlocker()
-		tasks := objs[0]
-		profiles := objs[1]
-		bootenvs := objs[3]
-		wantedProfiles := map[string]int{}
-		for i, profileName := range n.Profiles {
-			_, found := profiles.find(profileName)
-			if !found {
-				e.Errorf("Profile %s (at %d) does not exist", profileName, i)
-			} else {
-				if alreadyAt, ok := wantedProfiles[profileName]; ok {
-					e.Errorf("Duplicate profile %s: at %d and %d", profileName, alreadyAt, i)
-				} else {
-					wantedProfiles[profileName] = i
-				}
-			}
-		}
-		for i, taskName := range n.Tasks {
-			_, found := tasks.find(taskName)
-			if !found {
-				e.Errorf("Task %s (at %d) does not exist", taskName, i)
-			}
-		}
-		nbIdx, nbFound := bootenvs.find(n.BootEnv)
-		if !nbFound {
-			e.Errorf("Bootenv %s does not exist", n.BootEnv)
-		}
-		obIdx, obFound := bootenvs.find(n.oldBootEnv)
-		var env *BootEnv
-		if nbFound {
-			env = AsBootEnv(bootenvs.d[nbIdx])
-			if env.OnlyUnknown {
-				e.Errorf("BootEnv %s does not allow Machine assignments, it has the OnlyUnknown flag.", env.Name)
-			}
-			if !env.Available {
-				e.Errorf("Machine %s wants BootEnv %s, which is not available", n.UUID(), n.BootEnv)
-			}
-		}
-		if !e.ContainsError() {
-			if obFound {
-				oldEnv := AsBootEnv(bootenvs.d[nbIdx])
-				oldEnv.Render(n, e).deregister(n.p.FS)
-			}
-			if nbFound && (!obFound || nbIdx != obIdx) {
-				env.Render(n, e).register(n.p.FS)
-			}
-		}
-		n.Errors = e.Messages
-		n.Available = !e.ContainsError()
-		n.Validated = true
-		return true
-	})
-}
-
 func (n *Machine) AfterDelete() {
 	e := &Error{}
-	b, found := n.p.fetchOne(n.p.NewBootEnv(), n.BootEnv)
-	if !found {
-		return
+	if b := n.stores("bootenvs").Find(n.BootEnv); b != nil {
+		AsBootEnv(b).Render(n.stores, n, e).deregister(n.p.FS)
 	}
-	AsBootEnv(b).Render(n, e).deregister(n.p.FS)
-}
-
-func (b *Machine) List() []*Machine {
-	return AsMachines(b.p.FetchAll(b))
 }
 
 func (p *DataTracker) NewMachine() *Machine {

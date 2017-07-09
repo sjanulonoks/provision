@@ -49,6 +49,23 @@ func (v *Validation) deferred(thunk func() bool) {
 	}()
 }
 
+type validator interface {
+	setStores(Stores)
+	clearStores()
+}
+
+type validate struct {
+	stores Stores
+}
+
+func (v *validate) setStores(s Stores) {
+	v.stores = s
+}
+
+func (v *validate) clearStores() {
+	v.stores = nil
+}
+
 type postValidator interface {
 	canProceed() bool
 }

@@ -10,6 +10,7 @@ import (
 // default bootenv for known systems, etc.
 //
 type Pref struct {
+	validate
 	p    *DataTracker
 	Name string
 	Val  string
@@ -64,8 +65,4 @@ func AsPref(v store.KeySaver) *Pref {
 
 func (p *DataTracker) NewPref() *Pref {
 	return &Pref{p: p}
-}
-
-func (p *Pref) BeforeSave() error {
-	return index.CheckUnique(p, p.p.objs[p.Prefix()].d)
 }

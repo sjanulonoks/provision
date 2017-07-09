@@ -12,6 +12,7 @@ import (
 // the param must match to be considered valid.
 // swagger:model
 type Param struct {
+	validate
 	// Name is the name of the param.  Params must be uniquely named.
 	//
 	// required: true
@@ -115,8 +116,4 @@ func (p *Param) Validate(val interface{}) error {
 		e.Errorf(i.String())
 	}
 	return e
-}
-
-func (p *Param) List() []*Param {
-	return AsParams(p.p.FetchAll(p))
 }

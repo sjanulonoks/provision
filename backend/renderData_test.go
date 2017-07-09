@@ -74,14 +74,14 @@ func TestRenderData(t *testing.T) {
 
 	objs := []crudTest{
 		{"Update global profile to have test with a value", dt.update, &Profile{Name: "global", Params: map[string]interface{}{"test": "foreal"}}, true},
-		{"create test profile to have test with a value", dt.create, &Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true},
+		{"create test profile to have test with a value", dt.Create, &Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true},
 
-		{"Create included template", dt.create, &Template{p: dt, ID: "included", Contents: tmplIncluded}, true},
-		{"Create default template", dt.create, &Template{p: dt, ID: "default", Contents: tmplDefault}, true},
-		{"Create nothing template", dt.create, &Template{p: dt, ID: "nothing", Contents: tmplNothing}, true},
-		{"Create default bootenv", dt.create, defaultBootEnv, true},
-		{"Create nothing bootenv", dt.create, nothingBootEnv, true},
-		{"Create bad bootenv", dt.create, badBootEnv, true},
+		{"Create included template", dt.Create, &Template{p: dt, ID: "included", Contents: tmplIncluded}, true},
+		{"Create default template", dt.Create, &Template{p: dt, ID: "default", Contents: tmplDefault}, true},
+		{"Create nothing template", dt.Create, &Template{p: dt, ID: "nothing", Contents: tmplNothing}, true},
+		{"Create default bootenv", dt.Create, defaultBootEnv, true},
+		{"Create nothing bootenv", dt.Create, nothingBootEnv, true},
+		{"Create bad bootenv", dt.Create, badBootEnv, true},
 	}
 	for _, obj := range objs {
 		obj.Test(t)
@@ -91,7 +91,7 @@ func TestRenderData(t *testing.T) {
 	machine.Name = "Test Name"
 	machine.Address = net.ParseIP("192.168.124.11")
 	machine.BootEnv = "default"
-	created, err := dt.create(machine)
+	created, err := dt.Create(machine)
 	if !created {
 		t.Errorf("Failed to create new test machine: %v", err)
 		return

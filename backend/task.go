@@ -12,6 +12,7 @@ import (
 //
 // swagger:model
 type Task struct {
+	validate
 	// Name is the name of this Task.  Task names must be globally unique
 	//
 	// required: true
@@ -76,10 +77,6 @@ func (t *Task) setDT(dp *DataTracker) {
 	t.p = dp
 }
 
-func (t *Task) List() []*Task {
-	return AsTasks(t.p.FetchAll(t))
-}
-
 func (t *Task) Indexes() map[string]index.Maker {
 	fix := AsTask
 	return map[string]index.Maker{
@@ -137,11 +134,9 @@ type taskHaver interface {
 
 func (t *Task) BeforeDelete() error {
 	e := &Error{Code: 409, Type: StillInUseError, o: t}
-	objs, unlocker := t.p.lockEnts("profiles", "machines", "bootenvs")
-	defer unlocker()
-	for i := range objs {
-		for j := range objs[i].d {
-			thing := objs[i].d[j].(taskHaver)
+	for _, objPrefix := range []string{"profiles", "machines", "bootenvs"} {
+		for _, j := range t.stores(objPrefix).Items() {
+			thing := j.(taskHaver)
 			if thing.HasTask(t.Name) {
 				e.Errorf("%s:%s still uses %s", thing.Prefix(), thing.Key(), t.Name)
 			}
@@ -158,11 +153,11 @@ func (t *Task) templates() *template.Template {
 	return t.rootTemplate
 }
 
-func (t *Task) Render(m *Machine, e *Error) renderers {
+func (t *Task) Render(d Stores, m *Machine, e *Error) renderers {
 	if m == nil {
 		e.Errorf("No machine to render against")
 		return nil
 	}
-	r := newRenderData(t.p, m, t)
+	r := newRenderData(d, t.p, m, t)
 	return r.makeRenderers(e)
 }

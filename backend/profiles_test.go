@@ -10,11 +10,11 @@ func TestProfilesCrud(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
 	tests := []crudTest{
-		{"Create empty profile", dt.create, &Profile{p: dt}, false},
-		{"Create new profile with name", dt.create, &Profile{p: dt, Name: "Test Profile"}, true},
-		{"Create Duplicate Profile", dt.create, &Profile{p: dt, Name: "Test Profile"}, false},
-		{"Delete Profile", dt.remove, &Profile{p: dt, Name: "Test Profile"}, true},
-		{"Delete Nonexistent Profile", dt.remove, &Profile{p: dt, Name: "Test Profile"}, false},
+		{"Create empty profile", dt.Create, &Profile{p: dt}, false},
+		{"Create new profile with name", dt.Create, &Profile{p: dt, Name: "Test Profile"}, true},
+		{"Create Duplicate Profile", dt.Create, &Profile{p: dt, Name: "Test Profile"}, false},
+		{"Delete Profile", dt.Remove, &Profile{p: dt, Name: "Test Profile"}, true},
+		{"Delete Nonexistent Profile", dt.Remove, &Profile{p: dt, Name: "Test Profile"}, false},
 	}
 	for _, test := range tests {
 		test.Test(t)
@@ -37,7 +37,7 @@ func TestProfilesValidation(t *testing.T) {
 	tests := []crudTest{
 		{
 			"Create new Parameter",
-			dt.create,
+			dt.Create,
 			&Param{
 				p:    dt,
 				Name: "Bool",
@@ -48,7 +48,7 @@ func TestProfilesValidation(t *testing.T) {
 			true},
 		{
 			"Create Passing Profile",
-			dt.create,
+			dt.Create,
 			&Profile{
 				p:    dt,
 				Name: "Bool Profile Pass",
@@ -60,7 +60,7 @@ func TestProfilesValidation(t *testing.T) {
 		},
 		{
 			"Create Failing Profile",
-			dt.create,
+			dt.Create,
 			&Profile{
 				p:    dt,
 				Name: "Bool Profile Fail",

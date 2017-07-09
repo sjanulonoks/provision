@@ -25,6 +25,7 @@ func Hexaddr(addr net.IP) string {
 // Lease models a DHCP Lease
 // swagger:model
 type Lease struct {
+	validate
 	// Addr is the IP address that the lease handed out.
 	//
 	// required: true
@@ -145,19 +146,20 @@ func (l *Lease) Prefix() string {
 	return "leases"
 }
 
-func (l *Lease) Subnet() *Subnet {
-	subnets := AsSubnets(l.p.fetchAll(l.p.NewSubnet()))
-	for i := range subnets {
-		if subnets[i].subnet().Contains(l.Addr) {
-			return subnets[i]
+func (l *Lease) Subnet(d Stores) *Subnet {
+	subnets := d("subnets")
+	for _, i := range subnets.Items() {
+		subnet := AsSubnet(i)
+		if subnet.subnet().Contains(l.Addr) {
+			return subnet
 		}
 	}
 	return nil
 }
 
-func (l *Lease) Reservation() *Reservation {
-	r, ok := l.p.fetchOne(l.p.NewReservation(), Hexaddr(l.Addr))
-	if !ok {
+func (l *Lease) Reservation(d Stores) *Reservation {
+	r := d("reservations").Find(Hexaddr(l.Addr))
+	if r == nil {
 		return nil
 	}
 	return AsReservation(r)
@@ -177,10 +179,6 @@ func (l *Lease) New() store.KeySaver {
 
 func (l *Lease) setDT(p *DataTracker) {
 	l.p = p
-}
-
-func (l *Lease) List() []*Lease {
-	return AsLeases(l.p.fetchAll(l))
 }
 
 func (p *DataTracker) NewLease() *Lease {
@@ -210,13 +208,13 @@ func (l *Lease) OnCreate() error {
 	}
 	// We can only create leases that have a Reservation or that are in
 	// the ActiveRange of a subnet.
-	if r := l.Reservation(); r != nil {
+	if r := l.Reservation(l.stores); r != nil {
 		return nil
 	}
 	if e.containsError {
 		return e
 	}
-	leases := AsLeases(l.p.unlockedFetchAll("leases"))
+	leases := AsLeases(l.stores("leases").Items())
 	for i := range leases {
 		if leases[i].Addr.Equal(l.Addr) {
 			continue
@@ -230,7 +228,7 @@ func (l *Lease) OnCreate() error {
 	if e.containsError {
 		return e
 	}
-	if s := l.Subnet(); s == nil {
+	if s := l.Subnet(l.stores); s == nil {
 		e.Errorf("Cannot create Lease without a reservation or a subnet")
 	} else if !s.InSubnetRange(l.Addr) {
 		e.Errorf("Address %s is a network or broadcast address for subnet %s", l.Addr.String(), s.Name)
@@ -255,7 +253,7 @@ func (l *Lease) Expired() bool {
 }
 
 func (l *Lease) BeforeSave() error {
-	return index.CheckUnique(l, l.p.objs[l.Prefix()].d)
+	return index.CheckUnique(l, l.stores("bootenvs").Items())
 }
 
 func (l *Lease) Expire() {

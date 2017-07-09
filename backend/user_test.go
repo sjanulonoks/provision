@@ -10,11 +10,11 @@ func TestUserCrud(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
 	tests := []crudTest{
-		{"Create empty user", dt.create, &User{p: dt}, false},
-		{"Create new user with name", dt.create, &User{p: dt, Name: "Test User"}, true},
-		{"Create Duplicate User", dt.create, &User{p: dt, Name: "Test User"}, false},
-		{"Delete User", dt.remove, &User{p: dt, Name: "Test User"}, true},
-		{"Delete Nonexistent User", dt.remove, &User{p: dt, Name: "Test User"}, false},
+		{"Create empty user", dt.Create, &User{p: dt}, false},
+		{"Create new user with name", dt.Create, &User{p: dt, Name: "Test User"}, true},
+		{"Create Duplicate User", dt.Create, &User{p: dt, Name: "Test User"}, false},
+		{"Delete User", dt.Remove, &User{p: dt, Name: "Test User"}, true},
+		{"Delete Nonexistent User", dt.Remove, &User{p: dt, Name: "Test User"}, false},
 	}
 	for _, test := range tests {
 		test.Test(t)
@@ -36,7 +36,7 @@ func TestUserPassword(t *testing.T) {
 	dt := mkDT(bs)
 	u := dt.NewUser()
 	u.Name = "test user"
-	saved, err := dt.create(u)
+	saved, err := dt.Create(u)
 	if !saved {
 		t.Errorf("Unable to create test user: %v", err)
 	} else {

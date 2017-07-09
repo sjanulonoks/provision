@@ -14,6 +14,7 @@ import (
 // These can be assigned to a machine's profile list.
 // swagger:model
 type Profile struct {
+	validate
 	Validation
 	// The name of the profile.  This must be unique across all
 	// profiles.
@@ -85,10 +86,10 @@ func (p *Profile) GetParams() map[string]interface{} {
 	return m
 }
 
-func (p *Profile) SetParams(values map[string]interface{}) error {
+func (p *Profile) SetParams(d Stores, values map[string]interface{}) error {
 	p.Params = values
 	e := &Error{Code: 409, Type: ValidationError, o: p}
-	_, e2 := p.p.save(p)
+	_, e2 := p.p.Save(d, p)
 	e.Merge(e2)
 	return e.OrNil()
 }
@@ -110,26 +111,11 @@ func (p *Profile) setDT(dp *DataTracker) {
 	p.p = dp
 }
 
-func (p *Profile) OnCreate() error {
-	e := &Error{Code: 409, Type: ValidationError, o: p}
-	// We do not allow duplicate profile names
-	profiles := AsProfiles(p.p.unlockedFetchAll(p.Prefix()))
-	for _, pp := range profiles {
-		if pp.Name == p.Name {
-			e.Errorf("Profile %s is already exists", p.Name)
-			return e
-		}
-	}
-	return nil
-}
-
 func (p *Profile) BeforeDelete() error {
 	e := &Error{Code: 422, Type: ValidationError, o: p}
-	objs, unlocker := p.p.lockEnts("machines")
-	defer unlocker()
-	machines := objs[0]
-	for i := range machines.d {
-		m := AsMachine(machines.d[i])
+	machines := p.stores("machines")
+	for _, i := range machines.Items() {
+		m := AsMachine(i)
 		if m.HasProfile(p.Name) {
 			e.Errorf("Machine %s is using profile %s", m.UUID(), p.Name)
 		}
@@ -142,10 +128,6 @@ func (p *Profile) OnLoad() error {
 		p.Params = map[string]interface{}{}
 	}
 	return nil
-}
-
-func (p *Profile) List() []*Profile {
-	return AsProfiles(p.p.FetchAll(p))
 }
 
 func (p *DataTracker) NewProfile() *Profile {
@@ -166,38 +148,18 @@ func AsProfiles(o []store.KeySaver) []*Profile {
 
 func (p *Profile) BeforeSave() error {
 	err := &Error{Code: 422, Type: ValidationError, o: p}
-	err.Merge(index.CheckUnique(p, p.p.objs[p.Prefix()].d))
-	objs, unlocker := p.p.lockEnts("params")
-	defer unlocker()
+	err.Merge(index.CheckUnique(p, p.stores("profiles").Items()))
+	params := p.stores("parameters")
 	for k, v := range p.Params {
-		pIdx, found := objs[0].find(k)
-		if !found {
-			continue
+		if pIdx := params.Find(k); pIdx != nil {
+			param := AsParam(pIdx)
+			err.Merge(param.Validate(v))
 		}
-		param := AsParam(objs[0].d[pIdx])
-		err.Merge(param.Validate(v))
+	}
+	for i, taskName := range p.Tasks {
+		if p.stores("tasks").Find(taskName) == nil {
+			err.Errorf("Task %s (at %d) does not exist", taskName, i)
+		}
 	}
 	return err.OrNil()
-}
-
-func (p *Profile) AfterSave() {
-	p.deferred(func() bool {
-		objs, unlocker := p.p.lockEnts("tasks", "profiles")
-		defer unlocker()
-		if len(p.Params) == 0 {
-			p.Available = true
-			p.Validated = true
-			return true
-		}
-		err := &Error{o: p}
-		for i, taskName := range p.Tasks {
-			if _, found := objs[0].find(taskName); !found {
-				err.Errorf("Task %s (at %d) does not exist", taskName, i)
-			}
-		}
-		p.Available = !err.ContainsError()
-		p.Errors = err.Messages
-		p.Validated = true
-		return true
-	})
 }

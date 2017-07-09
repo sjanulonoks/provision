@@ -20,13 +20,13 @@ var (
 
 type crudTest struct {
 	name string
-	op   func(store.KeySaver) (bool, error)
+	op   func(Stores, store.KeySaver) (bool, error)
 	t    store.KeySaver
 	pass bool
 }
 
-func (test *crudTest) Test(t *testing.T) {
-	passed, err := test.op(test.t)
+func (test *crudTest) Test(t *testing.T, d Stores) {
+	passed, err := test.op(d, test.t)
 	msg := fmt.Sprintf("%s: wanted to pass: %v, passed: %v", test.name, test.pass, passed)
 	if passed == test.pass {
 		t.Log(msg)
@@ -60,7 +60,7 @@ func TestDTObjs(t *testing.T) {
 
 	}
 	t.Logf("All names added in order")
-	dt.remove(0, 2, 3, 4, 6, 8)
+	dt.Remove(0, 2, 3, 4, 6, 8)
 	names = []string{"b", "f", "h"}
 	if len(dt.d) != len(names)+1 {
 		t.Errorf("Expected only %d to remain, but %d do", len(names), len(dt.d))
@@ -107,7 +107,7 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 	if err := dec.Decode(&res); err != nil {
 		return false, err
 	}
-	return dt.create(res)
+	return dt.Create(res)
 }
 
 func mkDT(bs store.SimpleStore) *DataTracker {

@@ -50,6 +50,7 @@ type OsInfo struct {
 // swagger:model
 type BootEnv struct {
 	Validation
+	validate
 	// The name of the boot environment.  Boot environments that install
 	// an operating system must end in '-install'.
 	//
@@ -331,122 +332,107 @@ func (b *BootEnv) explodeIso(e *Error) {
 
 func (b *BootEnv) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: b}
+	if err := index.CheckUnique(b, b.stores("bootenvs").Items()); err != nil {
+		e.Merge(err)
+	}
+	for _, taskName := range b.Tasks {
+		if b.stores("tasks").Find(taskName) == nil {
+			e.Errorf("Task %s does not exist", taskName)
+		}
+	}
 	// If our basic templates do not parse, it is game over for us
 	b.p.tmplMux.Lock()
 	b.tmplMux.Lock()
 	root := b.genRoot(b.p.rootTemplate, e)
 	b.p.tmplMux.Unlock()
-	if root == nil {
-		b.tmplMux.Unlock()
+	if root != nil {
+		b.rootTemplate = root
+	}
+	b.tmplMux.Unlock()
+	seenPxeLinux := false
+	seenELilo := false
+	seenIPXE := false
+	for _, template := range b.Templates {
+		if template.Name == "pxelinux" {
+			seenPxeLinux = true
+		}
+		if template.Name == "elilo" {
+			seenELilo = true
+		}
+		if template.Name == "ipxe" {
+			seenIPXE = true
+		}
+	}
+	if !seenIPXE {
+		if !(seenPxeLinux && seenELilo) {
+			e.Errorf("bootenv: Missing elilo or pxelinux template")
+		}
+	}
+	if e.ContainsError() {
 		return e
 	}
-	b.rootTemplate = root
-	b.tmplMux.Unlock()
-	return nil
-}
-
-func (b *BootEnv) AfterSave() {
-	b.deferred(func() bool {
-		// First, we have to have an iPXE template, or a PXELinux and eLILO template, or all three.
-		e := &Error{}
-		muxes, unlocker := b.p.lockEnts("tasks", "bootenvs")
-		defer unlocker()
-		tasks := muxes[0]
-		seenPxeLinux := false
-		seenELilo := false
-		seenIPXE := false
-		for _, template := range b.Templates {
-			if template.Name == "pxelinux" {
-				seenPxeLinux = true
-			}
-			if template.Name == "elilo" {
-				seenELilo = true
-			}
-			if template.Name == "ipxe" {
-				seenIPXE = true
-			}
+	// Make sure the ISO for this bootenv has been exploded locally so that
+	// the boot env can use its contents.
+	if b.OS.IsoFile != "" {
+		b.explodeIso(e)
+	}
+	// If we have a non-empty Kernel, make sure it points at something kernel-ish.
+	if b.Kernel != "" {
+		kPath := b.localPathFor(b.Kernel)
+		kernelStat, err := os.Stat(kPath)
+		if err != nil {
+			e.Errorf("bootenv: %s: missing kernel %s (%s)",
+				b.Name,
+				b.Kernel,
+				kPath)
+		} else if !kernelStat.Mode().IsRegular() {
+			e.Errorf("bootenv: %s: invalid kernel %s (%s)",
+				b.Name,
+				b.Kernel,
+				kPath)
 		}
-		if !seenIPXE {
-			if !(seenPxeLinux && seenELilo) {
-				e.Errorf("bootenv: Missing elilo or pxelinux template")
-			}
-		}
-		// Make sure the ISO for this bootenv has been exploded locally so that
-		// the boot env can use its contents.
-		if b.OS.IsoFile != "" {
-			b.explodeIso(e)
-		}
-		// If we have a non-empty Kernel, make sure it points at something kernel-ish.
-		if b.Kernel != "" {
-			kPath := b.localPathFor(b.Kernel)
-			kernelStat, err := os.Stat(kPath)
+	}
+	// Ditto for all the initrds.
+	if len(b.Initrds) > 0 {
+		for _, initrd := range b.Initrds {
+			iPath := b.localPathFor(initrd)
+			initrdStat, err := os.Stat(iPath)
 			if err != nil {
-				e.Errorf("bootenv: %s: missing kernel %s (%s)",
+				e.Errorf("bootenv: %s: missing initrd %s (%s)",
 					b.Name,
-					b.Kernel,
-					kPath)
-			} else if !kernelStat.Mode().IsRegular() {
-				e.Errorf("bootenv: %s: invalid kernel %s (%s)",
+					initrd,
+					iPath)
+				continue
+			}
+			if !initrdStat.Mode().IsRegular() {
+				e.Errorf("bootenv: %s: invalid initrd %s (%s)",
 					b.Name,
-					b.Kernel,
-					kPath)
+					initrd,
+					iPath)
 			}
 		}
-		// Ditto for all the initrds.
-		if len(b.Initrds) > 0 {
-			for _, initrd := range b.Initrds {
-				iPath := b.localPathFor(initrd)
-				initrdStat, err := os.Stat(iPath)
-				if err != nil {
-					e.Errorf("bootenv: %s: missing initrd %s (%s)",
-						b.Name,
-						initrd,
-						iPath)
-					continue
-				}
-				if !initrdStat.Mode().IsRegular() {
-					e.Errorf("bootenv: %s: invalid initrd %s (%s)",
-						b.Name,
-						initrd,
-						iPath)
-				}
-			}
-		}
-		if err := index.CheckUnique(b, b.p.objs[b.Prefix()].d); err != nil {
-			e.Merge(err)
-		}
-		for _, taskName := range b.Tasks {
-			if _, found := tasks.find(taskName); !found {
-				e.Errorf("Task %s does not exist", taskName)
-			}
-		}
-		b.Errors = e.Messages
-		b.Available = !e.ContainsError()
-		b.Validated = true
-		return true
-	})
+	}
+	b.Errors = e.Messages
+	b.Available = !e.ContainsError()
+	b.Validated = true
+	return nil
 }
 
 func (b *BootEnv) BeforeDelete() error {
 	e := &Error{Code: 409, Type: StillInUseError, o: b}
-	objs, unlocker := b.p.lockEnts("preferences", "machines")
-	defer unlocker()
-	prefs := objs[0]
-	machines := objs[1]
+	machines := b.stores("machines")
 	prefToFind := ""
 	if b.OnlyUnknown {
 		prefToFind = "unknownBootEnv"
 	} else {
 		prefToFind = "defaultBootEnv"
 	}
-
-	idx, found := prefs.find(prefToFind)
-	if found && AsPref(prefs.d[idx]).Name == b.Name {
+	if b.p.pref(prefToFind) == b.Name {
 		e.Errorf("BootEnv %s is the active %s, cannot remove it", b.Name, prefToFind)
 	}
 	if !b.OnlyUnknown {
-		for i := range machines.d {
-			machine := AsMachine(machines.d[i])
+		for _, i := range machines.Items() {
+			machine := AsMachine(i)
 			if machine.BootEnv != b.Name {
 				continue
 			}
@@ -459,17 +445,13 @@ func (b *BootEnv) BeforeDelete() error {
 func (b *BootEnv) AfterDelete() {
 	if b.OnlyUnknown {
 		err := &Error{o: b}
-		rts := b.Render(nil, err)
+		rts := b.Render(b.stores, nil, err)
 		if err.ContainsError() {
 			b.Errors = err.Messages
 		} else {
 			rts.deregister(b.p.FS)
 		}
 	}
-}
-
-func (b *BootEnv) List() []*BootEnv {
-	return AsBootEnvs(b.p.FetchAll(b))
 }
 
 func (p *DataTracker) NewBootEnv() *BootEnv {
@@ -496,19 +478,19 @@ func (b *BootEnv) templates() *template.Template {
 	return b.rootTemplate
 }
 
-func (b *BootEnv) Render(m *Machine, e *Error) renderers {
+func (b *BootEnv) Render(d Stores, m *Machine, e *Error) renderers {
 	if len(b.RequiredParams) > 0 && m == nil {
 		e.Errorf("Machine is nil or does not have params")
 		return nil
 	}
-	r := newRenderData(b.p, m, b)
+	r := newRenderData(d, b.p, m, b)
 	return r.makeRenderers(e)
 }
 
-func (b *BootEnv) followUpSave() {
+func (b *BootEnv) AfterSave() {
 	if b.OnlyUnknown {
 		err := &Error{o: b}
-		rts := b.Render(nil, err)
+		rts := b.Render(b.stores, nil, err)
 		if err.ContainsError() {
 			b.Errors = err.Messages
 		} else {
@@ -516,15 +498,14 @@ func (b *BootEnv) followUpSave() {
 		}
 		return
 	}
-	machines := b.p.lockFor("machines")
-	defer machines.Unlock()
-	for i := range machines.d {
-		machine := AsMachine(machines.d[i])
+	machines := b.stores("machines")
+	for _, i := range machines.Items() {
+		machine := AsMachine(i)
 		if machine.BootEnv != b.Name {
 			continue
 		}
 		err := &Error{o: b}
-		rts := b.Render(machine, err)
+		rts := b.Render(b.stores, machine, err)
 		if err.ContainsError() {
 			machine.Errors = err.Messages
 		} else {

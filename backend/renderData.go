@@ -71,27 +71,26 @@ func newRenderedTemplate(r *RenderData,
 		path: path,
 		name: tmplKey,
 		write: func(remoteIP net.IP) (*bytes.Reader, error) {
-			objs, unlocker := p.lockEnts(prefixes...)
+			objs, unlocker := p.LockEnts("tasks", "machines", "bootenvs", "profiles")
 			defer unlocker()
 			var rd *RenderData
 			var machine *Machine
 			var target renderable
 			for i, prefix := range prefixes {
-				idx, found := objs[i].find(keys[i])
-				if !found {
+				item := objs(prefix).Find(keys[i])
+				if item == nil {
 					return nil, fmt.Errorf("%s:%s has vanished", prefix, keys[i])
 				}
-				item := objs[i].d[idx]
 				switch item.(type) {
 				case renderable:
 					target = item.(renderable)
 				case *Machine:
-					machine = AsMachine(objs[i].d[idx])
+					machine = AsMachine(item)
 				default:
 					p.Logger.Panicf("%s:%s is neither Renderable nor a machine", item.Prefix(), item.Key())
 				}
 			}
-			rd = newRenderData(p, machine, target)
+			rd = newRenderData(objs, p, machine, target)
 			rd.remoteIP = remoteIP
 			buf := bytes.Buffer{}
 			tmpl := target.templates().Lookup(tmplKey)
@@ -162,13 +161,14 @@ type RenderData struct {
 	Machine  *rMachine // The Machine that the template is being rendered for.
 	Env      *rBootEnv // The boot environment that provided the template.
 	Task     *rTask
+	d        Stores
 	target   renderable
 	p        *DataTracker
 	remoteIP net.IP
 }
 
-func newRenderData(p *DataTracker, m *Machine, r renderable) *RenderData {
-	res := &RenderData{p: p}
+func newRenderData(d Stores, p *DataTracker, m *Machine, r renderable) *RenderData {
+	res := &RenderData{d: d, p: p}
 	res.target = r
 	if m != nil {
 		res.Machine = &rMachine{Machine: m, renderData: res}
@@ -198,14 +198,14 @@ func (r *RenderData) GenerateToken() string {
 	var t string
 	if r.Machine == nil {
 		ttl := 600
-		if sttl, e := r.p.Pref("unknownTokenTimeout"); e == nil {
+		if sttl := r.p.pref("unknownTokenTimeout"); sttl != "" {
 			ttl, _ = strconv.Atoi(sttl)
 		}
 		t, _ = NewClaim("general", ttl).Add("machines", "post", "*").
 			Add("machines", "get", "*").Seal(r.p.tokenManager)
 	} else {
 		ttl := 3600
-		if sttl, e := r.p.Pref("knownTokenTimeout"); e == nil {
+		if sttl := r.p.pref("knownTokenTimeout"); sttl != "" {
 			ttl, _ = strconv.Atoi(sttl)
 		}
 		t, _ = NewClaim(r.Machine.Key(), ttl).Add("machines", "patch", r.Machine.Key()).
@@ -249,12 +249,12 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 // ParamExists is a helper function for determining the existence of a machine parameter.
 func (r *RenderData) ParamExists(key string) bool {
 	if r.Machine != nil {
-		_, ok := r.Machine.GetParam(key, true)
+		_, ok := r.Machine.GetParam(r.d, key, true)
 		if ok {
 			return ok
 		}
 	}
-	if o, found := r.p.fetchOne(r.p.NewProfile(), r.p.globalProfileName); found {
+	if o := r.d("profiles").Find(r.p.globalProfileName); o != nil {
 		p := AsProfile(o)
 		if _, ok := p.Params[key]; ok {
 			return true
@@ -266,12 +266,12 @@ func (r *RenderData) ParamExists(key string) bool {
 // Param is a helper function for extracting a parameter from Machine.Params
 func (r *RenderData) Param(key string) (interface{}, error) {
 	if r.Machine != nil {
-		v, ok := r.Machine.GetParam(key, true)
+		v, ok := r.Machine.GetParam(r.d, key, true)
 		if ok {
 			return v, nil
 		}
 	}
-	if o, found := r.p.fetchOne(r.p.NewProfile(), r.p.globalProfileName); found {
+	if o := r.d("profiles").Find(r.p.globalProfileName); o != nil {
 		p := AsProfile(o)
 		if v, ok := p.Params[key]; ok {
 			return v, nil

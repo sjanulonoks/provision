@@ -108,10 +108,6 @@ func (j *Job) setDT(dp *DataTracker) {
 	j.p = dp
 }
 
-func (j *Job) List() []*Job {
-	return AsJobs(j.p.FetchAll(j))
-}
-
 func (j *Job) Indexes() map[string]index.Maker {
 	fix := AsJob
 	return map[string]index.Maker{

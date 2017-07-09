@@ -9,6 +9,7 @@ import (
 // User is an API user of DigitalRebar Provision
 // swagger:model
 type User struct {
+	validate
 	// Name is the name of the user
 	//
 	// required: true
@@ -70,10 +71,6 @@ func (u *User) CheckPassword(pass string) bool {
 	return false
 }
 
-func (u *User) List() []*User {
-	return AsUsers(u.p.FetchAll(u))
-}
-
 func AsUser(o store.KeySaver) *User {
 	return o.(*User)
 }
@@ -90,14 +87,14 @@ func (u *User) Sanitize() {
 	u.PasswordHash = []byte{}
 }
 
-func (u *User) ChangePassword(newPass string) error {
+func (u *User) ChangePassword(d Stores, newPass string) error {
 	ph, err := sc.GenerateFromPassword([]byte(newPass), sc.DefaultParams)
 	if err != nil {
 		return err
 	}
 	u.PasswordHash = ph
 	if u.p != nil {
-		_, err = u.p.save(u)
+		_, err = u.p.Save(d, u)
 	}
 	return err
 }
@@ -107,5 +104,5 @@ func (p *DataTracker) NewUser() *User {
 }
 
 func (u *User) BeforeSave() error {
-	return index.CheckUnique(u, u.p.objs[u.Prefix()].d)
+	return index.CheckUnique(u, u.stores("users").Items())
 }

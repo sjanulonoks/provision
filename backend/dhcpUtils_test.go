@@ -55,12 +55,12 @@ func TestDHCPRenew(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
 	startObjs := []crudTest{
-		{"Initial Subnet", dt.create, &Subnet{p: dt, Name: "sn", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true},
-		{"Initial Standalone Reservation", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true},
-		{"Valid Subnet Lease", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.80"), Strategy: "mac", Token: "subn1", ExpireTime: time.Now().Add(60 * time.Second)}, true},
-		{"Valid Reservation Lease", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.123.10"), Strategy: "mac", Token: "res1", ExpireTime: time.Now().Add(2 * time.Hour)}, true},
-		{"Conflicting Reservation Lease", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.81"), Strategy: "mac", Token: "subn2", ExpireTime: time.Now().Add(2 * time.Hour)}, true},
-		{"Initial Conflicting Reservation", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.81"), Token: "res2", Strategy: "mac"}, true},
+		{"Initial Subnet", dt.Create, &Subnet{p: dt, Name: "sn", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true},
+		{"Initial Standalone Reservation", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true},
+		{"Valid Subnet Lease", dt.Create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.80"), Strategy: "mac", Token: "subn1", ExpireTime: time.Now().Add(60 * time.Second)}, true},
+		{"Valid Reservation Lease", dt.Create, &Lease{p: dt, Addr: net.ParseIP("192.168.123.10"), Strategy: "mac", Token: "res1", ExpireTime: time.Now().Add(2 * time.Hour)}, true},
+		{"Conflicting Reservation Lease", dt.Create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.81"), Strategy: "mac", Token: "subn2", ExpireTime: time.Now().Add(2 * time.Hour)}, true},
+		{"Initial Conflicting Reservation", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.81"), Token: "res2", Strategy: "mac"}, true},
 	}
 	for _, obj := range startObjs {
 		obj.Test(t)
@@ -75,7 +75,7 @@ func TestDHCPRenew(t *testing.T) {
 	for _, l := range ltfs {
 		l.find(t, dt)
 	}
-	if ok, err := dt.remove(&Reservation{p: dt, Addr: net.ParseIP("192.168.123.10")}); !ok {
+	if ok, err := dt.Remove(&Reservation{p: dt, Addr: net.ParseIP("192.168.123.10")}); !ok {
 		t.Errorf("Failed to remove reservation for 192.168.123.10: %v", err)
 	}
 	if l, err := FindLease(dt, "mac", "res1", nil); err == nil {
@@ -116,8 +116,8 @@ func TestDHCPCreateReservationOnly(t *testing.T) {
 	bs := store.NewSimpleMemoryStore()
 	dt := mkDT(bs)
 	startObjs := []crudTest{
-		{"Res1", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true},
-		{"Res2", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.10"), Token: "res2", Strategy: "mac"}, true},
+		{"Res1", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true},
+		{"Res2", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.10"), Token: "res2", Strategy: "mac"}, true},
 	}
 	for _, obj := range startObjs {
 		obj.Test(t)
@@ -155,8 +155,8 @@ func TestDHCPCreateSubnet(t *testing.T) {
 	dt := mkDT(bs)
 	// A subnet with 3 active addresses
 	startObjs := []crudTest{
-		{"Create Subnet", dt.create, &Subnet{p: dt, Name: "test", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.83"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true},
-		{"Create Reservation", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.83"), Token: "res1", Strategy: "mac"}, true},
+		{"Create Subnet", dt.Create, &Subnet{p: dt, Name: "test", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.83"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true},
+		{"Create Reservation", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.83"), Token: "res1", Strategy: "mac"}, true},
 	}
 	for _, obj := range startObjs {
 		obj.Test(t)

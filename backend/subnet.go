@@ -135,6 +135,7 @@ func init() {
 //
 // swagger:model
 type Subnet struct {
+	validate
 	// Name is the name of the subnet.
 	// Subnet names must be unique
 	//
@@ -374,10 +375,6 @@ func (p *DataTracker) NewSubnet() *Subnet {
 	return &Subnet{p: p}
 }
 
-func (s *Subnet) List() []*Subnet {
-	return AsSubnets(s.p.FetchAll(s))
-}
-
 func (s *Subnet) sBounds() (func(string) bool, func(string) bool) {
 	sub := s.subnet()
 	first := big.NewInt(0)
@@ -409,6 +406,15 @@ func (s *Subnet) aBounds() (func(string) bool, func(string) bool) {
 		},
 		func(key string) bool {
 			return key > Hexaddr(s.ActiveEnd)
+		}
+}
+
+func (s *Subnet) idxABounds() (index.Test, index.Test) {
+	return func(o store.KeySaver) bool {
+			return o.Key() >= Hexaddr(s.ActiveStart)
+		},
+		func(o store.KeySaver) bool {
+			return o.Key() > Hexaddr(s.ActiveStart)
 		}
 }
 
@@ -522,7 +528,7 @@ func (s *Subnet) BeforeSave() error {
 	if e.containsError {
 		return e
 	}
-	subnets := AsSubnets(s.p.unlockedFetchAll("subnets"))
+	subnets := AsSubnets(s.stores("subnets").Items())
 	for i := range subnets {
 		if subnets[i].Name == s.Name {
 			continue
@@ -531,25 +537,8 @@ func (s *Subnet) BeforeSave() error {
 			e.Errorf("Overlaps subnet %s", subnets[i].Name)
 		}
 	}
-	if err := index.CheckUnique(s, s.p.objs[s.Prefix()].d); err != nil {
-		e.Merge(err)
-	}
+	e.Merge(index.CheckUnique(s, s.stores("subnets").Items()))
 	return e.OrNil()
-}
-
-func (s *Subnet) leases() []*Lease {
-	lower, upper := s.sBounds()
-	return AsLeases(s.p.fetchSome("leases", lower, upper))
-}
-
-func (s *Subnet) activeLeases() []*Lease {
-	lower, upper := s.aBounds()
-	return AsLeases(s.p.fetchSome("leases", lower, upper))
-}
-
-func (s *Subnet) reservations() []*Reservation {
-	lower, upper := s.sBounds()
-	return AsReservations(s.p.fetchSome("reservations", lower, upper))
 }
 
 func (s *Subnet) next(used map[string]store.KeySaver, token string, hint net.IP) (*Lease, bool) {
