@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/VictorLowther/jsonpatch2"
+	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
 )
@@ -193,8 +194,13 @@ func (f *Frontend) InitUserApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/users/:name/token",
 		func(c *gin.Context) {
-			user, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
-			if !ok {
+			var user store.KeySaver
+			func() {
+				d, unlocker := f.dt.LockEnts("users")
+				defer unlocker()
+				user = d("users").Find(c.Param("name"))
+			}()
+			if user == nil {
 				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
 				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound, s))
 				return
@@ -285,8 +291,10 @@ func (f *Frontend) InitUserApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name/password",
 		func(c *gin.Context) {
-			obj, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
-			if !ok {
+			d, unlocker := f.dt.LockEnts("users")
+			defer unlocker()
+			obj := d("users").Find(c.Param("name"))
+			if obj == nil {
 				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
 				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound, s))
 				return
@@ -299,8 +307,7 @@ func (f *Frontend) InitUserApi() {
 			if !assureDecode(c, &userPassword) {
 				return
 			}
-
-			if err := user.ChangePassword(userPassword.Password); err != nil {
+			if err := user.ChangePassword(d, userPassword.Password); err != nil {
 				be, ok := err.(*backend.Error)
 				if ok {
 					c.JSON(be.Code, be)
@@ -308,12 +315,8 @@ func (f *Frontend) InitUserApi() {
 					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				obj, _ = f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
-				s, _ := obj.(Sanitizable)
-				s.Sanitize()
-				c.JSON(http.StatusOK, obj)
+				c.JSON(http.StatusOK, user.Sanitize())
 			}
-
 		})
 
 	// swagger:route DELETE /users/{name} Users deleteUser

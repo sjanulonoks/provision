@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/VictorLowther/jsonpatch2"
+	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
 	"github.com/pborman/uuid"
@@ -145,7 +146,13 @@ func (f *Frontend) InitMachineApi() {
 			if b.Uuid == nil || len(b.Uuid) == 0 {
 				b.Uuid = uuid.NewRandom()
 			}
-			res, err := f.dt.Create(b)
+			var res store.KeySaver
+			var err error
+			func() {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("create")...)
+				defer unlocker()
+				_, err = f.dt.Create(d, b)
+			}()
 			if err != nil {
 				be, ok := err.(*backend.Error)
 				if ok {
@@ -154,9 +161,11 @@ func (f *Frontend) InitMachineApi() {
 					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				s, ok := res.(Sanitizable)
+				s, ok := store.KeySaver(b).(Sanitizable)
 				if ok {
-					s.Sanitize()
+					res = s.Sanitize()
+				} else {
+					res = b
 				}
 				c.JSON(http.StatusCreated, res)
 			}
@@ -247,23 +256,27 @@ func (f *Frontend) InitMachineApi() {
 	f.ApiGroup.GET("/machines/:uuid/params",
 		func(c *gin.Context) {
 			uuid := c.Param(`uuid`)
-			ref := f.dt.NewMachine()
-			res, ok := f.dt.FetchOne(ref, uuid)
-			if !ok {
+			var ref store.KeySaver
+			func() {
+				d, unlocker := f.dt.LockEnts("machines")
+				defer unlocker()
+				ref = d("machines").Find(uuid)
+			}()
+			if ref == nil {
 				err := &backend.Error{
 					Code:  http.StatusNotFound,
 					Type:  "API_ERROR",
-					Model: ref.Prefix(),
+					Model: "machines",
 					Key:   uuid,
 				}
 				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
 				c.JSON(err.Code, err)
 				return
 			}
-			if !assureAuth(c, f.Logger, res.Prefix(), "get", res.Key()) {
+			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
 				return
 			}
-			p := backend.AsMachine(res).GetParams()
+			p := backend.AsMachine(ref).GetParams()
 			c.JSON(http.StatusOK, p)
 		})
 
@@ -284,26 +297,34 @@ func (f *Frontend) InitMachineApi() {
 				return
 			}
 			uuid := c.Param(`uuid`)
-			ref := f.dt.NewMachine()
-			res, ok := f.dt.FetchOne(ref, uuid)
-			if !ok {
+			var ref store.KeySaver
+			func() {
+				d, unlocker := f.dt.LockEnts("machines")
+				defer unlocker()
+				ref = d("machines").Find(uuid)
+			}()
+			if ref == nil {
 				err := &backend.Error{
 					Code:  http.StatusNotFound,
 					Type:  "API_ERROR",
-					Model: ref.Prefix(),
+					Model: "machines",
 					Key:   uuid,
 				}
 				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
 				c.JSON(err.Code, err)
 				return
 			}
-			if !assureAuth(c, f.Logger, res.Prefix(), "get", res.Key()) {
+			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
 				return
 			}
 
-			m := backend.AsMachine(res)
-
-			err := m.SetParams(val)
+			m := backend.AsMachine(ref)
+			var err error
+			func() {
+				d, unlocker := f.dt.LockEnts("machines")
+				defer unlocker()
+				err = m.SetParams(d, val)
+			}()
 			if err != nil {
 				be, _ := err.(*backend.Error)
 				c.JSON(be.Code, be)

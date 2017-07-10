@@ -83,8 +83,10 @@ func AsUsers(o []store.KeySaver) []*User {
 	return res
 }
 
-func (u *User) Sanitize() {
-	u.PasswordHash = []byte{}
+func (u *User) Sanitize() *User {
+	res := AsUser(u.p.Clone(u))
+	res.PasswordHash = []byte{}
+	return res
 }
 
 func (u *User) ChangePassword(d Stores, newPass string) error {

@@ -70,7 +70,7 @@ func TestUserPassword(t *testing.T) {
 		t.Logf("CHecking password passed, as expected.")
 	}
 	// Make sure sanitizing the user works as expected
-	newU.Sanitize()
+	newU = newU.Sanitize()
 	if len(newU.PasswordHash) != 0 {
 		t.Errorf("Sanitize did not strip out the password hash")
 	} else {

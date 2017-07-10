@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
 )
@@ -177,13 +178,16 @@ func (f *Frontend) InitIsoApi() {
 }
 
 func reloadBootenvsForIso(dt DTI, name string) {
-	for _, blob := range dt.FetchAll(dt.NewBootEnv()) {
+	d, unloader := dt.LockEnts(store.KeySaver(dt.NewBootEnv()).(Lockable).Locks("update")...)
+	defer unloader()
+
+	for _, blob := range d("bootenvs").Items() {
 		env := backend.AsBootEnv(blob)
 		if env.Available || env.OS.IsoFile != name {
 			continue
 		}
 		env.Available = true
-		dt.Update(env)
+		dt.Update(d, env)
 	}
 }
 
