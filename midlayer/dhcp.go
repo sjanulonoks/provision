@@ -42,10 +42,10 @@ type DhcpHandler struct {
 	strats    []*Strategy
 }
 
-func (h *DhcpHandler) buildOptions(p dhcp.Packet, l *backend.Lease) (dhcp.Options, time.Duration, net.IP) {
-	r := l.Reservation()
-	s := l.Subnet()
-
+func (h *DhcpHandler) buildOptions(p dhcp.Packet,
+	l *backend.Lease,
+	s *backend.Subnet,
+	r *backend.Reservation) (dhcp.Options, time.Duration, net.IP) {
 	var leaseTime uint32 = 7200
 	if s != nil {
 		leaseTime = uint32(s.LeaseTimeFor(l.Addr) / time.Second)
@@ -294,12 +294,13 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		p.CHAddr().String())
 	// need code to figure out which interface or relay it came from
 	req, reqState := reqAddr(p, msgType, options)
-	lease := h.bk.NewLease()
 	var err error
 	switch msgType {
 	case dhcp.Decline:
-		leaseThing, ok := h.bk.FetchOne(lease, backend.Hexaddr(req))
-		if !ok {
+		d, unlocker := h.bk.LockEnts("leases", "reservations", "subnets")
+		defer unlocker()
+		leaseThing := d("leases").Find(backend.Hexaddr(req))
+		if leaseThing == nil {
 			h.Infof("%s: Asked to decline a lease we didn't issue by %s, ignoring", xid(p), req)
 			return nil
 		}
@@ -308,14 +309,16 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		if stratfn != nil && stratfn(p, options) == lease.Token {
 			h.Infof("%s: Lease for %s declined, invalidating.", xid(p), lease.Addr)
 			lease.Invalidate()
-			h.bk.Save(lease)
+			h.bk.Save(d, lease)
 		} else {
 			h.Infof("%s: Received spoofed decline for %s, ignoring", xid(p), lease.Addr)
 		}
 		return nil
 	case dhcp.Release:
-		leaseThing, ok := h.bk.FetchOne(lease, backend.Hexaddr(req))
-		if !ok {
+		d, unlocker := h.bk.LockEnts("leases", "reservations", "subnets")
+		defer unlocker()
+		leaseThing := d("leases").Find(backend.Hexaddr(req))
+		if leaseThing == nil {
 			h.Infof("%s: Asked to release a lease we didn't issue by %s, ignoring", xid(p), req)
 			return nil
 		}
@@ -324,7 +327,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		if stratfn != nil && stratfn(p, options) == lease.Token {
 			h.Infof("%s: Lease for %s released, expiring.", xid(p), lease.Addr)
 			lease.Expire()
-			h.bk.Save(lease)
+			h.bk.Save(d, lease)
 		} else {
 			h.Infof("%s: Received spoofed release for %s, ignoring", xid(p), lease.Addr)
 		}
@@ -340,8 +343,11 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 			h.Infof("%s: NAK'ing invalid requested IP %s", xid(p), req)
 			return h.nak(p, h.respondFrom(req))
 		}
+		var lease *backend.Lease
+		var reservation *backend.Reservation
+		var subnet *backend.Subnet
 		for _, s := range h.strats {
-			lease, err = backend.FindLease(h.bk, s.Name, s.GenToken(p, options), req)
+			lease, subnet, reservation, err = backend.FindLease(h.bk, s.Name, s.GenToken(p, options), req)
 			if err != nil {
 				if lease != nil {
 					h.Infof("%s: %s already leased to %s:%s: %s",
@@ -371,7 +377,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 				return h.nak(p, h.respondFrom(req))
 			}
 		}
-		opts, duration, nextServer := h.buildOptions(p, lease)
+		opts, duration, nextServer := h.buildOptions(p, lease, subnet, reservation)
 		reply := dhcp.ReplyPacket(p, dhcp.ACK,
 			h.respondFrom(lease.Addr),
 			lease.Addr,
@@ -390,9 +396,9 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 			if via[0] == nil || via[0].IsUnspecified() {
 				via = h.listenIPs()
 			}
-			lease = backend.FindOrCreateLease(h.bk, strat, token, req, via)
+			lease, subnet, reservation := backend.FindOrCreateLease(h.bk, strat, token, req, via)
 			if lease != nil {
-				opts, duration, _ := h.buildOptions(p, lease)
+				opts, duration, _ := h.buildOptions(p, lease, subnet, reservation)
 				reply := dhcp.ReplyPacket(p, dhcp.Offer,
 					h.respondFrom(lease.Addr),
 					lease.Addr,

@@ -63,13 +63,15 @@ func findLease(d Stores, dt *DataTracker, strat, token string, req net.IP) (leas
 // Otherwise, the lease will be returned with its ExpireTime updated and the Lease saved.
 //
 // This function should be called in response to a DHCPREQUEST.
-func FindLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, err error) {
+func FindLease(dt *DataTracker,
+	strat, token string,
+	req net.IP) (lease *Lease, subnet *Subnet, reservation *Reservation, err error) {
 	d, unlocker := dt.LockEnts("leases", "reservations", "subnets")
 	defer unlocker()
 	lease, err = findLease(d, dt, strat, token, req)
 	if lease != nil && err == nil {
-		subnet := lease.Subnet(d)
-		reservation := lease.Reservation(d)
+		subnet = lease.Subnet(d)
+		reservation = lease.Reservation(d)
 		if subnet != nil {
 			lease.ExpireTime = time.Now().Add(subnet.LeaseTimeFor(lease.Addr))
 		} else if reservation != nil {
@@ -82,11 +84,10 @@ func FindLease(dt *DataTracker, strat, token string, req net.IP) (lease *Lease, 
 		}
 		dt.Save(d, lease)
 	}
-	return lease, err
+	return
 }
 
-func findViaReservation(leases, reservations *Store, strat, token string, req net.IP) (lease *Lease) {
-	var reservation *Reservation
+func findViaReservation(leases, reservations *Store, strat, token string, req net.IP) (lease *Lease, reservation *Reservation) {
 	if req != nil && req.IsGlobalUnicast() {
 		hex := Hexaddr(req)
 		ok := reservations.Find(hex)
@@ -145,8 +146,7 @@ func findViaReservation(leases, reservations *Store, strat, token string, req ne
 	return
 }
 
-func findViaSubnet(leases, subnets, reservations *Store, strat, token string, req net.IP, vias []net.IP) (lease *Lease) {
-	var subnet *Subnet
+func findViaSubnet(leases, subnets, reservations *Store, strat, token string, req net.IP, vias []net.IP) (lease *Lease, subnet *Subnet) {
 	for _, idx := range subnets.Items() {
 		candidate := AsSubnet(idx)
 		for _, via := range vias {
@@ -161,7 +161,7 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 	}
 	if subnet == nil {
 		// There is no subnet that can handle the vias we want
-		return nil
+		return
 	}
 	currLeases, _ := index.Between(
 		Hexaddr(subnet.ActiveStart),
@@ -196,7 +196,7 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 	}
 	if lease != nil {
 		subnet.p.Infof("debugDhcp", "Subnet %s: handing out existing lease for %s to %s:%s", subnet.Name, lease.Addr, strat, token)
-		return lease
+		return
 	}
 	subnet.p.Infof("debugDhcp", "Subnet %s: %s:%s is in my range, attempting lease creation.", subnet.Name, strat, token)
 	lease, _ = subnet.next(usedAddrs, token, req)
@@ -204,10 +204,10 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 		if leases.Find(lease.Key()) == nil {
 			leases.Add(lease)
 		}
-		return lease
+		return
 	}
 	subnet.p.Infof("debugDhcp", "Subnet %s: No lease for %s:%s, it gets no IP from us", subnet.Name, strat, token)
-	return nil
+	return nil, nil
 }
 
 // FindOrCreateLease will return a lease for the passed information, creating it if it can.
@@ -215,13 +215,16 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 // If the returned lease is nil, then the DHCP system should not respond.
 //
 // This function should be called for DHCPDISCOVER.
-func FindOrCreateLease(dt *DataTracker, strat, token string, req net.IP, via []net.IP) *Lease {
+func FindOrCreateLease(dt *DataTracker,
+	strat, token string,
+	req net.IP,
+	via []net.IP) (lease *Lease, subnet *Subnet, reservation *Reservation) {
 	d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
 	defer unlocker()
 	leases, reservations, subnets := d("leases"), d("reservations"), d("subnets")
-	lease := findViaReservation(leases, reservations, strat, token, req)
+	lease, reservation = findViaReservation(leases, reservations, strat, token, req)
 	if lease == nil {
-		lease = findViaSubnet(leases, subnets, reservations, strat, token, req, via)
+		lease, subnet = findViaSubnet(leases, subnets, reservations, strat, token, req, via)
 	}
 	if lease != nil {
 		// Clean up any other leases that have this strategy and token lying around.
@@ -239,5 +242,5 @@ func FindOrCreateLease(dt *DataTracker, strat, token string, req net.IP, via []n
 		lease.ExpireTime = time.Now().Add(time.Minute)
 		dt.Save(d, lease)
 	}
-	return lease
+	return
 }
