@@ -266,6 +266,9 @@ func NewDataTracker(backend store.SimpleStore,
 			logger.Println(err.Error())
 		}
 	}
+	if err := res.RenderUnknown(d); err != nil {
+		logger.Fatalf("Failed to render unknown bootenv: %v", err)
+	}
 	return res
 }
 

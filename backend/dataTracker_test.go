@@ -78,7 +78,7 @@ func mkDT(bs store.SimpleStore) *DataTracker {
 		8091,
 		8092,
 		log.New(os.Stdout, "dt", 0),
-		map[string]string{"defaultBootEnv": "default"})
+		map[string]string{"defaultBootEnv": "default", "unknownBootEnv": "ignore"})
 	return dt
 }
 

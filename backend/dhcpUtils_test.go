@@ -16,7 +16,7 @@ type ltf struct {
 }
 
 func (l *ltf) find(t *testing.T, dt *DataTracker) {
-	res, err := FindLease(dt, l.strat, l.token, l.req)
+	res, _, _, err := FindLease(dt, l.strat, l.token, l.req)
 	if l.found {
 		if res == nil {
 			t.Errorf("%s: Expected a lease for %s:%s, failed to get one", l.msg, l.strat, l.token)
@@ -86,7 +86,7 @@ func TestDHCPRenew(t *testing.T) {
 			t.Errorf("Failed to remove reservation for 192.168.123.10: %v", err)
 		}
 	}()
-	if l, err := FindLease(dt, "mac", "res1", nil); err == nil {
+	if l, _, _, err := FindLease(dt, "mac", "res1", nil); err == nil {
 		t.Errorf("Should have removed lease for %s:%s, as its backing reservation is gone!", l.Strategy, l.Token)
 	} else {
 		t.Logf("Removed lease that no longer has a Subnet or Reservation covering it: %v", err)
@@ -102,7 +102,7 @@ type ltc struct {
 }
 
 func (l *ltc) test(t *testing.T, dt *DataTracker) {
-	res := FindOrCreateLease(dt, l.strat, l.token, l.req, []net.IP{l.via})
+	res, _, _ := FindOrCreateLease(dt, l.strat, l.token, l.req, []net.IP{l.via})
 	if l.created {
 		if res == nil {
 			t.Errorf("%s: Expected to create a lease with %s:%s, but did not!", l.msg, l.strat, l.token)

@@ -16,10 +16,10 @@ func TestPreferences(t *testing.T) {
 	} else {
 		t.Logf("Got defaultBootEnv %s", be)
 	}
-	if be, err := dt.Pref("unknownBootEnv"); err == nil {
-		t.Errorf("Did not expect to get unknownBootEnv %s", be)
+	if be, err := dt.Pref("unknownBootEnv"); err == nil && be == "ignore" {
+		t.Logf("Got expected value for unknownBootEnv %s", be)
 	} else {
-		t.Logf("Got expected error looking for unknownBootEnv: %v", err)
+		t.Errorf("Got Unexpected error looking for unknownBootEnv: %v, %v", be, err)
 	}
 	prefs := map[string]string{}
 	prefs["unknownBootEnv"] = "ignore"
