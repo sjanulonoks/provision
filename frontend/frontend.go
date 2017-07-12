@@ -34,35 +34,6 @@ type NoContentResponse struct {
 	//description: Nothing
 }
 
-// This interface defines the pieces of the backend.DataTracker that the
-// frontend needs.
-type DTI interface {
-	Create(backend.Stores, store.KeySaver) (bool, error)
-	Update(backend.Stores, store.KeySaver) (bool, error)
-	Remove(backend.Stores, store.KeySaver) (bool, error)
-	Save(backend.Stores, store.KeySaver) (bool, error)
-	Patch(backend.Stores, store.KeySaver, string, jsonpatch2.Patch) (store.KeySaver, error)
-	LockEnts(...string) (backend.Stores, func())
-	NewBootEnv() *backend.BootEnv
-	NewMachine() *backend.Machine
-	NewTemplate() *backend.Template
-	NewLease() *backend.Lease
-	NewReservation() *backend.Reservation
-	NewSubnet() *backend.Subnet
-	NewUser() *backend.User
-	NewProfile() *backend.Profile
-	NewParam() *backend.Param
-
-	Pref(string) (string, error)
-	Prefs() map[string]string
-	SetPrefs(backend.Stores, map[string]string) error
-
-	GetInterfaces() ([]*backend.Interface, error)
-
-	GetToken(string) (*backend.DrpCustomClaims, error)
-	NewToken(string, int, string, string, string) (string, error)
-}
-
 type Sanitizable interface {
 	Sanitize() store.KeySaver
 }
@@ -76,7 +47,7 @@ type Frontend struct {
 	FileRoot   string
 	MgmtApi    *gin.Engine
 	ApiGroup   *gin.RouterGroup
-	dt         DTI
+	dt         *backend.DataTracker
 	authSource AuthSource
 }
 
@@ -85,7 +56,7 @@ type AuthSource interface {
 }
 
 type DefaultAuthSource struct {
-	dt DTI
+	dt *backend.DataTracker
 }
 
 func (d DefaultAuthSource) GetUser(username string) *backend.User {
@@ -98,12 +69,12 @@ func (d DefaultAuthSource) GetUser(username string) *backend.User {
 	return nil
 }
 
-func NewDefaultAuthSource(dt DTI) (das AuthSource) {
+func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	das = DefaultAuthSource{dt: dt}
 	return
 }
 
-func NewFrontend(dt DTI, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
+func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {

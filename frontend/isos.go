@@ -177,7 +177,7 @@ func (f *Frontend) InitIsoApi() {
 		})
 }
 
-func reloadBootenvsForIso(dt DTI, name string) {
+func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
 	d, unloader := dt.LockEnts(store.KeySaver(dt.NewBootEnv()).(Lockable).Locks("update")...)
 	defer unloader()
 
@@ -191,7 +191,7 @@ func reloadBootenvsForIso(dt DTI, name string) {
 	}
 }
 
-func uploadIso(c *gin.Context, fileRoot, name string, dt DTI) {
+func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 	if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
 		c.JSON(http.StatusUnsupportedMediaType,
 			backend.NewError("API ERROR", http.StatusUnsupportedMediaType,
