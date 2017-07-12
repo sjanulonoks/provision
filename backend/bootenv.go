@@ -290,29 +290,24 @@ func (b *BootEnv) explodeIso(e *Error) {
 		return
 	}
 
-	f, err := os.Open(isoPath)
-	if err != nil {
-		e.Errorf("Explode ISO: failed to open iso file %s: %v", isoPath, err)
-		return
-	}
-	defer f.Close()
-	hasher := sha256.New()
-	if _, err := io.Copy(hasher, f); err != nil {
-		e.Errorf("Explode ISO: failed to read iso file %s: %v", isoPath, err)
-		return
-	}
-	hash := hex.EncodeToString(hasher.Sum(nil))
-	// This will wind up being saved along with the rest of the
-	// hash because explodeIso is called by OnChange before the struct gets saved.
-	/*
-		if b.OS.IsoSha256 == "" {
-			b.OS.IsoSha256 = hash
+	// Only check the has if we have one.
+	if b.OS.IsoSha256 != "" {
+		f, err := os.Open(isoPath)
+		if err != nil {
+			e.Errorf("Explode ISO: failed to open iso file %s: %v", isoPath, err)
+			return
 		}
-	*/
-
-	if b.OS.IsoSha256 != "" && hash != b.OS.IsoSha256 {
-		e.Errorf("Explode ISO: SHA256 bad. actual: %v expected: %v", hash, b.OS.IsoSha256)
-		return
+		defer f.Close()
+		hasher := sha256.New()
+		if _, err := io.Copy(hasher, f); err != nil {
+			e.Errorf("Explode ISO: failed to read iso file %s: %v", isoPath, err)
+			return
+		}
+		hash := hex.EncodeToString(hasher.Sum(nil))
+		if hash != b.OS.IsoSha256 {
+			e.Errorf("Explode ISO: SHA256 bad. actual: %v expected: %v", hash, b.OS.IsoSha256)
+			return
+		}
 	}
 
 	// Call extract script
