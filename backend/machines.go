@@ -17,7 +17,7 @@ import (
 // swagger:model
 type Machine struct {
 	validate
-	Validation
+
 	// The name of the machine.  THis must be unique across all
 	// machines, and by convention it is the FQDN of the machine,
 	// although nothing enforces that.
@@ -50,6 +50,10 @@ type Machine struct {
 	// If this field is not present or blank, the global default bootenv
 	// will be used instead.
 	BootEnv string
+	// If there are any errors in the rendering process, they will be
+	// available here.
+	// read only: true
+	Errors []string
 	// An array of profiles to apply to this machine in order when looking
 	// for a parameter during rendering.
 	Profiles []string
@@ -225,7 +229,7 @@ func (n *Machine) GetParams() map[string]interface{} {
 
 func (n *Machine) SetParams(d Stores, values map[string]interface{}) error {
 	n.Profile.Params = values
-	e := &Error{Code: 409, Type: ValidationError, o: n}
+	e := &Error{Code: 422, Type: ValidationError, o: n}
 	_, e2 := n.p.Save(d, n)
 	e.Merge(e2)
 	return e.OrNil()
@@ -319,9 +323,6 @@ func (n *Machine) BeforeSave() error {
 		} else {
 			env.Render(objs, n, e).register(n.p.FS)
 		}
-		n.Errors = e.Messages
-		n.Available = !e.ContainsError()
-		n.Validated = true
 	}
 	return e.OrNil()
 }

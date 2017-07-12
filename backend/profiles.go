@@ -15,7 +15,7 @@ import (
 // swagger:model
 type Profile struct {
 	validate
-	Validation
+
 	// The name of the profile.  This must be unique across all
 	// profiles.
 	//
@@ -88,7 +88,7 @@ func (p *Profile) GetParams() map[string]interface{} {
 
 func (p *Profile) SetParams(d Stores, values map[string]interface{}) error {
 	p.Params = values
-	e := &Error{Code: 409, Type: ValidationError, o: p}
+	e := &Error{Code: 422, Type: ValidationError, o: p}
 	_, e2 := p.p.Save(d, p)
 	e.Merge(e2)
 	return e.OrNil()
