@@ -196,7 +196,7 @@ func (f *Frontend) InitUserApi() {
 		func(c *gin.Context) {
 			var user store.KeySaver
 			func() {
-				d, unlocker := f.dt.LockEnts("users")
+				d, unlocker := f.dt.LockEnts(f.dt.NewUser().Locks("get")...)
 				defer unlocker()
 				user = d("users").Find(c.Param("name"))
 			}()
@@ -291,7 +291,7 @@ func (f *Frontend) InitUserApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name/password",
 		func(c *gin.Context) {
-			d, unlocker := f.dt.LockEnts("users")
+			d, unlocker := f.dt.LockEnts(f.dt.NewUser().Locks("update")...)
 			defer unlocker()
 			obj := d("users").Find(c.Param("name"))
 			if obj == nil {

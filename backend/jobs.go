@@ -276,3 +276,15 @@ func (j *Job) Indexes() map[string]index.Maker {
 			}),
 	}
 }
+
+var jobLockMap = map[string][]string{
+	"get":    []string{"jobs"},
+	"create": []string{"jobs"},
+	"update": []string{"jobs"},
+	"patch":  []string{"jobs"},
+	"delete": []string{"jobs"},
+}
+
+func (j *Job) Locks(action string) []string {
+	return jobLockMap[action]
+}

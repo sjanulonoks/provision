@@ -368,8 +368,9 @@ func Resort() Filter {
 
 func Sort(m Maker) Filter {
 	return func(i *Index) (*Index, error) {
-		i.Maker = m
-		return sort(i.Less)(i)
+		j := *i
+		j.Maker = m
+		return sort(j.Less)(&j)
 	}
 }
 

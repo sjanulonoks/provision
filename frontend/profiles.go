@@ -214,8 +214,9 @@ func (f *Frontend) InitProfileApi() {
 		func(c *gin.Context) {
 			name := c.Param(`name`)
 			var res store.KeySaver
+			tp := f.dt.NewProfile()
 			func() {
-				d, unlocker := f.dt.LockEnts("profiles")
+				d, unlocker := f.dt.LockEnts(store.KeySaver(tp).(Lockable).Locks("get")...)
 				defer unlocker()
 				res = d("profiles").Find(name)
 			}()
@@ -255,8 +256,9 @@ func (f *Frontend) InitProfileApi() {
 			}
 			name := c.Param(`name`)
 			var res store.KeySaver
+			tp := f.dt.NewProfile()
 			func() {
-				d, unlocker := f.dt.LockEnts("profiles")
+				d, unlocker := f.dt.LockEnts(store.KeySaver(tp).(Lockable).Locks("get")...)
 				defer unlocker()
 				res = d("profiles").Find(name)
 			}()
@@ -277,7 +279,7 @@ func (f *Frontend) InitProfileApi() {
 			m := backend.AsProfile(res)
 			var err error
 			func() {
-				d, unlocker := f.dt.LockEnts("profiles", "parameters")
+				d, unlocker := f.dt.LockEnts(res.(Lockable).Locks("update")...)
 				defer unlocker()
 				err = m.SetParams(d, val)
 			}()

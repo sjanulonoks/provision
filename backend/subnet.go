@@ -550,3 +550,15 @@ func (s *Subnet) next(used map[string]store.KeySaver, token string, hint net.IP)
 	}
 	return nil, false
 }
+
+var subnetLockMap = map[string][]string{
+	"get":    []string{"subnets"},
+	"create": []string{"subnets"},
+	"update": []string{"subnets"},
+	"patch":  []string{"subnets"},
+	"delete": []string{"subnets"},
+}
+
+func (s *Subnet) Locks(action string) []string {
+	return subnetLockMap[action]
+}

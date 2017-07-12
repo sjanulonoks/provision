@@ -45,7 +45,7 @@ func TestUserList(t *testing.T) {
 func TestUserPost(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.CreateValue = nil
+	localDTI.CreateValue = false
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
 	req, _ := http.NewRequest("POST", "/api/v3/users", nil)
 	req.Header.Set("Content-Type", "text/html")
@@ -54,7 +54,7 @@ func TestUserPost(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "Invalid content type: text/html")
 
-	localDTI.CreateValue = nil
+	localDTI.CreateValue = false
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
 	req, _ = http.NewRequest("POST", "/api/v3/users", strings.NewReader(""))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -63,7 +63,7 @@ func TestUserPost(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "EOF")
 
-	localDTI.CreateValue = nil
+	localDTI.CreateValue = false
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
 	req, _ = http.NewRequest("POST", "/api/v3/users", strings.NewReader("asgasgd"))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -74,9 +74,10 @@ func TestUserPost(t *testing.T) {
 
 	/* GREG: handle json failure? hard to do - send a machine instead of user */
 
-	localDTI.CreateValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.CreateValue = false
+	create := &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
 	localDTI.CreateError = fmt.Errorf("this is a test: bad fred")
-	v, _ := json.Marshal(localDTI.CreateValue)
+	v, _ := json.Marshal(create)
 	req, _ = http.NewRequest("POST", "/api/v3/users", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -84,9 +85,10 @@ func TestUserPost(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.CreateValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.CreateValue = true
+	create = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
 	localDTI.CreateError = nil
-	v, _ = json.Marshal(localDTI.CreateValue)
+	v, _ = json.Marshal(create)
 	req, _ = http.NewRequest("POST", "/api/v3/users", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w := localDTI.RunTest(req)
@@ -99,9 +101,10 @@ func TestUserPost(t *testing.T) {
 		t.Errorf("Returned User was not correct: %v %v\n", "fred", be.Name)
 	}
 
-	localDTI.CreateValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.CreateValue = false
+	create = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"test one"}}
-	v, _ = json.Marshal(localDTI.CreateValue)
+	v, _ = json.Marshal(create)
 	req, _ = http.NewRequest("POST", "/api/v3/users", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w = localDTI.RunTest(req)
@@ -142,7 +145,7 @@ func TestUserGet(t *testing.T) {
 func TestUserPatch(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = true
 	localDTI.UpdateError = nil
 	req, _ := http.NewRequest("PATCH", "/api/v3/users/fred", nil)
 	localDTI.RunTest(req)
@@ -155,7 +158,7 @@ func TestUserPatch(t *testing.T) {
 func TestUserPut(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = false
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
 	req, _ := http.NewRequest("PUT", "/api/v3/users/fred", nil)
 	req.Header.Set("Content-Type", "text/html")
@@ -164,7 +167,7 @@ func TestUserPut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "Invalid content type: text/html")
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = false
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
 	req, _ = http.NewRequest("PUT", "/api/v3/users/fred", strings.NewReader(""))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -173,7 +176,7 @@ func TestUserPut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "EOF")
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = false
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
 	req, _ = http.NewRequest("PUT", "/api/v3/users/fred", strings.NewReader("asgasgd"))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -184,9 +187,10 @@ func TestUserPut(t *testing.T) {
 
 	/* GREG: handle json failure? hard to do - send a machine instead of user */
 
-	localDTI.UpdateValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.UpdateValue = false
+	update := &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
 	localDTI.UpdateError = fmt.Errorf("this is a test: bad fred")
-	v, _ := json.Marshal(localDTI.UpdateValue)
+	v, _ := json.Marshal(update)
 	req, _ = http.NewRequest("PUT", "/api/v3/users/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -194,9 +198,10 @@ func TestUserPut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.UpdateValue = &backend.User{Name: "kfred", PasswordHash: []byte("kfred")}
+	localDTI.UpdateValue = true
+	update = &backend.User{Name: "kfred", PasswordHash: []byte("kfred")}
 	localDTI.UpdateError = nil
-	v, _ = json.Marshal(localDTI.UpdateValue)
+	v, _ = json.Marshal(update)
 	req, _ = http.NewRequest("PUT", "/api/v3/users/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -204,9 +209,10 @@ func TestUserPut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "users PUT: Key change from fred to kfred not allowed")
 
-	localDTI.UpdateValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.UpdateValue = false
+	update = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
 	localDTI.UpdateError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"test one"}}
-	v, _ = json.Marshal(localDTI.UpdateValue)
+	v, _ = json.Marshal(update)
 	req, _ = http.NewRequest("PUT", "/api/v3/users/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -214,9 +220,10 @@ func TestUserPut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "test one")
 
-	localDTI.UpdateValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.UpdateValue = true
+	update = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
 	localDTI.UpdateError = nil
-	v, _ = json.Marshal(localDTI.UpdateValue)
+	v, _ = json.Marshal(update)
 	req, _ = http.NewRequest("PUT", "/api/v3/users/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w := localDTI.RunTest(req)
@@ -232,7 +239,7 @@ func TestUserPut(t *testing.T) {
 func TestUserDelete(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.RemoveValue = nil
+	localDTI.RemoveValue = false
 	localDTI.RemoveError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"should get this one"}}
 	req, _ := http.NewRequest("DELETE", "/api/v3/users/fred", nil)
 	localDTI.RunTest(req)
@@ -240,7 +247,7 @@ func TestUserDelete(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "should get this one")
 
-	localDTI.RemoveValue = nil
+	localDTI.RemoveValue = false
 	localDTI.RemoveError = fmt.Errorf("this is a test: bad fred")
 	req, _ = http.NewRequest("DELETE", "/api/v3/users/fred", nil)
 	localDTI.RunTest(req)
@@ -248,7 +255,7 @@ func TestUserDelete(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.RemoveValue = &backend.User{Name: "fred", PasswordHash: []byte("kfred")}
+	localDTI.RemoveValue = true
 	localDTI.RemoveError = nil
 	req, _ = http.NewRequest("DELETE", "/api/v3/users/fred", nil)
 	w := localDTI.RunTest(req)

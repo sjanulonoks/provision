@@ -19,13 +19,13 @@ import (
 )
 
 type LocalDTI struct {
-	CreateValue  store.KeySaver
+	CreateValue  bool
 	CreateError  error
-	UpdateValue  store.KeySaver
+	UpdateValue  bool
 	UpdateError  error
-	SaveValue    store.KeySaver
+	SaveValue    bool
 	SaveError    error
-	RemoveValue  store.KeySaver
+	RemoveValue  bool
 	RemoveError  error
 	PatchValue   store.KeySaver
 	PatchError   error
@@ -41,21 +41,20 @@ type LocalDTI struct {
 	f            *Frontend
 }
 
-func (dt *LocalDTI) Create(store.KeySaver) (store.KeySaver, error) {
+func (dt *LocalDTI) Create(backend.Stores, store.KeySaver) (bool, error) {
 	return dt.CreateValue, dt.CreateError
 }
-func (dt *LocalDTI) Update(store.KeySaver) (store.KeySaver, error) {
+func (dt *LocalDTI) Update(backend.Stores, store.KeySaver) (bool, error) {
 	return dt.UpdateValue, dt.UpdateError
 }
-func (dt *LocalDTI) Remove(store.KeySaver) (store.KeySaver, error) {
+func (dt *LocalDTI) Remove(backend.Stores, store.KeySaver) (bool, error) {
 	return dt.RemoveValue, dt.RemoveError
 }
 
-func (dt *LocalDTI) Patch(ref store.KeySaver, key string, patch jsonpatch2.Patch) (store.KeySaver, error) {
+func (dt *LocalDTI) Patch(bs backend.Stores, ref store.KeySaver, key string, patch jsonpatch2.Patch) (store.KeySaver, error) {
 	return dt.PatchValue, dt.PatchError
 }
-
-func (dt *LocalDTI) Save(store.KeySaver) (store.KeySaver, error) {
+func (dt *LocalDTI) Save(backend.Stores, store.KeySaver) (bool, error) {
 	return dt.SaveValue, dt.SaveError
 }
 func (dt *LocalDTI) FetchOne(store.KeySaver, string) (store.KeySaver, bool) {
@@ -63,6 +62,9 @@ func (dt *LocalDTI) FetchOne(store.KeySaver, string) (store.KeySaver, bool) {
 }
 func (dt *LocalDTI) FetchAll(ref store.KeySaver) []store.KeySaver {
 	return dt.ListValue
+}
+func (dt *LocalDTI) LockEnts(...string) (backend.Stores, func()) {
+	return func(string) *backend.Store { return nil }, func() {}
 }
 
 func (dt *LocalDTI) Filter(ref store.KeySaver, filters ...index.Filter) ([]store.KeySaver, error) {
@@ -86,7 +88,7 @@ func (dt *LocalDTI) Prefs() map[string]string {
 	return dt.DefaultPrefs
 }
 
-func (dt *LocalDTI) SetPrefs(prefs map[string]string) error {
+func (dt *LocalDTI) SetPrefs(bs backend.Stores, prefs map[string]string) error {
 	for name, val := range prefs {
 		dt.DefaultPrefs[name] = val
 	}

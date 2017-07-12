@@ -44,7 +44,7 @@ func TestTemplateList(t *testing.T) {
 func TestTemplatePost(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.CreateValue = nil
+	localDTI.CreateValue = false
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
 	req, _ := http.NewRequest("POST", "/api/v3/templates", nil)
 	req.Header.Set("Content-Type", "text/html")
@@ -53,7 +53,7 @@ func TestTemplatePost(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "Invalid content type: text/html")
 
-	localDTI.CreateValue = nil
+	localDTI.CreateValue = false
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
 	req, _ = http.NewRequest("POST", "/api/v3/templates", strings.NewReader(""))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -62,7 +62,7 @@ func TestTemplatePost(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "EOF")
 
-	localDTI.CreateValue = nil
+	localDTI.CreateValue = false
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
 	req, _ = http.NewRequest("POST", "/api/v3/templates", strings.NewReader("asgasgd"))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -73,9 +73,10 @@ func TestTemplatePost(t *testing.T) {
 
 	/* GREG: handle json failure? hard to do - send a template instead of template */
 
-	localDTI.CreateValue = &backend.Template{ID: "fred", Contents: "kfred"}
+	localDTI.CreateValue = false
+	create := &backend.Template{ID: "fred", Contents: "kfred"}
 	localDTI.CreateError = fmt.Errorf("this is a test: bad fred")
-	v, _ := json.Marshal(localDTI.CreateValue)
+	v, _ := json.Marshal(create)
 	req, _ = http.NewRequest("POST", "/api/v3/templates", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -83,9 +84,10 @@ func TestTemplatePost(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.CreateValue = &backend.Template{ID: "fred", Contents: "kfred"}
+	localDTI.CreateValue = true
+	create = &backend.Template{ID: "fred", Contents: "kfred"}
 	localDTI.CreateError = nil
-	v, _ = json.Marshal(localDTI.CreateValue)
+	v, _ = json.Marshal(create)
 	req, _ = http.NewRequest("POST", "/api/v3/templates", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w := localDTI.RunTest(req)
@@ -98,9 +100,10 @@ func TestTemplatePost(t *testing.T) {
 		t.Errorf("Returned Template was not correct: %v %v\n", "fred", be.ID)
 	}
 
-	localDTI.CreateValue = &backend.Template{ID: "fred", Contents: "kfred"}
+	localDTI.CreateValue = false
+	create = &backend.Template{ID: "fred", Contents: "kfred"}
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"test one"}}
-	v, _ = json.Marshal(localDTI.CreateValue)
+	v, _ = json.Marshal(create)
 	req, _ = http.NewRequest("POST", "/api/v3/templates", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w = localDTI.RunTest(req)
@@ -141,7 +144,7 @@ func TestTemplateGet(t *testing.T) {
 func TestTemplatePatch(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = true
 	localDTI.UpdateError = nil
 	req, _ := http.NewRequest("PATCH", "/api/v3/templates/fred", nil)
 	localDTI.RunTest(req)
@@ -154,7 +157,7 @@ func TestTemplatePatch(t *testing.T) {
 func TestTemplatePut(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = false
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
 	req, _ := http.NewRequest("PUT", "/api/v3/templates/fred", nil)
 	req.Header.Set("Content-Type", "text/html")
@@ -163,7 +166,7 @@ func TestTemplatePut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "Invalid content type: text/html")
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = false
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
 	req, _ = http.NewRequest("PUT", "/api/v3/templates/fred", strings.NewReader(""))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -172,7 +175,7 @@ func TestTemplatePut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "EOF")
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = false
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
 	req, _ = http.NewRequest("PUT", "/api/v3/templates/fred", strings.NewReader("asgasgd"))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -183,9 +186,10 @@ func TestTemplatePut(t *testing.T) {
 
 	/* GREG: handle json failure? hard to do - send a template instead of template */
 
-	localDTI.UpdateValue = &backend.Template{ID: "fred", Contents: "kfred"}
+	localDTI.UpdateValue = false
+	update := &backend.Template{ID: "fred", Contents: "kfred"}
 	localDTI.UpdateError = fmt.Errorf("this is a test: bad fred")
-	v, _ := json.Marshal(localDTI.UpdateValue)
+	v, _ := json.Marshal(update)
 	req, _ = http.NewRequest("PUT", "/api/v3/templates/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -193,9 +197,10 @@ func TestTemplatePut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.UpdateValue = &backend.Template{ID: "kfred", Contents: "kfred"}
+	localDTI.UpdateValue = true
+	update = &backend.Template{ID: "kfred", Contents: "kfred"}
 	localDTI.UpdateError = nil
-	v, _ = json.Marshal(localDTI.UpdateValue)
+	v, _ = json.Marshal(update)
 	req, _ = http.NewRequest("PUT", "/api/v3/templates/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -203,9 +208,10 @@ func TestTemplatePut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "templates PUT: Key change from fred to kfred not allowed")
 
-	localDTI.UpdateValue = &backend.Template{ID: "fred", Contents: "kfred"}
+	localDTI.UpdateValue = false
+	update = &backend.Template{ID: "fred", Contents: "kfred"}
 	localDTI.UpdateError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"test one"}}
-	v, _ = json.Marshal(localDTI.UpdateValue)
+	v, _ = json.Marshal(update)
 	req, _ = http.NewRequest("PUT", "/api/v3/templates/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -213,9 +219,10 @@ func TestTemplatePut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "test one")
 
-	localDTI.UpdateValue = &backend.Template{ID: "fred", Contents: "kfred"}
+	localDTI.UpdateValue = false
+	update = &backend.Template{ID: "fred", Contents: "kfred"}
 	localDTI.UpdateError = nil
-	v, _ = json.Marshal(localDTI.UpdateValue)
+	v, _ = json.Marshal(update)
 	req, _ = http.NewRequest("PUT", "/api/v3/templates/fred", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w := localDTI.RunTest(req)
@@ -231,7 +238,7 @@ func TestTemplatePut(t *testing.T) {
 func TestTemplateDelete(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.RemoveValue = nil
+	localDTI.RemoveValue = false
 	localDTI.RemoveError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"should get this one"}}
 	req, _ := http.NewRequest("DELETE", "/api/v3/templates/fred", nil)
 	localDTI.RunTest(req)
@@ -239,7 +246,7 @@ func TestTemplateDelete(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "should get this one")
 
-	localDTI.RemoveValue = nil
+	localDTI.RemoveValue = false
 	localDTI.RemoveError = fmt.Errorf("this is a test: bad fred")
 	req, _ = http.NewRequest("DELETE", "/api/v3/templates/fred", nil)
 	localDTI.RunTest(req)
@@ -247,7 +254,7 @@ func TestTemplateDelete(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.RemoveValue = &backend.Template{ID: "fred", Contents: "kfred"}
+	localDTI.RemoveValue = true
 	localDTI.RemoveError = nil
 	req, _ = http.NewRequest("DELETE", "/api/v3/templates/fred", nil)
 	w := localDTI.RunTest(req)

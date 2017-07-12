@@ -163,3 +163,15 @@ func (p *Profile) BeforeSave() error {
 	}
 	return err.OrNil()
 }
+
+var profileLockMap = map[string][]string{
+	"get":    []string{"profiles"},
+	"create": []string{"profiles", "tasks", "params"},
+	"update": []string{"profiles", "tasks", "params"},
+	"patch":  []string{"profiles", "tasks", "params"},
+	"delete": []string{"profiles", "machines"},
+}
+
+func (p *Profile) Locks(action string) []string {
+	return profileLockMap[action]
+}

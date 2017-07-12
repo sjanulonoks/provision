@@ -353,3 +353,15 @@ func AsMachines(o []store.KeySaver) []*Machine {
 	}
 	return res
 }
+
+var machineLockMap = map[string][]string{
+	"get":    []string{"machines"},
+	"create": []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
+	"update": []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
+	"patch":  []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
+	"delete": []string{"bootenvs", "machines"},
+}
+
+func (m *Machine) Locks(action string) []string {
+	return machineLockMap[action]
+}

@@ -274,3 +274,15 @@ func AsTemplates(o []store.KeySaver) []*Template {
 	}
 	return res
 }
+
+var templateLockMap = map[string][]string{
+	"get":    []string{"templates"},
+	"create": []string{"templates", "bootenvs", "machines", "tasks"},
+	"update": []string{"templates", "bootenvs", "machines", "tasks"},
+	"patch":  []string{"templates", "bootenvs", "machines", "tasks"},
+	"delete": []string{"templates", "bootenvs", "machines", "tasks"},
+}
+
+func (t *Template) Locks(action string) []string {
+	return templateLockMap[action]
+}

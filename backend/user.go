@@ -83,7 +83,7 @@ func AsUsers(o []store.KeySaver) []*User {
 	return res
 }
 
-func (u *User) Sanitize() *User {
+func (u *User) Sanitize() store.KeySaver {
 	res := AsUser(u.p.Clone(u))
 	res.PasswordHash = []byte{}
 	return res
@@ -107,4 +107,16 @@ func (p *DataTracker) NewUser() *User {
 
 func (u *User) BeforeSave() error {
 	return index.CheckUnique(u, u.stores("users").Items())
+}
+
+var userLockMap = map[string][]string{
+	"get":    []string{"users"},
+	"create": []string{"users"},
+	"update": []string{"users"},
+	"patch":  []string{"users"},
+	"delete": []string{"users"},
+}
+
+func (u *User) Locks(action string) []string {
+	return userLockMap[action]
 }

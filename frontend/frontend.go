@@ -442,10 +442,12 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 }
 
 func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
+	prefix := ref.Prefix()
+	var err error
 	func() {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("get")...)
 		defer unlocker()
-		objs := d(ref.Prefix())
+		objs := d(prefix)
 		idxer, ok := ref.(index.Indexer)
 		found := false
 		if ok {
@@ -455,12 +457,13 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 					continue
 				}
 				found = true
+				ref = nil
 				if !idx.Unique {
 					break
 				}
 				items, err := index.All(index.Sort(idx))(&objs.Index)
 				if err == nil {
-					ref = items.Find(key)
+					ref = items.Find(idxKey)
 				}
 				break
 			}
@@ -471,7 +474,7 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	}()
 	if ref != nil {
 		// TODO: This should really be done before the fetch - it may have issue with HexAddr-based things.
-		if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
+		if !assureAuth(c, f.Logger, prefix, "get", ref.Key()) {
 			return
 		}
 		s, ok := ref.(Sanitizable)
@@ -480,14 +483,18 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 		}
 		c.JSON(http.StatusOK, ref)
 	} else {
-		err := &backend.Error{
+		rerr := &backend.Error{
 			Code:  http.StatusNotFound,
 			Type:  "API_ERROR",
-			Model: ref.Prefix(),
+			Model: prefix,
 			Key:   key,
 		}
-		err.Errorf("%s GET: %s: Not Found", err.Model, err.Key)
-		c.JSON(err.Code, err)
+		estring := ""
+		if err != nil {
+			estring = err.Error()
+		}
+		rerr.Errorf("%s GET: %s: Not Found%s", rerr.Model, rerr.Key, estring)
+		c.JSON(rerr.Code, rerr)
 	}
 }
 

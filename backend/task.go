@@ -161,3 +161,15 @@ func (t *Task) Render(d Stores, m *Machine, e *Error) renderers {
 	r := newRenderData(d, t.p, m, t)
 	return r.makeRenderers(e)
 }
+
+var taskLockMap = map[string][]string{
+	"get":    []string{"templates", "tasks"},
+	"create": []string{"templates", "tasks"},
+	"update": []string{"templates", "tasks"},
+	"patch":  []string{"templates", "tasks"},
+	"delete": []string{"bootenvs", "tasks", "profiles", "machines"},
+}
+
+func (t *Task) Locks(action string) []string {
+	return taskLockMap[action]
+}

@@ -230,12 +230,14 @@ func (r *Reservation) BeforeSave() error {
 	return e.OrNil()
 }
 
-func (r *Reservation) subnet(d Stores) *Subnet {
-	subnets := AsSubnets(d("subnets").Items())
-	for i := range subnets {
-		if subnets[i].InSubnetRange(r.Addr) {
-			return subnets[i]
-		}
-	}
-	return nil
+var reservationLockMap = map[string][]string{
+	"get":    []string{"reservations"},
+	"create": []string{"reservations", "subnets"},
+	"update": []string{"reservations"},
+	"patch":  []string{"reservations"},
+	"delete": []string{"reservations"},
+}
+
+func (r *Reservation) Locks(action string) []string {
+	return reservationLockMap[action]
 }

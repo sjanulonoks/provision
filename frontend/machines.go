@@ -256,9 +256,10 @@ func (f *Frontend) InitMachineApi() {
 	f.ApiGroup.GET("/machines/:uuid/params",
 		func(c *gin.Context) {
 			uuid := c.Param(`uuid`)
+			b := f.dt.NewMachine()
 			var ref store.KeySaver
 			func() {
-				d, unlocker := f.dt.LockEnts("machines")
+				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("get")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 			}()
@@ -297,9 +298,10 @@ func (f *Frontend) InitMachineApi() {
 				return
 			}
 			uuid := c.Param(`uuid`)
+			b := f.dt.NewMachine()
 			var ref store.KeySaver
 			func() {
-				d, unlocker := f.dt.LockEnts("machines")
+				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("get")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 			}()
@@ -321,7 +323,7 @@ func (f *Frontend) InitMachineApi() {
 			m := backend.AsMachine(ref)
 			var err error
 			func() {
-				d, unlocker := f.dt.LockEnts("machines")
+				d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
 				defer unlocker()
 				err = m.SetParams(d, val)
 			}()

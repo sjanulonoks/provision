@@ -117,3 +117,15 @@ func (p *Param) Validate(val interface{}) error {
 	}
 	return e
 }
+
+var paramLockMap = map[string][]string{
+	"get":    []string{"params"},
+	"create": []string{"params", "profiles"},
+	"update": []string{"params", "profiles"},
+	"patch":  []string{"params", "profiles"},
+	"delete": []string{"params", "profiles"},
+}
+
+func (p *Param) Locks(action string) []string {
+	return paramLockMap[action]
+}

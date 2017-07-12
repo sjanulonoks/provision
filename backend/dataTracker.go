@@ -231,7 +231,7 @@ func NewDataTracker(backend store.SimpleStore,
 	d, unlocker := res.LockEnts("bootenvs", "preferences", "users", "machines", "profiles", "params")
 	defer unlocker()
 	if d("bootenvs").Find(ignoreBoot.Key()) == nil {
-		res.Save(d, ignoreBoot)
+		res.Create(d, ignoreBoot)
 	}
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)

@@ -45,7 +45,7 @@ func TestMachineList(t *testing.T) {
 func TestMachinePost(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.CreateValue = nil
+	localDTI.CreateValue = false
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
 	req, _ := http.NewRequest("POST", "/api/v3/machines", nil)
 	req.Header.Set("Content-Type", "text/html")
@@ -54,7 +54,7 @@ func TestMachinePost(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "Invalid content type: text/html")
 
-	localDTI.CreateValue = nil
+	localDTI.CreateValue = false
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
 	req, _ = http.NewRequest("POST", "/api/v3/machines", strings.NewReader(""))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -63,7 +63,7 @@ func TestMachinePost(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "EOF")
 
-	localDTI.CreateValue = nil
+	localDTI.CreateValue = false
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"should not get this"}}
 	req, _ = http.NewRequest("POST", "/api/v3/machines", strings.NewReader("asgasgd"))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -73,9 +73,10 @@ func TestMachinePost(t *testing.T) {
 	localDTI.ValidateError(t, "API_ERROR", "invalid character 'a' looking for beginning of value")
 
 	/* GREG: handle json failure? hard to do - send a machine instead of machine */
-	localDTI.CreateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
+	localDTI.CreateValue = false
+	create := &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.CreateError = fmt.Errorf("this is a test: bad fred")
-	v, _ := json.Marshal(localDTI.CreateValue)
+	v, _ := json.Marshal(create)
 	req, _ = http.NewRequest("POST", "/api/v3/machines", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -83,9 +84,10 @@ func TestMachinePost(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.CreateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
+	localDTI.CreateValue = true
+	create = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.CreateError = nil
-	v, _ = json.Marshal(localDTI.CreateValue)
+	v, _ = json.Marshal(create)
 	req, _ = http.NewRequest("POST", "/api/v3/machines", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w := localDTI.RunTest(req)
@@ -98,9 +100,10 @@ func TestMachinePost(t *testing.T) {
 		t.Errorf("Returned Machine was not correct: %v %v\n", "fred", be.Name)
 	}
 
-	localDTI.CreateValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
+	localDTI.CreateValue = false
+	create = &backend.Machine{Name: "fred", BootEnv: "kfred"}
 	localDTI.CreateError = &backend.Error{Code: 23, Messages: []string{"test one"}}
-	v, _ = json.Marshal(localDTI.CreateValue)
+	v, _ = json.Marshal(create)
 	req, _ = http.NewRequest("POST", "/api/v3/machines", strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w = localDTI.RunTest(req)
@@ -143,7 +146,7 @@ func TestMachineGet(t *testing.T) {
 func TestMachinePatch(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = true
 	localDTI.UpdateError = nil
 	req, _ := http.NewRequest("PATCH", "/api/v3/machines/fred", nil)
 	localDTI.RunTest(req)
@@ -160,7 +163,7 @@ func TestMachinePut(t *testing.T) {
 	goodPath := fmt.Sprintf("/api/v3/machines/%s", goodUUID)
 	kcm := fmt.Sprintf("machines PUT: Key change from %s to %s not allowed", goodUUID, badUUID)
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = false
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
 	req, _ := http.NewRequest("PUT", "/api/v3/machines/fred", nil)
 	req.Header.Set("Content-Type", "text/html")
@@ -169,7 +172,7 @@ func TestMachinePut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "Invalid content type: text/html")
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = false
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
 	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader(""))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -178,7 +181,7 @@ func TestMachinePut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "EOF")
 
-	localDTI.UpdateValue = nil
+	localDTI.UpdateValue = false
 	localDTI.UpdateError = &backend.Error{Code: 23, Messages: []string{"should not get this one"}}
 	req, _ = http.NewRequest("PUT", "/api/v3/machines/fred", strings.NewReader("asgasgd"))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -189,9 +192,10 @@ func TestMachinePut(t *testing.T) {
 
 	/* GREG: handle json failure? hard to do - send a machine instead of machine */
 
-	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: goodUUID}
+	localDTI.UpdateValue = false
+	update := &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: goodUUID}
 	localDTI.UpdateError = fmt.Errorf("this is a test: bad fred")
-	v, _ := json.Marshal(localDTI.UpdateValue)
+	v, _ := json.Marshal(update)
 	req, _ = http.NewRequest("PUT", goodPath, strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -199,9 +203,10 @@ func TestMachinePut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: badUUID}
+	localDTI.UpdateValue = true
+	update = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: badUUID}
 	localDTI.UpdateError = nil
-	v, _ = json.Marshal(localDTI.UpdateValue)
+	v, _ = json.Marshal(update)
 	req, _ = http.NewRequest("PUT", goodPath, strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -209,9 +214,10 @@ func TestMachinePut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", kcm)
 
-	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: goodUUID}
+	localDTI.UpdateValue = false
+	update = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: goodUUID}
 	localDTI.UpdateError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"test one"}}
-	v, _ = json.Marshal(localDTI.UpdateValue)
+	v, _ = json.Marshal(update)
 	req, _ = http.NewRequest("PUT", goodPath, strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	localDTI.RunTest(req)
@@ -219,9 +225,10 @@ func TestMachinePut(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "test one")
 
-	localDTI.UpdateValue = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: goodUUID}
+	localDTI.UpdateValue = true
+	update = &backend.Machine{Name: "fred", BootEnv: "kfred", Uuid: goodUUID}
 	localDTI.UpdateError = nil
-	v, _ = json.Marshal(localDTI.UpdateValue)
+	v, _ = json.Marshal(update)
 	req, _ = http.NewRequest("PUT", goodPath, strings.NewReader(string(v)))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	w := localDTI.RunTest(req)
@@ -237,7 +244,7 @@ func TestMachinePut(t *testing.T) {
 func TestMachineDelete(t *testing.T) {
 	localDTI := testFrontend()
 
-	localDTI.RemoveValue = nil
+	localDTI.RemoveValue = false
 	localDTI.RemoveError = &backend.Error{Code: 23, Type: "API_ERROR", Messages: []string{"should get this one"}}
 	req, _ := http.NewRequest("DELETE", "/api/v3/machines/fred", nil)
 	localDTI.RunTest(req)
@@ -245,7 +252,7 @@ func TestMachineDelete(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "should get this one")
 
-	localDTI.RemoveValue = nil
+	localDTI.RemoveValue = false
 	localDTI.RemoveError = fmt.Errorf("this is a test: bad fred")
 	req, _ = http.NewRequest("DELETE", "/api/v3/machines/fred", nil)
 	localDTI.RunTest(req)
@@ -253,7 +260,7 @@ func TestMachineDelete(t *testing.T) {
 	localDTI.ValidateContentType(t, "application/json; charset=utf-8")
 	localDTI.ValidateError(t, "API_ERROR", "this is a test: bad fred")
 
-	localDTI.RemoveValue = &backend.Machine{Name: "fred", BootEnv: "kfred"}
+	localDTI.RemoveValue = true
 	localDTI.RemoveError = nil
 	req, _ = http.NewRequest("DELETE", "/api/v3/machines/fred", nil)
 	w := localDTI.RunTest(req)

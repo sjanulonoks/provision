@@ -513,3 +513,15 @@ func (b *BootEnv) AfterSave() {
 		}
 	}
 }
+
+var bootEnvLockMap = map[string][]string{
+	"get":    []string{"bootenvs"},
+	"create": []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
+	"update": []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
+	"patch":  []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
+	"delete": []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
+}
+
+func (b *BootEnv) Locks(action string) []string {
+	return bootEnvLockMap[action]
+}
