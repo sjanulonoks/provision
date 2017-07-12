@@ -13,6 +13,7 @@ import (
 //
 // swagger:model
 type Reservation struct {
+	validate
 	// Addr is the IP address permanently assigned to the strategy/token combination.
 	//
 	// required: true
@@ -160,10 +161,6 @@ func (p *DataTracker) NewReservation() *Reservation {
 	return &Reservation{p: p}
 }
 
-func (r *Reservation) List() []*Reservation {
-	return AsReservations(r.p.FetchAll(r))
-}
-
 func AsReservation(o store.KeySaver) *Reservation {
 	return o.(*Reservation)
 }
@@ -192,7 +189,7 @@ func (r *Reservation) OnCreate() error {
 	e := &Error{Code: 422, Type: ValidationError, o: r}
 	// Make sure we aren't creating a reservation for a network or
 	// a broadcast address in a subnet we know about
-	subnets := AsSubnets(r.p.fetchAll(r.p.NewSubnet()))
+	subnets := AsSubnets(r.stores("subnets").Items())
 	for i := range subnets {
 		if !subnets[i].subnet().Contains(r.Addr) {
 			continue
@@ -218,7 +215,7 @@ func (r *Reservation) BeforeSave() error {
 	if r.Strategy == "" {
 		e.Errorf("Reservation Strategy cannot be empty!")
 	}
-	reservations := AsReservations(r.p.unlockedFetchAll("reservations"))
+	reservations := AsReservations(r.stores("reservations").Items())
 	for i := range reservations {
 		if reservations[i].Addr.Equal(r.Addr) {
 			continue
@@ -229,18 +226,18 @@ func (r *Reservation) BeforeSave() error {
 			break
 		}
 	}
-	if err := index.CheckUnique(r, r.p.objs[r.Prefix()].d); err != nil {
-		e.Merge(err)
-	}
+	e.Merge(index.CheckUnique(r, r.stores("reservations").Items()))
 	return e.OrNil()
 }
 
-func (r *Reservation) subnet() *Subnet {
-	subnets := AsSubnets(r.p.fetchAll(r.p.NewSubnet()))
-	for i := range subnets {
-		if subnets[i].InSubnetRange(r.Addr) {
-			return subnets[i]
-		}
-	}
-	return nil
+var reservationLockMap = map[string][]string{
+	"get":    []string{"reservations"},
+	"create": []string{"reservations", "subnets"},
+	"update": []string{"reservations"},
+	"patch":  []string{"reservations"},
+	"delete": []string{"reservations"},
+}
+
+func (r *Reservation) Locks(action string) []string {
+	return reservationLockMap[action]
 }

@@ -62,7 +62,7 @@ func TestMain(m *testing.M) {
 		8091,
 		8092,
 		log.New(os.Stdout, "dt", 0),
-		map[string]string{"defaultBootEnv": "default"})
+		map[string]string{"defaultBootEnv": "default", "unknownBootEnv": "ignore"})
 
 	ret := m.Run()
 	err = os.RemoveAll(tmpDir)

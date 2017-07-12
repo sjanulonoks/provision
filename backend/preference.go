@@ -10,6 +10,7 @@ import (
 // default bootenv for known systems, etc.
 //
 type Pref struct {
+	validate
 	p    *DataTracker
 	Name string
 	Val  string
@@ -66,6 +67,14 @@ func (p *DataTracker) NewPref() *Pref {
 	return &Pref{p: p}
 }
 
-func (p *Pref) BeforeSave() error {
-	return index.CheckUnique(p, p.p.objs[p.Prefix()].d)
+var prefLockMap = map[string][]string{
+	"get":    []string{"preferences"},
+	"create": []string{"preferences", "bootenvs"},
+	"update": []string{"preferences", "bootenvs"},
+	"patch":  []string{"preferences", "bootenvs"},
+	"delete": []string{"preferences", "bootenvs"},
+}
+
+func (p *Pref) Locks(action string) []string {
+	return prefLockMap[action]
 }

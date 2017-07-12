@@ -10,11 +10,21 @@ import (
 // Specifically, it contains a description of what the information
 // is for, detailed documentation about the param, and a JSON schema that
 // the param must match to be considered valid.
+// swagger:model
 type Param struct {
-	Name          string
-	Description   string
+	validate
+	// Name is the name of the param.  Params must be uniquely named.
+	//
+	// required: true
+	Name string
+	// Description is a one-line description of the parameter.
+	Description string
+	// Documentation details what the parameter does, what values it can
+	// take, what it is used for, etc.
 	Documentation string
 	// Schema must be a valid JSONSchema as of draft v4.
+	//
+	// required: true
 	Schema    interface{}
 	p         *DataTracker
 	validator *gojsonschema.Schema
@@ -108,6 +118,14 @@ func (p *Param) Validate(val interface{}) error {
 	return e
 }
 
-func (p *Param) List() []*Param {
-	return AsParams(p.p.FetchAll(p))
+var paramLockMap = map[string][]string{
+	"get":    []string{"params"},
+	"create": []string{"params", "profiles"},
+	"update": []string{"params", "profiles"},
+	"patch":  []string{"params", "profiles"},
+	"delete": []string{"params", "profiles"},
+}
+
+func (p *Param) Locks(action string) []string {
+	return paramLockMap[action]
 }

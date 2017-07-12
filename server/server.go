@@ -134,10 +134,6 @@ func Server(c_opts *ProgOpts) {
 			"unknownTokenTimeout": fmt.Sprintf("%d", c_opts.UnknownTokenTimeout),
 		})
 
-	if err := dt.RenderUnknown(); err != nil {
-		logger.Fatalf("Unable to render default boot env for unknown PXE clients: %s", err)
-	}
-
 	fe := frontend.NewFrontend(dt, logger, c_opts.OurAddress, c_opts.ApiPort, c_opts.FileRoot, c_opts.DevUI, nil)
 
 	services := make([]midlayer.Service, 0, 0)

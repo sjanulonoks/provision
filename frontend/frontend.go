@@ -34,40 +34,12 @@ type NoContentResponse struct {
 	//description: Nothing
 }
 
-// This interface defines the pieces of the backend.DataTracker that the
-// frontend needs.
-type DTI interface {
-	Create(store.KeySaver) (store.KeySaver, error)
-	Update(store.KeySaver) (store.KeySaver, error)
-	Remove(store.KeySaver) (store.KeySaver, error)
-	Save(store.KeySaver) (store.KeySaver, error)
-	Patch(store.KeySaver, string, jsonpatch2.Patch) (store.KeySaver, error)
-	FetchOne(store.KeySaver, string) (store.KeySaver, bool)
-	FetchAll(store.KeySaver) []store.KeySaver
-	Filter(store.KeySaver, ...index.Filter) ([]store.KeySaver, error)
-
-	NewBootEnv() *backend.BootEnv
-	NewMachine() *backend.Machine
-	NewTemplate() *backend.Template
-	NewLease() *backend.Lease
-	NewReservation() *backend.Reservation
-	NewSubnet() *backend.Subnet
-	NewUser() *backend.User
-	NewProfile() *backend.Profile
-	NewParam() *backend.Param
-
-	Pref(string) (string, error)
-	Prefs() map[string]string
-	SetPrefs(map[string]string) error
-
-	GetInterfaces() ([]*backend.Interface, error)
-
-	GetToken(string) (*backend.DrpCustomClaims, error)
-	NewToken(string, int, string, string, string) (string, error)
+type Sanitizable interface {
+	Sanitize() store.KeySaver
 }
 
-type Sanitizable interface {
-	Sanitize()
+type Lockable interface {
+	Locks(string) []string
 }
 
 type Frontend struct {
@@ -75,7 +47,7 @@ type Frontend struct {
 	FileRoot   string
 	MgmtApi    *gin.Engine
 	ApiGroup   *gin.RouterGroup
-	dt         DTI
+	dt         *backend.DataTracker
 	authSource AuthSource
 }
 
@@ -84,24 +56,25 @@ type AuthSource interface {
 }
 
 type DefaultAuthSource struct {
-	dt DTI
+	dt *backend.DataTracker
 }
 
-func (d DefaultAuthSource) GetUser(username string) (u *backend.User) {
-	userThing, found := d.dt.FetchOne(d.dt.NewUser(), username)
-	if !found {
-		return
+func (d DefaultAuthSource) GetUser(username string) *backend.User {
+	objs, unlocker := d.dt.LockEnts("users")
+	defer unlocker()
+	u := objs("users").Find(username)
+	if u != nil {
+		return backend.AsUser(u)
 	}
-	u = backend.AsUser(userThing)
-	return
+	return nil
 }
 
-func NewDefaultAuthSource(dt DTI) (das AuthSource) {
+func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	das = DefaultAuthSource{dt: dt}
 	return
 }
 
-func NewFrontend(dt DTI, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
+func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {
@@ -418,42 +391,81 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 		c.JSON(res.Code, res)
 		return
 	}
-	arr, err := f.dt.Filter(ref, filters...)
+	var idx *index.Index
+	func() {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("get")...)
+		defer unlocker()
+		idx, err = index.All(filters...)(&d(ref.Prefix()).Index)
+	}()
 	if err != nil {
 		res.Merge(err)
 		c.JSON(res.Code, res)
 		return
 	}
-	for _, res := range arr {
+	arr := idx.Items()
+	for i, res := range arr {
 		s, ok := res.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			arr[i] = s.Sanitize()
 		}
 	}
 	c.JSON(http.StatusOK, arr)
 }
 
 func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
-	res, ok := f.dt.FetchOne(ref, key)
-	if ok {
+	prefix := ref.Prefix()
+	var err error
+	func() {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("get")...)
+		defer unlocker()
+		objs := d(prefix)
+		idxer, ok := ref.(index.Indexer)
+		found := false
+		if ok {
+			for idxName, idx := range idxer.Indexes() {
+				idxKey := strings.TrimPrefix(key, idxName+":")
+				if key == idxKey {
+					continue
+				}
+				found = true
+				ref = nil
+				if !idx.Unique {
+					break
+				}
+				items, err := index.All(index.Sort(idx))(&objs.Index)
+				if err == nil {
+					ref = items.Find(idxKey)
+				}
+				break
+			}
+		}
+		if !found {
+			ref = objs.Find(key)
+		}
+	}()
+	if ref != nil {
 		// TODO: This should really be done before the fetch - it may have issue with HexAddr-based things.
-		if !assureAuth(c, f.Logger, ref.Prefix(), "get", res.Key()) {
+		if !assureAuth(c, f.Logger, prefix, "get", ref.Key()) {
 			return
 		}
-		s, ok := res.(Sanitizable)
+		s, ok := ref.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			ref = s.Sanitize()
 		}
-		c.JSON(http.StatusOK, res)
+		c.JSON(http.StatusOK, ref)
 	} else {
-		err := &backend.Error{
+		rerr := &backend.Error{
 			Code:  http.StatusNotFound,
 			Type:  "API_ERROR",
-			Model: ref.Prefix(),
+			Model: prefix,
 			Key:   key,
 		}
-		err.Errorf("%s GET: %s: Not Found", err.Model, err.Key)
-		c.JSON(err.Code, err)
+		estring := ""
+		if err != nil {
+			estring = err.Error()
+		}
+		rerr.Errorf("%s GET: %s: Not Found%s", rerr.Model, rerr.Key, estring)
+		c.JSON(rerr.Code, rerr)
 	}
 }
 
@@ -464,7 +476,12 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 	if !assureAuth(c, f.Logger, val.Prefix(), "create", "") {
 		return
 	}
-	res, err := f.dt.Create(val)
+	var err error
+	func() {
+		d, unlocker := f.dt.LockEnts(val.(Lockable).Locks("create")...)
+		defer unlocker()
+		_, err = f.dt.Create(d, val)
+	}()
 	if err != nil {
 		be, ok := err.(*backend.Error)
 		if ok {
@@ -473,11 +490,11 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 			c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 		}
 	} else {
-		s, ok := res.(Sanitizable)
+		s, ok := val.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			val = s.Sanitize()
 		}
-		c.JSON(http.StatusCreated, res)
+		c.JSON(http.StatusCreated, val)
 	}
 }
 
@@ -489,11 +506,17 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "patch", key) {
 		return
 	}
-	res, err := f.dt.Patch(ref, key, patch)
+	var err error
+	var res store.KeySaver
+	func() {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
+		defer unlocker()
+		res, err = f.dt.Patch(d, ref, key, patch)
+	}()
 	if err == nil {
 		s, ok := res.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			res = s.Sanitize()
 		}
 		c.JSON(http.StatusOK, res)
 		return
@@ -524,13 +547,18 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 		c.JSON(err.Code, err)
 		return
 	}
-	newThing, err := f.dt.Update(ref)
+	var err error
+	func() {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
+		defer unlocker()
+		_, err = f.dt.Update(d, ref)
+	}()
 	if err == nil {
-		s, ok := newThing.(Sanitizable)
+		s, ok := ref.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			ref = s.Sanitize()
 		}
-		c.JSON(http.StatusOK, newThing)
+		c.JSON(http.StatusOK, ref)
 		return
 	}
 	ne, ok := err.(*backend.Error)
@@ -545,7 +573,12 @@ func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "delete", ref.Key()) {
 		return
 	}
-	res, err := f.dt.Remove(ref)
+	var err error
+	func() {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("delete")...)
+		defer unlocker()
+		_, err = f.dt.Remove(d, ref)
+	}()
 	if err != nil {
 		ne, ok := err.(*backend.Error)
 		if ok {
@@ -554,10 +587,10 @@ func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver) {
 			c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 		}
 	} else {
-		s, ok := res.(Sanitizable)
+		s, ok := ref.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			ref = s.Sanitize()
 		}
-		c.JSON(http.StatusOK, res)
+		c.JSON(http.StatusOK, ref)
 	}
 }

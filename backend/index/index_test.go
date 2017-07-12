@@ -1,6 +1,7 @@
 package index
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 type testThing int64
 
 func (t testThing) Key() string {
-	return strconv.FormatInt(int64(t), 10)
+	return fmt.Sprintf("%04d", int64(t))
 }
 
 func (t testThing) Prefix() string {
@@ -55,6 +56,45 @@ func matchIdx(t *testing.T, i *Index, ints ...int64) {
 	for j := range ints {
 		if int64(i.objs[j].(testThing)) != ints[j] {
 			t.Errorf("At position %d, expected %d, got %d", j, ints[j], i.objs[j])
+		}
+	}
+}
+
+func TestAddIndex(t *testing.T) {
+	objs := make([]store.KeySaver, 10)
+	objs[0] = testThing(10)
+	objs[1] = testThing(4)
+	objs[2] = testThing(14)
+	objs[3] = testThing(0)
+	objs[4] = testThing(18)
+	objs[5] = testThing(2)
+	objs[6] = testThing(12)
+	objs[7] = testThing(16)
+	objs[8] = testThing(6)
+	objs[9] = testThing(8)
+	idx := Create([]store.KeySaver{})
+	idx.Add(objs...)
+	for i, item := range idx.Items() {
+		if (int64(i) * 2) != int64(item.(testThing)) {
+			t.Errorf("Expected %d, got %d", i, item)
+		}
+	}
+	objs = make([]store.KeySaver, 11)
+	objs[0] = testThing(11)
+	objs[1] = testThing(5)
+	objs[2] = testThing(15)
+	objs[3] = testThing(1)
+	objs[4] = testThing(19)
+	objs[5] = testThing(3)
+	objs[6] = testThing(13)
+	objs[7] = testThing(17)
+	objs[8] = testThing(7)
+	objs[9] = testThing(9)
+	objs[10] = testThing(8)
+	idx.Add(objs...)
+	for i, item := range idx.Items() {
+		if int64(i) != int64(item.(testThing)) {
+			t.Errorf("Expected %d, got %d", i, item)
 		}
 	}
 }

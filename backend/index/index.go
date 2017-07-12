@@ -43,11 +43,12 @@ type Filler func(string) (store.KeySaver, error)
 // Fill, which takes a string from a query parameter and turns it into
 // a store.KeySaver that has the appropriate slot filled.
 type Maker struct {
-	Unique bool
-	Type   string
-	Less   Less
-	Tests  TestMaker
-	Fill   Filler
+	keyOrder bool
+	Unique   bool
+	Type     string
+	Less     Less
+	Tests    TestMaker
+	Fill     Filler
 }
 
 // Index declares a struct field that can be indexed for a given
@@ -57,6 +58,7 @@ type Maker struct {
 type Index struct {
 	Maker
 	sorted bool
+	base   bool
 	objs   []store.KeySaver
 }
 
@@ -66,16 +68,23 @@ func Make(unique bool, t string, less Less, maker TestMaker, filler Filler) Make
 	return Maker{Unique: unique, Type: t, Less: less, Tests: maker, Fill: filler}
 }
 
-type fake string
+func Create(objs []store.KeySaver) *Index {
+	res := &Index{Maker: MakeKey(), sorted: true, base: true, objs: objs}
+	s.Slice(res.objs, func(j, k int) bool { return res.Less(res.objs[j], res.objs[k]) })
+	return res
+}
 
-func (f fake) Prefix() string             { return "fake" }
-func (f fake) Key() string                { return string(f) }
-func (f fake) New() store.KeySaver        { return f }
-func (f fake) Backend() store.SimpleStore { return nil }
+type Fake string
+
+func (f Fake) Prefix() string             { return "fake" }
+func (f Fake) Key() string                { return string(f) }
+func (f Fake) New() store.KeySaver        { return f }
+func (f Fake) Backend() store.SimpleStore { return nil }
 
 func MakeKey() Maker {
 	return Maker{
-		Unique: true,
+		keyOrder: true,
+		Unique:   true,
 		Less: func(i, j store.KeySaver) bool {
 			return i.Key() < j.Key()
 		},
@@ -85,7 +94,7 @@ func MakeKey() Maker {
 				func(s store.KeySaver) bool { return s.Key() > key }
 		},
 		Fill: func(s string) (store.KeySaver, error) {
-			return fake(s), nil
+			return Fake(s), nil
 		},
 	}
 }
@@ -132,12 +141,133 @@ func (i *Index) Items() []store.KeySaver {
 	return res
 }
 
-// SetItems returns a new *Index with its items set to s.
-// The new Index is not sorted.
-func (i *Index) SetItems(s []store.KeySaver) *Index {
-	res := i.cp(s)
-	res.sorted = false
-	return res
+func (i *Index) find(ref store.KeySaver) (int, bool) {
+	gte, gt := i.Tests(ref)
+	idx := s.Search(len(i.objs), func(j int) bool { return gte(i.objs[j]) })
+	if idx == len(i.objs) {
+		return idx, false
+	}
+	return idx, !gt(i.objs[idx])
+}
+
+func (i *Index) Find(key string) store.KeySaver {
+	ref, err := i.Fill(key)
+	if err == nil {
+		if idx, found := i.find(ref); found {
+			return i.objs[idx]
+		}
+	}
+	return nil
+}
+
+func (i *Index) Add(items ...store.KeySaver) error {
+	if !i.base {
+		return fmt.Errorf("Can only add to a base index")
+	}
+	if !i.sorted {
+		return fmt.Errorf("Cannot add items to a non-sorted Index")
+	}
+	growers, appenders := []store.KeySaver{}, []store.KeySaver{}
+	growIndexes := []int{}
+	for _, obj := range items {
+		idx, found := i.find(obj)
+		if found {
+			i.objs[idx] = obj
+			continue
+		}
+		if idx == len(i.objs) {
+			appenders = append(appenders, obj)
+			continue
+		}
+		growers = append(growers, obj)
+		growIndexes = append(growIndexes, idx)
+	}
+	// Append new objects.  We do this before growing the slice to minimize the amount of
+	// memory that potentially has to be copied.
+	if len(appenders) > 0 {
+		s.Slice(appenders, func(j, k int) bool { return i.Less(appenders[j], appenders[k]) })
+		i.objs = append(i.objs, appenders...)
+	}
+	// Insert new items in sorted order with minimal data copying
+	if len(growers) > 0 {
+		s.Ints(growIndexes)
+		s.Slice(growers, func(j, k int) bool {
+			return i.Less(growers[j], growers[k])
+		})
+		oldLen := len(i.objs)
+		i.objs = append(i.objs, make([]store.KeySaver, len(growers))...)
+		for j := len(growIndexes) - 1; j >= 0; j-- {
+			idx := growIndexes[j]
+			dest, src := i.objs[idx+j+1:], i.objs[idx:oldLen]
+			copy(dest, src)
+			i.objs[idx+j] = growers[j]
+			oldLen = idx
+		}
+	}
+	return nil
+}
+
+func (i *Index) Remove(items ...store.KeySaver) error {
+	if !i.base {
+		return fmt.Errorf("Cannot remove from a non-base Indes")
+	}
+	if !i.sorted {
+		return fmt.Errorf("Cannot remove items from a non-sorted Index")
+	}
+	idxs := []int{}
+	for j := range items {
+		idx, found := i.find(items[j])
+		if !found {
+			continue
+		}
+		idxs = append(idxs, idx)
+	}
+	if len(idxs) == 0 {
+		return nil
+	}
+	s.Ints(idxs)
+	lastDT := len(i.objs)
+	lastIdx := len(idxs) - 1
+	// Progressively copy over slices to overwrite entries we are
+	// deleting
+	for j, idx := range idxs {
+		if idx == lastDT-1 {
+			continue
+		}
+		var srcend int
+		if j != lastIdx {
+			srcend = idxs[j+1]
+		} else {
+			srcend = lastDT
+		}
+		// copy(dest, src)
+		copy(i.objs[idx-j:srcend], i.objs[idx+1:srcend])
+	}
+	// Nil out entries that we should garbage collect.  We do this
+	// so that we don't wind up leaking items based on the
+	// underlying arrays still pointing at things we no longer
+	// care about.
+	for j := range idxs {
+		i.objs[lastDT-j-1] = nil
+	}
+	// Resize dt.d to forget about the last elements.  This does
+	// not always resize the underlying array, hence the above
+	// manual GC enablement.
+	//
+	// At some point we may want to manually switch to a smaller
+	// underlying array based on len() vs. cap() for dt.d, but
+	// probably only when we can potentially free a significant
+	// amount of memory by doing so.
+	i.objs = i.objs[:len(i.objs)-len(idxs)]
+	return nil
+}
+
+func (i *Index) Count() int {
+	return len(i.objs)
+}
+
+func (i *Index) Empty() bool {
+	return i.objs == nil || i.Count() == 0
 }
 
 // cp makes a copy of the current Index with a copy of the passed-in
@@ -238,8 +368,9 @@ func Resort() Filter {
 
 func Sort(m Maker) Filter {
 	return func(i *Index) (*Index, error) {
-		i.Maker = m
-		return sort(i.Less)(i)
+		j := *i
+		j.Maker = m
+		return sort(j.Less)(&j)
 	}
 }
 

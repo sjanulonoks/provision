@@ -8,11 +8,14 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"text/template"
+
+	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
 type renderer struct {
-	path  string
-	write func(net.IP) (*bytes.Reader, error)
+	path, name string
+	write      func(net.IP) (*bytes.Reader, error)
 }
 
 func (r renderer) register(fs *FileSystem) {
@@ -24,6 +27,12 @@ func (r renderer) deregister(fs *FileSystem) {
 }
 
 type renderers []renderer
+
+type renderable interface {
+	store.KeySaver
+	renderInfo() ([]TemplateInfo, []string)
+	templates() *template.Template
+}
 
 func (r renderers) register(fs *FileSystem) {
 	if r == nil || len(r) == 0 {
@@ -47,40 +56,44 @@ func newRenderedTemplate(r *RenderData,
 	tmplKey,
 	path string) renderer {
 	p := r.p
-	var mKey, eKey string
-	eKey = r.Env.Key()
-	if r.Machine != nil {
-		mKey = r.Machine.Key()
+	var prefixes, keys []string
+	if r.Task != nil {
+		prefixes = []string{"tasks", "machines"}
+		keys = []string{r.target.Key(), r.Machine.Key()}
+	} else if r.Machine == nil {
+		prefixes = []string{"bootenvs"}
+		keys = []string{r.target.Key()}
+	} else {
+		prefixes = []string{"machines", "bootenvs"}
+		keys = []string{r.Machine.Key(), r.target.Key()}
 	}
 	return renderer{
 		path: path,
+		name: tmplKey,
 		write: func(remoteIP net.IP) (*bytes.Reader, error) {
-			objs, unlocker := p.lockEnts("machines", "bootenvs")
+			objs, unlocker := p.LockEnts("tasks", "machines", "bootenvs", "profiles")
 			defer unlocker()
 			var rd *RenderData
-			var bootenv *BootEnv
 			var machine *Machine
-			bidx, bfound := objs[1].find(eKey)
-			if !bfound {
-				return nil, fmt.Errorf("Bootenv %s has vanished!", eKey)
-			}
-			bootenv = AsBootEnv(objs[1].d[bidx])
-			if !bootenv.OnlyUnknown {
-				midx, mfound := objs[0].find(mKey)
-				if !mfound {
-					return nil, fmt.Errorf("Machine %s has vanished!", mKey)
+			var target renderable
+			for i, prefix := range prefixes {
+				item := objs(prefix).Find(keys[i])
+				if item == nil {
+					return nil, fmt.Errorf("%s:%s has vanished", prefix, keys[i])
 				}
-				machine = AsMachine(objs[0].d[midx])
+				switch item.(type) {
+				case renderable:
+					target = item.(renderable)
+				case *Machine:
+					machine = AsMachine(item)
+				default:
+					p.Logger.Panicf("%s:%s is neither Renderable nor a machine", item.Prefix(), item.Key())
+				}
 			}
-			mStr := "All"
-			if machine != nil {
-				mStr = machine.Name
-			}
-			p.Infof("debugRenderer", "Rendering %s for %s booting %s\n", tmplKey, mStr, bootenv.Name)
-			rd = newRenderData(p, machine, bootenv)
+			rd = newRenderData(objs, p, machine, target)
 			rd.remoteIP = remoteIP
 			buf := bytes.Buffer{}
-			tmpl := bootenv.rootTemplate.Lookup(tmplKey)
+			tmpl := target.templates().Lookup(tmplKey)
 			if err := tmpl.Execute(&buf, rd); err != nil {
 				return nil, err
 			}
@@ -101,6 +114,11 @@ func (n *rMachine) Url() string {
 
 type rBootEnv struct {
 	*BootEnv
+	renderData *RenderData
+}
+
+type rTask struct {
+	*Task
 	renderData *RenderData
 }
 
@@ -142,17 +160,24 @@ func (b *rBootEnv) JoinInitrds(proto string) string {
 type RenderData struct {
 	Machine  *rMachine // The Machine that the template is being rendered for.
 	Env      *rBootEnv // The boot environment that provided the template.
+	Task     *rTask
+	d        Stores
+	target   renderable
 	p        *DataTracker
 	remoteIP net.IP
 }
 
-func newRenderData(p *DataTracker, m *Machine, e *BootEnv) *RenderData {
-	res := &RenderData{p: p}
+func newRenderData(d Stores, p *DataTracker, m *Machine, r renderable) *RenderData {
+	res := &RenderData{d: d, p: p}
+	res.target = r
 	if m != nil {
 		res.Machine = &rMachine{Machine: m, renderData: res}
 	}
-	if e != nil {
-		res.Env = &rBootEnv{BootEnv: e, renderData: res}
+	switch obj := r.(type) {
+	case *BootEnv:
+		res.Env = &rBootEnv{BootEnv: obj, renderData: res}
+	case *Task:
+		res.Task = &rTask{Task: obj, renderData: res}
 	}
 	return res
 }
@@ -173,14 +198,14 @@ func (r *RenderData) GenerateToken() string {
 	var t string
 	if r.Machine == nil {
 		ttl := 600
-		if sttl, e := r.p.Pref("unknownTokenTimeout"); e == nil {
+		if sttl := r.p.pref("unknownTokenTimeout"); sttl != "" {
 			ttl, _ = strconv.Atoi(sttl)
 		}
 		t, _ = NewClaim("general", ttl).Add("machines", "post", "*").
 			Add("machines", "get", "*").Seal(r.p.tokenManager)
 	} else {
 		ttl := 3600
-		if sttl, e := r.p.Pref("knownTokenTimeout"); e == nil {
+		if sttl := r.p.pref("knownTokenTimeout"); sttl != "" {
 			ttl, _ = strconv.Atoi(sttl)
 		}
 		t, _ = NewClaim(r.Machine.Key(), ttl).Add("machines", "patch", r.Machine.Key()).
@@ -224,12 +249,12 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 // ParamExists is a helper function for determining the existence of a machine parameter.
 func (r *RenderData) ParamExists(key string) bool {
 	if r.Machine != nil {
-		_, ok := r.Machine.GetParam(key, true)
+		_, ok := r.Machine.GetParam(r.d, key, true)
 		if ok {
 			return ok
 		}
 	}
-	if o, found := r.p.fetchOne(r.p.NewProfile(), r.p.globalProfileName); found {
+	if o := r.d("profiles").Find(r.p.globalProfileName); o != nil {
 		p := AsProfile(o)
 		if _, ok := p.Params[key]; ok {
 			return true
@@ -241,16 +266,44 @@ func (r *RenderData) ParamExists(key string) bool {
 // Param is a helper function for extracting a parameter from Machine.Params
 func (r *RenderData) Param(key string) (interface{}, error) {
 	if r.Machine != nil {
-		v, ok := r.Machine.GetParam(key, true)
+		v, ok := r.Machine.GetParam(r.d, key, true)
 		if ok {
 			return v, nil
 		}
 	}
-	if o, found := r.p.fetchOne(r.p.NewProfile(), r.p.globalProfileName); found {
+	if o := r.d("profiles").Find(r.p.globalProfileName); o != nil {
 		p := AsProfile(o)
 		if v, ok := p.Params[key]; ok {
 			return v, nil
 		}
 	}
 	return nil, fmt.Errorf("No such machine parameter %s", key)
+}
+
+func (r *RenderData) makeRenderers(e *Error) renderers {
+	toRender, requiredParams := r.target.renderInfo()
+	for _, param := range requiredParams {
+		if !r.ParamExists(param) {
+			e.Errorf("Missing required parameter %s for %s %s", param, r.target.Prefix(), r.target.Key())
+		}
+	}
+	rts := make(renderers, len(toRender))
+	for i := range toRender {
+		tmplPath := ""
+		ti := &toRender[i]
+		if ti.pathTmpl != nil {
+			// first, render the path
+			buf := &bytes.Buffer{}
+			if err := ti.pathTmpl.Execute(buf, r); err != nil {
+				e.Errorf("Error rendering template %s path %s: %v",
+					ti.Name,
+					ti.Path,
+					err)
+				continue
+			}
+			tmplPath = path.Clean("/" + buf.String())
+		}
+		rts[i] = newRenderedTemplate(r, ti.id(), tmplPath)
+	}
+	return renderers(rts)
 }
