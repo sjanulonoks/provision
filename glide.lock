@@ -1,5 +1,5 @@
-hash: f2b7f8afb9fc96899eb501cf1519c52b31d313f8242034e919b619ecc6e24d4d
-updated: 2017-07-05T12:18:32.318776796-05:00
+hash: 793a3536b29fbd595b49b98cd409ebc9d9b6ccbc44d6ffcdb7fb2107ca543278
+updated: 2017-07-13T01:02:47.837308791-05:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 71551cef584cae1b2e01c37e8c0e1f1160eedd6f
@@ -61,6 +61,8 @@ imports:
   version: 2402d76f3d41f928c7902a765dfc872356dd3aad
   subpackages:
   - proto
+- name: github.com/gorilla/websocket
+  version: 462d5c5828f6203e4047c47be2920315937be380
 - name: github.com/hashicorp/consul
   version: f288c0e8eb594782e8b3a7632e64f2f0d1cc8528
   subpackages:
@@ -153,7 +155,9 @@ imports:
   subpackages:
   - bson
   - internal/json
+- name: gopkg.in/olahol/melody.v1
+  version: d521390733761fe1db13de575c253afd5c743085
 - name: gopkg.in/yaml.v2
-  version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
+  version: 1be3d31502d6eabc0dd7ce5b0daab022e14a5538
   repo: https://github.com/go-yaml/yaml
 testImports: []

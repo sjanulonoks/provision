@@ -100,6 +100,7 @@ type DataTracker struct {
 	tmplMux             *sync.Mutex
 	thunks              []func()
 	thunkMux            *sync.Mutex
+	publishers          *Publishers
 }
 
 type Stores func(string) *Store
@@ -171,7 +172,8 @@ func NewDataTracker(backend store.SimpleStore,
 	fileRoot, addr string,
 	staticPort, apiPort int,
 	logger *log.Logger,
-	defaultPrefs map[string]string) *DataTracker {
+	defaultPrefs map[string]string,
+	publishers *Publishers) *DataTracker {
 	res := &DataTracker{
 		FileRoot:          fileRoot,
 		StaticPort:        staticPort,
@@ -187,6 +189,7 @@ func NewDataTracker(backend store.SimpleStore,
 		globalProfileName: "global",
 		thunks:            make([]func(), 0),
 		thunkMux:          &sync.Mutex{},
+		publishers:        publishers,
 	}
 	objs := []store.KeySaver{
 		&Task{p: res},
@@ -446,7 +449,10 @@ func (p *DataTracker) Create(d Stores, ref store.KeySaver) (saved bool, err erro
 	if saved {
 		ref.(validator).clearStores()
 		d(prefix).Add(ref)
+
+		p.publishers.Publish(prefix, "create", key, ref)
 	}
+
 	return saved, err
 }
 
@@ -467,6 +473,7 @@ func (p *DataTracker) Remove(d Stores, ref store.KeySaver) (removed bool, err er
 	removed, err = store.Remove(item)
 	if removed {
 		d(prefix).Remove(item)
+		p.publishers.Publish(prefix, "delete", key, item)
 	}
 	return removed, err
 }
@@ -531,6 +538,7 @@ func (p *DataTracker) Update(d Stores, ref store.KeySaver) (saved bool, err erro
 	ref.(validator).clearStores()
 	if saved {
 		d(prefix).Add(ref)
+		p.publishers.Publish(prefix, "update", key, ref)
 	}
 	return saved, err
 }
@@ -542,6 +550,7 @@ func (p *DataTracker) Save(d Stores, ref store.KeySaver) (saved bool, err error)
 	ref.(validator).clearStores()
 	if saved {
 		d(ref.Prefix()).Add(ref)
+		p.publishers.Publish(ref.Prefix(), "save", ref.Key(), ref)
 	}
 	return saved, err
 }

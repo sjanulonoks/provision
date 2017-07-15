@@ -32,14 +32,15 @@ func MacStrategy(p dhcp.Packet, options dhcp.Options) string {
 }
 
 type DhcpHandler struct {
-	waitGroup *sync.WaitGroup
-	closing   bool
-	ifs       []string
-	port      int
-	conn      *ipv4.PacketConn
-	bk        *backend.DataTracker
-	cm        *ipv4.ControlMessage
-	strats    []*Strategy
+	waitGroup  *sync.WaitGroup
+	closing    bool
+	ifs        []string
+	port       int
+	conn       *ipv4.PacketConn
+	bk         *backend.DataTracker
+	cm         *ipv4.ControlMessage
+	strats     []*Strategy
+	publishers *backend.Publishers
 }
 
 func (h *DhcpHandler) buildOptions(p dhcp.Packet,
@@ -425,17 +426,18 @@ type Service interface {
 	Shutdown(context.Context) error
 }
 
-func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string, dhcpPort int) (Service, error) {
+func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string, dhcpPort int, pubs *backend.Publishers) (Service, error) {
 	ifs := []string{}
 	if dhcpIfs != "" {
 		ifs = strings.Split(dhcpIfs, ",")
 	}
 	handler := &DhcpHandler{
-		waitGroup: &sync.WaitGroup{},
-		ifs:       ifs,
-		bk:        dhcpInfo,
-		port:      dhcpPort,
-		strats:    []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
+		waitGroup:  &sync.WaitGroup{},
+		ifs:        ifs,
+		bk:         dhcpInfo,
+		port:       dhcpPort,
+		strats:     []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
+		publishers: pubs,
 	}
 
 	l, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", handler.port))
