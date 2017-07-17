@@ -517,6 +517,7 @@ func (p *DataTracker) Patch(d Stores, ref store.KeySaver, key string, patch json
 		return toSave, err
 	}
 	d(prefix).Add(toSave)
+	p.publishers.Publish(prefix, "update", key, ref)
 	return toSave, nil
 }
 
