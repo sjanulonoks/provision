@@ -49,7 +49,6 @@ func (f *Frontend) Publish(e *backend.Event) error {
 	if msg, err := json.Marshal(e); err != nil {
 		return err
 	} else {
-		f.Logger.Printf("GREG: sending message: %s\n", string(msg))
 		return f.melody.BroadcastFilter(msg, func(s *melody.Session) bool {
 			return filterFunction(s, e)
 		})
