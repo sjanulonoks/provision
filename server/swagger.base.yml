@@ -19,3 +19,7 @@ tags:
   - name: Profiles
   - name: Users
   - name: Params
+  - name: Tasks
+  - name: Jobs
+  - name: Plugins
+  - name: PluginProviders
