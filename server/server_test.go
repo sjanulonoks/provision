@@ -35,6 +35,7 @@ func TestServer(t *testing.T) {
 
 	testArgs := []string{
 		"--data-root", tmpDir + "/digitalrebar",
+		"--plugin-root", tmpDir + "/plugins",
 		"--file-root", tmpDir + "/tftpboot",
 		"--tls-key", tmpDir + "/server.key",
 		"--tls-cert", tmpDir + "/server.crt",
