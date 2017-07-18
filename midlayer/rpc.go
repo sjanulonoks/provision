@@ -1,7 +1,6 @@
 package midlayer
 
 import (
-	"fmt"
 	"io"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -48,13 +47,11 @@ func NewPluginRpcClient(path string, params map[string]interface{}) (answer *Plu
 	var err backend.Error
 	terr := answer.rpcClient.Call("Plugin.Config", params, &err)
 	if terr != nil {
-		fmt.Printf("GREG: error = %v\n", terr)
 		answer.Stop()
 		theErr = terr
 		return
 	}
 	if err.Code != 0 || len(err.Messages) > 0 {
-		fmt.Printf("GREG: error = %v\n", err)
 		answer.Stop()
 		theErr = &err
 		return

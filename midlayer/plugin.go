@@ -147,13 +147,21 @@ func InitPluginController(pluginDir string, dt *backend.DataTracker, logger *log
 		return
 	}
 	for _, f := range files {
-		pc.importPluginProvider(f.Name())
+		err = pc.importPluginProvider(f.Name())
+		if err != nil {
+			return
+		}
+
 	}
 
+	return
+}
+
+func (pc *PluginController) walkPlugins(provider string) (err error) {
 	// Walk all plugin objects from dt.
 	var idx *index.Index
-	ref := dt.NewPlugin()
-	d, unlocker := dt.LockEnts(ref.Locks("get")...)
+	ref := pc.dataTracker.NewPlugin()
+	d, unlocker := pc.dataTracker.LockEnts(ref.Locks("get")...)
 	defer unlocker()
 	idx, err = index.All([]index.Filter{index.Native()}...)(&d(ref.Prefix()).Index)
 	if err != nil {
@@ -162,9 +170,10 @@ func InitPluginController(pluginDir string, dt *backend.DataTracker, logger *log
 	arr := idx.Items()
 	for _, res := range arr {
 		plugin := res.(*backend.Plugin)
-		pc.startPlugin(d, plugin)
+		if plugin.Provider == provider {
+			pc.startPlugin(d, plugin)
+		}
 	}
-
 	return
 }
 
@@ -258,8 +267,10 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 			pc.dataTracker.Update(d, plugin)
 		}
 	} else {
-		plugin.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", plugin.Provider)}
-		pc.dataTracker.Update(d, plugin)
+		if plugin.Errors == nil || len(plugin.Errors) == 0 {
+			plugin.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", plugin.Provider)}
+			pc.dataTracker.Update(d, plugin)
+		}
 	}
 }
 
@@ -287,7 +298,7 @@ func (pc *PluginController) restartPlugin(d backend.Stores, plugin *backend.Plug
 }
 
 // Try to add to available - Must lock before calling
-func (pc *PluginController) importPluginProvider(provider string) {
+func (pc *PluginController) importPluginProvider(provider string) error {
 	out, err := exec.Command(pc.pluginDir+"/"+provider, "define").Output()
 	if err != nil {
 		pc.logger.Printf("Skipping %s because %s\n", provider, err)
@@ -316,24 +327,43 @@ func (pc *PluginController) importPluginProvider(provider string) {
 			}
 
 			if !skip {
-				pc.AvailableProviders[pp.Name] = &pp
-				pp.path = pc.pluginDir + "/" + provider
+				if _, ok := pc.AvailableProviders[pp.Name]; !ok {
+					pc.AvailableProviders[pp.Name] = &pp
+					pp.path = pc.pluginDir + "/" + provider
+					return pc.walkPlugins(provider)
+				}
 			}
 		}
 	}
+	return nil
 }
 
 // Try to stop using plugins and remove available - Must lock before calling
 func (pc *PluginController) removePluginProvider(provider string) {
 	var name string
 	for _, pp := range pc.AvailableProviders {
-		if provider == pp.path {
+		if provider == pp.Name {
 			name = pp.Name
-			// GREG: If a running provider has its executable deleted, should we clear the running
-			// plugin instannces.  I'm not sure what will happen.
+			break
 		}
 	}
 	if name != "" {
+		remove := []*backend.Plugin{}
+		for _, rp := range pc.runningPlugins {
+			if rp.Provider.Name == name {
+				remove = append(remove, rp.Plugin)
+			}
+		}
+		for _, p := range remove {
+			pc.stopPlugin(p)
+
+			ref := pc.dataTracker.NewPlugin()
+			d, unlocker := pc.dataTracker.LockEnts(ref.Locks("get")...)
+			ref2 := d(ref.Prefix()).Find(p.Name)
+			pc.startPlugin(d, ref2.(*backend.Plugin))
+			unlocker()
+		}
+
 		pc.logger.Printf("Removing plugin provider: %s\n", name)
 		delete(pc.AvailableProviders, name)
 	}
