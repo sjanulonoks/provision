@@ -237,16 +237,20 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 		}
 
 		if len(errors) == 0 {
-			thingee := NewPluginRpcClient(pp.path, plugin.Params)
-			rp := &RunningPlugin{Plugin: plugin, Client: thingee, Provider: pp}
-			if pp.HasPublish {
-				pc.publishers.Add(thingee)
+			thingee, err := NewPluginRpcClient(pp.path, plugin.Params)
+			if err == nil {
+				rp := &RunningPlugin{Plugin: plugin, Client: thingee, Provider: pp}
+				if pp.HasPublish {
+					pc.publishers.Add(thingee)
+				}
+				for _, aa := range pp.AvailableActions {
+					aa.plugin = rp
+					pc.MachineActions.Add(aa)
+				}
+				pc.runningPlugins = append(pc.runningPlugins, rp)
+			} else {
+				errors = append(errors, err.Error())
 			}
-			for _, aa := range pp.AvailableActions {
-				aa.plugin = rp
-				pc.MachineActions.Add(aa)
-			}
-			pc.runningPlugins = append(pc.runningPlugins, rp)
 		}
 
 		if len(plugin.Errors) != len(errors) {
@@ -262,6 +266,7 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 func (pc *PluginController) stopPlugin(plugin *backend.Plugin) {
 	for i, rp := range pc.runningPlugins {
 		if rp.Plugin.Name == plugin.Name {
+			pc.logger.Printf("Stoping plugin: %s(%s)\n", plugin.Name, plugin.Provider)
 			rp.Client.Stop()
 			pc.runningPlugins = append(pc.runningPlugins[:i], pc.runningPlugins[i+1:]...)
 
@@ -292,7 +297,7 @@ func (pc *PluginController) importPluginProvider(provider string) {
 		if err != nil {
 			pc.logger.Printf("Skipping %s because of bad json: %s\n%s\n", provider, err, out)
 		} else {
-			pc.logger.Printf("Adding plugin: %s\n", pp.Name)
+			pc.logger.Printf("Adding plugin provider: %s\n", pp.Name)
 
 			skip := false
 			for _, p := range pp.RequiredParams {
@@ -329,6 +334,7 @@ func (pc *PluginController) removePluginProvider(provider string) {
 		}
 	}
 	if name != "" {
+		pc.logger.Printf("Removing plugin provider: %s\n", name)
 		delete(pc.AvailableProviders, name)
 	}
 }
