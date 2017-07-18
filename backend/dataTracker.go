@@ -94,7 +94,7 @@ type DataTracker struct {
 	runningPrefs        map[string]string
 	prefMux             *sync.Mutex
 	defaultBootEnv      string
-	globalProfileName   string
+	GlobalProfileName   string
 	tokenManager        *JwtManager
 	rootTemplate        *template.Template
 	tmplMux             *sync.Mutex
@@ -186,7 +186,7 @@ func NewDataTracker(backend store.SimpleStore,
 		FS:                NewFS(fileRoot, logger),
 		tokenManager:      NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
 		tmplMux:           &sync.Mutex{},
-		globalProfileName: "global",
+		GlobalProfileName: "global",
 		thunks:            make([]func(), 0),
 		thunkMux:          &sync.Mutex{},
 		publishers:        publishers,
@@ -241,7 +241,7 @@ func NewDataTracker(backend store.SimpleStore,
 		pref := AsPref(prefIsh)
 		res.runningPrefs[pref.Name] = pref.Val
 	}
-	if d("preferences").Find(res.globalProfileName) == nil {
+	if d("preferences").Find(res.GlobalProfileName) == nil {
 		gp := AsProfile(res.NewProfile())
 		gp.Name = "global"
 		res.Create(d, gp)

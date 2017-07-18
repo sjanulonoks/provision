@@ -509,8 +509,7 @@ func (f *Frontend) InitMachineApi() {
 					if !ok {
 						obj, ok = m.GetParam(d, param, true)
 						if !ok {
-							// GREG: Fix this r.p.globalProfileName = "global"
-							if o := d("profiles").Find("global"); o != nil {
+							if o := d("profiles").Find(f.dt.GlobalProfileName); o != nil {
 								p := backend.AsProfile(o)
 								if tobj, ok := p.Params[param]; ok {
 									obj = tobj
@@ -527,7 +526,14 @@ func (f *Frontend) InitMachineApi() {
 						err.Errorf("%s Call Action: machine %s: Missing Parameter", err.Model, err.Key, param)
 					}
 
-					// GREG: Validate format of Paramter.
+					pobj := d("params").Find(param)
+					if pobj != nil {
+						rp := pobj.(*backend.Param)
+
+						if ev := rp.Validate(obj); ev != nil {
+							err.Errorf("%s Call Action machine %s: Invalid Parameter: %s", err.Model, err.Key, param)
+						}
+					}
 				}
 				for _, param := range aa.OptionalParams {
 					var obj interface{} = nil
@@ -535,8 +541,7 @@ func (f *Frontend) InitMachineApi() {
 					if !ok {
 						obj, ok = m.GetParam(d, param, true)
 						if !ok {
-							// GREG: Fix this r.p.globalProfileName = "global"
-							if o := d("profiles").Find("global"); o != nil {
+							if o := d("profiles").Find(f.dt.GlobalProfileName); o != nil {
 								p := backend.AsProfile(o)
 								if tobj, ok := p.Params[param]; ok {
 									obj = tobj
@@ -550,7 +555,14 @@ func (f *Frontend) InitMachineApi() {
 						}
 					}
 					if obj != nil {
-						// GREG: Validate format of Paramter.
+						pobj := d("params").Find(param)
+						if pobj != nil {
+							rp := pobj.(*backend.Param)
+
+							if ev := rp.Validate(obj); ev != nil {
+								err.Errorf("%s Call Action machine %s: Invalid Parameter: %s", err.Model, err.Key, param)
+							}
+						}
 					}
 				}
 

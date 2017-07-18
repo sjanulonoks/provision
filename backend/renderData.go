@@ -254,7 +254,7 @@ func (r *RenderData) ParamExists(key string) bool {
 			return ok
 		}
 	}
-	if o := r.d("profiles").Find(r.p.globalProfileName); o != nil {
+	if o := r.d("profiles").Find(r.p.GlobalProfileName); o != nil {
 		p := AsProfile(o)
 		if _, ok := p.Params[key]; ok {
 			return true
@@ -271,7 +271,7 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 			return v, nil
 		}
 	}
-	if o := r.d("profiles").Find(r.p.globalProfileName); o != nil {
+	if o := r.d("profiles").Find(r.p.GlobalProfileName); o != nil {
 		p := AsProfile(o)
 		if v, ok := p.Params[key]; ok {
 			return v, nil
