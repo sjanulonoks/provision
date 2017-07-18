@@ -453,6 +453,7 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			name := c.Param(`name`)
 
+			var ok bool
 			var aa *midlayer.AvailableAction
 			ma := &midlayer.MachineAction{Command: name, Params: val}
 
@@ -484,7 +485,7 @@ func (f *Frontend) InitMachineApi() {
 				ma.Address = m.Address
 				ma.BootEnv = m.BootEnv
 
-				aa, ok := f.pc.MachineActions.Get(name)
+				aa, ok = f.pc.MachineActions.Get(name)
 				if !ok {
 					err := &backend.Error{
 						Code:  http.StatusNotFound,
