@@ -193,6 +193,7 @@ func NewDataTracker(backend store.SimpleStore,
 	}
 	objs := []store.KeySaver{
 		&Task{p: res},
+		&Job{p: res},
 		&Param{p: res},
 		&Profile{p: res},
 		&User{p: res},
@@ -422,6 +423,8 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 		res = p.NewPref()
 	case *Task:
 		res = p.NewTask()
+	case *Job:
+		res = p.NewJob()
 	default:
 		panic("Unknown type of KeySaver passed to Clone")
 	}
