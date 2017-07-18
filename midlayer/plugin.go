@@ -8,6 +8,7 @@ import (
 	"log"
 	"os/exec"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/digitalrebar/provision/backend"
@@ -79,15 +80,17 @@ func InitPluginController(pluginDir string, dt *backend.DataTracker, logger *log
 			select {
 			case event := <-pc.watcher.Events:
 				pc.logger.Println("file event:", event)
+				arr := strings.Split(event.Name, "/")
+				file := arr[len(arr)-1]
 				if event.Op&fsnotify.Write == fsnotify.Write ||
 					event.Op&fsnotify.Create == fsnotify.Create ||
 					event.Op&fsnotify.Chmod == fsnotify.Chmod {
 					pc.lock.Lock()
-					pc.importPluginProvider(event.Name)
+					pc.importPluginProvider(file)
 					pc.lock.Unlock()
 				} else if event.Op&fsnotify.Remove == fsnotify.Remove {
 					pc.lock.Lock()
-					pc.removePluginProvider(event.Name)
+					pc.removePluginProvider(file)
 					pc.lock.Unlock()
 				} else if event.Op&fsnotify.Rename == fsnotify.Rename {
 					pc.logger.Printf("Rename file: %s %v\n", event.Name, event)
