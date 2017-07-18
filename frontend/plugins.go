@@ -225,7 +225,7 @@ func (f *Frontend) InitPluginApi() {
 	f.ApiGroup.DELETE("/plugins/:name",
 		func(c *gin.Context) {
 			b := f.dt.NewPlugin()
-			b.Name = c.Param(`Name`)
+			b.Name = c.Param(`name`)
 			f.Remove(c, b)
 		})
 

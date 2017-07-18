@@ -44,6 +44,15 @@ func (p *Publishers) Add(pp Publisher) {
 	p.pubs = append(p.pubs, pp)
 }
 
+func (p *Publishers) Remove(pp Publisher) {
+	for i, ppp := range p.pubs {
+		if ppp == pp {
+			p.pubs = append(p.pubs[:i], p.pubs[i+1:]...)
+			break
+		}
+	}
+}
+
 func (p *Publishers) Publish(t, a, k string, o interface{}) error {
 	e := &Event{Time: time.Now(), Type: t, Action: a, Key: k, Object: o}
 

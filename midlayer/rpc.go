@@ -60,9 +60,34 @@ func NewPluginRpcClient(path string, params map[string]interface{}) *PluginRpcCl
 func (prpc *PluginRpcClient) Publish(e *backend.Event) error {
 	var err backend.Error
 	e2 := prpc.rpcClient.Call("Plugin.Publish", *e, &err)
-	return e2
+	if e2 != nil {
+		return e2
+	}
+	if err.Code != 0 || len(err.Messages) > 0 {
+		return &err
+	}
+	return nil
 }
 
-func (prpc *PluginRpcClient) Stop() {
+func (prpc *PluginRpcClient) Action(a *MachineAction) error {
+	var err backend.Error
+	e2 := prpc.rpcClient.Call("Plugin.Action", *a, &err)
+	if e2 != nil {
+		return e2
+	}
+	if err.Code != 0 || len(err.Messages) > 0 {
+		return &err
+	}
+	return nil
+}
 
+func (prpc *PluginRpcClient) Stop() error {
+	var err backend.Error
+	i := 0
+	e2 := prpc.rpcClient.Call("Plugin.Stop", i, &err)
+	if e2 == nil {
+		// Wait for exit
+		prpc.cmd.Wait()
+	}
+	return e2
 }

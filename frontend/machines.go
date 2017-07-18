@@ -6,6 +6,7 @@ import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/midlayer"
 	"github.com/gin-gonic/gin"
 	"github.com/pborman/uuid"
 )
@@ -24,11 +25,32 @@ type MachinesResponse struct {
 	Body []*backend.Machine
 }
 
+// MachineActionResponse return on a successful GET of a single Machine Action
+// swagger:response
+type MachineActionResponse struct {
+	// in: body
+	Body *midlayer.AvailableAction
+}
+
+// MachineActionsResponse return on a successful GET of all Machine Actions
+// swagger:response
+type MachineActionsResponse struct {
+	// in: body
+	Body []*midlayer.AvailableAction
+}
+
 // MachineParamsResponse return on a successful GET of all Machine's Params
 // swagger:response
 type MachineParamsResponse struct {
 	// in: body
 	Body map[string]interface{}
+}
+
+// MachineActionPostResponse return on a successful POST of action
+// swagger:response
+type MachineActionPostResponse struct {
+	// in: body
+	Body string
 }
 
 // MachineBodyParameter used to inject a Machine
@@ -48,12 +70,39 @@ type MachinePatchBodyParameter struct {
 }
 
 // MachinePathParameter used to find a Machine in the path
-// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine getMachineParams postMachineParams
+// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine getMachineParams postMachineParams getMachineActions
 type MachinePathParameter struct {
 	// in: path
 	// required: true
 	// swagger:strfmt uuid
 	Uuid uuid.UUID `json:"uuid"`
+}
+
+// MachineActionPathParameter used to find a Machine / Action in the path
+// swagger:parameters postMachineAction getMachineAction
+type MachineActionPathParameter struct {
+	// in: path
+	// required: true
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
+	// in: path
+	// required: true
+	Name string `json:"name"`
+}
+
+// MachineActionBodyParameter used to post a Machine / Action in the path
+// swagger:parameters postMachineAction
+type MachineActionBodyParameter struct {
+	// in: path
+	// required: true
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
 }
 
 // MachineParamsBodyParameter used to set Machine Params
@@ -332,6 +381,129 @@ func (f *Frontend) InitMachineApi() {
 				c.JSON(be.Code, be)
 			} else {
 				c.JSON(http.StatusOK, val)
+			}
+		})
+
+	// swagger:route GET /machines/{uuid}/actions Machines getMachineActions
+	//
+	// List machine actions Machine
+	//
+	// List Machine actions for a Machine specified by {uuid}
+	//
+	//     Responses:
+	//       200: MachineActionsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/machines/:uuid/actions",
+		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "machines", "actions", c.Param(`uuid`)) {
+				return
+			}
+			c.JSON(http.StatusOK, f.pc.MachineActions.List())
+		})
+
+	// swagger:route GET /machines/{uuid}/actions/{name} Machines getMachineAction
+	//
+	// List specific action for a machine Machine
+	//
+	// List specific {name} action for a Machine specified by {uuid}
+	//
+	//     Responses:
+	//       200: MachineActionResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/machines/:uuid/actions/:name",
+		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "machines", c.Param(`name`), c.Param(`uuid`)) {
+				return
+			}
+			ma, ok := f.pc.MachineActions.Get(c.Param(`name`))
+			if !ok {
+				rerr := &backend.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: "machines",
+					Key:   c.Param(`uuid`),
+				}
+				rerr.Errorf("%s GET: %s: Not Found: Action %s", rerr.Model, rerr.Key, c.Param(`name`))
+				c.JSON(rerr.Code, rerr)
+			} else {
+				c.JSON(http.StatusOK, ma)
+			}
+		})
+
+	// swagger:route POST /machines/{uuid}/actions/{name} Machines postMachineAction
+	//
+	// Call an action on the node.
+	//
+	//     Responses:
+	//       200: MachineActionPostResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/machines/:uuid/actions/:name",
+		func(c *gin.Context) {
+			var val map[string]interface{}
+			if !assureDecode(c, &val) {
+				return
+			}
+			uuid := c.Param(`uuid`)
+			name := c.Param(`name`)
+
+			b := f.dt.NewMachine()
+			var ref store.KeySaver
+			func() {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("get")...)
+				defer unlocker()
+				ref = d("machines").Find(uuid)
+			}()
+			if ref == nil {
+				err := &backend.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: "machines",
+					Key:   uuid,
+				}
+				err.Errorf("%s Call Action: machine %s: Not Found", err.Model, err.Key)
+				c.JSON(err.Code, err)
+				return
+			}
+			if !assureAuth(c, f.Logger, ref.Prefix(), name, ref.Key()) {
+				return
+			}
+
+			m := backend.AsMachine(ref)
+
+			aa, ok := f.pc.MachineActions.Get(name)
+			if !ok {
+				err := &backend.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: "machines",
+					Key:   uuid,
+				}
+				err.Errorf("%s Call Action: action %s: Not Found", err.Model, name)
+				c.JSON(err.Code, err)
+				return
+			}
+
+			// GREG: validate params against aa
+
+			ma := &midlayer.MachineAction{Command: name, Params: val, Machine: m}
+
+			err := f.pc.MachineActions.Run(aa, ma)
+			if err != nil {
+				be, ok := err.(*backend.Error)
+				if !ok {
+					c.JSON(409, err)
+				} else {
+					c.JSON(be.Code, be)
+				}
+			} else {
+				c.JSON(http.StatusOK, "")
 			}
 		})
 

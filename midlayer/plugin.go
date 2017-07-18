@@ -19,9 +19,12 @@ import (
 // instantiated by a plugin.
 // swagger:model
 type PluginProvider struct {
-	Name           string
-	Version        string
-	Interfaces     []string
+	Name    string
+	Version string
+
+	HasPublish       bool
+	AvailableActions []*AvailableAction
+
 	RequiredParams []*backend.Param
 	OptionalParams []*backend.Param
 
@@ -29,8 +32,9 @@ type PluginProvider struct {
 }
 
 type RunningPlugin struct {
-	Plugin *backend.Plugin
-	Client *PluginRpcClient
+	Plugin   *backend.Plugin
+	Provider *PluginProvider
+	Client   *PluginRpcClient
 }
 
 type PluginController struct {
@@ -45,12 +49,14 @@ type PluginController struct {
 	finished           chan bool
 	events             chan *backend.Event
 	publishers         *backend.Publishers
+	MachineActions     *MachineActions
 }
 
 func InitPluginController(pluginDir string, dt *backend.DataTracker, logger *log.Logger, pubs *backend.Publishers) (pc *PluginController, err error) {
 	pc = &PluginController{pluginDir: pluginDir, dataTracker: dt, publishers: pubs, logger: logger,
 		AvailableProviders: make(map[string]*PluginProvider, 0)}
 
+	pc.MachineActions = NewMachineActions()
 	pubs.Add(pc)
 
 	pc.watcher, err = fsnotify.NewWatcher()
@@ -229,8 +235,15 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 
 		if len(errors) == 0 {
 			thingee := NewPluginRpcClient(pp.path, plugin.Params)
-			pc.publishers.Add(thingee)
-			pc.runningPlugins = append(pc.runningPlugins, &RunningPlugin{Plugin: plugin, Client: thingee})
+			rp := &RunningPlugin{Plugin: plugin, Client: thingee, Provider: pp}
+			if pp.HasPublish {
+				pc.publishers.Add(thingee)
+			}
+			for _, aa := range pp.AvailableActions {
+				aa.plugin = rp
+				pc.MachineActions.Add(aa)
+			}
+			pc.runningPlugins = append(pc.runningPlugins, rp)
 		}
 
 		if len(plugin.Errors) != len(errors) {
@@ -244,7 +257,20 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 }
 
 func (pc *PluginController) stopPlugin(plugin *backend.Plugin) {
-	// GREG: Stop a plugin!!!
+	for i, rp := range pc.runningPlugins {
+		if rp.Plugin.Name == plugin.Name {
+			rp.Client.Stop()
+			pc.runningPlugins = append(pc.runningPlugins[:i], pc.runningPlugins[i+1:]...)
+
+			if rp.Provider.HasPublish {
+				pc.publishers.Remove(rp.Client)
+			}
+			for _, aa := range rp.Provider.AvailableActions {
+				pc.MachineActions.Remove(aa)
+			}
+			break
+		}
+	}
 }
 
 func (pc *PluginController) restartPlugin(d backend.Stores, plugin *backend.Plugin) {
