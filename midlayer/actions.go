@@ -2,9 +2,10 @@ package midlayer
 
 import (
 	"fmt"
+	"net"
 	"sort"
 
-	"github.com/digitalrebar/provision/backend"
+	"github.com/pborman/uuid"
 )
 
 // Plugins can provide actions for machines
@@ -14,16 +15,23 @@ import (
 // swagger:model
 type AvailableAction struct {
 	Command        string
-	RequiredParams []*backend.Param
-	OptionalParams []*backend.Param
+	RequiredParams []string
+	OptionalParams []string
 
 	plugin *RunningPlugin
 }
 
+//
+// Params is built from the caller, plus
+// the machine, plus profiles, plus global.
+//
 type MachineAction struct {
+	Name    string
+	Uuid    uuid.UUID
+	Address net.IP
+	BootEnv string
 	Command string
 	Params  map[string]interface{}
-	Machine *backend.Machine
 }
 
 type MachineActions struct {

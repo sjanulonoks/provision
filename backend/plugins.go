@@ -149,11 +149,11 @@ func AsPlugins(o []store.KeySaver) []*Plugin {
 }
 
 var pluginLockMap = map[string][]string{
-	"get":    []string{"plugins"},
-	"create": []string{"plugins"},
-	"update": []string{"plugins"},
-	"patch":  []string{"plugins"},
-	"delete": []string{"plugins"},
+	"get":    []string{"plugins", "params"},
+	"create": []string{"plugins", "params"},
+	"update": []string{"plugins", "params"},
+	"patch":  []string{"plugins", "params"},
+	"delete": []string{"plugins", "params"},
 }
 
 func (m *Plugin) Locks(action string) []string {

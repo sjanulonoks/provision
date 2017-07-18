@@ -453,46 +453,112 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			name := c.Param(`name`)
 
+			var aa *midlayer.AvailableAction
+			ma := &midlayer.MachineAction{Command: name, Params: val}
+
 			b := f.dt.NewMachine()
 			var ref store.KeySaver
 			func() {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("get")...)
+				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("actions")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
+				if ref == nil {
+					err := &backend.Error{
+						Code:  http.StatusBadRequest,
+						Type:  "API_ERROR",
+						Model: "machines",
+						Key:   uuid,
+					}
+					err.Errorf("%s Call Action: machine %s: Not Found", err.Model, err.Key)
+					c.JSON(err.Code, err)
+					return
+				}
+				if !assureAuth(c, f.Logger, ref.Prefix(), name, ref.Key()) {
+					return
+				}
+
+				m := backend.AsMachine(ref)
+
+				ma.Name = m.Name
+				ma.Uuid = m.Uuid
+				ma.Address = m.Address
+				ma.BootEnv = m.BootEnv
+
+				aa, ok := f.pc.MachineActions.Get(name)
+				if !ok {
+					err := &backend.Error{
+						Code:  http.StatusNotFound,
+						Type:  "API_ERROR",
+						Model: "machines",
+						Key:   uuid,
+					}
+					err.Errorf("%s Call Action: action %s: Not Found", err.Model, name)
+					c.JSON(err.Code, err)
+					return
+				}
+
+				err := &backend.Error{
+					Code:  http.StatusBadRequest,
+					Type:  "API_ERROR",
+					Model: "machines",
+					Key:   uuid,
+				}
+				for _, param := range aa.RequiredParams {
+					var obj interface{} = nil
+					obj, ok := val[param]
+					if !ok {
+						obj, ok = m.GetParam(d, param, true)
+						if !ok {
+							// GREG: Fix this r.p.globalProfileName = "global"
+							if o := d("profiles").Find("global"); o != nil {
+								p := backend.AsProfile(o)
+								if tobj, ok := p.Params[param]; ok {
+									obj = tobj
+								}
+							}
+						}
+
+						// Put into place
+						if obj != nil {
+							val[param] = obj
+						}
+					}
+					if obj == nil {
+						err.Errorf("%s Call Action: machine %s: Missing Parameter", err.Model, err.Key, param)
+					}
+
+					// GREG: Validate format of Paramter.
+				}
+				for _, param := range aa.OptionalParams {
+					var obj interface{} = nil
+					obj, ok := val[param]
+					if !ok {
+						obj, ok = m.GetParam(d, param, true)
+						if !ok {
+							// GREG: Fix this r.p.globalProfileName = "global"
+							if o := d("profiles").Find("global"); o != nil {
+								p := backend.AsProfile(o)
+								if tobj, ok := p.Params[param]; ok {
+									obj = tobj
+								}
+							}
+						}
+
+						// Put into place
+						if obj != nil {
+							val[param] = obj
+						}
+					}
+					if obj != nil {
+						// GREG: Validate format of Paramter.
+					}
+				}
+
+				if len(err.Messages) > 0 {
+					c.JSON(err.Code, err)
+					return
+				}
 			}()
-			if ref == nil {
-				err := &backend.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: "machines",
-					Key:   uuid,
-				}
-				err.Errorf("%s Call Action: machine %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
-				return
-			}
-			if !assureAuth(c, f.Logger, ref.Prefix(), name, ref.Key()) {
-				return
-			}
-
-			m := backend.AsMachine(ref)
-
-			aa, ok := f.pc.MachineActions.Get(name)
-			if !ok {
-				err := &backend.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: "machines",
-					Key:   uuid,
-				}
-				err.Errorf("%s Call Action: action %s: Not Found", err.Model, name)
-				c.JSON(err.Code, err)
-				return
-			}
-
-			// GREG: validate params against aa
-
-			ma := &midlayer.MachineAction{Command: name, Params: val, Machine: m}
 
 			err := f.pc.MachineActions.Run(aa, ma)
 			if err != nil {

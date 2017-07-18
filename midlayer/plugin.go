@@ -26,8 +26,11 @@ type PluginProvider struct {
 	HasPublish       bool
 	AvailableActions []*AvailableAction
 
-	RequiredParams []*backend.Param
-	OptionalParams []*backend.Param
+	RequiredParams []string
+	OptionalParams []string
+
+	// Ensure that these are in the system.
+	Parameters []*backend.Param
 
 	path string
 }
@@ -226,21 +229,31 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 	if ok {
 		errors := []string{}
 
-		for _, rp := range pp.RequiredParams {
-			obj, ok := plugin.Params[rp.Name]
+		for _, parmName := range pp.RequiredParams {
+			obj, ok := plugin.Params[parmName]
 			if !ok {
-				errors = append(errors, fmt.Sprintf("Missing required parameter: %s", rp.Name))
+				errors = append(errors, fmt.Sprintf("Missing required parameter: %s", parmName))
 			} else {
-				if ev := rp.Validate(obj); ev != nil {
-					errors = append(errors, ev.Error())
+				pobj := d("params").Find(parmName)
+				if pobj != nil {
+					rp := pobj.(*backend.Param)
+
+					if ev := rp.Validate(obj); ev != nil {
+						errors = append(errors, ev.Error())
+					}
 				}
 			}
 		}
-		for _, rp := range pp.OptionalParams {
-			obj, ok := plugin.Params[rp.Name]
+		for _, parmName := range pp.OptionalParams {
+			obj, ok := plugin.Params[parmName]
 			if ok {
-				if ev := rp.Validate(obj); ev != nil {
-					errors = append(errors, ev.Error())
+				pobj := d("params").Find(parmName)
+				if pobj != nil {
+					rp := pobj.(*backend.Param)
+
+					if ev := rp.Validate(obj); ev != nil {
+						errors = append(errors, ev.Error())
+					}
 				}
 			}
 		}
@@ -299,6 +312,7 @@ func (pc *PluginController) restartPlugin(d backend.Stores, plugin *backend.Plug
 
 // Try to add to available - Must lock before calling
 func (pc *PluginController) importPluginProvider(provider string) error {
+	pc.logger.Printf("Importing plugin provider: %s\n", provider)
 	out, err := exec.Command(pc.pluginDir+"/"+provider, "define").Output()
 	if err != nil {
 		pc.logger.Printf("Skipping %s because %s\n", provider, err)
@@ -308,29 +322,36 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 		if err != nil {
 			pc.logger.Printf("Skipping %s because of bad json: %s\n%s\n", provider, err, out)
 		} else {
-			pc.logger.Printf("Adding plugin provider: %s\n", pp.Name)
 
 			skip := false
-			for _, p := range pp.RequiredParams {
+			for _, p := range pp.Parameters {
 				err := p.BeforeSave()
 				if err != nil {
 					pc.logger.Printf("Skipping %s because of bad required scheme: %s %s\n", pp.Name, p.Name, err)
 					skip = true
-				}
-			}
-			for _, p := range pp.OptionalParams {
-				err := p.BeforeSave()
-				if err != nil {
-					pc.logger.Printf("Skipping %s because of bad optional scheme: %s %s\n", pp.Name, p.Name, err)
-					skip = true
+				} else {
+					// Attempt create if it doesn't exist already.
+					ref := pc.dataTracker.NewParam()
+					d, unlocker := pc.dataTracker.LockEnts(ref.Locks("create")...)
+					ref2 := d(ref.Prefix()).Find(p.Name)
+					if ref2 == nil {
+						if _, err := pc.dataTracker.Create(d, p); err != nil {
+							pc.logger.Printf("Skipping %s because parameter could not be created: %s %s\n", pp.Name, p.Name, err)
+							skip = true
+						}
+					}
+					unlocker()
 				}
 			}
 
 			if !skip {
 				if _, ok := pc.AvailableProviders[pp.Name]; !ok {
+					pc.logger.Printf("Adding plugin provider: %s\n", pp.Name)
 					pc.AvailableProviders[pp.Name] = &pp
 					pp.path = pc.pluginDir + "/" + provider
 					return pc.walkPlugins(provider)
+				} else {
+					pc.logger.Printf("Already exists plugin provider: %s\n", pp.Name)
 				}
 			}
 		}
