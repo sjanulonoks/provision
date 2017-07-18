@@ -439,6 +439,7 @@ func (f *Frontend) InitMachineApi() {
 	// Call an action on the node.
 	//
 	//     Responses:
+	//       400: ErrorResponse
 	//       200: MachineActionPostResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
@@ -459,23 +460,23 @@ func (f *Frontend) InitMachineApi() {
 
 			b := f.dt.NewMachine()
 			var ref store.KeySaver
-			func() {
+			bad := func() bool {
 				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("actions")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 				if ref == nil {
 					err := &backend.Error{
-						Code:  http.StatusBadRequest,
+						Code:  http.StatusNotFound,
 						Type:  "API_ERROR",
 						Model: "machines",
 						Key:   uuid,
 					}
 					err.Errorf("%s Call Action: machine %s: Not Found", err.Model, err.Key)
 					c.JSON(err.Code, err)
-					return
+					return true
 				}
 				if !assureAuth(c, f.Logger, ref.Prefix(), name, ref.Key()) {
-					return
+					return true
 				}
 
 				m := backend.AsMachine(ref)
@@ -495,7 +496,7 @@ func (f *Frontend) InitMachineApi() {
 					}
 					err.Errorf("%s Call Action: action %s: Not Found", err.Model, name)
 					c.JSON(err.Code, err)
-					return
+					return true
 				}
 
 				err := &backend.Error{
@@ -524,15 +525,15 @@ func (f *Frontend) InitMachineApi() {
 						}
 					}
 					if obj == nil {
-						err.Errorf("%s Call Action: machine %s: Missing Parameter", err.Model, err.Key, param)
-					}
+						err.Errorf("%s Call Action: machine %s: Missing Parameter %s", err.Model, err.Key, param)
+					} else {
+						pobj := d("params").Find(param)
+						if pobj != nil {
+							rp := pobj.(*backend.Param)
 
-					pobj := d("params").Find(param)
-					if pobj != nil {
-						rp := pobj.(*backend.Param)
-
-						if ev := rp.Validate(obj); ev != nil {
-							err.Errorf("%s Call Action machine %s: Invalid Parameter: %s", err.Model, err.Key, param)
+							if ev := rp.Validate(obj); ev != nil {
+								err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
+							}
 						}
 					}
 				}
@@ -561,7 +562,7 @@ func (f *Frontend) InitMachineApi() {
 							rp := pobj.(*backend.Param)
 
 							if ev := rp.Validate(obj); ev != nil {
-								err.Errorf("%s Call Action machine %s: Invalid Parameter: %s", err.Model, err.Key, param)
+								err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
 							}
 						}
 					}
@@ -569,9 +570,14 @@ func (f *Frontend) InitMachineApi() {
 
 				if len(err.Messages) > 0 {
 					c.JSON(err.Code, err)
-					return
+					return true
 				}
+				return false
 			}()
+
+			if bad {
+				return
+			}
 
 			err := f.pc.MachineActions.Run(aa, ma)
 			if err != nil {

@@ -14,6 +14,7 @@ import (
 //
 // swagger:model
 type AvailableAction struct {
+	Provider       string
 	Command        string
 	RequiredParams []string
 	OptionalParams []string

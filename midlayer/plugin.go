@@ -266,6 +266,7 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 					pc.publishers.Add(thingee)
 				}
 				for _, aa := range pp.AvailableActions {
+					aa.Provider = pp.Name
 					aa.plugin = rp
 					pc.MachineActions.Add(aa)
 				}
