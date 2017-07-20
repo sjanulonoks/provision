@@ -1,9 +1,13 @@
 package midlayer
 
 import (
+	"bufio"
+	"fmt"
 	"io"
+	"log"
 	"net/rpc"
 	"net/rpc/jsonrpc"
+	"os"
 	"os/exec"
 
 	"github.com/digitalrebar/provision/backend"
@@ -32,13 +36,33 @@ type PluginRpcClient struct {
 	rpcClient *rpc.Client
 }
 
-func NewPluginRpcClient(path string, params map[string]interface{}) (answer *PluginRpcClient, theErr error) {
+func NewPluginRpcClient(plugin string, logger *log.Logger, apiPort int, path string, params map[string]interface{}) (answer *PluginRpcClient, theErr error) {
 	answer = &PluginRpcClient{}
 
 	answer.cmd = exec.Command(path, "listen")
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("RS_ENDPOINT=https://127.0.0.1:%d", apiPort))
+	answer.cmd.Env = env
 	in := pipePair{}
 	in.reader, _ = answer.cmd.StdoutPipe()
 	in.writer, _ = answer.cmd.StdinPipe()
+
+	stderr, err2 := answer.cmd.StderrPipe()
+	if err2 != nil {
+		return nil, err2
+	}
+
+	go func() {
+		// read command's stdout line by line
+		in := bufio.NewScanner(stderr)
+
+		for in.Scan() {
+			logger.Printf("Plugin " + plugin + ": " + in.Text()) // write each line to your log, or anything you need
+		}
+		if err := in.Err(); err != nil {
+			logger.Printf("Plugin %s: error: %s", plugin, err)
+		}
+	}()
 
 	answer.rpcClient = jsonrpc.NewClient(&in)
 

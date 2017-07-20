@@ -71,6 +71,8 @@ type PluginListPathParameter struct {
 	Limit int `json:"limit"`
 	// in: query
 	Name string
+	// in: query
+	Provider string
 }
 
 func (f *Frontend) InitPluginApi() {

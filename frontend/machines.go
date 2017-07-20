@@ -400,6 +400,26 @@ func (f *Frontend) InitMachineApi() {
 			if !assureAuth(c, f.Logger, "machines", "actions", c.Param(`uuid`)) {
 				return
 			}
+			uuid := c.Param(`uuid`)
+			b := f.dt.NewMachine()
+			var ref store.KeySaver
+			func() {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("get")...)
+				defer unlocker()
+				ref = d("machines").Find(uuid)
+			}()
+			if ref == nil {
+				err := &backend.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: "machines",
+					Key:   uuid,
+				}
+				err.Errorf("%s Actions Get: %s: Not Found", err.Model, err.Key)
+				c.JSON(err.Code, err)
+				return
+			}
+
 			c.JSON(http.StatusOK, f.pc.MachineActions.List())
 		})
 
@@ -419,6 +439,26 @@ func (f *Frontend) InitMachineApi() {
 			if !assureAuth(c, f.Logger, "machines", c.Param(`name`), c.Param(`uuid`)) {
 				return
 			}
+			uuid := c.Param(`uuid`)
+			b := f.dt.NewMachine()
+			var ref store.KeySaver
+			func() {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("get")...)
+				defer unlocker()
+				ref = d("machines").Find(uuid)
+			}()
+			if ref == nil {
+				err := &backend.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: "machines",
+					Key:   uuid,
+				}
+				err.Errorf("%s Action Get: %s: Not Found", err.Model, err.Key)
+				c.JSON(err.Code, err)
+				return
+			}
+
 			ma, ok := f.pc.MachineActions.Get(c.Param(`name`))
 			if !ok {
 				rerr := &backend.Error{
@@ -427,7 +467,7 @@ func (f *Frontend) InitMachineApi() {
 					Model: "machines",
 					Key:   c.Param(`uuid`),
 				}
-				rerr.Errorf("%s GET: %s: Not Found: Action %s", rerr.Model, rerr.Key, c.Param(`name`))
+				rerr.Errorf("%s Action Get: %s: Not Found: Action %s", rerr.Model, rerr.Key, c.Param(`name`))
 				c.JSON(rerr.Code, rerr)
 			} else {
 				c.JSON(http.StatusOK, ma)

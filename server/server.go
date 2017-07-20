@@ -165,7 +165,7 @@ func Server(c_opts *ProgOpts) {
 	}
 
 	mkdir(c_opts.PluginRoot, logger)
-	pc, err := midlayer.InitPluginController(c_opts.PluginRoot, dt, logger, publishers)
+	pc, err := midlayer.InitPluginController(c_opts.PluginRoot, dt, logger, publishers, c_opts.ApiPort)
 	if err != nil {
 		logger.Fatalf("Error starting plugin service: %v", err)
 	} else {

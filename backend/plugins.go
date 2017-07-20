@@ -120,11 +120,8 @@ func (n *Plugin) setDT(p *DataTracker) {
 
 func (n *Plugin) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: n}
-	if n.Name == "" {
-		e.Errorf("Plugin %v must have a name", n)
-	}
 	if n.Provider == "" {
-		e.Errorf("Plugin %v must have a provider", n)
+		e.Errorf("Plugin %s must have a provider", n.Name)
 	}
 	if err := index.CheckUnique(n, n.stores("plugins").Items()); err != nil {
 		e.Merge(err)
