@@ -56,14 +56,15 @@ func TestMain(m *testing.M) {
 		log.Printf("Could not create boltdb: %v", err)
 		os.Exit(1)
 	}
+	logger := log.New(os.Stdout, "dt", 0)
 	dataTracker = backend.NewDataTracker(bs,
 		tmpDir,
 		"127.0.0.1",
 		8091,
 		8092,
-		log.New(os.Stdout, "dt", 0),
+		logger,
 		map[string]string{"defaultBootEnv": "default", "unknownBootEnv": "ignore"},
-		backend.NewPublishers())
+		backend.NewPublishers(logger))
 
 	ret := m.Run()
 	err = os.RemoveAll(tmpDir)
