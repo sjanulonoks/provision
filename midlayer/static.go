@@ -8,7 +8,7 @@ import (
 	"github.com/digitalrebar/provision/backend"
 )
 
-func ServeStatic(listenAt string, responder http.Handler, logger *log.Logger) (*http.Server, error) {
+func ServeStatic(listenAt string, responder http.Handler, logger *log.Logger, pubs *backend.Publishers) (*http.Server, error) {
 	conn, err := net.Listen("tcp", listenAt)
 	if err != nil {
 		return nil, err

@@ -28,6 +28,9 @@ import:
 - package: github.com/tylerb/graceful
 - package: github.com/elithrar/simple-scrypt
 - package: github.com/krolaw/dhcp4
+- package: github.com/gorilla/websocket
+- package: gopkg.in/olahol/melody.v1
 - package: golang.org/x/net
   subpackages:
   - context
+

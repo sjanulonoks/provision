@@ -118,6 +118,9 @@ func Server(c_opts *ProgOpts) {
 		logger.Fatalf("Unable to extract assets: %v", err)
 	}
 
+	services := make([]midlayer.Service, 0, 0)
+	publishers := backend.NewPublishers()
+
 	dt := backend.NewDataTracker(backendStore,
 		c_opts.FileRoot,
 		c_opts.OurAddress,
@@ -132,24 +135,27 @@ func Server(c_opts *ProgOpts) {
 			"unknownBootEnv":      c_opts.UnknownBootEnv,
 			"knownTokenTimeout":   fmt.Sprintf("%d", c_opts.KnownTokenTimeout),
 			"unknownTokenTimeout": fmt.Sprintf("%d", c_opts.UnknownTokenTimeout),
-		})
+		},
+		publishers)
 
-	fe := frontend.NewFrontend(dt, logger, c_opts.OurAddress, c_opts.ApiPort, c_opts.FileRoot, c_opts.DevUI, nil)
+	fe := frontend.NewFrontend(dt, logger,
+		c_opts.OurAddress, c_opts.ApiPort, c_opts.FileRoot,
+		c_opts.DevUI, nil, publishers)
+	publishers.Add(fe)
 
-	services := make([]midlayer.Service, 0, 0)
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)
 	}
 	if !c_opts.DisableProvisioner {
 		logger.Printf("Starting TFTP server")
-		if svc, err := midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), dt.FS.TftpResponder(), logger); err != nil {
+		if svc, err := midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), dt.FS.TftpResponder(), logger, publishers); err != nil {
 			logger.Fatalf("Error starting TFTP server: %v", err)
 		} else {
 			services = append(services, svc)
 		}
 
 		logger.Printf("Starting static file server")
-		if svc, err := midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), dt.FS, logger); err != nil {
+		if svc, err := midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), dt.FS, logger, publishers); err != nil {
 			logger.Fatalf("Error starting static file server: %v", err)
 		} else {
 			services = append(services, svc)
@@ -158,7 +164,7 @@ func Server(c_opts *ProgOpts) {
 
 	if !c_opts.DisableDHCP {
 		logger.Printf("Starting DHCP server")
-		if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.DhcpPort); err != nil {
+		if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.DhcpPort, publishers); err != nil {
 			logger.Fatalf("Error starting DHCP server: %v", err)
 		} else {
 			services = append(services, svc)

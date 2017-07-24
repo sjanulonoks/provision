@@ -19,6 +19,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/location"
 	"github.com/gin-gonic/gin"
+	"gopkg.in/olahol/melody.v1"
 )
 
 // ErrorResponse is returned whenever an error occurs
@@ -49,6 +50,8 @@ type Frontend struct {
 	ApiGroup   *gin.RouterGroup
 	dt         *backend.DataTracker
 	authSource AuthSource
+	pubs       *backend.Publishers
+	melody     *melody.Melody
 }
 
 type AuthSource interface {
@@ -74,7 +77,7 @@ func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	return
 }
 
-func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
+func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {
@@ -85,10 +88,19 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, po
 		return func(c *gin.Context) {
 			authHeader := c.Request.Header.Get("Authorization")
 			if len(authHeader) == 0 {
-				logger.Printf("No authentication header")
-				c.Header("WWW-Authenticate", "dr-provision")
-				c.AbortWithStatus(http.StatusUnauthorized)
-				return
+				authHeader = c.Query("token")
+				if len(authHeader) == 0 {
+					logger.Printf("No authentication header or token")
+					c.Header("WWW-Authenticate", "dr-provision")
+					c.AbortWithStatus(http.StatusUnauthorized)
+					return
+				} else {
+					if strings.Contains(authHeader, ":") {
+						authHeader = "Basic " + base64.StdEncoding.EncodeToString([]byte(authHeader))
+					} else {
+						authHeader = "Bearer " + authHeader
+					}
+				}
 			}
 			hdrParts := strings.SplitN(authHeader, " ", 2)
 			if len(hdrParts) != 2 || (hdrParts[0] != "Basic" && hdrParts[0] != "Bearer") {
@@ -155,8 +167,9 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, po
 	apiGroup := mgmtApi.Group("/api/v3")
 	apiGroup.Use(userAuth())
 
-	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt}
+	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt, pubs: pubs}
 
+	me.InitWebSocket()
 	me.InitBootEnvApi()
 	me.InitIsoApi()
 	me.InitFileApi()
