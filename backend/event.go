@@ -2,6 +2,7 @@ package backend
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -33,11 +34,12 @@ type Publisher interface {
 }
 
 type Publishers struct {
-	pubs []Publisher
+	pubs   []Publisher
+	logger *log.Logger
 }
 
-func NewPublishers() *Publishers {
-	return &Publishers{pubs: make([]Publisher, 0, 0)}
+func NewPublishers(logger *log.Logger) *Publishers {
+	return &Publishers{logger: logger, pubs: make([]Publisher, 0, 0)}
 }
 
 func (p *Publishers) Add(pp Publisher) {
@@ -53,12 +55,16 @@ func (p *Publishers) Remove(pp Publisher) {
 	}
 }
 
+func (p *Publishers) List() []Publisher {
+	return p.pubs
+}
+
 func (p *Publishers) Publish(t, a, k string, o interface{}) error {
 	e := &Event{Time: time.Now(), Type: t, Action: a, Key: k, Object: o}
 
 	for _, pub := range p.pubs {
 		if err := pub.Publish(e); err != nil {
-			return err
+			p.logger.Printf("Failed to Publish event on %#v: %#v\n", pub, err)
 		}
 	}
 

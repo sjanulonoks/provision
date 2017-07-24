@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/digitalrebar/provision/backend"
-	"github.com/digitalrebar/provision/midlayer"
+	"github.com/digitalrebar/provision/plugin"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,14 +13,14 @@ import (
 // swagger:response
 type PluginProviderResponse struct {
 	// in: body
-	Body *midlayer.PluginProvider
+	Body *plugin.PluginProvider
 }
 
 // PluginProvidersResponse returned on a successful GET of all plugin_provider
 // swagger:response
 type PluginProvidersResponse struct {
 	// in: body
-	Body []*midlayer.PluginProvider
+	Body []*plugin.PluginProvider
 }
 
 // swagger:parameters getPluginProvider

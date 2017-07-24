@@ -6,7 +6,7 @@ import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
-	"github.com/digitalrebar/provision/midlayer"
+	"github.com/digitalrebar/provision/plugin"
 	"github.com/gin-gonic/gin"
 	"github.com/pborman/uuid"
 )
@@ -29,14 +29,14 @@ type MachinesResponse struct {
 // swagger:response
 type MachineActionResponse struct {
 	// in: body
-	Body *midlayer.AvailableAction
+	Body *plugin.AvailableAction
 }
 
 // MachineActionsResponse return on a successful GET of all Machine Actions
 // swagger:response
 type MachineActionsResponse struct {
 	// in: body
-	Body []*midlayer.AvailableAction
+	Body []*plugin.AvailableAction
 }
 
 // MachineParamsResponse return on a successful GET of all Machine's Params
@@ -495,8 +495,8 @@ func (f *Frontend) InitMachineApi() {
 			name := c.Param(`name`)
 
 			var ok bool
-			var aa *midlayer.AvailableAction
-			ma := &midlayer.MachineAction{Command: name, Params: val}
+			var aa *plugin.AvailableAction
+			ma := &plugin.MachineAction{Command: name, Params: val}
 
 			b := f.dt.NewMachine()
 			var ref store.KeySaver

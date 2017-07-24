@@ -15,7 +15,7 @@ import (
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/embedded"
-	"github.com/digitalrebar/provision/midlayer"
+	"github.com/digitalrebar/provision/plugin"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/location"
@@ -50,7 +50,7 @@ type Frontend struct {
 	MgmtApi    *gin.Engine
 	ApiGroup   *gin.RouterGroup
 	dt         *backend.DataTracker
-	pc         *midlayer.PluginController
+	pc         *plugin.PluginController
 	authSource AuthSource
 	pubs       *backend.Publishers
 	melody     *melody.Melody
@@ -79,7 +79,7 @@ func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	return
 }
 
-func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers, drpid string, pc *midlayer.PluginController) (me *Frontend) {
+func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers, drpid string, pc *plugin.PluginController) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {
@@ -190,6 +190,7 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, po
 	me.InitPluginProviderApi()
 	me.InitTaskApi()
 	me.InitJobApi()
+	me.InitStatsApi()
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("swagger.json")
