@@ -155,6 +155,9 @@ func (f *Frontend) InitJobApi() {
 			if !assureDecode(c, b) {
 				return
 			}
+			if b.Uuid == nil || len(b.Uuid) == 0 {
+				b.Uuid = uuid.NewRandom()
+			}
 			var res store.KeySaver
 			var err error
 			func() {
