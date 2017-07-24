@@ -38,7 +38,7 @@ type PluginProvider struct {
 type RunningPlugin struct {
 	Plugin   *backend.Plugin
 	Provider *PluginProvider
-	Client   *PluginRpcClient
+	Client   *PluginClient
 }
 
 type PluginController struct {
@@ -266,7 +266,7 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 		}
 
 		if len(errors) == 0 {
-			thingee, err := NewPluginRpcClient(plugin.Name, pc.logger, pc.apiPort, pp.path, plugin.Params)
+			thingee, err := NewPluginClient(plugin.Name, pc.logger, pc.apiPort, pp.path, plugin.Params)
 			if err == nil {
 				rp := &RunningPlugin{Plugin: plugin, Client: thingee, Provider: pp}
 				if pp.HasPublish {
