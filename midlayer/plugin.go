@@ -45,7 +45,7 @@ type PluginController struct {
 	logger             *log.Logger
 	lock               sync.Mutex
 	AvailableProviders map[string]*PluginProvider
-	runningPlugins     []*RunningPlugin
+	runningPlugins     map[string]*RunningPlugin
 	dataTracker        *backend.DataTracker
 	pluginDir          string
 	watcher            *fsnotify.Watcher
@@ -59,7 +59,8 @@ type PluginController struct {
 
 func InitPluginController(pluginDir string, dt *backend.DataTracker, logger *log.Logger, pubs *backend.Publishers, apiPort int) (pc *PluginController, err error) {
 	pc = &PluginController{pluginDir: pluginDir, dataTracker: dt, publishers: pubs, logger: logger,
-		AvailableProviders: make(map[string]*PluginProvider, 0), apiPort: apiPort}
+		AvailableProviders: make(map[string]*PluginProvider, 0), apiPort: apiPort,
+		runningPlugins: make(map[string]*RunningPlugin, 0)}
 
 	pc.MachineActions = NewMachineActions()
 	pubs.Add(pc)
@@ -196,17 +197,21 @@ func (pc *PluginController) Publish(e *backend.Event) error {
 }
 
 func (pc *PluginController) GetPluginProvider(name string) *PluginProvider {
+	pc.logger.Printf("GREG: GetPlugingProvider: %s\n", name)
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
 
 	if pp, ok := pc.AvailableProviders[name]; !ok {
+		pc.logger.Printf("GREG: GetPlugingProvider %s: nil\n", name)
 		return nil
 	} else {
+		pc.logger.Printf("GREG: GetPlugingProvider %s: %v\n", name, pp)
 		return pp
 	}
 }
 
 func (pc *PluginController) GetPluginProviders() []*PluginProvider {
+	pc.logger.Printf("GREG: GetPlugingProviders\n")
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
 
@@ -221,6 +226,7 @@ func (pc *PluginController) GetPluginProviders() []*PluginProvider {
 	for _, key := range keys {
 		answer = append(answer, pc.AvailableProviders[key])
 	}
+	pc.logger.Printf("GREG: GetPlugingProviders: %v\n", answer)
 	return answer
 }
 
@@ -271,7 +277,7 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 					aa.plugin = rp
 					pc.MachineActions.Add(aa)
 				}
-				pc.runningPlugins = append(pc.runningPlugins, rp)
+				pc.runningPlugins[plugin.Name] = rp
 			} else {
 				errors = append(errors, err.Error())
 			}
@@ -281,7 +287,9 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 			plugin.Errors = errors
 			pc.dataTracker.Update(d, plugin)
 		}
+		pc.logger.Printf("Starting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
 	} else {
+		pc.logger.Printf("Starting plugin: %s(%s) missing provider\n", plugin.Name, plugin.Provider)
 		if plugin.Errors == nil || len(plugin.Errors) == 0 {
 			plugin.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", plugin.Provider)}
 			pc.dataTracker.Update(d, plugin)
@@ -290,26 +298,27 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 }
 
 func (pc *PluginController) stopPlugin(plugin *backend.Plugin) {
-	for i, rp := range pc.runningPlugins {
-		if rp.Plugin.Name == plugin.Name {
-			pc.logger.Printf("Stoping plugin: %s(%s)\n", plugin.Name, plugin.Provider)
-			rp.Client.Stop()
-			pc.runningPlugins = append(pc.runningPlugins[:i], pc.runningPlugins[i+1:]...)
+	rp, ok := pc.runningPlugins[plugin.Name]
+	if ok {
+		pc.logger.Printf("Stoping plugin: %s(%s)\n", plugin.Name, plugin.Provider)
+		delete(pc.runningPlugins, plugin.Name)
 
-			if rp.Provider.HasPublish {
-				pc.publishers.Remove(rp.Client)
-			}
-			for _, aa := range rp.Provider.AvailableActions {
-				pc.MachineActions.Remove(aa)
-			}
-			break
+		if rp.Provider.HasPublish {
+			pc.publishers.Remove(rp.Client)
 		}
+		for _, aa := range rp.Provider.AvailableActions {
+			pc.MachineActions.Remove(aa)
+		}
+		rp.Client.Stop()
+		pc.logger.Printf("Stoping plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
 	}
 }
 
 func (pc *PluginController) restartPlugin(d backend.Stores, plugin *backend.Plugin) {
+	pc.logger.Printf("Restarting plugin: %s(%s)\n", plugin.Name, plugin.Provider)
 	pc.stopPlugin(plugin)
 	pc.startPlugin(d, plugin)
+	pc.logger.Printf("Restarting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
 }
 
 // Try to add to available - Must lock before calling
@@ -378,10 +387,9 @@ func (pc *PluginController) removePluginProvider(provider string) {
 			}
 		}
 		for _, p := range remove {
-			pc.stopPlugin(p)
-
 			ref := pc.dataTracker.NewPlugin()
 			d, unlocker := pc.dataTracker.LockEnts(ref.Locks("get")...)
+			pc.stopPlugin(p)
 			ref2 := d(ref.Prefix()).Find(p.Name)
 			pc.startPlugin(d, ref2.(*backend.Plugin))
 			unlocker()

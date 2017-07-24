@@ -619,7 +619,7 @@ func (f *Frontend) InitMachineApi() {
 				return
 			}
 
-			err := f.pc.MachineActions.Run(aa, ma)
+			err := aa.Run(ma)
 			if err != nil {
 				be, ok := err.(*backend.Error)
 				if !ok {

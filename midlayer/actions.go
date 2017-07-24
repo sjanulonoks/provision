@@ -20,6 +20,7 @@ type AvailableAction struct {
 	OptionalParams []string
 
 	plugin *RunningPlugin
+	ma     *MachineActions
 }
 
 //
@@ -48,6 +49,7 @@ func (ma *MachineActions) Add(aa *AvailableAction) error {
 		return fmt.Errorf("Duplicate Action %s: already present\n", aa.Command)
 	}
 	ma.actions[aa.Command] = aa
+	aa.ma = ma
 	return nil
 }
 
@@ -80,6 +82,6 @@ func (ma *MachineActions) Get(name string) (a *AvailableAction, ok bool) {
 	return
 }
 
-func (ma *MachineActions) Run(aa *AvailableAction, maa *MachineAction) error {
+func (aa *AvailableAction) Run(maa *MachineAction) error {
 	return aa.plugin.Client.Action(maa)
 }
