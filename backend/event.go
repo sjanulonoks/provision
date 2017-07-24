@@ -3,6 +3,7 @@ package backend
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -36,6 +37,7 @@ type Publisher interface {
 type Publishers struct {
 	pubs   []Publisher
 	logger *log.Logger
+	lock   sync.Mutex
 }
 
 func NewPublishers(logger *log.Logger) *Publishers {
@@ -43,10 +45,16 @@ func NewPublishers(logger *log.Logger) *Publishers {
 }
 
 func (p *Publishers) Add(pp Publisher) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	p.pubs = append(p.pubs, pp)
 }
 
 func (p *Publishers) Remove(pp Publisher) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	for i, ppp := range p.pubs {
 		if ppp == pp {
 			p.pubs = append(p.pubs[:i], p.pubs[i+1:]...)
@@ -56,12 +64,22 @@ func (p *Publishers) Remove(pp Publisher) {
 }
 
 func (p *Publishers) List() []Publisher {
-	return p.pubs
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	newPubs := make([]Publisher, 0, 0)
+	for _, pub := range p.pubs {
+		newPubs = append(newPubs, pub)
+	}
+
+	return newPubs
 }
 
 func (p *Publishers) Publish(t, a, k string, o interface{}) error {
 	e := &Event{Time: time.Now(), Type: t, Action: a, Key: k, Object: o}
 
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	for _, pub := range p.pubs {
 		if err := pub.Publish(e); err != nil {
 			p.logger.Printf("Failed to Publish event on %#v: %#v\n", pub, err)
