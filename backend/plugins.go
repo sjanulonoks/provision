@@ -96,7 +96,7 @@ func (n *Plugin) GetParams() map[string]interface{} {
 func (n *Plugin) SetParams(d Stores, values map[string]interface{}) error {
 	n.Params = values
 	e := &Error{Code: 422, Type: ValidationError, o: n}
-	_, e2 := n.p.Save(d, n)
+	_, e2 := n.p.Save(d, n, nil)
 	e.Merge(e2)
 	return e.OrNil()
 }

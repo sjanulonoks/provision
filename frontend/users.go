@@ -162,7 +162,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 	f.ApiGroup.POST("/users",
 		func(c *gin.Context) {
 			b := f.dt.NewUser()
-			f.Create(c, b)
+			f.Create(c, b, nil)
 		})
 
 	// swagger:route GET /users/{name} Users getUser
@@ -257,7 +257,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/users/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewUser(), c.Param(`name`))
+			f.Patch(c, f.dt.NewUser(), c.Param(`name`), nil)
 		})
 
 	// swagger:route PUT /users/{name} Users putUser
@@ -275,7 +275,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewUser(), c.Param(`name`))
+			f.Update(c, f.dt.NewUser(), c.Param(`name`), nil)
 		})
 
 	// swagger:route PUT /users/{name}/password Users putUserPassword
@@ -336,6 +336,6 @@ func (f *Frontend) InitUserApi(drpid string) {
 		func(c *gin.Context) {
 			b := f.dt.NewUser()
 			b.Name = c.Param(`name`)
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 		})
 }

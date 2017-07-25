@@ -163,7 +163,7 @@ func (f *Frontend) InitJobApi() {
 			func() {
 				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("create")...)
 				defer unlocker()
-				_, err = f.dt.Create(d, b)
+				_, err = f.dt.Create(d, b, nil)
 			}()
 			if err != nil {
 				be, ok := err.(*backend.Error)
@@ -215,7 +215,7 @@ func (f *Frontend) InitJobApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/jobs/:uuid",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewJob(), c.Param(`uuid`))
+			f.Patch(c, f.dt.NewJob(), c.Param(`uuid`), nil)
 		})
 
 	// swagger:route PUT /jobs/{uuid} Jobs putJob
@@ -233,7 +233,7 @@ func (f *Frontend) InitJobApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/jobs/:uuid",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewJob(), c.Param(`uuid`))
+			f.Update(c, f.dt.NewJob(), c.Param(`uuid`), nil)
 		})
 
 	// swagger:route DELETE /jobs/{uuid} Jobs deleteJob
@@ -247,10 +247,11 @@ func (f *Frontend) InitJobApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/jobs/:uuid",
 		func(c *gin.Context) {
 			b := f.dt.NewJob()
 			b.Uuid = uuid.Parse(c.Param(`uuid`))
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 		})
 }

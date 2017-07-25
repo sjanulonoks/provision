@@ -491,7 +491,7 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	}
 }
 
-func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
+func (f *Frontend) Create(c *gin.Context, val store.KeySaver, ov backend.ObjectValidator) {
 	if !assureDecode(c, val) {
 		return
 	}
@@ -502,7 +502,7 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 	func() {
 		d, unlocker := f.dt.LockEnts(val.(Lockable).Locks("create")...)
 		defer unlocker()
-		_, err = f.dt.Create(d, val)
+		_, err = f.dt.Create(d, val, ov)
 	}()
 	if err != nil {
 		be, ok := err.(*backend.Error)
@@ -520,7 +520,7 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 	}
 }
 
-func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
+func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string, ov backend.ObjectValidator) {
 	patch := make(jsonpatch2.Patch, 0)
 	if !assureDecode(c, &patch) {
 		return
@@ -533,7 +533,9 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	func() {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
 		defer unlocker()
-		res, err = f.dt.Patch(d, ref, key, patch)
+		if err == nil {
+			res, err = f.dt.Patch(d, ref, key, patch, ov)
+		}
 	}()
 	if err == nil {
 		s, ok := res.(Sanitizable)
@@ -551,7 +553,7 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	}
 }
 
-func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
+func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string, ov backend.ObjectValidator) {
 	if !assureDecode(c, ref) {
 		return
 	}
@@ -573,7 +575,7 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 	func() {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
 		defer unlocker()
-		_, err = f.dt.Update(d, ref)
+		_, err = f.dt.Update(d, ref, ov)
 	}()
 	if err == nil {
 		s, ok := ref.(Sanitizable)
@@ -591,7 +593,7 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 	}
 }
 
-func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver) {
+func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, ov backend.ObjectValidator) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "delete", ref.Key()) {
 		return
 	}
@@ -599,7 +601,7 @@ func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver) {
 	func() {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("delete")...)
 		defer unlocker()
-		_, err = f.dt.Remove(d, ref)
+		_, err = f.dt.Remove(d, ref, ov)
 	}()
 	if err != nil {
 		ne, ok := err.(*backend.Error)

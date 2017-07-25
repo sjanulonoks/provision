@@ -39,7 +39,7 @@ func findLease(d Stores, dt *DataTracker, strat, token string, req net.IP) (leas
 		if reservation.Strategy != lease.Strategy ||
 			reservation.Token != lease.Token {
 			lease.Invalidate()
-			dt.Save(d, lease)
+			dt.Save(d, lease, nil)
 			err = LeaseNAK(fmt.Errorf("Reservation %s (%s:%s conflicts with %s:%s",
 				reservation.Addr,
 				reservation.Strategy,
@@ -77,12 +77,12 @@ func FindLease(dt *DataTracker,
 		} else if reservation != nil {
 			lease.ExpireTime = time.Now().Add(2 * time.Hour)
 		} else {
-			dt.Remove(d, lease)
+			dt.Remove(d, lease, nil)
 			err = LeaseNAK(fmt.Errorf("Lease %s has no reservation or subnet, it is dead to us.", lease.Addr))
 			lease = nil
 			return
 		}
-		dt.Save(d, lease)
+		dt.Save(d, lease, nil)
 	}
 	return
 }
@@ -240,7 +240,7 @@ func FindOrCreateLease(dt *DataTracker,
 		leases.Remove(toRemove...)
 		lease.p = dt
 		lease.ExpireTime = time.Now().Add(time.Minute)
-		dt.Save(d, lease)
+		dt.Save(d, lease, nil)
 	}
 	return
 }

@@ -138,7 +138,7 @@ func (f *Frontend) InitTaskApi() {
 			func() {
 				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("create")...)
 				defer unlocker()
-				_, err = f.dt.Create(d, b)
+				_, err = f.dt.Create(d, b, nil)
 			}()
 			if err != nil {
 				be, ok := err.(*backend.Error)
@@ -190,7 +190,7 @@ func (f *Frontend) InitTaskApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/tasks/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewTask(), c.Param(`name`))
+			f.Patch(c, f.dt.NewTask(), c.Param(`name`), nil)
 		})
 
 	// swagger:route PUT /tasks/{name} Tasks putTask
@@ -208,7 +208,7 @@ func (f *Frontend) InitTaskApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/tasks/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewTask(), c.Param(`name`))
+			f.Update(c, f.dt.NewTask(), c.Param(`name`), nil)
 		})
 
 	// swagger:route DELETE /tasks/{name} Tasks deleteTask
@@ -226,6 +226,6 @@ func (f *Frontend) InitTaskApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewTask()
 			b.Name = c.Param(`name`)
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 		})
 }

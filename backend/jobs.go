@@ -19,10 +19,11 @@ import (
 //   CurrentTask. If the current job is "finished", the machine
 //   CurrentTask is incremented.  If that causes CurrentTask to go
 //   past the end of the Tasks list for the machine, no job is created
-//   and the API returns a 204, otherwise a new job is created and is
-//   returned with a 202. If there is a current job that is neither
-//   "failed" nor "finished", the POST fails.  The new job will be
-//   created with its Previos value set to the machine's CurrentJob,
+//   and the API returns a 204. If the current job is in the imcomplete
+//   state, that job is returned with a 202.  Otherwise a new job is
+//   created and is returned with a 202. If there is a current job that is neither
+//   "completed", "failed", nor "finished", the POST fails.  The new job will be
+//   created with its Previous value set to the machine's CurrentJob,
 //   and the machine's CurrentJob is updated with the UUID of the new
 //   job.
 //
@@ -43,6 +44,8 @@ import (
 // * On provisioner startup, all machine CurrentJobs are set to "failed" if they are not "finished"
 
 type Job struct {
+	validate
+
 	// The UUID of the job.  The primary key.
 	// required: true
 	// swagger:strfmt uuid
@@ -106,6 +109,10 @@ func (d *DataTracker) NewJob() *Job {
 
 func (j *Job) setDT(dp *DataTracker) {
 	j.p = dp
+}
+
+func (j *Job) UUID() string {
+	return j.Uuid.String()
 }
 
 func (j *Job) Indexes() map[string]index.Maker {
@@ -277,11 +284,75 @@ func (j *Job) Indexes() map[string]index.Maker {
 	}
 }
 
+var JobValidStates []string = []string{
+	"created",
+	"running",
+	"failed",
+	"finished",
+	"incomplete",
+}
+
+func (j *Job) BeforeSave() error {
+	e := &Error{Code: 422, Type: ValidationError, o: j}
+	if j.Uuid == nil {
+		e.Errorf("Job %#v was not assigned a uuid!", j)
+	}
+	if j.Previous == nil {
+		e.Errorf("Job %s does not have a Previous job", j.UUID())
+	}
+
+	objs := j.stores
+	tasks := objs("tasks")
+	bootenvs := objs("bootenvs")
+	machines := objs("machines")
+
+	if machines.Find(j.Machine.String()) == nil {
+		e.Errorf("Machine %s does not exist", j.Machine.String())
+	}
+
+	if tasks.Find(j.Task) == nil {
+		e.Errorf("Task %s does not exist", j.Task)
+	}
+
+	var env *BootEnv
+	if nbFound := bootenvs.Find(j.BootEnv); nbFound == nil {
+		e.Errorf("Bootenv %s does not exist", j.BootEnv)
+	} else {
+		env = AsBootEnv(nbFound)
+	}
+	if env != nil && !env.Available {
+		e.Errorf("Jobs %s wants BootEnv %s, which is not available", j.UUID(), j.BootEnv)
+	}
+
+	found := false
+	for _, s := range JobValidStates {
+		if s == j.State {
+			found = true
+			break
+		}
+	}
+	if !found {
+		e.Errorf("Jobs %s wants State %s, which is not valid", j.UUID(), j.State)
+	}
+
+	return e.OrNil()
+}
+
+func (j *Job) BeforeDelete() error {
+	e := &Error{Code: 422, Type: ValidationError, o: j}
+
+	if j.State != "finished" && j.State != "failed" {
+		e.Errorf("Jobs %s is not in a deletable state: %s", j.UUID(), j.State)
+	}
+
+	return e.OrNil()
+}
+
 var jobLockMap = map[string][]string{
 	"get":    []string{"jobs"},
-	"create": []string{"jobs"},
-	"update": []string{"jobs"},
-	"patch":  []string{"jobs"},
+	"create": []string{"jobs", "machines", "tasks", "bootenvs"},
+	"update": []string{"jobs", "machines", "tasks", "bootenvs"},
+	"patch":  []string{"jobs", "machines", "tasks", "bootenvs"},
 	"delete": []string{"jobs"},
 }
 

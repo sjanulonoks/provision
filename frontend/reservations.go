@@ -122,7 +122,7 @@ func (f *Frontend) InitReservationApi() {
 	f.ApiGroup.POST("/reservations",
 		func(c *gin.Context) {
 			b := f.dt.NewReservation()
-			f.Create(c, b)
+			f.Create(c, b, nil)
 		})
 
 	// swagger:route GET /reservations/{address} Reservations getReservation
@@ -172,7 +172,7 @@ func (f *Frontend) InitReservationApi() {
 						fmt.Sprintf("reservation get: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Patch(c, f.dt.NewReservation(), backend.Hexaddr(ip))
+			f.Patch(c, f.dt.NewReservation(), backend.Hexaddr(ip), nil)
 		})
 
 	// swagger:route PUT /reservations/{address} Reservations putReservation
@@ -197,7 +197,7 @@ func (f *Frontend) InitReservationApi() {
 						fmt.Sprintf("reservation put: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Update(c, f.dt.NewReservation(), backend.Hexaddr(ip))
+			f.Update(c, f.dt.NewReservation(), backend.Hexaddr(ip), nil)
 		})
 
 	// swagger:route DELETE /reservations/{address} Reservations deleteReservation
@@ -222,6 +222,6 @@ func (f *Frontend) InitReservationApi() {
 						fmt.Sprintf("reservation delete: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 		})
 }

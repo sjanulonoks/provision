@@ -125,7 +125,7 @@ func (f *Frontend) InitProfileApi() {
 	f.ApiGroup.POST("/profiles",
 		func(c *gin.Context) {
 			b := f.dt.NewProfile()
-			f.Create(c, b)
+			f.Create(c, b, nil)
 		})
 	// swagger:route GET /profiles/{name} Profiles getProfile
 	//
@@ -159,7 +159,7 @@ func (f *Frontend) InitProfileApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/profiles/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewProfile(), c.Param(`name`))
+			f.Patch(c, f.dt.NewProfile(), c.Param(`name`), nil)
 		})
 
 	// swagger:route PUT /profiles/{name} Profiles putProfile
@@ -177,7 +177,7 @@ func (f *Frontend) InitProfileApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/profiles/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewProfile(), c.Param(`name`))
+			f.Update(c, f.dt.NewProfile(), c.Param(`name`), nil)
 		})
 
 	// swagger:route DELETE /profiles/{name} Profiles deleteProfile
@@ -195,8 +195,7 @@ func (f *Frontend) InitProfileApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewProfile()
 			b.Name = c.Param(`name`)
-			f.Remove(c, b)
-
+			f.Remove(c, b, nil)
 		})
 
 	// swagger:route GET /profiles/{name}/params Profiles getProfileParams

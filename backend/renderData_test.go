@@ -76,15 +76,15 @@ func TestRenderData(t *testing.T) {
 		defer unlocker()
 
 		objs := []crudTest{
-			{"Update global profile to have test with a value", dt.Update, &Profile{Name: "global", Params: map[string]interface{}{"test": "foreal"}}, true},
-			{"create test profile to have test with a value", dt.Create, &Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true},
+			{"Update global profile to have test with a value", dt.Update, &Profile{Name: "global", Params: map[string]interface{}{"test": "foreal"}}, true, nil},
+			{"create test profile to have test with a value", dt.Create, &Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true, nil},
 
-			{"Create included template", dt.Create, &Template{p: dt, ID: "included", Contents: tmplIncluded}, true},
-			{"Create default template", dt.Create, &Template{p: dt, ID: "default", Contents: tmplDefault}, true},
-			{"Create nothing template", dt.Create, &Template{p: dt, ID: "nothing", Contents: tmplNothing}, true},
-			{"Create default bootenv", dt.Create, defaultBootEnv, true},
-			{"Create nothing bootenv", dt.Create, nothingBootEnv, true},
-			{"Create bad bootenv", dt.Create, badBootEnv, true},
+			{"Create included template", dt.Create, &Template{p: dt, ID: "included", Contents: tmplIncluded}, true, nil},
+			{"Create default template", dt.Create, &Template{p: dt, ID: "default", Contents: tmplDefault}, true, nil},
+			{"Create nothing template", dt.Create, &Template{p: dt, ID: "nothing", Contents: tmplNothing}, true, nil},
+			{"Create default bootenv", dt.Create, defaultBootEnv, true, nil},
+			{"Create nothing bootenv", dt.Create, nothingBootEnv, true, nil},
+			{"Create bad bootenv", dt.Create, badBootEnv, true, nil},
 		}
 		for _, obj := range objs {
 			obj.Test(t, d)
@@ -94,7 +94,7 @@ func TestRenderData(t *testing.T) {
 		machine.Name = "Test Name"
 		machine.Address = net.ParseIP("192.168.124.11")
 		machine.BootEnv = "default"
-		created, err := dt.Create(d, machine)
+		created, err := dt.Create(d, machine, nil)
 		if !created {
 			t.Errorf("Failed to create new test machine: %v", err)
 			return
@@ -142,7 +142,7 @@ func TestRenderData(t *testing.T) {
 		d, unlocker := dt.LockEnts("bootenvs", "templates", "machines", "profiles", "params", "tasks")
 		defer unlocker()
 		machine.BootEnv = "nothing"
-		saved, err := dt.Save(d, machine)
+		saved, err := dt.Save(d, machine, nil)
 		if !saved {
 			t.Errorf("Failed to save test machine with new bootenv: %v", err)
 		}
@@ -326,7 +326,7 @@ func TestRenderData(t *testing.T) {
 
 		// Test a machine profile parameter
 		machine.Profiles = []string{"test"}
-		saved, err := dt.Save(d, machine)
+		saved, err := dt.Save(d, machine, nil)
 		if !saved {
 			t.Errorf("Failed to save test machine with new profile list: %v", err)
 		}
