@@ -10,8 +10,9 @@ import (
 
 type Info struct {
 	Arch    string `json:"arch"`
-	OS      string `json:"os"`
+	Os      string `json:"os"`
 	Version string `json:"version"`
+	Id      string `json:"id"`
 }
 
 // InfosResponse returned on a successful GET of an info
@@ -21,7 +22,7 @@ type InfoResponse struct {
 	Body *Info
 }
 
-func (f *Frontend) InitInfoApi() {
+func (f *Frontend) InitInfoApi(drpid string) {
 	// swagger:route GET /info Info getInfo
 	//
 	// Return current system info.
@@ -42,8 +43,9 @@ func (f *Frontend) InitInfoApi() {
 
 			info := &Info{
 				Arch:    runtime.GOARCH,
-				OS:      runtime.GOOS,
+				Os:      runtime.GOOS,
 				Version: provision.RS_VERSION,
+				Id:      drpid,
 			}
 
 			c.JSON(http.StatusOK, info)
