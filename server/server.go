@@ -29,9 +29,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/digitalrebar/digitalrebar/go/common/client"
@@ -66,6 +68,7 @@ type ProgOpts struct {
 	DebugRenderer int    `long:"debug-renderer" description:"Debug level for the Template Renderer - 0 = off, 1 = info, 2 = debug" default:"0"`
 	TlsKeyFile    string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
 	TlsCertFile   string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
+	DrpId         string `long:"drp-id" description:"The id of this Digital Rebar Provision instance" default:""`
 }
 
 func mkdir(d string, logger *log.Logger) {
@@ -138,9 +141,31 @@ func Server(c_opts *ProgOpts) {
 		},
 		publishers)
 
+	// No DrpId - get a mac address
+	if c_opts.DrpId == "" {
+		intfs, err := net.Interfaces()
+		if err != nil {
+			logger.Fatalf("Error getting interfaces for DrpId: %v", err)
+		}
+
+		for _, intf := range intfs {
+			if (intf.Flags & net.FlagLoopback) == net.FlagLoopback {
+				continue
+			}
+			if (intf.Flags & net.FlagUp) != net.FlagUp {
+				continue
+			}
+			if strings.HasPrefix(intf.Name, "veth") {
+				continue
+			}
+			c_opts.DrpId = intf.HardwareAddr.String()
+			break
+		}
+	}
+
 	fe := frontend.NewFrontend(dt, logger,
 		c_opts.OurAddress, c_opts.ApiPort, c_opts.FileRoot,
-		c_opts.DevUI, nil, publishers)
+		c_opts.DevUI, nil, publishers, c_opts.DrpId)
 	publishers.Add(fe)
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {

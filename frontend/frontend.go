@@ -77,7 +77,7 @@ func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	return
 }
 
-func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers) (me *Frontend) {
+func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, port int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers, drpid string) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {
@@ -183,6 +183,7 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, po
 	me.InitInterfaceApi()
 	me.InitPrefApi()
 	me.InitParamApi()
+	me.InitInfoApi(drpid)
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("swagger.json")
