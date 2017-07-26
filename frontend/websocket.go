@@ -55,6 +55,13 @@ func (f *Frontend) Publish(e *backend.Event) error {
 	}
 }
 
+// This never gets unloaded.
+func (f *Frontend) Reserve() error {
+	return nil
+}
+func (f *Frontend) Release() {}
+func (f *Frontend) Unload()  {}
+
 func (f *Frontend) websocketHandler(s *melody.Session, msg []byte) {
 	str := strings.TrimSpace(string(msg))
 	if strings.HasPrefix(str, "register ") {

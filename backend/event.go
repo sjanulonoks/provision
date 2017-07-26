@@ -32,6 +32,9 @@ type Event struct {
 
 type Publisher interface {
 	Publish(event *Event) error
+	Reserve() error
+	Release()
+	Unload()
 }
 
 type Publishers struct {
@@ -53,14 +56,15 @@ func (p *Publishers) Add(pp Publisher) {
 
 func (p *Publishers) Remove(pp Publisher) {
 	p.lock.Lock()
-	defer p.lock.Unlock()
-
 	for i, ppp := range p.pubs {
 		if ppp == pp {
 			p.pubs = append(p.pubs[:i], p.pubs[i+1:]...)
 			break
 		}
 	}
+	p.lock.Unlock()
+
+	pp.Unload()
 }
 
 func (p *Publishers) List() []Publisher {
@@ -78,12 +82,20 @@ func (p *Publishers) List() []Publisher {
 func (p *Publishers) Publish(t, a, k string, o interface{}) error {
 	e := &Event{Time: time.Now(), Type: t, Action: a, Key: k, Object: o}
 
+	newPubs := make([]Publisher, 0, 0)
 	p.lock.Lock()
-	defer p.lock.Unlock()
 	for _, pub := range p.pubs {
+		if err := pub.Reserve(); err == nil {
+			newPubs = append(newPubs, pub)
+		}
+	}
+	p.lock.Unlock()
+
+	for _, pub := range newPubs {
 		if err := pub.Publish(e); err != nil {
 			p.logger.Printf("Failed to Publish event on %#v: %#v\n", pub, err)
 		}
+		pub.Release()
 	}
 
 	return nil
