@@ -65,7 +65,12 @@ type Machine struct {
 	Tasks []string
 	// required: true
 	CurrentTask int
-	p           *DataTracker
+	// Indicates if the machine can run jobs or not.  Failed jobs mark the machine
+	// not runnable.
+	//
+	// required: true
+	Runnable bool
+	p        *DataTracker
 
 	// used during AfterSave() and AfterRemove() to handle boot environment changes.
 	oldBootEnv string
@@ -262,6 +267,12 @@ func (n *Machine) setDT(p *DataTracker) {
 	n.p = p
 }
 
+func (n *Machine) OnCreate() error {
+	// All machines start runnable.
+	n.Runnable = true
+	return nil
+}
+
 func (n *Machine) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: n}
 	if n.Uuid == nil {
@@ -361,7 +372,11 @@ func (n *Machine) AfterSave() {
 
 		// Reset the task list, set currentTask to 0
 		n.Tasks = taskList
-		n.CurrentTask = 0
+		n.CurrentTask = -1
+		if len(taskList) == 0 {
+			// Already done.
+			n.CurrentTask = 0
+		}
 
 		// Reset this here to keep from looping forever.
 		n.oldBootEnv = n.BootEnv

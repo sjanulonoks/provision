@@ -267,7 +267,7 @@ func (f *Frontend) InitMachineApi() {
 				// If we are changing bootenvs and we aren't done running tasks,
 				// Fail unless the users marks a force
 				if oldm.BootEnv != newm.BootEnv && oldm.CurrentTask != len(oldm.Tasks) && !force {
-					e := &backend.Error{Code: 422, Type: backend.ValidationError}
+					e := &backend.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError}
 					e.Errorf("Can not change bootenvs with pending tasks unless forced")
 					return e
 				}
@@ -301,7 +301,7 @@ func (f *Frontend) InitMachineApi() {
 				// If we are changing bootenvs and we aren't done running tasks,
 				// Fail unless the users marks a force
 				if oldm.BootEnv != newm.BootEnv && oldm.CurrentTask != len(oldm.Tasks) && !force {
-					e := &backend.Error{Code: 422, Type: backend.ValidationError}
+					e := &backend.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError}
 					e.Errorf("Can not change bootenvs with pending tasks unless forced")
 					return e
 				}

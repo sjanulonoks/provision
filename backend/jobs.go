@@ -21,7 +21,7 @@ import (
 //   past the end of the Tasks list for the machine, no job is created
 //   and the API returns a 204. If the current job is in the imcomplete
 //   state, that job is returned with a 202.  Otherwise a new job is
-//   created and is returned with a 202. If there is a current job that is neither
+//   created and is returned with a 201. If there is a current job that is neither
 //   "completed", "failed", nor "finished", the POST fails.  The new job will be
 //   created with its Previous value set to the machine's CurrentJob,
 //   and the machine's CurrentJob is updated with the UUID of the new
@@ -63,15 +63,21 @@ type Job struct {
 	// The boot environment that the task was created in.
 	// read only: true
 	BootEnv string
-	// The state the job is in.  Must be one of "created", "running", "failed", or "finished"
+	// The state the job is in.  Must be one of "created", "running", "failed", "finished", "incomplete"
 	// required: true
-	State      string
-	StartTime  time.Time
-	EndTime    time.Time
-	Archived   bool
-	LogPath    string
+	State string
+	// The time the job entered running.
+	StartTime time.Time
+	// The time the job entered failed or finished.
+	EndTime time.Time
+	// ???
+	Archived bool
+	// DRP Filesystem path to the log for this job
+	LogPath string
+
 	p          *DataTracker
 	renderData *RenderData
+	oldState   string
 }
 
 func AsJob(o store.KeySaver) *Job {
@@ -292,6 +298,11 @@ var JobValidStates []string = []string{
 	"incomplete",
 }
 
+func (j *Job) OnChange(oldThing store.KeySaver) error {
+	j.oldState = AsJob(oldThing).State
+	return nil
+}
+
 func (j *Job) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: j}
 	if j.Uuid == nil {
@@ -306,8 +317,11 @@ func (j *Job) BeforeSave() error {
 	bootenvs := objs("bootenvs")
 	machines := objs("machines")
 
-	if machines.Find(j.Machine.String()) == nil {
+	var m *Machine
+	if om := machines.Find(j.Machine.String()); om == nil {
 		e.Errorf("Machine %s does not exist", j.Machine.String())
+	} else {
+		m = AsMachine(om)
 	}
 
 	if tasks.Find(j.Task) == nil {
@@ -333,6 +347,23 @@ func (j *Job) BeforeSave() error {
 	}
 	if !found {
 		e.Errorf("Jobs %s wants State %s, which is not valid", j.UUID(), j.State)
+	}
+
+	if e.OrNil() == nil {
+		if j.oldState != j.State {
+			if j.State == "running" {
+				j.StartTime = time.Now()
+			}
+			if j.State == "failed" || j.State == "finished" {
+				j.EndTime = time.Now()
+			}
+			// We are going to failed.  Mark machine as not Runnable
+			if j.State == "failed" {
+				m.Runnable = false
+				_, e2 := j.p.Save(objs, m, nil)
+				e.Merge(e2)
+			}
+		}
 	}
 
 	return e.OrNil()

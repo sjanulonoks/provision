@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/VictorLowther/jsonpatch2"
@@ -138,19 +139,25 @@ func (f *Frontend) InitJobApi() {
 	//
 	// Create a Job
 	//
-	// Create a Job from the provided object
+	// Create a Job from the provided object, Only Machine and UUID are used.
 	//
 	//     Responses:
 	//       201: JobResponse
+	//       202: JobResponse
+	//       204: NoContentResponse
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/jobs",
 		func(c *gin.Context) {
 			// We don't use f.Create() because we need to be able to assign random
 			// UUIDs to new Jobs without forcing the client to do so, yet allow them
 			// for testing purposes amd if they alrady have a UUID scheme for jobs.
+			if !assureAuth(c, f.Logger, "jobs", "create", "*") {
+				return
+			}
 			b := f.dt.NewJob()
 			if !assureDecode(c, b) {
 				return
@@ -160,10 +167,89 @@ func (f *Frontend) InitJobApi() {
 			}
 			var res store.KeySaver
 			var err error
-			func() {
+			code := func() int {
 				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("create")...)
 				defer unlocker()
+
+				// See the backend.Job comments for what is going on.
+				machines := d("machines")
+				jobs := d("jobs")
+
+				var mo store.KeySaver
+				if mo = machines.Find(b.Machine.String()); mo == nil {
+					err = &backend.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError,
+						Messages: []string{fmt.Sprintf("Machine %s does not exist", b.Machine.String())}}
+					return http.StatusUnprocessableEntity
+				}
+				m := backend.AsMachine(mo)
+
+				// Machine isn't runnable return conflict
+				if !m.Runnable {
+					err = &backend.Error{Code: http.StatusConflict, Type: "Conflict",
+						Messages: []string{fmt.Sprintf("Machine %s is not runnable", b.Machine.String())}}
+					return http.StatusConflict
+				}
+
+				// Are we running a job or not on list yet, do some checking.
+				if m.CurrentTask < len(m.Tasks) {
+					if jo := jobs.Find(m.CurrentJob.String()); jo != nil && m.CurrentTask != -1 {
+						cj := backend.AsJob(jo)
+						if cj.State == "failed" {
+							// We are re-running the current task
+						} else if cj.State == "finished" {
+							// We are running the next task
+							m.CurrentTask += 1
+						} else if cj.State == "incomplete" {
+							b = cj
+							return http.StatusAccepted
+						} else {
+							// Need to error - running job already running or just created.
+							err = &backend.Error{Code: http.StatusConflict, Type: "Conflict",
+								Messages: []string{fmt.Sprintf("Machine %s already has running or created job", b.Machine.String())}}
+							return http.StatusConflict
+						}
+					} else if jo != nil {
+						// We have an old job, but we are starting over.  Mark it failed
+						cj := backend.AsJob(jo)
+						cj.State = "failed"
+						if _, err = f.dt.Update(d, cj, nil); err != nil {
+							return http.StatusBadRequest
+						}
+
+						m.CurrentTask += 1
+
+					} else {
+						// No current job. Index to next.
+						m.CurrentTask += 1
+					}
+				}
+
+				if m.CurrentTask >= len(m.Tasks) {
+					// Nothing to do.
+					return http.StatusNoContent
+				}
+
+				// Fill in new job.
+				b.State = "created"
+				b.Previous = m.CurrentJob
+				b.BootEnv = m.BootEnv
+				b.Task = m.Tasks[m.CurrentTask]
+
+				// GREG: Setup log path
+
+				m.CurrentJob = b.Uuid
+
+				// Create the job, and then create the machine
 				_, err = f.dt.Create(d, b, nil)
+				if err == nil {
+					_, err = f.dt.Update(d, m, nil)
+					if err != nil {
+						f.dt.Remove(d, b, nil)
+					}
+				}
+
+				return http.StatusCreated
+
 			}()
 			if err != nil {
 				be, ok := err.(*backend.Error)
@@ -172,6 +258,8 @@ func (f *Frontend) InitJobApi() {
 				} else {
 					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
+			} else if code == http.StatusNoContent {
+				c.JSON(code, nil)
 			} else {
 				s, ok := store.KeySaver(b).(Sanitizable)
 				if ok {
@@ -179,7 +267,7 @@ func (f *Frontend) InitJobApi() {
 				} else {
 					res = b
 				}
-				c.JSON(http.StatusCreated, res)
+				c.JSON(code, res)
 			}
 		})
 
