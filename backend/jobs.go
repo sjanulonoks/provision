@@ -70,7 +70,7 @@ type Job struct {
 	StartTime time.Time
 	// The time the job entered failed or finished.
 	EndTime time.Time
-	// ???
+	// required: true
 	Archived bool
 	// DRP Filesystem path to the log for this job
 	LogPath string
@@ -223,7 +223,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 				avail := fix(ref).Archived
 				return func(s store.KeySaver) bool {
 						v := fix(s).Archived
-						return v || (v && avail)
+						return v || (v == avail)
 					},
 					func(s store.KeySaver) bool {
 						return fix(s).Archived && !avail
@@ -258,7 +258,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (store.KeySaver, error) {
-				parsedTime, err := time.Parse(s, time.RFC3339)
+				parsedTime, err := time.Parse(time.RFC3339, s)
 				if err != nil {
 					return nil, err
 				}
@@ -281,7 +281,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (store.KeySaver, error) {
-				parsedTime, err := time.Parse(s, time.RFC3339)
+				parsedTime, err := time.Parse(time.RFC3339, s)
 				if err != nil {
 					return nil, err
 				}
@@ -381,9 +381,9 @@ func (j *Job) BeforeDelete() error {
 
 var jobLockMap = map[string][]string{
 	"get":    []string{"jobs"},
-	"create": []string{"jobs", "machines", "tasks", "bootenvs"},
-	"update": []string{"jobs", "machines", "tasks", "bootenvs"},
-	"patch":  []string{"jobs", "machines", "tasks", "bootenvs"},
+	"create": []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
+	"update": []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
+	"patch":  []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
 	"delete": []string{"jobs"},
 }
 

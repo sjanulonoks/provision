@@ -85,6 +85,7 @@ func (n *Machine) HasTask(s string) bool {
 	return false
 }
 
+// GREG: Add Runnable index.
 func (n *Machine) Indexes() map[string]index.Maker {
 	fix := AsMachine
 	return map[string]index.Maker{

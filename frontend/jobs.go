@@ -150,6 +150,7 @@ func (f *Frontend) InitJobApi() {
 	//       403: NoContentResponse
 	//       409: ErrorResponse
 	//       422: ErrorResponse
+	//       500: ErrorResponse
 	f.ApiGroup.POST("/jobs",
 		func(c *gin.Context) {
 			// We don't use f.Create() because we need to be able to assign random
@@ -176,6 +177,7 @@ func (f *Frontend) InitJobApi() {
 				jobs := d("jobs")
 
 				var mo store.KeySaver
+				// XXX?? Should find return a live object.
 				if mo = machines.Find(b.Machine.String()); mo == nil {
 					err = &backend.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError,
 						Messages: []string{fmt.Sprintf("Machine %s does not exist", b.Machine.String())}}
@@ -191,14 +193,15 @@ func (f *Frontend) InitJobApi() {
 				}
 
 				// Are we running a job or not on list yet, do some checking.
-				if m.CurrentTask < len(m.Tasks) {
-					if jo := jobs.Find(m.CurrentJob.String()); jo != nil && m.CurrentTask != -1 {
+				newCT := m.CurrentTask
+				if newCT < len(m.Tasks) {
+					if jo := jobs.Find(m.CurrentJob.String()); jo != nil && newCT != -1 {
 						cj := backend.AsJob(jo)
 						if cj.State == "failed" {
 							// We are re-running the current task
 						} else if cj.State == "finished" {
 							// We are running the next task
-							m.CurrentTask += 1
+							newCT += 1
 						} else if cj.State == "incomplete" {
 							b = cj
 							return http.StatusAccepted
@@ -215,36 +218,46 @@ func (f *Frontend) InitJobApi() {
 						if _, err = f.dt.Update(d, cj, nil); err != nil {
 							return http.StatusBadRequest
 						}
-
-						m.CurrentTask += 1
+						newCT += 1
 
 					} else {
 						// No current job. Index to next.
-						m.CurrentTask += 1
+						newCT += 1
 					}
 				}
 
-				if m.CurrentTask >= len(m.Tasks) {
+				if newCT >= len(m.Tasks) {
 					// Nothing to do.
+					if newCT != m.CurrentTask {
+						_, err = f.dt.Update(d, m, nil)
+						if err != nil {
+							return http.StatusInternalServerError
+						}
+
+					}
 					return http.StatusNoContent
 				}
 
 				// Fill in new job.
 				b.State = "created"
-				b.Previous = m.CurrentJob
+				if m.CurrentJob == nil {
+					b.Previous = uuid.Parse("00000000-0000-0000-0000-000000000000")
+				} else {
+					b.Previous = m.CurrentJob
+				}
 				b.BootEnv = m.BootEnv
-				b.Task = m.Tasks[m.CurrentTask]
+				b.Task = m.Tasks[newCT]
 
 				// GREG: Setup log path
-
-				m.CurrentJob = b.Uuid
 
 				// Create the job, and then create the machine
 				_, err = f.dt.Create(d, b, nil)
 				if err == nil {
+					m.CurrentTask = newCT
+					m.CurrentJob = b.Uuid
 					_, err = f.dt.Update(d, m, nil)
 					if err != nil {
-						f.dt.Remove(d, b, nil)
+						_, err = f.dt.Remove(d, b, nil)
 					}
 				}
 
