@@ -132,6 +132,8 @@ type MachineListPathParameter struct {
 	BootEnv string
 	// in: query
 	Address string
+	// in: query
+	Runnable string
 }
 
 func (f *Frontend) InitMachineApi() {
@@ -150,6 +152,7 @@ func (f *Frontend) InitMachineApi() {
 	//    Name = string
 	//    BootEnv = string
 	//    Address = IP Address
+	//    Runnable = true/false
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value

@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -85,7 +86,6 @@ func (n *Machine) HasTask(s string) bool {
 	return false
 }
 
-// GREG: Add Runnable index.
 func (n *Machine) Indexes() map[string]index.Maker {
 	fix := AsMachine
 	return map[string]index.Maker{
@@ -171,6 +171,34 @@ func (n *Machine) Indexes() map[string]index.Maker {
 					return nil, fmt.Errorf("Invalid address: %s", s)
 				}
 				return &Machine{Address: addr}, nil
+			}),
+		"Runnable": index.Make(
+			false,
+			"boolean",
+			func(i, j store.KeySaver) bool {
+				return (!fix(i).Runnable) && fix(j).Runnable
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				avail := fix(ref).Runnable
+				return func(s store.KeySaver) bool {
+						v := fix(s).Runnable
+						return v || (v == avail)
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Runnable && !avail
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				res := &Machine{}
+				switch s {
+				case "true":
+					res.Runnable = true
+				case "false":
+					res.Runnable = false
+				default:
+					return nil, errors.New("Runnable must be true or false")
+				}
+				return res, nil
 			}),
 	}
 }
