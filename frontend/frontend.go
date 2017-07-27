@@ -179,7 +179,7 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, po
 	me.InitLeaseApi()
 	me.InitReservationApi()
 	me.InitSubnetApi()
-	me.InitUserApi()
+	me.InitUserApi(drpid)
 	me.InitInterfaceApi()
 	me.InitPrefApi()
 	me.InitParamApi()

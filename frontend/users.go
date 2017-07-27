@@ -35,6 +35,7 @@ type UserTokenResponse struct {
 // swagger:model
 type UserToken struct {
 	Token string
+	Info  Info
 }
 
 // swagger:model
@@ -109,7 +110,7 @@ type UserListPathParameter struct {
 	Name string
 }
 
-func (f *Frontend) InitUserApi() {
+func (f *Frontend) InitUserApi(drpid string) {
 	// swagger:route GET /users Users listUsers
 	//
 	// Lists Users filtered by some parameters.
@@ -235,7 +236,8 @@ func (f *Frontend) InitUserApi() {
 					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				c.JSON(http.StatusOK, UserToken{Token: t})
+				info := GetInfo(drpid)
+				c.JSON(http.StatusOK, UserToken{Token: t, Info: info})
 			}
 		})
 
