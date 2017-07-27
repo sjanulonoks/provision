@@ -22,6 +22,15 @@ type InfoResponse struct {
 	Body *Info
 }
 
+func GetInfo(drpid string) Info {
+	return Info{
+		Arch:    runtime.GOARCH,
+		Os:      runtime.GOOS,
+		Version: provision.RS_VERSION,
+		Id:      drpid,
+	}
+}
+
 func (f *Frontend) InitInfoApi(drpid string) {
 	// swagger:route GET /info Info getInfo
 	//
@@ -40,14 +49,7 @@ func (f *Frontend) InitInfoApi(drpid string) {
 			if !assureAuth(c, f.Logger, "info", "get", "") {
 				return
 			}
-
-			info := &Info{
-				Arch:    runtime.GOARCH,
-				Os:      runtime.GOOS,
-				Version: provision.RS_VERSION,
-				Id:      drpid,
-			}
-
-			c.JSON(http.StatusOK, info)
+			info := GetInfo(drpid)
+			c.JSON(http.StatusOK, &info)
 		})
 }
