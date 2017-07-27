@@ -73,6 +73,7 @@ type Job struct {
 	// required: true
 	Archived bool
 	// DRP Filesystem path to the log for this job
+	// read only: true
 	LogPath string
 
 	p          *DataTracker
