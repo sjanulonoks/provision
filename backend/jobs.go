@@ -3,6 +3,9 @@ package backend
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"net/http"
 	"time"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
@@ -42,7 +45,8 @@ import (
 // * If all job operations succeed, the client will update the job status to "finished"
 //
 // * On provisioner startup, all machine CurrentJobs are set to "failed" if they are not "finished"
-
+//
+// swagger:model
 type Job struct {
 	validate
 
@@ -76,9 +80,19 @@ type Job struct {
 	// read only: true
 	LogPath string
 
-	p          *DataTracker
-	renderData *RenderData
-	oldState   string
+	p        *DataTracker
+	oldState string
+}
+
+// Job Action is something that job runner will need to do.
+// If path is specified, then the runner will place the contents into that location.
+// If path is not specified, then the runner will attempt to bash exec the contents.
+// swagger:model
+type JobAction struct {
+	// required: true
+	Path string
+	// required: true
+	Content string
 }
 
 func AsJob(o store.KeySaver) *Job {
@@ -380,12 +394,70 @@ func (j *Job) BeforeDelete() error {
 	return e.OrNil()
 }
 
+func (j *Job) RenderActions() ([]*JobAction, error) {
+	renderers, addr, e := func() (renderers, net.IP, error) {
+		d, unlocker := j.p.LockEnts(j.Locks("actions")...)
+		defer unlocker()
+		machines := d("machines")
+		tasks := d("tasks")
+
+		// This should not happen, but we treat task in the job as soft.
+		var to store.KeySaver
+		if to = tasks.Find(j.Task); to == nil {
+			err := &Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
+				Messages: []string{fmt.Sprintf("Task %s does not exist", j.Task)}}
+			return nil, nil, err
+		}
+		t := AsTask(to)
+
+		// This should not happen, but we treat machine in the job as soft.
+		var mo store.KeySaver
+		if mo = machines.Find(j.Machine.String()); mo == nil {
+			err := &Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
+				Messages: []string{fmt.Sprintf("Machine %s does not exist", j.Machine.String())}}
+			return nil, nil, err
+		}
+		m := AsMachine(mo)
+
+		err := &Error{}
+		renderers := t.Render(d, m, err)
+		if err.OrNil() != nil {
+			return nil, nil, err
+		}
+
+		return renderers, m.Address, nil
+	}()
+	if e != nil {
+		return nil, e
+	}
+
+	err := &Error{}
+	actions := []*JobAction{}
+	for _, r := range renderers {
+		rr, err1 := r.write(addr)
+		if err1 != nil {
+			err.Merge(err1)
+		} else {
+			b, err2 := ioutil.ReadAll(rr)
+			if err2 != nil {
+				err.Merge(err2)
+			} else {
+				na := &JobAction{Path: r.path, Content: string(b)}
+				actions = append(actions, na)
+			}
+		}
+	}
+
+	return actions, err.OrNil()
+}
+
 var jobLockMap = map[string][]string{
-	"get":    []string{"jobs"},
-	"create": []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
-	"update": []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
-	"patch":  []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
-	"delete": []string{"jobs"},
+	"get":     []string{"jobs"},
+	"create":  []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
+	"update":  []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
+	"patch":   []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
+	"delete":  []string{"jobs"},
+	"actions": []string{"jobs", "machines", "tasks", "profiles"},
 }
 
 func (j *Job) Locks(action string) []string {

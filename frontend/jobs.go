@@ -25,6 +25,13 @@ type JobsResponse struct {
 	Body []*backend.Job
 }
 
+// JobActionsResponse return on a successful GET of a Job's actions
+// swagger:response
+type JobActionsResponse struct {
+	// in: body
+	Body []*backend.JobAction
+}
+
 // JobParamsResponse return on a successful GET of all Job's Params
 // swagger:response
 type JobParamsResponse struct {
@@ -49,7 +56,7 @@ type JobPatchBodyParameter struct {
 }
 
 // JobPathParameter used to find a Job in the path
-// swagger:parameters putJobs getJob putJob patchJob deleteJob getJobParams postJobParams
+// swagger:parameters putJobs getJob putJob patchJob deleteJob getJobParams postJobParams getJobActions
 type JobPathParameter struct {
 	// in: path
 	// required: true
@@ -354,5 +361,61 @@ func (f *Frontend) InitJobApi() {
 			b := f.dt.NewJob()
 			b.Uuid = uuid.Parse(c.Param(`uuid`))
 			f.Remove(c, b, nil)
+		})
+
+	// swagger:route GET /jobs/{uuid}/actions Jobs getJobActions
+	//
+	// Get actions for this job
+	//
+	// Get actions for the Job specified by {uuid} or return NotFound.
+	//
+	//     Responses:
+	//       200: JobActionsResponse
+	//       400: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	//       422: ErrorResponse
+	f.ApiGroup.GET("/jobs/:uuid/actions",
+		func(c *gin.Context) {
+			// We don't use f.Create() because we need to be able to assign random
+			// UUIDs to new Jobs without forcing the client to do so, yet allow them
+			// for testing purposes amd if they alrady have a UUID scheme for jobs.
+			if !assureAuth(c, f.Logger, "jobs", "actions", c.Param(`uuid`)) {
+				return
+			}
+			uuid := c.Param(`uuid`)
+			j := f.dt.NewJob()
+			bad := func() bool {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(j).(Lockable).Locks("actions")...)
+				defer unlocker()
+
+				var jo store.KeySaver
+				if jo = d("jobs").Find(uuid); jo == nil {
+					err := &backend.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
+						Messages: []string{fmt.Sprintf("Job %s does not exist", uuid)}}
+					c.JSON(err.Code, err)
+					return true
+				}
+				j = backend.AsJob(jo)
+				return false
+			}()
+			if bad {
+				return
+			}
+
+			var err error
+			actions, err := j.RenderActions()
+			if err != nil {
+				be, ok := err.(*backend.Error)
+				if ok {
+					c.JSON(be.Code, be)
+				} else {
+					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+				}
+			}
+			c.JSON(http.StatusOK, actions)
+
 		})
 }
