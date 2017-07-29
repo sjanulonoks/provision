@@ -237,6 +237,10 @@ func (n *Machine) Key() string {
 	return n.UUID()
 }
 
+func (n *Machine) AuthKey() string {
+	return n.Key()
+}
+
 func (n *Machine) HasProfile(name string) bool {
 	for _, e := range n.Profiles {
 		if e == name {

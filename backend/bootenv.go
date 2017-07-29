@@ -259,6 +259,10 @@ func (b *BootEnv) Key() string {
 	return b.Name
 }
 
+func (b *BootEnv) AuthKey() string {
+	return b.Key()
+}
+
 func (b *BootEnv) New() store.KeySaver {
 	return &BootEnv{Name: b.Name, p: b.p}
 }

@@ -208,8 +208,14 @@ func (r *RenderData) GenerateToken() string {
 		if sttl := r.p.pref("knownTokenTimeout"); sttl != "" {
 			ttl, _ = strconv.Atoi(sttl)
 		}
-		t, _ = NewClaim(r.Machine.Key(), ttl).Add("machines", "patch", r.Machine.Key()).
-			Add("machines", "get", r.Machine.Key()).Seal(r.p.tokenManager)
+		t, _ = NewClaim(r.Machine.Key(), ttl).
+			Add("machines", "patch", r.Machine.Key()).
+			Add("machines", "get", r.Machine.Key()).
+			Add("jobs", "create", r.Machine.Key()).
+			Add("jobs", "get", r.Machine.Key()).
+			Add("jobs", "patch", r.Machine.Key()).
+			Add("jobs", "actions", r.Machine.Key()).
+			Seal(r.p.tokenManager)
 	}
 	return t
 }

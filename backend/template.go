@@ -153,6 +153,10 @@ func (t *Template) Key() string {
 	return t.ID
 }
 
+func (t *Template) AuthKey() string {
+	return t.Key()
+}
+
 func (t *Template) New() store.KeySaver {
 	res := &Template{ID: t.ID, p: t.p}
 	return store.KeySaver(res)

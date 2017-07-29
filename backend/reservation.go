@@ -145,6 +145,10 @@ func (r *Reservation) Key() string {
 	return Hexaddr(r.Addr)
 }
 
+func (r *Reservation) AuthKey() string {
+	return r.Key()
+}
+
 func (r *Reservation) Backend() store.SimpleStore {
 	return r.p.getBackend(r)
 }

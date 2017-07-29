@@ -90,6 +90,8 @@ type Job struct {
 // swagger:model
 type JobAction struct {
 	// required: true
+	Name string
+	// required: true
 	Path string
 	// required: true
 	Content string
@@ -117,6 +119,10 @@ func (j *Job) Prefix() string {
 
 func (j *Job) Key() string {
 	return j.Uuid.String()
+}
+
+func (j *Job) AuthKey() string {
+	return j.Machine.String()
 }
 
 func (j *Job) New() store.KeySaver {
@@ -442,7 +448,7 @@ func (j *Job) RenderActions() ([]*JobAction, error) {
 			if err2 != nil {
 				err.Merge(err2)
 			} else {
-				na := &JobAction{Path: r.path, Content: string(b)}
+				na := &JobAction{Name: r.name, Path: r.path, Content: string(b)}
 				actions = append(actions, na)
 			}
 		}

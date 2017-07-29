@@ -1,5 +1,5 @@
 hash: a8668a7181fb926238c252f385cf5d1f98b3fc405c7c77bfc2ebd2a0c69cf255
-updated: 2017-07-16T15:32:54.837899441-05:00
+updated: 2017-07-29T10:31:46.603284063-05:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 71551cef584cae1b2e01c37e8c0e1f1160eedd6f
@@ -160,6 +160,6 @@ imports:
 - name: gopkg.in/olahol/melody.v1
   version: d521390733761fe1db13de575c253afd5c743085
 - name: gopkg.in/yaml.v2
-  version: 1be3d31502d6eabc0dd7ce5b0daab022e14a5538
+  version: 25c4ec802a7d637f88d584ab26798e94ad14c13b
   repo: https://github.com/go-yaml/yaml
 testImports: []

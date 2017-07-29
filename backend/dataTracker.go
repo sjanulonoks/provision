@@ -59,6 +59,10 @@ type followUpDeleter interface {
 	followUpDelete()
 }
 
+type AuthSaver interface {
+	AuthKey() string
+}
+
 // dtobjs is an in-memory cache of all the objects we could
 // reference. The implementation of this may need to change from
 // storing a slice of things to a more elaborate datastructure at some

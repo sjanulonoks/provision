@@ -11,6 +11,8 @@ import (
 	"github.com/pborman/uuid"
 )
 
+// NOTE: Jobs are restricted by Machine UUID
+
 // JobResponse return on a successful GET, PUT, PATCH or POST of a single Job
 // swagger:response
 type JobResponse struct {
@@ -163,11 +165,15 @@ func (f *Frontend) InitJobApi() {
 			// We don't use f.Create() because we need to be able to assign random
 			// UUIDs to new Jobs without forcing the client to do so, yet allow them
 			// for testing purposes amd if they alrady have a UUID scheme for jobs.
-			if !assureAuth(c, f.Logger, "jobs", "create", "*") {
-				return
-			}
 			b := f.dt.NewJob()
 			if !assureDecode(c, b) {
+				return
+			}
+			if b.Machine == nil {
+				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, "Create request must have Machine field"))
+				return
+			}
+			if !assureAuth(c, f.Logger, "jobs", "create", b.AuthKey()) {
 				return
 			}
 			if b.Uuid == nil || len(b.Uuid) == 0 {
@@ -279,7 +285,7 @@ func (f *Frontend) InitJobApi() {
 					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else if code == http.StatusNoContent {
-				c.JSON(code, nil)
+				c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
 			} else {
 				s, ok := store.KeySaver(b).(Sanitizable)
 				if ok {
@@ -379,12 +385,6 @@ func (f *Frontend) InitJobApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.GET("/jobs/:uuid/actions",
 		func(c *gin.Context) {
-			// We don't use f.Create() because we need to be able to assign random
-			// UUIDs to new Jobs without forcing the client to do so, yet allow them
-			// for testing purposes amd if they alrady have a UUID scheme for jobs.
-			if !assureAuth(c, f.Logger, "jobs", "actions", c.Param(`uuid`)) {
-				return
-			}
 			uuid := c.Param(`uuid`)
 			j := f.dt.NewJob()
 			bad := func() bool {
@@ -399,6 +399,10 @@ func (f *Frontend) InitJobApi() {
 					return true
 				}
 				j = backend.AsJob(jo)
+
+				if !assureAuth(c, f.Logger, "jobs", "actions", j.AuthKey()) {
+					return true
+				}
 				return false
 			}()
 			if bad {

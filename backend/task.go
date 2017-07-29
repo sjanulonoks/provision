@@ -64,6 +64,10 @@ func (t *Task) Key() string {
 	return t.Name
 }
 
+func (t *Task) AuthKey() string {
+	return t.Key()
+}
+
 func (t *Task) New() store.KeySaver {
 	res := &Task{Name: t.Name, p: t.p}
 	return store.KeySaver(res)

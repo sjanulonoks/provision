@@ -169,6 +169,10 @@ func (l *Lease) Key() string {
 	return Hexaddr(l.Addr)
 }
 
+func (l *Lease) AuthKey() string {
+	return l.Key()
+}
+
 func (l *Lease) Backend() store.SimpleStore {
 	return l.p.getBackend(l)
 }

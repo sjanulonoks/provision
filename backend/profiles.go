@@ -78,6 +78,10 @@ func (p *Profile) Key() string {
 	return p.Name
 }
 
+func (p *Profile) AuthKey() string {
+	return p.Key()
+}
+
 func (p *Profile) GetParams() map[string]interface{} {
 	m := p.Params
 	if m == nil {

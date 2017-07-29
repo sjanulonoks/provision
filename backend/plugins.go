@@ -85,6 +85,10 @@ func (n *Plugin) Key() string {
 	return n.Name
 }
 
+func (n *Plugin) AuthKey() string {
+	return n.Key()
+}
+
 func (n *Plugin) GetParams() map[string]interface{} {
 	m := n.Params
 	if m == nil {
