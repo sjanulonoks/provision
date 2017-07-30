@@ -33,6 +33,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -55,15 +56,20 @@ type ProgOpts struct {
 	DhcpPort            int    `long:"dhcp-port" description:"Port for the DHCP server to listen on" default:"67"`
 	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
 	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
-	BackEndType         string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"directory"`
-	DataRoot            string `long:"data-root" description:"Location we should store runtime information in" default:"/var/lib/dr-provision"`
 	OurAddress          string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
-	FileRoot            string `long:"file-root" description:"Root of filesystem we should manage" default:"/var/lib/tftpboot"`
-	PluginRoot          string `long:"plugin-root" description:"Directory for plugins" default:"/var/lib/dr-provision-plugins"`
-	DevUI               string `long:"dev-ui" description:"Root of UI Pages for Development"`
-	DhcpInterfaces      string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
-	DefaultBootEnv      string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"sledgehammer"`
-	UnknownBootEnv      string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
+
+	BackEndType string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"directory"`
+
+	BaseRoot   string `long:"base-root" description:"Base directory for other root dirs." default:"/var/lib/dr-provision"`
+	DataRoot   string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
+	PluginRoot string `long:"plugin-root" description:"Directory for plugins" default:"plugins"`
+	LogRoot    string `long:"log-root" description:"Directory for job logs" default:"job-logs"`
+	FileRoot   string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
+
+	DevUI          string `long:"dev-ui" description:"Root of UI Pages for Development"`
+	DhcpInterfaces string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
+	DefaultBootEnv string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"sledgehammer"`
+	UnknownBootEnv string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
 
 	DebugBootEnv  int    `long:"debug-bootenv" description:"Debug level for the BootEnv System - 0 = off, 1 = info, 2 = debug" default:"0"`
 	DebugDhcp     int    `long:"debug-dhcp" description:"Debug level for the DHCP Server - 0 = off, 1 = info, 2 = debug" default:"0"`
@@ -90,25 +96,41 @@ func Server(c_opts *ProgOpts) {
 	}
 	logger.Printf("Version: %s\n", provision.RS_VERSION)
 
+	// Make base root dir
+	mkdir(c_opts.BaseRoot, logger)
+
+	// Make other dirs as needed - adjust the dirs as well.
+	if strings.IndexRune(c_opts.FileRoot, filepath.Separator) != 0 {
+		c_opts.FileRoot = filepath.Join(c_opts.BaseRoot, c_opts.FileRoot)
+	}
+	if strings.IndexRune(c_opts.PluginRoot, filepath.Separator) != 0 {
+		c_opts.PluginRoot = filepath.Join(c_opts.BaseRoot, c_opts.PluginRoot)
+	}
+	if strings.IndexRune(c_opts.DataRoot, filepath.Separator) != 0 {
+		c_opts.DataRoot = filepath.Join(c_opts.BaseRoot, c_opts.DataRoot)
+	}
+	if strings.IndexRune(c_opts.LogRoot, filepath.Separator) != 0 {
+		c_opts.LogRoot = filepath.Join(c_opts.BaseRoot, c_opts.LogRoot)
+	}
 	mkdir(c_opts.FileRoot, logger)
+	mkdir(c_opts.PluginRoot, logger)
+	mkdir(c_opts.DataRoot, logger)
+	mkdir(c_opts.LogRoot, logger)
 
 	var backendStore store.SimpleStore
 	switch c_opts.BackEndType {
 	case "consul":
-		mkdir(c_opts.DataRoot, logger)
 		consulClient, err := client.Consul(true)
 		if err != nil {
 			logger.Fatalf("Error talking to Consul: %v", err)
 		}
 		backendStore, err = store.NewSimpleConsulStore(consulClient, c_opts.DataRoot)
 	case "directory":
-		mkdir(c_opts.DataRoot, logger)
 		backendStore, err = store.NewFileBackend(c_opts.DataRoot)
 	case "memory":
 		backendStore = store.NewSimpleMemoryStore()
 		err = nil
 	case "bolt", "local":
-		mkdir(c_opts.DataRoot, logger)
 		backendStore, err = store.NewSimpleLocalStore(c_opts.DataRoot)
 	default:
 		logger.Fatalf("Unknown storage backend type %v\n", c_opts.BackEndType)
@@ -128,6 +150,7 @@ func Server(c_opts *ProgOpts) {
 
 	dt := backend.NewDataTracker(backendStore,
 		c_opts.FileRoot,
+		c_opts.LogRoot,
 		c_opts.OurAddress,
 		c_opts.StaticPort,
 		c_opts.ApiPort,
@@ -165,7 +188,6 @@ func Server(c_opts *ProgOpts) {
 		}
 	}
 
-	mkdir(c_opts.PluginRoot, logger)
 	pc, err := plugin.InitPluginController(c_opts.PluginRoot, dt, logger, publishers, c_opts.ApiPort)
 	if err != nil {
 		logger.Fatalf("Error starting plugin service: %v", err)

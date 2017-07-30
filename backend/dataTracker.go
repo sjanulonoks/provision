@@ -91,6 +91,7 @@ type dtSetter interface {
 // a dataTracker.
 type DataTracker struct {
 	FileRoot            string
+	LogRoot             string
 	OurAddress          string
 	StaticPort, ApiPort int
 	Logger              *log.Logger
@@ -175,13 +176,14 @@ func (p *DataTracker) ApiURL(remoteIP net.IP) string {
 
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.SimpleStore,
-	fileRoot, addr string,
+	fileRoot, logRoot, addr string,
 	staticPort, apiPort int,
 	logger *log.Logger,
 	defaultPrefs map[string]string,
 	publishers *Publishers) *DataTracker {
 	res := &DataTracker{
 		FileRoot:          fileRoot,
+		LogRoot:           logRoot,
 		StaticPort:        staticPort,
 		ApiPort:           apiPort,
 		OurAddress:        addr,

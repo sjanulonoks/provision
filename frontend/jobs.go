@@ -41,6 +41,20 @@ type JobParamsResponse struct {
 	Body map[string]interface{}
 }
 
+// This is a HACK - I can't figure out how to get
+// swagger to render this a binary.  So we lie.
+// We also override this object from the server
+// directory to have a binary format which
+// turns it into a stream.
+//
+// JobLogResponse returned on a successful GET of a log
+// swagger:response
+type JobLogResponse struct {
+	// in: body
+	// format: binary
+	Body string
+}
+
 // JobBodyParameter used to inject a Job
 // swagger:parameters createJob putJob
 type JobBodyParameter struct {
@@ -57,8 +71,16 @@ type JobPatchBodyParameter struct {
 	Body jsonpatch2.Patch
 }
 
+// JobLogBodyParameter used to append to a Job log
+// swagger:parameters putJobLog
+type JobLogPutBodyParameter struct {
+	// in: body
+	// required: true
+	Body interface{}
+}
+
 // JobPathParameter used to find a Job in the path
-// swagger:parameters putJobs getJob putJob patchJob deleteJob getJobParams postJobParams getJobActions
+// swagger:parameters putJobs getJob putJob patchJob deleteJob getJobParams postJobParams getJobActions getJobLog putJobLog
 type JobPathParameter struct {
 	// in: path
 	// required: true
@@ -261,8 +283,6 @@ func (f *Frontend) InitJobApi() {
 				b.BootEnv = m.BootEnv
 				b.Task = m.Tasks[newCT]
 
-				// GREG: Setup log path
-
 				// Create the job, and then create the machine
 				_, err = f.dt.Create(d, b, nil)
 				if err == nil {
@@ -422,4 +442,100 @@ func (f *Frontend) InitJobApi() {
 			c.JSON(http.StatusOK, actions)
 
 		})
+
+	// swagger:route GET /jobs/{uuid}/log Jobs getJobLog
+	//
+	// Get the log for this job
+	//
+	// Get log for the Job specified by {uuid} or return NotFound.
+	//
+	//     Produces:
+	//       application/octet-stream
+	//       application/json
+	//
+	//     Responses:
+	//       200: JobLogResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       500: ErrorResponse
+	f.ApiGroup.GET("/jobs/:uuid/log",
+		func(c *gin.Context) {
+			uuid := c.Param(`uuid`)
+			j := f.dt.NewJob()
+			bad := func() bool {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(j).(Lockable).Locks("get")...)
+				defer unlocker()
+
+				var jo store.KeySaver
+				if jo = d("jobs").Find(uuid); jo == nil {
+					err := &backend.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
+						Messages: []string{fmt.Sprintf("Job %s does not exist", uuid)}}
+					c.JSON(err.Code, err)
+					return true
+				}
+				j = backend.AsJob(jo)
+
+				if !assureAuth(c, f.Logger, "jobs", "log", j.AuthKey()) {
+					return true
+				}
+				return false
+			}()
+			if bad {
+				return
+			}
+
+			c.Writer.Header().Set("Content-Type", "application/octet-stream")
+			c.File(j.LogPath)
+		})
+
+	// swagger:route PUT /jobs/{uuid}/log Jobs putJobLog
+	//
+	// Append the string to the end of the job's log.
+	//
+	//     Responses:
+	//       204: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       500: ErrorResponse
+	f.ApiGroup.PUT("/jobs/:uuid/log",
+		func(c *gin.Context) {
+			var s string
+			if !assureDecode(c, &s) {
+				return
+			}
+			uuid := c.Param(`uuid`)
+			j := f.dt.NewJob()
+			bad := func() bool {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(j).(Lockable).Locks("get")...)
+				defer unlocker()
+
+				var jo store.KeySaver
+				if jo = d("jobs").Find(uuid); jo == nil {
+					err := &backend.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
+						Messages: []string{fmt.Sprintf("Job %s does not exist", uuid)}}
+					c.JSON(err.Code, err)
+					return true
+				}
+				j = backend.AsJob(jo)
+
+				if !assureAuth(c, f.Logger, "jobs", "log", j.AuthKey()) {
+					return true
+				}
+				return false
+			}()
+			if bad {
+				return
+			}
+
+			if err := j.Log(s); err != nil {
+				err2 := &backend.Error{Code: http.StatusInternalServerError, Type: "Server ERROR",
+					Messages: []string{err.Error()}}
+				c.JSON(err2.Code, err2)
+			} else {
+				c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
+			}
+		})
+
 }

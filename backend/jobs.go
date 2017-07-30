@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
@@ -370,6 +372,12 @@ func (j *Job) BeforeSave() error {
 		e.Errorf("Jobs %s wants State %s, which is not valid", j.UUID(), j.State)
 	}
 
+	if j.LogPath == "" {
+		j.LogPath = filepath.Join(j.p.LogRoot, j.Uuid.String())
+		ee := j.Log(fmt.Sprintf("Log for Job: %s\n", j.Uuid.String()))
+		e.Merge(ee)
+	}
+
 	if e.OrNil() == nil {
 		if j.oldState != j.State {
 			if j.State == "running" {
@@ -455,6 +463,22 @@ func (j *Job) RenderActions() ([]*JobAction, error) {
 	}
 
 	return actions, err.OrNil()
+}
+
+func (j *Job) Log(text string) error {
+	f, err := os.OpenFile(j.LogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		fmt.Printf("Umm err: %v\n", err)
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(text)
+	if err != nil {
+		fmt.Printf("Umm write err: %v\n", err)
+		return err
+	}
+	return nil
 }
 
 var jobLockMap = map[string][]string{

@@ -5,6 +5,17 @@ securityDefinitions:
     type: apiKey
     name: Authorization
     in: header
+responses:
+  FileResponse:
+    description: FileResponse returned on a successful GET of a file
+    schema:
+      type: string
+      format: binary
+  JobLogResponse:
+    description: JobLogResponse returned on a successful GET of a log
+    schema:
+      type: string
+      format: binary
 tags:
   - name: BootEnvs
   - name: Templates

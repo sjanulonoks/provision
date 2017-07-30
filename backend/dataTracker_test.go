@@ -76,6 +76,7 @@ func mkDT(bs store.SimpleStore) *DataTracker {
 	logger := log.New(os.Stdout, "dt", 0)
 	dt := NewDataTracker(bs,
 		tmpDir,
+		tmpDir,
 		"127.0.0.1",
 		8091,
 		8092,
