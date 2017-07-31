@@ -56,6 +56,8 @@ type MachineActionPostResponse struct {
 // MachineBodyParameter used to inject a Machine
 // swagger:parameters createMachine putMachine
 type MachineBodyParameter struct {
+	// in: query
+	Force string `json:"force"`
 	// in: body
 	// required: true
 	Body *backend.Machine
@@ -64,6 +66,8 @@ type MachineBodyParameter struct {
 // MachinePatchBodyParameter used to patch a Machine
 // swagger:parameters patchMachine
 type MachinePatchBodyParameter struct {
+	// in: query
+	Force string `json:"force"`
 	// in: body
 	// required: true
 	Body jsonpatch2.Patch
@@ -128,6 +132,8 @@ type MachineListPathParameter struct {
 	BootEnv string
 	// in: query
 	Address string
+	// in: query
+	Runnable string
 }
 
 func (f *Frontend) InitMachineApi() {
@@ -146,6 +152,7 @@ func (f *Frontend) InitMachineApi() {
 	//    Name = string
 	//    BootEnv = string
 	//    Address = IP Address
+	//    Runnable = true/false
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value
@@ -200,7 +207,7 @@ func (f *Frontend) InitMachineApi() {
 			func() {
 				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("create")...)
 				defer unlocker()
-				_, err = f.dt.Create(d, b)
+				_, err = f.dt.Create(d, b, nil)
 			}()
 			if err != nil {
 				be, ok := err.(*backend.Error)
@@ -252,7 +259,23 @@ func (f *Frontend) InitMachineApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/machines/:uuid",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewMachine(), c.Param(`uuid`))
+			force := false
+			if c.Query("force") == "true" {
+				force = true
+			}
+			f.Patch(c, f.dt.NewMachine(), c.Param(`uuid`), func(d backend.Stores, old, new store.KeySaver) error {
+				oldm := backend.AsMachine(old)
+				newm := backend.AsMachine(new)
+
+				// If we are changing bootenvs and we aren't done running tasks,
+				// Fail unless the users marks a force
+				if oldm.BootEnv != newm.BootEnv && oldm.CurrentTask != len(oldm.Tasks) && !force {
+					e := &backend.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError}
+					e.Errorf("Can not change bootenvs with pending tasks unless forced")
+					return e
+				}
+				return nil
+			})
 		})
 
 	// swagger:route PUT /machines/{uuid} Machines putMachine
@@ -270,7 +293,23 @@ func (f *Frontend) InitMachineApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/machines/:uuid",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewMachine(), c.Param(`uuid`))
+			force := false
+			if c.Query("force") == "true" {
+				force = true
+			}
+			f.Update(c, f.dt.NewMachine(), c.Param(`uuid`), func(d backend.Stores, old, new store.KeySaver) error {
+				oldm := backend.AsMachine(old)
+				newm := backend.AsMachine(new)
+
+				// If we are changing bootenvs and we aren't done running tasks,
+				// Fail unless the users marks a force
+				if oldm.BootEnv != newm.BootEnv && oldm.CurrentTask != len(oldm.Tasks) && !force {
+					e := &backend.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError}
+					e.Errorf("Can not change bootenvs with pending tasks unless forced")
+					return e
+				}
+				return nil
+			})
 		})
 
 	// swagger:route DELETE /machines/{uuid} Machines deleteMachine
@@ -288,7 +327,7 @@ func (f *Frontend) InitMachineApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewMachine()
 			b.Uuid = uuid.Parse(c.Param(`uuid`))
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 		})
 
 	// swagger:route GET /machines/{uuid}/params Machines getMachineParams

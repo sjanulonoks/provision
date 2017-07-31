@@ -52,6 +52,10 @@ func (u *User) Key() string {
 	return u.Name
 }
 
+func (u *User) AuthKey() string {
+	return u.Key()
+}
+
 func (u *User) Backend() store.SimpleStore {
 	return u.p.getBackend(u)
 }
@@ -96,7 +100,7 @@ func (u *User) ChangePassword(d Stores, newPass string) error {
 	}
 	u.PasswordHash = ph
 	if u.p != nil {
-		_, err = u.p.Save(d, u)
+		_, err = u.p.Save(d, u, nil)
 	}
 	return err
 }

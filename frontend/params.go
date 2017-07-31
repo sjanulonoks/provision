@@ -122,7 +122,7 @@ func (f *Frontend) InitParamApi() {
 	f.ApiGroup.POST("/params",
 		func(c *gin.Context) {
 			b := f.dt.NewParam()
-			f.Create(c, b)
+			f.Create(c, b, nil)
 		})
 	// swagger:route GET /params/{name} Params getParam
 	//
@@ -156,7 +156,7 @@ func (f *Frontend) InitParamApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/params/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewParam(), c.Param(`name`))
+			f.Patch(c, f.dt.NewParam(), c.Param(`name`), nil)
 		})
 
 	// swagger:route PUT /params/{name} Params putParam
@@ -174,7 +174,7 @@ func (f *Frontend) InitParamApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/params/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewParam(), c.Param(`name`))
+			f.Update(c, f.dt.NewParam(), c.Param(`name`), nil)
 		})
 
 	// swagger:route DELETE /params/{name} Params deleteParam
@@ -192,7 +192,7 @@ func (f *Frontend) InitParamApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewParam()
 			b.Name = c.Param(`name`)
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 
 		})
 

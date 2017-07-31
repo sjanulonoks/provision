@@ -59,6 +59,10 @@ type followUpDeleter interface {
 	followUpDelete()
 }
 
+type AuthSaver interface {
+	AuthKey() string
+}
+
 // dtobjs is an in-memory cache of all the objects we could
 // reference. The implementation of this may need to change from
 // storing a slice of things to a more elaborate datastructure at some
@@ -71,6 +75,8 @@ type Store struct {
 	index.Index
 	backingStore store.SimpleStore
 }
+
+type ObjectValidator func(Stores, store.KeySaver, store.KeySaver) error
 
 func (s *Store) getBackend(obj store.KeySaver) store.SimpleStore {
 	return s.backingStore
@@ -85,6 +91,7 @@ type dtSetter interface {
 // a dataTracker.
 type DataTracker struct {
 	FileRoot            string
+	LogRoot             string
 	OurAddress          string
 	StaticPort, ApiPort int
 	Logger              *log.Logger
@@ -169,13 +176,14 @@ func (p *DataTracker) ApiURL(remoteIP net.IP) string {
 
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.SimpleStore,
-	fileRoot, addr string,
+	fileRoot, logRoot, addr string,
 	staticPort, apiPort int,
 	logger *log.Logger,
 	defaultPrefs map[string]string,
 	publishers *Publishers) *DataTracker {
 	res := &DataTracker{
 		FileRoot:          fileRoot,
+		LogRoot:           logRoot,
 		StaticPort:        staticPort,
 		ApiPort:           apiPort,
 		OurAddress:        addr,
@@ -236,7 +244,7 @@ func NewDataTracker(backend store.SimpleStore,
 	d, unlocker := res.LockEnts("bootenvs", "preferences", "users", "machines", "profiles", "params")
 	defer unlocker()
 	if d("bootenvs").Find(ignoreBoot.Key()) == nil {
-		res.Create(d, ignoreBoot)
+		res.Create(d, ignoreBoot, nil)
 	}
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)
@@ -245,7 +253,7 @@ func NewDataTracker(backend store.SimpleStore,
 	if d("preferences").Find(res.GlobalProfileName) == nil {
 		gp := AsProfile(res.NewProfile())
 		gp.Name = "global"
-		res.Create(d, gp)
+		res.Create(d, gp, nil)
 	}
 	users := d("users")
 	if users.Count() == 0 {
@@ -254,7 +262,7 @@ func NewDataTracker(backend store.SimpleStore,
 		if err := user.ChangePassword(d, "r0cketsk8ts"); err != nil {
 			logger.Fatalf("Failed to create rocketskates user: %v", err)
 		}
-		res.Create(d, user)
+		res.Create(d, user, nil)
 	}
 	res.defaultBootEnv = defaultPrefs["defaultBootEnv"]
 	machines := d("machines")
@@ -325,7 +333,7 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 		p.prefMux.Lock()
 		defer p.prefMux.Unlock()
 		pref := &Pref{p: p, Name: name, Val: val}
-		if _, saveErr := p.Save(d, pref); saveErr != nil {
+		if _, saveErr := p.Save(d, pref, nil); saveErr != nil {
 			err.Errorf("%s: Failed to save %s: %v", name, val, saveErr)
 			return false
 		}
@@ -438,7 +446,7 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 	return res
 }
 
-func (p *DataTracker) Create(d Stores, ref store.KeySaver) (saved bool, err error) {
+func (p *DataTracker) Create(d Stores, ref store.KeySaver, ov ObjectValidator) (saved bool, err error) {
 	p.setDT(ref)
 	prefix := ref.Prefix()
 	key := ref.Key()
@@ -449,6 +457,11 @@ func (p *DataTracker) Create(d Stores, ref store.KeySaver) (saved bool, err erro
 		return false, fmt.Errorf("dataTracker create %s: %s already exists", prefix, key)
 	}
 	ref.(validator).setStores(d)
+	if ov != nil {
+		if err := ov(d, nil, ref); err != nil {
+			return false, err
+		}
+	}
 	saved, err = store.Create(ref)
 	if saved {
 		ref.(validator).clearStores()
@@ -460,7 +473,7 @@ func (p *DataTracker) Create(d Stores, ref store.KeySaver) (saved bool, err erro
 	return saved, err
 }
 
-func (p *DataTracker) Remove(d Stores, ref store.KeySaver) (removed bool, err error) {
+func (p *DataTracker) Remove(d Stores, ref store.KeySaver, ov ObjectValidator) (removed bool, err error) {
 	prefix := ref.Prefix()
 	key := ref.Key()
 	item := d(prefix).Find(key)
@@ -474,6 +487,11 @@ func (p *DataTracker) Remove(d Stores, ref store.KeySaver) (removed bool, err er
 		return false, err
 	}
 	item.(validator).setStores(d)
+	if ov != nil {
+		if err := ov(d, item, nil); err != nil {
+			return false, err
+		}
+	}
 	removed, err = store.Remove(item)
 	if removed {
 		d(prefix).Remove(item)
@@ -482,7 +500,7 @@ func (p *DataTracker) Remove(d Stores, ref store.KeySaver) (removed bool, err er
 	return removed, err
 }
 
-func (p *DataTracker) Patch(d Stores, ref store.KeySaver, key string, patch jsonpatch2.Patch) (store.KeySaver, error) {
+func (p *DataTracker) Patch(d Stores, ref store.KeySaver, key string, patch jsonpatch2.Patch, ov ObjectValidator) (store.KeySaver, error) {
 	prefix := ref.Prefix()
 	target := d(prefix).Find(key)
 	if target == nil {
@@ -513,6 +531,13 @@ func (p *DataTracker) Patch(d Stores, ref store.KeySaver, key string, patch json
 	if err := json.Unmarshal(resBuf, &toSave); err != nil {
 		return nil, err
 	}
+
+	if ov != nil {
+		if err := ov(d, target, toSave); err != nil {
+			return nil, err
+		}
+	}
+
 	p.setDT(toSave)
 	toSave.(validator).setStores(d)
 	saved, err := store.Update(toSave)
@@ -521,14 +546,14 @@ func (p *DataTracker) Patch(d Stores, ref store.KeySaver, key string, patch json
 		return toSave, err
 	}
 	d(prefix).Add(toSave)
-	p.publishers.Publish(prefix, "update", key, ref)
+	p.publishers.Publish(prefix, "update", key, toSave)
 	return toSave, nil
 }
 
-func (p *DataTracker) Update(d Stores, ref store.KeySaver) (saved bool, err error) {
+func (p *DataTracker) Update(d Stores, ref store.KeySaver, ov ObjectValidator) (saved bool, err error) {
 	prefix := ref.Prefix()
 	key := ref.Key()
-	if d(prefix).Find(key) == nil {
+	if target := d(prefix).Find(key); target == nil {
 		err := &Error{
 			Code:  http.StatusNotFound,
 			Key:   key,
@@ -536,7 +561,14 @@ func (p *DataTracker) Update(d Stores, ref store.KeySaver) (saved bool, err erro
 		}
 		err.Errorf("%s: PUT %s: Not Found", err.Model, err.Key)
 		return false, err
+	} else {
+		if ov != nil {
+			if err := ov(d, target, ref); err != nil {
+				return false, err
+			}
+		}
 	}
+
 	p.setDT(ref)
 	ref.(validator).setStores(d)
 	saved, err = store.Update(ref)
@@ -548,9 +580,21 @@ func (p *DataTracker) Update(d Stores, ref store.KeySaver) (saved bool, err erro
 	return saved, err
 }
 
-func (p *DataTracker) Save(d Stores, ref store.KeySaver) (saved bool, err error) {
+func (p *DataTracker) Save(d Stores, ref store.KeySaver, ov ObjectValidator) (saved bool, err error) {
 	p.setDT(ref)
 	ref.(validator).setStores(d)
+	if ov != nil {
+		prefix := ref.Prefix()
+		key := ref.Key()
+		target := d(prefix).Find(key)
+
+		// Skip target compare if it doesn't exist already. Shouldn't happen.
+		if target != nil {
+			if err := ov(d, target, ref); err != nil {
+				return false, err
+			}
+		}
+	}
 	saved, err = store.Save(ref)
 	ref.(validator).clearStores()
 	if saved {

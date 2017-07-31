@@ -53,22 +53,22 @@ func TestMachineCrud(t *testing.T) {
 	defer unlocker()
 	okUUID := uuid.NewRandom()
 	tests := []crudTest{
-		{"Create known-good Template", dt.Create, &Template{p: dt, ID: "default"}, true},
-		{"Create known-good Bootenv", dt.Create, &BootEnv{p: dt, Name: "default", Templates: []TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "default"}}}, true},
-		{"Create known-unavailable Bootenv", dt.Create, &BootEnv{p: dt, Name: "unavailable"}, true},
-		{"Create empty machine", dt.Create, &Machine{p: dt}, false},
-		{"Create unnamed machine", dt.Create, &Machine{p: dt, Uuid: okUUID}, false},
-		{"Create named machine", dt.Create, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn"}, true},
-		{"Create new machine with same UUID", dt.Create, &Machine{p: dt, Uuid: okUUID, Name: "other.fqdn"}, false},
-		{"Create new machine with same name", dt.Create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "default.fqdn"}, false},
-		{"Create new machine with invalid bootenv", dt.Create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "badenv.fqdn", BootEnv: "blargh"}, false},
-		{"Create new machine with bad address", dt.Create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "badaddr.fqdn", BootEnv: "default", Address: net.ParseIP("127.0.0.1")}, false},
-		{"Create another known-good bootenv", dt.Create, &BootEnv{p: dt, Name: "new", Templates: []TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "default"}}}, true},
-		{"Update node with different bootenv", dt.Update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "new"}, true},
-		{"Update node with different bootenv", dt.Update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "unavailable"}, false},
-		{"Remove machine that does not exist", dt.Remove, &Machine{p: dt, Uuid: uuid.NewRandom()}, false},
-		{"Remove machine that does exist", dt.Remove, &Machine{p: dt, Uuid: okUUID, BootEnv: "new"}, true},
-		{"Create named machine for patch", dt.Create, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn"}, true},
+		{"Create known-good Template", dt.Create, &Template{p: dt, ID: "default"}, true, nil},
+		{"Create known-good Bootenv", dt.Create, &BootEnv{p: dt, Name: "default", Templates: []TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "default"}}}, true, nil},
+		{"Create known-unavailable Bootenv", dt.Create, &BootEnv{p: dt, Name: "unavailable"}, true, nil},
+		{"Create empty machine", dt.Create, &Machine{p: dt}, false, nil},
+		{"Create unnamed machine", dt.Create, &Machine{p: dt, Uuid: okUUID}, false, nil},
+		{"Create named machine", dt.Create, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn"}, true, nil},
+		{"Create new machine with same UUID", dt.Create, &Machine{p: dt, Uuid: okUUID, Name: "other.fqdn"}, false, nil},
+		{"Create new machine with same name", dt.Create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "default.fqdn"}, false, nil},
+		{"Create new machine with invalid bootenv", dt.Create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "badenv.fqdn", BootEnv: "blargh"}, false, nil},
+		{"Create new machine with bad address", dt.Create, &Machine{p: dt, Uuid: uuid.NewRandom(), Name: "badaddr.fqdn", BootEnv: "default", Address: net.ParseIP("127.0.0.1")}, false, nil},
+		{"Create another known-good bootenv", dt.Create, &BootEnv{p: dt, Name: "new", Templates: []TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "default"}}}, true, nil},
+		{"Update node with different bootenv", dt.Update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "new"}, true, nil},
+		{"Update node with different bootenv", dt.Update, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn", BootEnv: "unavailable"}, false, nil},
+		{"Remove machine that does not exist", dt.Remove, &Machine{p: dt, Uuid: uuid.NewRandom()}, false, nil},
+		{"Remove machine that does exist", dt.Remove, &Machine{p: dt, Uuid: okUUID, BootEnv: "new"}, true, nil},
+		{"Create named machine for patch", dt.Create, &Machine{p: dt, Uuid: okUUID, Name: "default.fqdn"}, true, nil},
 	}
 	for _, test := range tests {
 		test.Test(t, d)

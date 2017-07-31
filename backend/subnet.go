@@ -359,6 +359,10 @@ func (s *Subnet) Key() string {
 	return s.Name
 }
 
+func (s *Subnet) AuthKey() string {
+	return s.Key()
+}
+
 func (s *Subnet) Backend() store.SimpleStore {
 	return s.p.getBackend(s)
 }

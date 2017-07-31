@@ -263,7 +263,7 @@ case $1 in
                      fi
                  fi
 
-                 echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar &"
+                 echo "sudo ./dr-provision $IPADDR --base-root=`pwd`/drp-data &"
                  echo
                  echo "# Once dr-provision is started, this commmand will gather and upload the tools required to"
                  echo "# do discovery-based machine management"

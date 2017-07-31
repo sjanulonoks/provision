@@ -3,6 +3,11 @@ package backend
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/digitalrebar/digitalrebar/go/common/store"
@@ -19,10 +24,11 @@ import (
 //   CurrentTask. If the current job is "finished", the machine
 //   CurrentTask is incremented.  If that causes CurrentTask to go
 //   past the end of the Tasks list for the machine, no job is created
-//   and the API returns a 204, otherwise a new job is created and is
-//   returned with a 202. If there is a current job that is neither
-//   "failed" nor "finished", the POST fails.  The new job will be
-//   created with its Previos value set to the machine's CurrentJob,
+//   and the API returns a 204. If the current job is in the imcomplete
+//   state, that job is returned with a 202.  Otherwise a new job is
+//   created and is returned with a 201. If there is a current job that is neither
+//   "completed", "failed", nor "finished", the POST fails.  The new job will be
+//   created with its Previous value set to the machine's CurrentJob,
 //   and the machine's CurrentJob is updated with the UUID of the new
 //   job.
 //
@@ -41,8 +47,11 @@ import (
 // * If all job operations succeed, the client will update the job status to "finished"
 //
 // * On provisioner startup, all machine CurrentJobs are set to "failed" if they are not "finished"
-
+//
+// swagger:model
 type Job struct {
+	validate
+
 	// The UUID of the job.  The primary key.
 	// required: true
 	// swagger:strfmt uuid
@@ -60,15 +69,34 @@ type Job struct {
 	// The boot environment that the task was created in.
 	// read only: true
 	BootEnv string
-	// The state the job is in.  Must be one of "created", "running", "failed", or "finished"
+	// The state the job is in.  Must be one of "created", "running", "failed", "finished", "incomplete"
 	// required: true
-	State      string
-	StartTime  time.Time
-	EndTime    time.Time
-	Archived   bool
-	LogPath    string
-	p          *DataTracker
-	renderData *RenderData
+	State string
+	// The time the job entered running.
+	StartTime time.Time
+	// The time the job entered failed or finished.
+	EndTime time.Time
+	// required: true
+	Archived bool
+	// DRP Filesystem path to the log for this job
+	// read only: true
+	LogPath string
+
+	p        *DataTracker
+	oldState string
+}
+
+// Job Action is something that job runner will need to do.
+// If path is specified, then the runner will place the contents into that location.
+// If path is not specified, then the runner will attempt to bash exec the contents.
+// swagger:model
+type JobAction struct {
+	// required: true
+	Name string
+	// required: true
+	Path string
+	// required: true
+	Content string
 }
 
 func AsJob(o store.KeySaver) *Job {
@@ -95,6 +123,10 @@ func (j *Job) Key() string {
 	return j.Uuid.String()
 }
 
+func (j *Job) AuthKey() string {
+	return j.Machine.String()
+}
+
 func (j *Job) New() store.KeySaver {
 	res := &Job{p: j.p}
 	return store.KeySaver(res)
@@ -106,6 +138,10 @@ func (d *DataTracker) NewJob() *Job {
 
 func (j *Job) setDT(dp *DataTracker) {
 	j.p = dp
+}
+
+func (j *Job) UUID() string {
+	return j.Uuid.String()
 }
 
 func (j *Job) Indexes() map[string]index.Maker {
@@ -210,7 +246,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 				avail := fix(ref).Archived
 				return func(s store.KeySaver) bool {
 						v := fix(s).Archived
-						return v || (v && avail)
+						return v || (v == avail)
 					},
 					func(s store.KeySaver) bool {
 						return fix(s).Archived && !avail
@@ -245,7 +281,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (store.KeySaver, error) {
-				parsedTime, err := time.Parse(s, time.RFC3339)
+				parsedTime, err := time.Parse(time.RFC3339, s)
 				if err != nil {
 					return nil, err
 				}
@@ -268,7 +304,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (store.KeySaver, error) {
-				parsedTime, err := time.Parse(s, time.RFC3339)
+				parsedTime, err := time.Parse(time.RFC3339, s)
 				if err != nil {
 					return nil, err
 				}
@@ -277,12 +313,181 @@ func (j *Job) Indexes() map[string]index.Maker {
 	}
 }
 
+var JobValidStates []string = []string{
+	"created",
+	"running",
+	"failed",
+	"finished",
+	"incomplete",
+}
+
+func (j *Job) OnChange(oldThing store.KeySaver) error {
+	j.oldState = AsJob(oldThing).State
+	return nil
+}
+
+func (j *Job) BeforeSave() error {
+	e := &Error{Code: 422, Type: ValidationError, o: j}
+	if j.Uuid == nil {
+		e.Errorf("Job %#v was not assigned a uuid!", j)
+	}
+	if j.Previous == nil {
+		e.Errorf("Job %s does not have a Previous job", j.UUID())
+	}
+
+	objs := j.stores
+	tasks := objs("tasks")
+	bootenvs := objs("bootenvs")
+	machines := objs("machines")
+
+	var m *Machine
+	if om := machines.Find(j.Machine.String()); om == nil {
+		e.Errorf("Machine %s does not exist", j.Machine.String())
+	} else {
+		m = AsMachine(om)
+	}
+
+	if tasks.Find(j.Task) == nil {
+		e.Errorf("Task %s does not exist", j.Task)
+	}
+
+	var env *BootEnv
+	if nbFound := bootenvs.Find(j.BootEnv); nbFound == nil {
+		e.Errorf("Bootenv %s does not exist", j.BootEnv)
+	} else {
+		env = AsBootEnv(nbFound)
+	}
+	if env != nil && !env.Available {
+		e.Errorf("Jobs %s wants BootEnv %s, which is not available", j.UUID(), j.BootEnv)
+	}
+
+	found := false
+	for _, s := range JobValidStates {
+		if s == j.State {
+			found = true
+			break
+		}
+	}
+	if !found {
+		e.Errorf("Jobs %s wants State %s, which is not valid", j.UUID(), j.State)
+	}
+
+	if j.LogPath == "" {
+		j.LogPath = filepath.Join(j.p.LogRoot, j.Uuid.String())
+		ee := j.Log(fmt.Sprintf("Log for Job: %s\n", j.Uuid.String()))
+		e.Merge(ee)
+	}
+
+	if e.OrNil() == nil {
+		if j.oldState != j.State {
+			if j.State == "running" {
+				j.StartTime = time.Now()
+			}
+			if j.State == "failed" || j.State == "finished" {
+				j.EndTime = time.Now()
+			}
+			// We are going to failed.  Mark machine as not Runnable
+			if j.State == "failed" {
+				m.Runnable = false
+				_, e2 := j.p.Save(objs, m, nil)
+				e.Merge(e2)
+			}
+		}
+	}
+
+	return e.OrNil()
+}
+
+func (j *Job) BeforeDelete() error {
+	e := &Error{Code: 422, Type: ValidationError, o: j}
+
+	if j.State != "finished" && j.State != "failed" {
+		e.Errorf("Jobs %s is not in a deletable state: %s", j.UUID(), j.State)
+	}
+
+	return e.OrNil()
+}
+
+func (j *Job) RenderActions() ([]*JobAction, error) {
+	renderers, addr, e := func() (renderers, net.IP, error) {
+		d, unlocker := j.p.LockEnts(j.Locks("actions")...)
+		defer unlocker()
+		machines := d("machines")
+		tasks := d("tasks")
+
+		// This should not happen, but we treat task in the job as soft.
+		var to store.KeySaver
+		if to = tasks.Find(j.Task); to == nil {
+			err := &Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
+				Messages: []string{fmt.Sprintf("Task %s does not exist", j.Task)}}
+			return nil, nil, err
+		}
+		t := AsTask(to)
+
+		// This should not happen, but we treat machine in the job as soft.
+		var mo store.KeySaver
+		if mo = machines.Find(j.Machine.String()); mo == nil {
+			err := &Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
+				Messages: []string{fmt.Sprintf("Machine %s does not exist", j.Machine.String())}}
+			return nil, nil, err
+		}
+		m := AsMachine(mo)
+
+		err := &Error{}
+		renderers := t.Render(d, m, err)
+		if err.OrNil() != nil {
+			return nil, nil, err
+		}
+
+		return renderers, m.Address, nil
+	}()
+	if e != nil {
+		return nil, e
+	}
+
+	err := &Error{}
+	actions := []*JobAction{}
+	for _, r := range renderers {
+		rr, err1 := r.write(addr)
+		if err1 != nil {
+			err.Merge(err1)
+		} else {
+			b, err2 := ioutil.ReadAll(rr)
+			if err2 != nil {
+				err.Merge(err2)
+			} else {
+				na := &JobAction{Name: r.name, Path: r.path, Content: string(b)}
+				actions = append(actions, na)
+			}
+		}
+	}
+
+	return actions, err.OrNil()
+}
+
+func (j *Job) Log(text string) error {
+	f, err := os.OpenFile(j.LogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		fmt.Printf("Umm err: %v\n", err)
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(text)
+	if err != nil {
+		fmt.Printf("Umm write err: %v\n", err)
+		return err
+	}
+	return nil
+}
+
 var jobLockMap = map[string][]string{
-	"get":    []string{"jobs"},
-	"create": []string{"jobs"},
-	"update": []string{"jobs"},
-	"patch":  []string{"jobs"},
-	"delete": []string{"jobs"},
+	"get":     []string{"jobs"},
+	"create":  []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
+	"update":  []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
+	"patch":   []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
+	"delete":  []string{"jobs"},
+	"actions": []string{"jobs", "machines", "tasks", "profiles"},
 }
 
 func (j *Job) Locks(action string) []string {

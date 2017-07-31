@@ -122,7 +122,7 @@ func (f *Frontend) InitLeaseApi() {
 	f.ApiGroup.POST("/leases",
 		func(c *gin.Context) {
 			b := f.dt.NewLease()
-			f.Create(c, b)
+			f.Create(c, b, nil)
 		})
 	// swagger:route GET /leases/{address} Leases getLease
 	//
@@ -171,7 +171,7 @@ func (f *Frontend) InitLeaseApi() {
 						fmt.Sprintf("lease get: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Patch(c, f.dt.NewLease(), backend.Hexaddr(ip))
+			f.Patch(c, f.dt.NewLease(), backend.Hexaddr(ip), nil)
 		})
 
 	// swagger:route PUT /leases/{address} Leases putLease
@@ -196,7 +196,7 @@ func (f *Frontend) InitLeaseApi() {
 						fmt.Sprintf("lease put: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Update(c, f.dt.NewLease(), backend.Hexaddr(ip))
+			f.Update(c, f.dt.NewLease(), backend.Hexaddr(ip), nil)
 		})
 
 	// swagger:route DELETE /leases/{address} Leases deleteLease
@@ -221,6 +221,6 @@ func (f *Frontend) InitLeaseApi() {
 						fmt.Sprintf("lease delete: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 		})
 }

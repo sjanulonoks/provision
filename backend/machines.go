@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -62,9 +63,15 @@ type Machine struct {
 	// fields not used
 	Profile Profile
 	// The tasks this machine has to run.
-	Tasks       []string
+	Tasks []string
+	// required: true
 	CurrentTask int
-	p           *DataTracker
+	// Indicates if the machine can run jobs or not.  Failed jobs mark the machine
+	// not runnable.
+	//
+	// required: true
+	Runnable bool
+	p        *DataTracker
 
 	// used during AfterSave() and AfterRemove() to handle boot environment changes.
 	oldBootEnv string
@@ -165,6 +172,34 @@ func (n *Machine) Indexes() map[string]index.Maker {
 				}
 				return &Machine{Address: addr}, nil
 			}),
+		"Runnable": index.Make(
+			false,
+			"boolean",
+			func(i, j store.KeySaver) bool {
+				return (!fix(i).Runnable) && fix(j).Runnable
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				avail := fix(ref).Runnable
+				return func(s store.KeySaver) bool {
+						v := fix(s).Runnable
+						return v || (v == avail)
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Runnable && !avail
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				res := &Machine{}
+				switch s {
+				case "true":
+					res.Runnable = true
+				case "false":
+					res.Runnable = false
+				default:
+					return nil, errors.New("Runnable must be true or false")
+				}
+				return res, nil
+			}),
 	}
 }
 
@@ -202,6 +237,10 @@ func (n *Machine) Key() string {
 	return n.UUID()
 }
 
+func (n *Machine) AuthKey() string {
+	return n.Key()
+}
+
 func (n *Machine) HasProfile(name string) bool {
 	for _, e := range n.Profiles {
 		if e == name {
@@ -230,7 +269,7 @@ func (n *Machine) GetParams() map[string]interface{} {
 func (n *Machine) SetParams(d Stores, values map[string]interface{}) error {
 	n.Profile.Params = values
 	e := &Error{Code: 422, Type: ValidationError, o: n}
-	_, e2 := n.p.Save(d, n)
+	_, e2 := n.p.Save(d, n, nil)
 	e.Merge(e2)
 	return e.OrNil()
 }
@@ -253,12 +292,18 @@ func (n *Machine) GetParam(d Stores, key string, searchProfiles bool) (interface
 }
 
 func (n *Machine) New() store.KeySaver {
-	res := &Machine{Name: n.Name, Uuid: n.Uuid, p: n.p}
+	res := &Machine{Name: n.Name, Uuid: n.Uuid, p: n.p, Tasks: []string{}, Profiles: []string{}}
 	return store.KeySaver(res)
 }
 
 func (n *Machine) setDT(p *DataTracker) {
 	n.p = p
+}
+
+func (n *Machine) OnCreate() error {
+	// All machines start runnable.
+	n.Runnable = true
+	return nil
 }
 
 func (n *Machine) BeforeSave() error {
@@ -330,6 +375,50 @@ func (n *Machine) BeforeSave() error {
 func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	n.oldBootEnv = AsMachine(oldThing).BootEnv
 	return nil
+}
+
+func (n *Machine) AfterSave() {
+
+	// Have we changed bootenvs.  Rebuild the task lists
+	if n.oldBootEnv != n.BootEnv {
+		objs := n.stores
+		profiles := objs("profiles")
+		bootenvs := objs("bootenvs")
+
+		// We get tasks by aggregating
+		//   1. BootEnv tasks
+		//   2. Profile tasks in order.
+		//   3. Global Profile tasks (if they exist)
+
+		taskList := []string{}
+
+		env := AsBootEnv(bootenvs.Find(n.BootEnv))
+		taskList = append(taskList, env.Tasks...)
+
+		for _, pname := range n.Profiles {
+			prof := AsProfile(profiles.Find(pname))
+			taskList = append(taskList, prof.Tasks...)
+		}
+
+		gprof := AsProfile(profiles.Find(n.p.GlobalProfileName))
+		taskList = append(taskList, gprof.Tasks...)
+
+		// Reset the task list, set currentTask to 0
+		n.Tasks = taskList
+		n.CurrentTask = -1
+		if len(taskList) == 0 {
+			// Already done.
+			n.CurrentTask = 0
+		}
+
+		// Reset this here to keep from looping forever.
+		n.oldBootEnv = n.BootEnv
+
+		_, e2 := n.p.Save(objs, n, nil)
+		if e2 != nil {
+			n.p.Logger.Printf("Failed to save machine in after Save. %v\n", n)
+		}
+	}
 }
 
 func (n *Machine) AfterDelete() {

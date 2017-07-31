@@ -12,11 +12,11 @@ func TestProfilesCrud(t *testing.T) {
 	d, unlocker := dt.LockEnts("profiles", "params", "machines")
 	defer unlocker()
 	tests := []crudTest{
-		{"Create empty profile", dt.Create, &Profile{p: dt}, false},
-		{"Create new profile with name", dt.Create, &Profile{p: dt, Name: "Test Profile"}, true},
-		{"Create Duplicate Profile", dt.Create, &Profile{p: dt, Name: "Test Profile"}, false},
-		{"Delete Profile", dt.Remove, &Profile{p: dt, Name: "Test Profile"}, true},
-		{"Delete Nonexistent Profile", dt.Remove, &Profile{p: dt, Name: "Test Profile"}, false},
+		{"Create empty profile", dt.Create, &Profile{p: dt}, false, nil},
+		{"Create new profile with name", dt.Create, &Profile{p: dt, Name: "Test Profile"}, true, nil},
+		{"Create Duplicate Profile", dt.Create, &Profile{p: dt, Name: "Test Profile"}, false, nil},
+		{"Delete Profile", dt.Remove, &Profile{p: dt, Name: "Test Profile"}, true, nil},
+		{"Delete Nonexistent Profile", dt.Remove, &Profile{p: dt, Name: "Test Profile"}, false, nil},
 	}
 	for _, test := range tests {
 		test.Test(t, d)
@@ -48,7 +48,9 @@ func TestProfilesValidation(t *testing.T) {
 					"type": "boolean",
 				},
 			},
-			true},
+			true,
+			nil,
+		},
 		{
 			"Create Passing Profile",
 			dt.Create,
@@ -60,6 +62,7 @@ func TestProfilesValidation(t *testing.T) {
 				},
 			},
 			true,
+			nil,
 		},
 		{
 			"Create Failing Profile",
@@ -72,6 +75,7 @@ func TestProfilesValidation(t *testing.T) {
 				},
 			},
 			false,
+			nil,
 		},
 	}
 	for _, test := range tests {

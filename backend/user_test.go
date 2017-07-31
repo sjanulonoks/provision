@@ -12,11 +12,11 @@ func TestUserCrud(t *testing.T) {
 	d, unlocker := dt.LockEnts("users")
 	defer unlocker()
 	tests := []crudTest{
-		{"Create empty user", dt.Create, &User{p: dt}, false},
-		{"Create new user with name", dt.Create, &User{p: dt, Name: "Test User"}, true},
-		{"Create Duplicate User", dt.Create, &User{p: dt, Name: "Test User"}, false},
-		{"Delete User", dt.Remove, &User{p: dt, Name: "Test User"}, true},
-		{"Delete Nonexistent User", dt.Remove, &User{p: dt, Name: "Test User"}, false},
+		{"Create empty user", dt.Create, &User{p: dt}, false, nil},
+		{"Create new user with name", dt.Create, &User{p: dt, Name: "Test User"}, true, nil},
+		{"Create Duplicate User", dt.Create, &User{p: dt, Name: "Test User"}, false, nil},
+		{"Delete User", dt.Remove, &User{p: dt, Name: "Test User"}, true, nil},
+		{"Delete Nonexistent User", dt.Remove, &User{p: dt, Name: "Test User"}, false, nil},
 	}
 	for _, test := range tests {
 		test.Test(t, d)
@@ -39,7 +39,7 @@ func TestUserPassword(t *testing.T) {
 	defer unlocker()
 	u := dt.NewUser()
 	u.Name = "test user"
-	saved, err := dt.Create(d, u)
+	saved, err := dt.Create(d, u, nil)
 	if !saved {
 		t.Errorf("Unable to create test user: %v", err)
 	} else {

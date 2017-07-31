@@ -12,19 +12,19 @@ func TestTaskCrud(t *testing.T) {
 	d, unlocker := dt.LockEnts("templates", "tasks", "bootenvs")
 	defer unlocker()
 	tmpl := &Template{p: dt, ID: "ok", Contents: "{{ .Env.Name }}"}
-	if ok, err := dt.Create(d, tmpl); !ok {
+	if ok, err := dt.Create(d, tmpl, nil); !ok {
 		t.Errorf("Failed to create test OK template: %v", err)
 		return
 	}
 	tests := []crudTest{
-		{"Create Task with nonexistent Name", dt.Create, &Task{p: dt}, false},
-		{"Create Task with no templates", dt.Create, &Task{p: dt, Name: "test 1"}, true},
-		{"Create Task with invalid TemplateInfo (missing Name)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Path: "{{ .Env.Name }}", ID: "ok"}}}, false},
-		{"Create Task with invalid TemplateInfo (missing ID)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}"}}}, false},
-		{"Create Task with invalid TemplateInfo (invalid ID)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}", ID: "okp"}}}, false},
-		{"Create Task with invalid TemplateInfo (invalid Path)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }", ID: "ok"}}}, false},
-		{"Create Task with valid TemplateInfo (not available}", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "unavailable", Path: "{{ .Env.Name }}", ID: "ok"}}}, true},
-		{"Create Task with valid TemplateInfo (available)", dt.Create, &Task{p: dt, Name: "available", Templates: []TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "ok"}}}, true},
+		{"Create Task with nonexistent Name", dt.Create, &Task{p: dt}, false, nil},
+		{"Create Task with no templates", dt.Create, &Task{p: dt, Name: "test 1"}, true, nil},
+		{"Create Task with invalid TemplateInfo (missing Name)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Path: "{{ .Env.Name }}", ID: "ok"}}}, false, nil},
+		{"Create Task with invalid TemplateInfo (missing ID)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}"}}}, false, nil},
+		{"Create Task with invalid TemplateInfo (invalid ID)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}", ID: "okp"}}}, false, nil},
+		{"Create Task with invalid TemplateInfo (invalid Path)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }", ID: "ok"}}}, false, nil},
+		{"Create Task with valid TemplateInfo (not available}", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "unavailable", Path: "{{ .Env.Name }}", ID: "ok"}}}, true, nil},
+		{"Create Task with valid TemplateInfo (available)", dt.Create, &Task{p: dt, Name: "available", Templates: []TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "ok"}}}, true, nil},
 	}
 
 	for _, test := range tests {

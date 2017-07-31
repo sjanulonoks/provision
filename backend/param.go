@@ -54,6 +54,10 @@ func (p *Param) Key() string {
 	return p.Name
 }
 
+func (p *Param) AuthKey() string {
+	return p.Key()
+}
+
 func (p *Param) New() store.KeySaver {
 	res := &Param{Name: p.Name, p: p.p}
 	return store.KeySaver(res)

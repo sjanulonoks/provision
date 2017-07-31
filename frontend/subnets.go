@@ -117,7 +117,7 @@ func (f *Frontend) InitSubnetApi() {
 	f.ApiGroup.POST("/subnets",
 		func(c *gin.Context) {
 			b := f.dt.NewSubnet()
-			f.Create(c, b)
+			f.Create(c, b, nil)
 		})
 
 	// swagger:route GET /subnets/{name} Subnets getSubnet
@@ -152,7 +152,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/subnets/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewSubnet(), c.Param(`name`))
+			f.Patch(c, f.dt.NewSubnet(), c.Param(`name`), nil)
 		})
 
 	// swagger:route PUT /subnets/{name} Subnets putSubnet
@@ -170,7 +170,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/subnets/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewSubnet(), c.Param(`name`))
+			f.Update(c, f.dt.NewSubnet(), c.Param(`name`), nil)
 		})
 
 	// swagger:route DELETE /subnets/{name} Subnets deleteSubnet
@@ -188,6 +188,6 @@ func (f *Frontend) InitSubnetApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewSubnet()
 			b.Name = c.Param(`name`)
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 		})
 }

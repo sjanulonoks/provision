@@ -398,6 +398,7 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 	return filters, nil
 }
 
+// XXX: Auth enforce may need to limit return values based up access to get - one day.
 func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
 		return
@@ -466,8 +467,8 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 		}
 	}()
 	if ref != nil {
-		// TODO: This should really be done before the fetch - it may have issue with HexAddr-based things.
-		if !assureAuth(c, f.Logger, prefix, "get", ref.Key()) {
+		aref, _ := ref.(backend.AuthSaver)
+		if !assureAuth(c, f.Logger, prefix, "get", aref.AuthKey()) {
 			return
 		}
 		s, ok := ref.(Sanitizable)
@@ -491,7 +492,7 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	}
 }
 
-func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
+func (f *Frontend) Create(c *gin.Context, val store.KeySaver, ov backend.ObjectValidator) {
 	if !assureDecode(c, val) {
 		return
 	}
@@ -502,7 +503,7 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 	func() {
 		d, unlocker := f.dt.LockEnts(val.(Lockable).Locks("create")...)
 		defer unlocker()
-		_, err = f.dt.Create(d, val)
+		_, err = f.dt.Create(d, val, ov)
 	}()
 	if err != nil {
 		be, ok := err.(*backend.Error)
@@ -520,21 +521,31 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 	}
 }
 
-func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
+func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string, ov backend.ObjectValidator) {
 	patch := make(jsonpatch2.Patch, 0)
 	if !assureDecode(c, &patch) {
 		return
 	}
-	if !assureAuth(c, f.Logger, ref.Prefix(), "patch", key) {
-		return
-	}
 	var err error
 	var res store.KeySaver
-	func() {
+	bad := func() bool {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
 		defer unlocker()
-		res, err = f.dt.Patch(d, ref, key, patch)
+
+		tref := d(ref.Prefix()).Find(key)
+		if tref != nil {
+			aref := tref.(backend.AuthSaver)
+			if !assureAuth(c, f.Logger, ref.Prefix(), "patch", aref.AuthKey()) {
+				return true
+			}
+		}
+		// This will fail with notfound as well.
+		res, err = f.dt.Patch(d, ref, key, patch, ov)
+		return false
 	}()
+	if bad {
+		return
+	}
 	if err == nil {
 		s, ok := res.(Sanitizable)
 		if ok {
@@ -551,11 +562,8 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	}
 }
 
-func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
+func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string, ov backend.ObjectValidator) {
 	if !assureDecode(c, ref) {
-		return
-	}
-	if !assureAuth(c, f.Logger, ref.Prefix(), "update", key) {
 		return
 	}
 	if ref.Key() != key {
@@ -570,11 +578,23 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 		return
 	}
 	var err error
-	func() {
+	bad := func() bool {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
 		defer unlocker()
-		_, err = f.dt.Update(d, ref)
+
+		tref := d(ref.Prefix()).Find(ref.Key())
+		if tref != nil {
+			aref := tref.(backend.AuthSaver)
+			if !assureAuth(c, f.Logger, ref.Prefix(), "update", aref.AuthKey()) {
+				return true
+			}
+		}
+		_, err = f.dt.Update(d, ref, ov)
+		return false
 	}()
+	if bad {
+		return
+	}
 	if err == nil {
 		s, ok := ref.(Sanitizable)
 		if ok {
@@ -591,16 +611,24 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 	}
 }
 
-func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver) {
-	if !assureAuth(c, f.Logger, ref.Prefix(), "delete", ref.Key()) {
-		return
-	}
+func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, ov backend.ObjectValidator) {
 	var err error
-	func() {
+	bad := func() bool {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("delete")...)
 		defer unlocker()
-		_, err = f.dt.Remove(d, ref)
+		tref := d(ref.Prefix()).Find(ref.Key())
+		if tref != nil {
+			aref := tref.(backend.AuthSaver)
+			if !assureAuth(c, f.Logger, ref.Prefix(), "delete", aref.AuthKey()) {
+				return true
+			}
+		}
+		_, err = f.dt.Remove(d, ref, ov)
+		return false
 	}()
+	if bad {
+		return
+	}
 	if err != nil {
 		ne, ok := err.(*backend.Error)
 		if ok {

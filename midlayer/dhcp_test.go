@@ -59,6 +59,7 @@ func TestMain(m *testing.M) {
 	logger := log.New(os.Stdout, "dt", 0)
 	dataTracker = backend.NewDataTracker(bs,
 		tmpDir,
+		tmpDir,
 		"127.0.0.1",
 		8091,
 		8092,

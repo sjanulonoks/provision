@@ -310,7 +310,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		if stratfn != nil && stratfn(p, options) == lease.Token {
 			h.Infof("%s: Lease for %s declined, invalidating.", xid(p), lease.Addr)
 			lease.Invalidate()
-			h.bk.Save(d, lease)
+			h.bk.Save(d, lease, nil)
 		} else {
 			h.Infof("%s: Received spoofed decline for %s, ignoring", xid(p), lease.Addr)
 		}
@@ -328,7 +328,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		if stratfn != nil && stratfn(p, options) == lease.Token {
 			h.Infof("%s: Lease for %s released, expiring.", xid(p), lease.Addr)
 			lease.Expire()
-			h.bk.Save(d, lease)
+			h.bk.Save(d, lease, nil)
 		} else {
 			h.Infof("%s: Received spoofed release for %s, ignoring", xid(p), lease.Addr)
 		}

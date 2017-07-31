@@ -187,7 +187,7 @@ func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
 			continue
 		}
 		env.Available = true
-		dt.Update(d, env)
+		dt.Update(d, env, nil)
 	}
 }
 

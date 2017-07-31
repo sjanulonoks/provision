@@ -78,6 +78,10 @@ func (p *Profile) Key() string {
 	return p.Name
 }
 
+func (p *Profile) AuthKey() string {
+	return p.Key()
+}
+
 func (p *Profile) GetParams() map[string]interface{} {
 	m := p.Params
 	if m == nil {
@@ -89,7 +93,7 @@ func (p *Profile) GetParams() map[string]interface{} {
 func (p *Profile) SetParams(d Stores, values map[string]interface{}) error {
 	p.Params = values
 	e := &Error{Code: 422, Type: ValidationError, o: p}
-	_, e2 := p.p.Save(d, p)
+	_, e2 := p.p.Save(d, p, nil)
 	e.Merge(e2)
 	return e.OrNil()
 }

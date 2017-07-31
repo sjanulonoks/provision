@@ -19,13 +19,14 @@ var (
 
 type crudTest struct {
 	name string
-	op   func(Stores, store.KeySaver) (bool, error)
+	op   func(Stores, store.KeySaver, ObjectValidator) (bool, error)
 	t    store.KeySaver
 	pass bool
+	ov   ObjectValidator
 }
 
 func (test *crudTest) Test(t *testing.T, d Stores) {
-	passed, err := test.op(d, test.t)
+	passed, err := test.op(d, test.t, test.ov)
 	msg := fmt.Sprintf("%s: wanted to pass: %v, passed: %v", test.name, test.pass, passed)
 	if passed == test.pass {
 		t.Log(msg)
@@ -68,12 +69,13 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 	if err := dec.Decode(&res); err != nil {
 		return false, err
 	}
-	return dt.Create(d, res)
+	return dt.Create(d, res, nil)
 }
 
 func mkDT(bs store.SimpleStore) *DataTracker {
 	logger := log.New(os.Stdout, "dt", 0)
 	dt := NewDataTracker(bs,
+		tmpDir,
 		tmpDir,
 		"127.0.0.1",
 		8091,

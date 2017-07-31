@@ -140,7 +140,7 @@ func (f *Frontend) InitPluginApi() {
 			func() {
 				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("create")...)
 				defer unlocker()
-				_, err = f.dt.Create(d, b)
+				_, err = f.dt.Create(d, b, nil)
 			}()
 			if err != nil {
 				be, ok := err.(*backend.Error)
@@ -192,7 +192,7 @@ func (f *Frontend) InitPluginApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/plugins/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewPlugin(), c.Param(`name`))
+			f.Patch(c, f.dt.NewPlugin(), c.Param(`name`), nil)
 		})
 
 	// swagger:route PUT /plugins/{name} Plugins putPlugin
@@ -210,7 +210,7 @@ func (f *Frontend) InitPluginApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/plugins/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewPlugin(), c.Param(`name`))
+			f.Update(c, f.dt.NewPlugin(), c.Param(`name`), nil)
 		})
 
 	// swagger:route DELETE /plugins/{name} Plugins deletePlugin
@@ -228,7 +228,7 @@ func (f *Frontend) InitPluginApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewPlugin()
 			b.Name = c.Param(`name`)
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 		})
 
 	// swagger:route GET /plugins/{name}/params Plugins getPluginParams
