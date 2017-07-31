@@ -59,6 +59,8 @@ type SubnetListPathParameter struct {
 	Subnet string
 	// in: query
 	Name string
+	// in: query
+	Enabled string
 }
 
 func (f *Frontend) InitSubnetApi() {

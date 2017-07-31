@@ -153,7 +153,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 				avail := fix(ref).Available
 				return func(s store.KeySaver) bool {
 						v := fix(s).Available
-						return v || (v && avail)
+						return v || (v == avail)
 					},
 					func(s store.KeySaver) bool {
 						return fix(s).Available && !avail
@@ -167,7 +167,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 				case "false":
 					res.Available = false
 				default:
-					return nil, errors.New("Availale must be true or false")
+					return nil, errors.New("Available must be true or false")
 				}
 				return res, nil
 			}),

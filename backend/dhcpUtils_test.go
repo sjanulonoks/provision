@@ -58,7 +58,7 @@ func TestDHCPRenew(t *testing.T) {
 		d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
 		defer unlocker()
 		startObjs := []crudTest{
-			{"Initial Subnet", dt.Create, &Subnet{p: dt, Name: "sn", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true, nil},
+			{"Initial Subnet", dt.Create, &Subnet{p: dt, Enabled: true, Name: "sn", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true, nil},
 			{"Initial Standalone Reservation", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true, nil},
 			{"Valid Subnet Lease", dt.Create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.80"), Strategy: "mac", Token: "subn1", ExpireTime: time.Now().Add(60 * time.Second)}, true, nil},
 			{"Valid Reservation Lease", dt.Create, &Lease{p: dt, Addr: net.ParseIP("192.168.123.10"), Strategy: "mac", Token: "res1", ExpireTime: time.Now().Add(2 * time.Hour)}, true, nil},
@@ -175,7 +175,7 @@ func TestDHCPCreateSubnet(t *testing.T) {
 		defer unlocker()
 		// A subnet with 3 active addresses
 		startObjs := []crudTest{
-			{"Create Subnet", dt.Create, &Subnet{p: dt, Name: "test", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.83"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true, nil},
+			{"Create Subnet", dt.Create, &Subnet{p: dt, Enabled: true, Name: "test", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.83"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true, nil},
 			{"Create Reservation", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.83"), Token: "res1", Strategy: "mac"}, true, nil},
 		}
 		for _, obj := range startObjs {

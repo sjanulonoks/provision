@@ -74,6 +74,11 @@ func FindLease(dt *DataTracker,
 		reservation = lease.Reservation(d)
 		if subnet != nil {
 			lease.ExpireTime = time.Now().Add(subnet.LeaseTimeFor(lease.Addr))
+			if !subnet.Enabled {
+				// We aren't enabled, so act like we are silent.
+				lease = nil
+				return
+			}
 		} else if reservation != nil {
 			lease.ExpireTime = time.Now().Add(2 * time.Hour)
 		} else {
@@ -161,6 +166,10 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 	}
 	if subnet == nil {
 		// There is no subnet that can handle the vias we want
+		return
+	}
+	if !subnet.Enabled {
+		// Subnet isn't enabled, don't give out leases.
 		return
 	}
 	currLeases, _ := index.Between(
