@@ -48,8 +48,9 @@ import (
 
 type ProgOpts struct {
 	VersionFlag         bool   `long:"version" description:"Print Version and exit"`
+	DisableTftpServer   bool   `long:"disable-tftp" description:"Disable TFTP server"`
 	DisableProvisioner  bool   `long:"disable-provisioner" description:"Disable provisioner"`
-	DisableDHCP         bool   `long:"disable-dhcp" description:"Disable DHCP"`
+	DisableDHCP         bool   `long:"disable-dhcp" description:"Disable DHCP server"`
 	StaticPort          int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
 	TftpPort            int    `long:"tftp-port" description:"Port for the TFTP server to listen on" default:"69"`
 	ApiPort             int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
@@ -203,14 +204,17 @@ func Server(c_opts *ProgOpts) {
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)
 	}
-	if !c_opts.DisableProvisioner {
+
+	if !c_opts.DisableTftpServer {
 		logger.Printf("Starting TFTP server")
 		if svc, err := midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), dt.FS.TftpResponder(), logger, publishers); err != nil {
 			logger.Fatalf("Error starting TFTP server: %v", err)
 		} else {
 			services = append(services, svc)
 		}
+	}
 
+	if !c_opts.DisableProvisioner {
 		logger.Printf("Starting static file server")
 		if svc, err := midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), dt.FS, logger, publishers); err != nil {
 			logger.Fatalf("Error starting static file server: %v", err)
