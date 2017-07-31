@@ -336,6 +336,7 @@ class Subnets extends React.Component {
     var subnet = {
       _new: true,
       Name: '',
+      Enabled: true,
       ActiveLeaseTime: 60,
       ReservedLeaseTime: 7200,
       OnlyReservations: false,

@@ -2,6 +2,7 @@ package backend
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -141,6 +142,11 @@ type Subnet struct {
 	//
 	// required: true
 	Name string
+	// Enabled indicates if the subnet should hand out leases or continue operating
+	// leases if already running.
+	//
+	// required: true
+	Enabled bool
 	// Subnet is the network address in CIDR form that all leases
 	// acquired in its range will use for options, lease times, and NextServer settings
 	// by default
@@ -335,6 +341,34 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 					return nil, fmt.Errorf("Invalid subnet CIDR: %s", s)
 				}
 				return &Subnet{Subnet: s}, nil
+			}),
+		"Enabled": index.Make(
+			false,
+			"boolean",
+			func(i, j store.KeySaver) bool {
+				return (!fix(i).Enabled) && fix(j).Enabled
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				avail := fix(ref).Enabled
+				return func(s store.KeySaver) bool {
+						v := fix(s).Enabled
+						return v || (v == avail)
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Enabled && !avail
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				res := &Subnet{}
+				switch s {
+				case "true":
+					res.Enabled = true
+				case "false":
+					res.Enabled = false
+				default:
+					return nil, errors.New("Enabled must be true or false")
+				}
+				return res, nil
 			}),
 	}
 }
