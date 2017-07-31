@@ -90,13 +90,17 @@ func (p *Param) Indexes() map[string]index.Maker {
 	}
 }
 
-func (p *Param) BeforeSave() error {
+func (p *Param) setValidator() error {
 	schema, err := gojsonschema.NewSchema(gojsonschema.NewGoLoader(p.Schema))
 	if err != nil {
 		return err
 	}
 	p.validator = schema
 	return nil
+}
+
+func (p *Param) BeforeSave() error {
+	return p.setValidator()
 	// Arguably, we should also detect when an attempted schema update happens
 	// and verify that it does not break validation, or at least report on what
 	// previously-valid values would become invalid.
@@ -104,6 +108,12 @@ func (p *Param) BeforeSave() error {
 }
 
 func (p *Param) Validate(val interface{}) error {
+	if p.validator == nil {
+		err := p.setValidator()
+		if err != nil {
+			return err
+		}
+	}
 	res, err := p.validator.Validate(gojsonschema.NewGoLoader(val))
 	if err != nil {
 		return err

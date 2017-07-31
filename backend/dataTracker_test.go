@@ -72,14 +72,15 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 }
 
 func mkDT(bs store.SimpleStore) *DataTracker {
+	logger := log.New(os.Stdout, "dt", 0)
 	dt := NewDataTracker(bs,
 		tmpDir,
 		"127.0.0.1",
 		8091,
 		8092,
-		log.New(os.Stdout, "dt", 0),
+		logger,
 		map[string]string{"defaultBootEnv": "default", "unknownBootEnv": "ignore"},
-		NewPublishers())
+		NewPublishers(logger))
 	return dt
 }
 

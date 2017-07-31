@@ -10,6 +10,7 @@ github.com/digitalrebar/provision/midlayer,\
 github.com/digitalrebar/provision/frontend,\
 github.com/digitalrebar/provision/embedded,\
 github.com/digitalrebar/provision/server,\
+github.com/digitalrebar/provision/plugin,\
 github.com/digitalrebar/provision/cli\
 "
 

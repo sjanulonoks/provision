@@ -6,6 +6,7 @@ import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/plugin"
 	"github.com/gin-gonic/gin"
 	"github.com/pborman/uuid"
 )
@@ -24,11 +25,32 @@ type MachinesResponse struct {
 	Body []*backend.Machine
 }
 
+// MachineActionResponse return on a successful GET of a single Machine Action
+// swagger:response
+type MachineActionResponse struct {
+	// in: body
+	Body *plugin.AvailableAction
+}
+
+// MachineActionsResponse return on a successful GET of all Machine Actions
+// swagger:response
+type MachineActionsResponse struct {
+	// in: body
+	Body []*plugin.AvailableAction
+}
+
 // MachineParamsResponse return on a successful GET of all Machine's Params
 // swagger:response
 type MachineParamsResponse struct {
 	// in: body
 	Body map[string]interface{}
+}
+
+// MachineActionPostResponse return on a successful POST of action
+// swagger:response
+type MachineActionPostResponse struct {
+	// in: body
+	Body string
 }
 
 // MachineBodyParameter used to inject a Machine
@@ -48,12 +70,39 @@ type MachinePatchBodyParameter struct {
 }
 
 // MachinePathParameter used to find a Machine in the path
-// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine getMachineParams postMachineParams
+// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine getMachineParams postMachineParams getMachineActions
 type MachinePathParameter struct {
 	// in: path
 	// required: true
 	// swagger:strfmt uuid
 	Uuid uuid.UUID `json:"uuid"`
+}
+
+// MachineActionPathParameter used to find a Machine / Action in the path
+// swagger:parameters postMachineAction getMachineAction
+type MachineActionPathParameter struct {
+	// in: path
+	// required: true
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
+	// in: path
+	// required: true
+	Name string `json:"name"`
+}
+
+// MachineActionBodyParameter used to post a Machine / Action in the path
+// swagger:parameters postMachineAction
+type MachineActionBodyParameter struct {
+	// in: path
+	// required: true
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
 }
 
 // MachineParamsBodyParameter used to set Machine Params
@@ -335,4 +384,269 @@ func (f *Frontend) InitMachineApi() {
 			}
 		})
 
+	// swagger:route GET /machines/{uuid}/actions Machines getMachineActions
+	//
+	// List machine actions Machine
+	//
+	// List Machine actions for a Machine specified by {uuid}
+	//
+	//     Responses:
+	//       200: MachineActionsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/machines/:uuid/actions",
+		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "machines", "actions", c.Param(`uuid`)) {
+				return
+			}
+			uuid := c.Param(`uuid`)
+			b := f.dt.NewMachine()
+			var ref store.KeySaver
+			list := make([]*plugin.AvailableAction, 0, 0)
+			bad := func() bool {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("actions")...)
+				defer unlocker()
+				ref = d("machines").Find(uuid)
+				if ref == nil {
+					err := &backend.Error{
+						Code:  http.StatusNotFound,
+						Type:  "API_ERROR",
+						Model: "machines",
+						Key:   uuid,
+					}
+					err.Errorf("%s Actions Get: %s: Not Found", err.Model, err.Key)
+					c.JSON(err.Code, err)
+					return true
+				}
+
+				m := backend.AsMachine(ref)
+				for _, aa := range f.pc.MachineActions.List() {
+					if _, err := validateMachineAction(f, d, aa.Command, m, make(map[string]interface{}, 0)); err == nil {
+						list = append(list, aa)
+					}
+				}
+				return false
+			}()
+			if bad {
+				return
+			}
+
+			c.JSON(http.StatusOK, list)
+		})
+
+	// swagger:route GET /machines/{uuid}/actions/{name} Machines getMachineAction
+	//
+	// List specific action for a machine Machine
+	//
+	// List specific {name} action for a Machine specified by {uuid}
+	//
+	//     Responses:
+	//       200: MachineActionResponse
+	//       400: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/machines/:uuid/actions/:name",
+		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "machines", c.Param(`name`), c.Param(`uuid`)) {
+				return
+			}
+			uuid := c.Param(`uuid`)
+			b := f.dt.NewMachine()
+			var ref store.KeySaver
+			var aa *plugin.AvailableAction
+			bad := func() bool {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("actions")...)
+				defer unlocker()
+				ref = d("machines").Find(uuid)
+				if ref == nil {
+					err := &backend.Error{
+						Code:  http.StatusNotFound,
+						Type:  "API_ERROR",
+						Model: "machines",
+						Key:   uuid,
+					}
+					err.Errorf("%s Action Get: %s: Not Found", err.Model, err.Key)
+					c.JSON(err.Code, err)
+					return true
+				}
+				m := backend.AsMachine(ref)
+				var err *backend.Error
+				aa, err = validateMachineAction(f, d, c.Param(`name`), m, make(map[string]interface{}, 0))
+				if err != nil {
+					c.JSON(err.Code, err)
+					return true
+				}
+				return false
+			}()
+
+			if bad {
+				return
+			}
+
+			c.JSON(http.StatusOK, aa)
+		})
+
+	// swagger:route POST /machines/{uuid}/actions/{name} Machines postMachineAction
+	//
+	// Call an action on the node.
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: MachineActionPostResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/machines/:uuid/actions/:name",
+		func(c *gin.Context) {
+			var val map[string]interface{}
+			if !assureDecode(c, &val) {
+				return
+			}
+			uuid := c.Param(`uuid`)
+			name := c.Param(`name`)
+
+			var aa *plugin.AvailableAction
+			ma := &plugin.MachineAction{Command: name, Params: val}
+
+			b := f.dt.NewMachine()
+			var ref store.KeySaver
+			bad := func() bool {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("actions")...)
+				defer unlocker()
+				ref = d("machines").Find(uuid)
+				if ref == nil {
+					err := &backend.Error{
+						Code:  http.StatusNotFound,
+						Type:  "API_ERROR",
+						Model: "machines",
+						Key:   uuid,
+					}
+					err.Errorf("%s Call Action: machine %s: Not Found", err.Model, err.Key)
+					c.JSON(err.Code, err)
+					return true
+				}
+				if !assureAuth(c, f.Logger, ref.Prefix(), name, ref.Key()) {
+					return true
+				}
+
+				m := backend.AsMachine(ref)
+
+				ma.Name = m.Name
+				ma.Uuid = m.Uuid
+				ma.Address = m.Address
+				ma.BootEnv = m.BootEnv
+
+				var err *backend.Error
+				aa, err = validateMachineAction(f, d, name, m, val)
+				if err != nil {
+					c.JSON(err.Code, err)
+					return true
+				}
+				return false
+			}()
+
+			if bad {
+				return
+			}
+
+			f.pubs.Publish("machines", name, uuid, ma)
+			err := aa.Run(ma)
+			if err != nil {
+				be, ok := err.(*backend.Error)
+				if !ok {
+					c.JSON(409, err)
+				} else {
+					c.JSON(be.Code, be)
+				}
+			} else {
+				c.JSON(http.StatusOK, "")
+			}
+		})
+
+}
+
+func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backend.Machine, val map[string]interface{}) (*plugin.AvailableAction, *backend.Error) {
+	err := &backend.Error{
+		Code:  http.StatusBadRequest,
+		Type:  "API_ERROR",
+		Model: "machines",
+		Key:   m.Uuid.String(),
+	}
+
+	aa, ok := f.pc.MachineActions.Get(name)
+	if !ok {
+		err.Errorf("%s Call Action: action %s: Not Found", err.Model, name)
+		return nil, err
+	}
+
+	for _, param := range aa.RequiredParams {
+		var obj interface{} = nil
+		obj, ok := val[param]
+		if !ok {
+			obj, ok = m.GetParam(d, param, true)
+			if !ok {
+				if o := d("profiles").Find(f.dt.GlobalProfileName); o != nil {
+					p := backend.AsProfile(o)
+					if tobj, ok := p.Params[param]; ok {
+						obj = tobj
+					}
+				}
+			}
+
+			// Put into place
+			if obj != nil {
+				val[param] = obj
+			}
+		}
+		if obj == nil {
+			err.Errorf("%s Call Action: machine %s: Missing Parameter %s", err.Model, err.Key, param)
+		} else {
+			pobj := d("params").Find(param)
+			if pobj != nil {
+				rp := pobj.(*backend.Param)
+
+				if ev := rp.Validate(obj); ev != nil {
+					err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
+				}
+			}
+		}
+	}
+	for _, param := range aa.OptionalParams {
+		var obj interface{} = nil
+		obj, ok := val[param]
+		if !ok {
+			obj, ok = m.GetParam(d, param, true)
+			if !ok {
+				if o := d("profiles").Find(f.dt.GlobalProfileName); o != nil {
+					p := backend.AsProfile(o)
+					if tobj, ok := p.Params[param]; ok {
+						obj = tobj
+					}
+				}
+			}
+
+			// Put into place
+			if obj != nil {
+				val[param] = obj
+			}
+		}
+		if obj != nil {
+			pobj := d("params").Find(param)
+			if pobj != nil {
+				rp := pobj.(*backend.Param)
+
+				if ev := rp.Validate(obj); ev != nil {
+					err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
+				}
+			}
+		}
+	}
+
+	if err.OrNil() == nil {
+		return aa, nil
+	}
+	return aa, err
 }

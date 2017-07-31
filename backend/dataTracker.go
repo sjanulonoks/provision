@@ -94,7 +94,7 @@ type DataTracker struct {
 	runningPrefs        map[string]string
 	prefMux             *sync.Mutex
 	defaultBootEnv      string
-	globalProfileName   string
+	GlobalProfileName   string
 	tokenManager        *JwtManager
 	rootTemplate        *template.Template
 	tmplMux             *sync.Mutex
@@ -186,13 +186,14 @@ func NewDataTracker(backend store.SimpleStore,
 		FS:                NewFS(fileRoot, logger),
 		tokenManager:      NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
 		tmplMux:           &sync.Mutex{},
-		globalProfileName: "global",
+		GlobalProfileName: "global",
 		thunks:            make([]func(), 0),
 		thunkMux:          &sync.Mutex{},
 		publishers:        publishers,
 	}
 	objs := []store.KeySaver{
 		&Task{p: res},
+		&Job{p: res},
 		&Param{p: res},
 		&Profile{p: res},
 		&User{p: res},
@@ -203,6 +204,7 @@ func NewDataTracker(backend store.SimpleStore,
 		&Reservation{p: res},
 		&Lease{p: res},
 		&Pref{p: res},
+		&Plugin{p: res},
 	}
 	res.objs = map[string]*Store{}
 	for _, obj := range objs {
@@ -240,7 +242,7 @@ func NewDataTracker(backend store.SimpleStore,
 		pref := AsPref(prefIsh)
 		res.runningPrefs[pref.Name] = pref.Val
 	}
-	if d("preferences").Find(res.globalProfileName) == nil {
+	if d("preferences").Find(res.GlobalProfileName) == nil {
 		gp := AsProfile(res.NewProfile())
 		gp.Name = "global"
 		res.Create(d, gp)
@@ -421,6 +423,8 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 		res = p.NewPref()
 	case *Task:
 		res = p.NewTask()
+	case *Job:
+		res = p.NewJob()
 	default:
 		panic("Unknown type of KeySaver passed to Clone")
 	}

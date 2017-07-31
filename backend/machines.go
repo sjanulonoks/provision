@@ -356,11 +356,12 @@ func AsMachines(o []store.KeySaver) []*Machine {
 }
 
 var machineLockMap = map[string][]string{
-	"get":    []string{"machines"},
-	"create": []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
-	"update": []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
-	"patch":  []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
-	"delete": []string{"bootenvs", "machines"},
+	"get":     []string{"machines"},
+	"create":  []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
+	"update":  []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
+	"patch":   []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
+	"delete":  []string{"bootenvs", "machines"},
+	"actions": []string{"machines", "profiles", "params"},
 }
 
 func (m *Machine) Locks(action string) []string {
