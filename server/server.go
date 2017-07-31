@@ -197,8 +197,9 @@ func Server(c_opts *ProgOpts) {
 	}
 
 	fe := frontend.NewFrontend(dt, logger,
-		c_opts.OurAddress, c_opts.ApiPort, c_opts.FileRoot,
-		c_opts.DevUI, nil, publishers, c_opts.DrpId, pc)
+		c_opts.OurAddress, c_opts.ApiPort, c_opts.StaticPort, c_opts.FileRoot,
+		c_opts.DevUI, nil, publishers, c_opts.DrpId, pc,
+		c_opts.DisableDHCP, c_opts.DisableTftpServer, c_opts.DisableProvisioner)
 	publishers.Add(fe)
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {

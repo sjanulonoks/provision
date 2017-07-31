@@ -236,8 +236,10 @@ func (f *Frontend) InitUserApi(drpid string) {
 					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				info := GetInfo(drpid)
-				c.JSON(http.StatusOK, UserToken{Token: t, Info: info})
+				// Error is only if stats are not filled in.  User
+				// Token should work regardless of that.
+				info, _ := f.GetInfo(drpid)
+				c.JSON(http.StatusOK, UserToken{Token: t, Info: *info})
 			}
 		})
 
