@@ -5,14 +5,40 @@ import (
 	"runtime"
 
 	"github.com/digitalrebar/provision"
+	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/backend/index"
 	"github.com/gin-gonic/gin"
 )
 
+type Stat struct {
+	// required: true
+	Name string `json:"name"`
+	// required: true
+	Count int `json:"count"`
+}
+
+// swagger:model
 type Info struct {
-	Arch    string `json:"arch"`
-	Os      string `json:"os"`
+	// required: true
+	Arch string `json:"arch"`
+	// required: true
+	Os string `json:"os"`
+	// required: true
 	Version string `json:"version"`
-	Id      string `json:"id"`
+	// required: true
+	Id string `json:"id"`
+	// required: true
+	ApiPort int `json:"api_port"`
+	// required: true
+	FilePort int `json:"file_port"`
+	// required: true
+	TftpEnabled bool `json:"tftp_enabled"`
+	// required: true
+	DhcpEnabled bool `json:"dhcp_enabled"`
+	// required: true
+	ProvisionerEnabled bool `json:"prov_enabled"`
+	// required: true
+	Stats []*Stat `json:"stats"`
 }
 
 // InfosResponse returned on a successful GET of an info
@@ -22,13 +48,48 @@ type InfoResponse struct {
 	Body *Info
 }
 
-func GetInfo(drpid string) Info {
-	return Info{
-		Arch:    runtime.GOARCH,
-		Os:      runtime.GOOS,
-		Version: provision.RS_VERSION,
-		Id:      drpid,
+func (f *Frontend) GetInfo(drpid string) (*Info, *backend.Error) {
+	i := &Info{
+		Arch:               runtime.GOARCH,
+		Os:                 runtime.GOOS,
+		Version:            provision.RS_VERSION,
+		Id:                 drpid,
+		ApiPort:            f.ApiPort,
+		FilePort:           f.ProvPort,
+		TftpEnabled:        !f.NoTftp,
+		DhcpEnabled:        !f.NoDhcp,
+		ProvisionerEnabled: !f.NoProv,
+		Stats:              make([]*Stat, 0, 0),
 	}
+
+	res := &backend.Error{
+		Code:  http.StatusInternalServerError,
+		Type:  "API_ERROR",
+		Model: "info",
+	}
+
+	func() {
+		d, unlocker := f.dt.LockEnts("machines", "subnets")
+		defer unlocker()
+
+		if idx, err := index.All(index.Native())(&d("machines").Index); err != nil {
+			res.Merge(err)
+		} else {
+			i.Stats = append(i.Stats, &Stat{"machines.count", idx.Count()})
+		}
+
+		if idx, err := index.All(index.Native())(&d("subnets").Index); err != nil {
+			res.Merge(err)
+		} else {
+			i.Stats = append(i.Stats, &Stat{"subnets.count", idx.Count()})
+		}
+	}()
+
+	if res.OrNil() == nil {
+		res = nil
+	}
+
+	return i, res
 }
 
 func (f *Frontend) InitInfoApi(drpid string) {
@@ -49,7 +110,11 @@ func (f *Frontend) InitInfoApi(drpid string) {
 			if !assureAuth(c, f.Logger, "info", "get", "") {
 				return
 			}
-			info := GetInfo(drpid)
-			c.JSON(http.StatusOK, &info)
+			info, err := f.GetInfo(drpid)
+			if err != nil {
+				c.JSON(err.Code, err)
+				return
+			}
+			c.JSON(http.StatusOK, info)
 		})
 }
