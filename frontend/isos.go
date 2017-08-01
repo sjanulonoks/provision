@@ -224,6 +224,7 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 	}
 
 	copied, err := io.Copy(tgt, c.Request.Body)
+	tgt.Close()
 	if err != nil {
 		os.Remove(isoTmpName)
 		c.JSON(http.StatusInsufficientStorage,
