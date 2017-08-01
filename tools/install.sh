@@ -264,12 +264,14 @@ case $1 in
                  fi
 
 
+                 set +e
                  ./dr-provision --help | grep -q base-root
                  if [[ $? -eq 0 ]] ; then
                      echo "sudo ./dr-provision $IPADDR --base-root=`pwd`/drp-data &"
                  else
                      echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar &"
                  fi
+                 set -e
                  echo
                  echo "# Once dr-provision is started, this commmand will gather and upload the tools required to"
                  echo "# do discovery-based machine management"
