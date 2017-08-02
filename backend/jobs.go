@@ -29,7 +29,7 @@ import (
 //   and the API returns a 204. If the current job is in the imcomplete
 //   state, that job is returned with a 202.  Otherwise a new job is
 //   created and is returned with a 201. If there is a current job that is neither
-//   "completed", "failed", nor "finished", the POST fails.  The new job will be
+//   "incomplete", "failed", nor "finished", the POST fails.  The new job will be
 //   created with its Previous value set to the machine's CurrentJob,
 //   and the machine's CurrentJob is updated with the UUID of the new
 //   job.

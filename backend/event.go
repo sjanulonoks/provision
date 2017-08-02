@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
@@ -102,5 +103,10 @@ func (p *Publishers) Publish(t, a, k string, o interface{}) error {
 }
 
 func (e *Event) Text() string {
-	return fmt.Sprintf("%d: %s %s %s\n", e.Time.Unix(), e.Type, e.Action, e.Key)
+	jsonString, err := json.MarshalIndent(e.Object, "", "  ")
+	if err != nil {
+		jsonString = []byte("json failure")
+	}
+
+	return fmt.Sprintf("%d: %s %s %s\n%s\n", e.Time.Unix(), e.Type, e.Action, e.Key, string(jsonString))
 }
