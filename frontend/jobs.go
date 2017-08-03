@@ -247,11 +247,18 @@ func (f *Frontend) InitJobApi() {
 							return http.StatusConflict
 						}
 					} else if jo != nil {
-						// We have an old job, but we are starting over.  Mark it failed
+						// At this point, newCT == -1 (we are starting over on a list)
+						// We have an old job - check its state.
+						// We could have been forced and need to close out a job.
+						// if it is running, created, or incomplete, we need
+						// to mark it failed, but leave us runnable.
 						cj := backend.AsJob(jo)
-						cj.State = "failed"
-						if _, err = f.dt.Update(d, cj, nil); err != nil {
-							return http.StatusBadRequest
+						if cj.State == "running" || cj.State == "created" || cj.State == "incomplete" {
+							cj.State = "failed"
+							if _, err = f.dt.Update(d, cj, nil); err != nil {
+								return http.StatusBadRequest
+							}
+							m.Runnable = true
 						}
 						newCT += 1
 
@@ -264,6 +271,7 @@ func (f *Frontend) InitJobApi() {
 				if newCT >= len(m.Tasks) {
 					// Nothing to do.
 					if newCT != m.CurrentTask {
+						m.CurrentTask = newCT
 						_, err = f.dt.Update(d, m, nil)
 						if err != nil {
 							return http.StatusInternalServerError
@@ -283,7 +291,7 @@ func (f *Frontend) InitJobApi() {
 				b.BootEnv = m.BootEnv
 				b.Task = m.Tasks[newCT]
 
-				// Create the job, and then create the machine
+				// Create the job, and then update the machine
 				_, err = f.dt.Create(d, b, nil)
 				if err == nil {
 					m.CurrentTask = newCT
