@@ -82,7 +82,10 @@ func (p *Publishers) List() []Publisher {
 
 func (p *Publishers) Publish(t, a, k string, o interface{}) error {
 	e := &Event{Time: time.Now(), Type: t, Action: a, Key: k, Object: o}
+	return p.PublishEvent(e)
+}
 
+func (p *Publishers) PublishEvent(e *Event) error {
 	newPubs := make([]Publisher, 0, 0)
 	p.lock.Lock()
 	for _, pub := range p.pubs {
