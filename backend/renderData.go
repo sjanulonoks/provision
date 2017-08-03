@@ -307,7 +307,11 @@ func (r *RenderData) makeRenderers(e *Error) renderers {
 					err)
 				continue
 			}
-			tmplPath = path.Clean("/" + buf.String())
+			if r.target.Prefix() == "tasks" {
+				tmplPath = path.Clean(buf.String())
+			} else {
+				tmplPath = path.Clean("/" + buf.String())
+			}
 		}
 		rts[i] = newRenderedTemplate(r, ti.id(), tmplPath)
 	}
