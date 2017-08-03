@@ -1,8 +1,10 @@
 package backend
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -374,7 +376,9 @@ func (j *Job) BeforeSave() error {
 
 	if j.LogPath == "" {
 		j.LogPath = filepath.Join(j.p.LogRoot, j.Uuid.String())
-		ee := j.Log(fmt.Sprintf("Log for Job: %s\n", j.Uuid.String()))
+		buf := &bytes.Buffer{}
+		fmt.Fprintf(buf, "Log for Job: %s\n", j.Uuid.String())
+		ee := j.Log(buf)
 		e.Merge(ee)
 	}
 
@@ -465,15 +469,13 @@ func (j *Job) RenderActions() ([]*JobAction, error) {
 	return actions, err.OrNil()
 }
 
-func (j *Job) Log(text string) error {
+func (j *Job) Log(src io.Reader) error {
 	f, err := os.OpenFile(j.LogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		fmt.Printf("Umm err: %v\n", err)
 		return err
 	}
-	defer f.Close()
-
-	_, err = f.WriteString(text)
+	_, err = io.Copy(f, src)
 	if err != nil {
 		fmt.Printf("Umm write err: %v\n", err)
 		return err

@@ -492,17 +492,32 @@ func (f *Frontend) InitJobApi() {
 	// swagger:route PUT /jobs/{uuid}/log Jobs putJobLog
 	//
 	// Append the string to the end of the job's log.
+	//     Consumes:
+	//       application/octet-stream
+	//
+	//     Produces:
+	//       application/json
 	//
 	//     Responses:
 	//       204: NoContentResponse
+	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       415: ErrorResponse
 	//       404: ErrorResponse
 	//       500: ErrorResponse
 	f.ApiGroup.PUT("/jobs/:uuid/log",
 		func(c *gin.Context) {
-			var s string
-			if !assureDecode(c, &s) {
+			if c.Request.Body == nil {
+				err := &backend.Error{Code: http.StatusBadRequest}
+				c.JSON(err.Code, err)
+				return
+			}
+			defer c.Request.Body.Close()
+			if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
+				c.JSON(http.StatusUnsupportedMediaType,
+					backend.NewError("API ERROR", http.StatusUnsupportedMediaType,
+						"job log put must have content-type application/octet-stream"))
 				return
 			}
 			uuid := c.Param(`uuid`)
@@ -529,7 +544,7 @@ func (f *Frontend) InitJobApi() {
 				return
 			}
 
-			if err := j.Log(s); err != nil {
+			if err := j.Log(c.Request.Body); err != nil {
 				err2 := &backend.Error{Code: http.StatusInternalServerError, Type: "Server ERROR",
 					Messages: []string{err.Error()}}
 				c.JSON(err2.Code, err2)
