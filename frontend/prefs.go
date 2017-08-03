@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
 )

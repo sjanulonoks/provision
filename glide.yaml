@@ -15,8 +15,8 @@ import:
   subpackages:
   - go/common/client
   - go/common/service
-  - go/common/store
   - go/common/version
+- package: github.com/digitalrebar/store
 - package: github.com/hashicorp/consul
   subpackages:
   - api

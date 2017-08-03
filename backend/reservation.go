@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"net"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
 )
 

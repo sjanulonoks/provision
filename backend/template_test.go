@@ -1,14 +1,9 @@
 package backend
 
-import (
-	"testing"
-
-	"github.com/digitalrebar/digitalrebar/go/common/store"
-)
+import "testing"
 
 func TestTemplateCrud(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("templates", "bootenvs", "tasks", "machines")
 	defer unlocker()
 	tests := []crudTest{

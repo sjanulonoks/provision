@@ -1,14 +1,9 @@
 package backend
 
-import (
-	"testing"
-
-	"github.com/digitalrebar/digitalrebar/go/common/store"
-)
+import "testing"
 
 func TestGetInterfaces(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 
 	ifs, err := dt.GetInterfaces()
 	if err != nil {

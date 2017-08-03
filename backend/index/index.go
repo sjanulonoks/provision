@@ -5,7 +5,7 @@ import (
 	"fmt"
 	s "sort"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 )
 
 type Indexer interface {

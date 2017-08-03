@@ -6,7 +6,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/pborman/uuid"
 )
 
@@ -65,8 +64,7 @@ BootParams = default`
 )
 
 func TestRenderData(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	var machine *Machine
 	defaultBootEnv := &BootEnv{p: dt, Name: "default", Templates: []TemplateInfo{{Name: "ipxe", Path: "machines/{{.Machine.UUID}}/file", ID: "default"}}, BootParams: "{{.Env.Name}}"}
 	nothingBootEnv := &BootEnv{p: dt, Name: "nothing", Templates: []TemplateInfo{{Name: "ipxe", Path: "machines/{{.Machine.UUID}}/file", ID: "nothing"}}, BootParams: "{{.Env.Name}}"}

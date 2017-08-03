@@ -4,8 +4,6 @@ import (
 	"net"
 	"testing"
 	"time"
-
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
 type ltf struct {
@@ -52,8 +50,7 @@ func (l *ltf) find(t *testing.T, dt *DataTracker) {
 }
 
 func TestDHCPRenew(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	func() {
 		d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
 		defer unlocker()
@@ -121,8 +118,7 @@ func (l *ltc) test(t *testing.T, dt *DataTracker) {
 }
 
 func TestDHCPCreateReservationOnly(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	func() {
 		d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
 		defer unlocker()
@@ -167,8 +163,7 @@ func TestDHCPCreateReservationOnly(t *testing.T) {
 }
 
 func TestDHCPCreateSubnet(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	var subnet *Subnet
 	func() {
 		d, unlocker := dt.LockEnts("subnets", "leases", "reservations")

@@ -1,14 +1,9 @@
 package backend
 
-import (
-	"testing"
-
-	"github.com/digitalrebar/digitalrebar/go/common/store"
-)
+import "testing"
 
 func TestPreferences(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("preferences", "bootenvs")
 	defer unlocker()
 	if be, err := dt.Pref("defaultBootEnv"); err != nil {

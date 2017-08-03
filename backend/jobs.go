@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/pborman/uuid"
 )

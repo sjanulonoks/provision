@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 )
 
 type renderer struct {
