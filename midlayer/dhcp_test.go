@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/store"
 	dhcp "github.com/krolaw/dhcp4"
 )
 
@@ -51,9 +51,9 @@ func TestMain(m *testing.M) {
 		log.Printf("Creating temp dir for file root failed: %v", err)
 		os.Exit(1)
 	}
-	bs, err := store.NewFileBackend(tmpDir)
+	bs, err := store.NewDirBackend(tmpDir, nil)
 	if err != nil {
-		log.Printf("Could not create boltdb: %v", err)
+		log.Printf("Could not create directory: %v", err)
 		os.Exit(1)
 	}
 	logger := log.New(os.Stdout, "dt", 0)

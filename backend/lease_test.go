@@ -4,13 +4,10 @@ import (
 	"net"
 	"testing"
 	"time"
-
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
 func TestLeaseCrud(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("leases", "reservations", "subnets")
 	defer unlocker()
 	tests := []crudTest{

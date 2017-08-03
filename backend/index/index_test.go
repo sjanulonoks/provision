@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 )
 
 type testThing int64

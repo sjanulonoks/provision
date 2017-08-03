@@ -1,14 +1,9 @@
 package backend
 
-import (
-	"testing"
-
-	"github.com/digitalrebar/digitalrebar/go/common/store"
-)
+import "testing"
 
 func TestUserCrud(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("users")
 	defer unlocker()
 	tests := []crudTest{
@@ -33,8 +28,7 @@ func TestUserCrud(t *testing.T) {
 }
 
 func TestUserPassword(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("users")
 	defer unlocker()
 	u := dt.NewUser()

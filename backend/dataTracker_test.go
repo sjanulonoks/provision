@@ -9,7 +9,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 )
 
 var (
@@ -73,6 +73,9 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 }
 
 func mkDT(bs store.SimpleStore) *DataTracker {
+	if bs == nil {
+		bs = store.NewSimpleMemoryStore(nil)
+	}
 	logger := log.New(os.Stdout, "dt", 0)
 	dt := NewDataTracker(bs,
 		tmpDir,
@@ -89,7 +92,7 @@ func mkDT(bs store.SimpleStore) *DataTracker {
 func TestBackingStorePersistence(t *testing.T) {
 	// Comment out for now
 	return
-	bs, err := store.NewFileBackend(tmpDir)
+	bs, err := store.NewDirBackend(tmpDir, nil)
 	if err != nil {
 		t.Errorf("Could not create boltdb: %v", err)
 		return

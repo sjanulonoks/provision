@@ -3,13 +3,11 @@ package backend
 import (
 	"testing"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/pborman/uuid"
 )
 
 func TestBootEnvCrud(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("bootenvs", "templates", "tasks", "machines", "profiles")
 	defer unlocker()
 	tmpl := &Template{p: dt, ID: "ok", Contents: "{{ .Env.Name }}"}

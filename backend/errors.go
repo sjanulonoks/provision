@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 )
 
 const (

@@ -38,12 +38,12 @@ import (
 	"syscall"
 
 	"github.com/digitalrebar/digitalrebar/go/common/client"
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/frontend"
 	"github.com/digitalrebar/provision/midlayer"
 	"github.com/digitalrebar/provision/plugin"
+	"github.com/digitalrebar/store"
 )
 
 type ProgOpts struct {
@@ -125,14 +125,14 @@ func Server(c_opts *ProgOpts) {
 		if err != nil {
 			logger.Fatalf("Error talking to Consul: %v", err)
 		}
-		backendStore, err = store.NewSimpleConsulStore(consulClient, c_opts.DataRoot)
+		backendStore, err = store.NewSimpleConsulStore(consulClient, c_opts.DataRoot, nil)
 	case "directory":
-		backendStore, err = store.NewFileBackend(c_opts.DataRoot)
+		backendStore, err = store.NewDirBackend(c_opts.DataRoot, nil)
 	case "memory":
-		backendStore = store.NewSimpleMemoryStore()
+		backendStore = store.NewSimpleMemoryStore(nil)
 		err = nil
 	case "bolt", "local":
-		backendStore, err = store.NewSimpleLocalStore(c_opts.DataRoot)
+		backendStore, err = store.NewSimpleLocalStore(c_opts.DataRoot, nil)
 	default:
 		logger.Fatalf("Unknown storage backend type %v\n", c_opts.BackEndType)
 	}

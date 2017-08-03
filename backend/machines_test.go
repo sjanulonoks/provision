@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 	"github.com/pborman/uuid"
 )
 
@@ -47,8 +47,7 @@ func (p *patchTest) test(t *testing.T, target store.KeySaver) {
 }
 
 func TestMachineCrud(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("templates", "machines", "tasks", "bootenvs", "profiles")
 	defer unlocker()
 	okUUID := uuid.NewRandom()

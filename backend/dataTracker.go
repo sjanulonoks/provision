@@ -14,8 +14,8 @@ import (
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
 
 var (

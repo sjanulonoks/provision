@@ -3,13 +3,10 @@ package backend
 import (
 	"net"
 	"testing"
-
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
 func TestReservationCrud(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
+	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("reservations", "subnets")
 	defer unlocker()
 	tests := []crudTest{
