@@ -11,15 +11,16 @@ import (
 	"strings"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/embedded"
 	"github.com/digitalrebar/provision/plugin"
+	"github.com/digitalrebar/store"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/location"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"gopkg.in/olahol/melody.v1"
 )
 
@@ -279,7 +280,7 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	if !assureContentType(c, "application/json") {
 		return false
 	}
-	marshalErr := c.Bind(&val)
+	marshalErr := binding.JSON.Bind(c.Request, &val)
 	if marshalErr == nil {
 		return true
 	}
