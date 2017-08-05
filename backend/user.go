@@ -1,8 +1,8 @@
 package backend
 
 import (
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 	sc "github.com/elithrar/simple-scrypt"
 )
 
@@ -16,7 +16,6 @@ type User struct {
 	Name string
 	// PasswordHash is the scrypt-hashed version of the user's Password.
 	//
-	// swagger:strfmt password
 	PasswordHash []byte `json:",omitempty"`
 	p            *DataTracker
 }
