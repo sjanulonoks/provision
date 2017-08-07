@@ -337,7 +337,7 @@ func convertValueToFilter(v string) (index.Filter, error) {
 	return nil, fmt.Errorf("Should never get here")
 }
 
-func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string) ([]index.Filter, error) {
+func (f *Frontend) processFilters(d backend.Stores, ref store.KeySaver, params map[string][]string) ([]index.Filter, error) {
 	filters := []index.Filter{}
 
 	var indexes map[string]index.Maker
@@ -352,7 +352,19 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 			continue
 		}
 
-		if maker, ok := indexes[k]; ok {
+		maker, ok := indexes[k]
+		if !ok {
+			if ref.Prefix() != "machines" {
+				return nil, fmt.Errorf("Filter not found: %s", k)
+			}
+			var err error
+			maker, err = ref.(*backend.Machine).ParameterMaker(d, k)
+			if err != nil {
+				return nil, err
+			}
+			ok = true
+		}
+		if ok {
 			filters = append(filters, index.Sort(maker))
 			subfilters := []index.Filter{}
 			for _, v := range vs {
@@ -363,8 +375,6 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 				subfilters = append(subfilters, f)
 			}
 			filters = append(filters, index.Any(subfilters...))
-		} else {
-			return nil, fmt.Errorf("Filter not found: %s", k)
 		}
 	}
 
@@ -415,16 +425,16 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 		Type:  "API_ERROR",
 		Model: ref.Prefix(),
 	}
-	filters, err := f.processFilters(ref, c.Request.URL.Query())
-	if err != nil {
-		res.Merge(err)
-		c.JSON(res.Code, res)
-		return
-	}
 	var idx *index.Index
+	var err error
 	func() {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("get")...)
 		defer unlocker()
+		var filters []index.Filter
+		filters, err = f.processFilters(d, ref, c.Request.URL.Query())
+		if err != nil {
+			return
+		}
 		idx, err = index.All(filters...)(&d(ref.Prefix()).Index)
 	}()
 	if err != nil {
