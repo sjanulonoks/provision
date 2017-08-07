@@ -55,7 +55,7 @@ func (u *User) AuthKey() string {
 	return u.Key()
 }
 
-func (u *User) Backend() store.SimpleStore {
+func (u *User) Backend() store.Store {
 	return u.p.getBackend(u)
 }
 

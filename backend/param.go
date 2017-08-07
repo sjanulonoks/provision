@@ -42,7 +42,7 @@ func AsParams(o []store.KeySaver) []*Param {
 	return res
 }
 
-func (p *Param) Backend() store.SimpleStore {
+func (p *Param) Backend() store.Store {
 	return p.p.getBackend(p)
 }
 

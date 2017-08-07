@@ -18,7 +18,7 @@ imports:
   - go/common/service
   - go/common/version
 - name: github.com/digitalrebar/store
-  version: 67ced395f767a9416a2c6ad58106808952e401cb
+  version: 45d1f3cd3d95b37bb6d56e89918ad124e1f6d94c
 - name: github.com/elazarl/go-bindata-assetfs
   version: 30f82fa23fd844bd5bb1e5f216db87fd77b5eb43
 - name: github.com/elithrar/simple-scrypt

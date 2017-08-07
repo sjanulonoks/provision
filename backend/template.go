@@ -145,7 +145,7 @@ func (t *Template) Prefix() string {
 	return "templates"
 }
 
-func (t *Template) Backend() store.SimpleStore {
+func (t *Template) Backend() store.Store {
 	return t.p.getBackend(t)
 }
 

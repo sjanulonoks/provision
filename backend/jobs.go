@@ -113,7 +113,7 @@ func AsJobs(o []store.KeySaver) []*Job {
 	return res
 }
 
-func (j *Job) Backend() store.SimpleStore {
+func (j *Job) Backend() store.Store {
 	return j.p.getBackend(j)
 }
 

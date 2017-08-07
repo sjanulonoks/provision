@@ -327,7 +327,7 @@ func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error
 
 }
 
-func (n *Machine) Backend() store.SimpleStore {
+func (n *Machine) Backend() store.Store {
 	return n.p.getBackend(n)
 }
 

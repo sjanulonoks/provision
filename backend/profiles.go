@@ -66,7 +66,7 @@ func (p *Profile) Indexes() map[string]index.Maker {
 	}
 }
 
-func (p *Profile) Backend() store.SimpleStore {
+func (p *Profile) Backend() store.Store {
 	return p.p.getBackend(p)
 }
 

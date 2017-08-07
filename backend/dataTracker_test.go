@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	backingStore store.SimpleStore
+	backingStore store.Store
 	tmpDir       string
 )
 
@@ -72,9 +72,10 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 	return dt.Create(d, res, nil)
 }
 
-func mkDT(bs store.SimpleStore) *DataTracker {
+func mkDT(bs store.Store) *DataTracker {
 	if bs == nil {
-		bs = store.NewSimpleMemoryStore(nil)
+		bs = &store.Memory{}
+		bs.Open(nil)
 	}
 	logger := log.New(os.Stdout, "dt", 0)
 	dt := NewDataTracker(bs,
@@ -92,8 +93,8 @@ func mkDT(bs store.SimpleStore) *DataTracker {
 func TestBackingStorePersistence(t *testing.T) {
 	// Comment out for now
 	return
-	bs, err := store.NewDirBackend(tmpDir, nil)
-	if err != nil {
+	bs := &store.Directory{Path: tmpDir}
+	if err := bs.Open(nil); err != nil {
 		t.Errorf("Could not create boltdb: %v", err)
 		return
 	}

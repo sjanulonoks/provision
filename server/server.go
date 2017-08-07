@@ -118,25 +118,25 @@ func Server(c_opts *ProgOpts) {
 	mkdir(c_opts.DataRoot, logger)
 	mkdir(c_opts.LogRoot, logger)
 
-	var backendStore store.SimpleStore
+	var backendStore store.Store
 	switch c_opts.BackEndType {
 	case "consul":
 		consulClient, err := client.Consul(true)
 		if err != nil {
 			logger.Fatalf("Error talking to Consul: %v", err)
 		}
-		backendStore, err = store.NewSimpleConsulStore(consulClient, c_opts.DataRoot, nil)
+		backendStore = &store.Consul{Client: consulClient, BaseKey: c_opts.DataRoot}
 	case "directory":
-		backendStore, err = store.NewDirBackend(c_opts.DataRoot, nil)
+		backendStore = &store.Directory{Path: c_opts.DataRoot}
 	case "memory":
-		backendStore = store.NewSimpleMemoryStore(nil)
+		backendStore = &store.Memory{}
 		err = nil
 	case "bolt", "local":
-		backendStore, err = store.NewSimpleLocalStore(c_opts.DataRoot, nil)
+		backendStore = &store.Bolt{Path: c_opts.DataRoot}
 	default:
 		logger.Fatalf("Unknown storage backend type %v\n", c_opts.BackEndType)
 	}
-	if err != nil {
+	if err := backendStore.Open(store.DefaultCodec); err != nil {
 		logger.Fatalf("Error using backing store %s: %v", c_opts.BackEndType, err)
 	}
 
