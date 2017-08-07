@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -8,8 +9,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 	"github.com/pborman/uuid"
 )
 
@@ -203,6 +204,129 @@ func (n *Machine) Indexes() map[string]index.Maker {
 	}
 }
 
+func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error) {
+	fix := AsMachine
+	pobj := d("params").Find(parameter)
+	if pobj == nil {
+		return index.Maker{}, fmt.Errorf("Parameter %s must be defined", parameter)
+	}
+	param := AsParam(pobj)
+
+	return index.Make(
+		false,
+		"parameter",
+		func(i, j store.KeySaver) bool {
+			ip, _ := fix(i).GetParam(d, parameter, true)
+			jp, _ := fix(j).GetParam(d, parameter, true)
+
+			// If both are nil, the Less is i < j == false
+			if ip == nil && jp == nil {
+				return false
+			}
+			// If ip is nil, the Less is i < j == true
+			if ip == nil {
+				if _, ok := jp.(bool); ok {
+					return jp.(bool)
+				}
+				return true
+			}
+			// If jp is nil, the Less is i < j == false
+			if jp == nil {
+				return false
+			}
+
+			if _, ok := ip.(string); ok {
+				return ip.(string) < jp.(string)
+			}
+			if _, ok := ip.(bool); ok {
+				return jp.(bool) && !ip.(bool)
+			}
+			if _, ok := ip.(int); ok {
+				return ip.(int) < jp.(int)
+			}
+
+			return false
+		},
+		func(ref store.KeySaver) (gte, gt index.Test) {
+			jp, _ := fix(ref).GetParam(d, parameter, true)
+			return func(s store.KeySaver) bool {
+					ip, _ := fix(s).GetParam(d, parameter, true)
+
+					// If both are nil, the Less is i >= j == true
+					if ip == nil && jp == nil {
+						return true
+					}
+					// If ip is nil, the Less is i >= j == false
+					if ip == nil {
+						if _, ok := jp.(bool); ok {
+							return !jp.(bool)
+						}
+						return false
+					}
+					// If jp is nil, the Less is i >= j == true
+					if jp == nil {
+						return true
+					}
+
+					if _, ok := ip.(string); ok {
+						return ip.(string) >= jp.(string)
+					}
+					if _, ok := ip.(bool); ok {
+						return ip.(bool) || ip.(bool) == jp.(bool)
+					}
+					if _, ok := ip.(int); ok {
+						return ip.(int) >= jp.(int)
+					}
+					return false
+				},
+				func(s store.KeySaver) bool {
+					ip, _ := fix(s).GetParam(d, parameter, true)
+
+					// If both are nil, the Less is i > j == false
+					if ip == nil && jp == nil {
+						return false
+					}
+					// If ip is nil, the Less is i > j == false
+					if ip == nil {
+						return false
+					}
+					// If jp is nil, the Less is i > j == true
+					if jp == nil {
+						if _, ok := ip.(bool); ok {
+							return ip.(bool)
+						}
+						return true
+					}
+
+					if _, ok := ip.(string); ok {
+						return ip.(string) > jp.(string)
+					}
+					if _, ok := ip.(bool); ok {
+						return ip.(bool) && !jp.(bool)
+					}
+					if _, ok := ip.(int); ok {
+						return ip.(int) > jp.(int)
+					}
+					return false
+				}
+		},
+		func(s string) (store.KeySaver, error) {
+			res := &Machine{Profile: Profile{Params: map[string]interface{}{}}}
+
+			var obj interface{}
+			err := json.Unmarshal([]byte(s), &obj)
+			if err != nil {
+				return nil, err
+			}
+			if err := param.Validate(obj); err != nil {
+				return nil, err
+			}
+			res.Profile.Params[parameter] = obj
+			return res, nil
+		}), nil
+
+}
+
 func (n *Machine) Backend() store.SimpleStore {
 	return n.p.getBackend(n)
 }
@@ -285,6 +409,11 @@ func (n *Machine) GetParam(d Stores, key string, searchProfiles bool) (interface
 				if v, ok := p.GetParam(key, false); ok {
 					return v, true
 				}
+			}
+		}
+		if gp := n.getProfile(d, n.p.GlobalProfileName); gp != nil {
+			if v, ok := gp.Params[key]; ok {
+				return v, true
 			}
 		}
 	}
@@ -445,7 +574,7 @@ func AsMachines(o []store.KeySaver) []*Machine {
 }
 
 var machineLockMap = map[string][]string{
-	"get":     []string{"machines"},
+	"get":     []string{"machines", "profiles", "params"},
 	"create":  []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
 	"update":  []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
 	"patch":   []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
