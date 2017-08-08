@@ -1,5 +1,5 @@
-hash: 60107cf312eeb5bf6f49608bf1de5abbe00f21e799d5ec1e6c411b88476666a9
-updated: 2017-08-03T14:43:06.914544601-05:00
+hash: 89bd2bca6342045b039230cedb29304a35829cada54f96206e8f3863f7028639
+updated: 2017-08-08T11:00:10.380883183-05:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 71551cef584cae1b2e01c37e8c0e1f1160eedd6f
@@ -11,14 +11,8 @@ imports:
   - md2man
 - name: github.com/dgrijalva/jwt-go
   version: d2709f9f1f31ebcda9651b03077758c1f3a0018c
-- name: github.com/digitalrebar/digitalrebar
-  version: d1a912ced52de58d8b164c415df3cd133477818b
-  subpackages:
-  - go/common/client
-  - go/common/service
-  - go/common/version
 - name: github.com/digitalrebar/store
-  version: 45d1f3cd3d95b37bb6d56e89918ad124e1f6d94c
+  version: 5ca701fcc7efbde36b2bf44b4a3dcb897d5acf01
 - name: github.com/elazarl/go-bindata-assetfs
   version: 30f82fa23fd844bd5bb1e5f216db87fd77b5eb43
 - name: github.com/elithrar/simple-scrypt
@@ -161,6 +155,6 @@ imports:
 - name: gopkg.in/olahol/melody.v1
   version: d521390733761fe1db13de575c253afd5c743085
 - name: gopkg.in/yaml.v2
-  version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
+  version: 25c4ec802a7d637f88d584ab26798e94ad14c13b
   repo: https://github.com/go-yaml/yaml
 testImports: []

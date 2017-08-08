@@ -11,11 +11,6 @@ import:
 - package: github.com/xeipuuv/gojsonschema
 - package: github.com/VictorLowther/jsonpatch2
 - package: github.com/ghodss/yaml
-- package: github.com/digitalrebar/digitalrebar
-  subpackages:
-  - go/common/client
-  - go/common/service
-  - go/common/version
 - package: github.com/digitalrebar/store
 - package: github.com/hashicorp/consul
   subpackages:

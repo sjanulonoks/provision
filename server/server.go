@@ -31,13 +31,13 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
 
-	"github.com/digitalrebar/digitalrebar/go/common/client"
 	"github.com/digitalrebar/provision"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/frontend"
@@ -59,7 +59,7 @@ type ProgOpts struct {
 	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
 	OurAddress          string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
 
-	BackEndType string `long:"backend" description:"Storage backend to use. Can be either 'consul' or 'directory'" default:"directory"`
+	BackEndType string `long:"backend" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI" default:"directory"`
 
 	BaseRoot   string `long:"base-root" description:"Base directory for other root dirs." default:"/var/lib/dr-provision"`
 	DataRoot   string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
@@ -117,29 +117,16 @@ func Server(c_opts *ProgOpts) {
 	mkdir(c_opts.PluginRoot, logger)
 	mkdir(c_opts.DataRoot, logger)
 	mkdir(c_opts.LogRoot, logger)
-
 	var backendStore store.Store
-	switch c_opts.BackEndType {
-	case "consul":
-		consulClient, err := client.Consul(true)
-		if err != nil {
-			logger.Fatalf("Error talking to Consul: %v", err)
-		}
-		backendStore = &store.Consul{Client: consulClient, BaseKey: c_opts.DataRoot}
-	case "directory":
-		backendStore = &store.Directory{Path: c_opts.DataRoot}
-	case "memory":
-		backendStore = &store.Memory{}
-		err = nil
-	case "bolt", "local":
-		backendStore = &store.Bolt{Path: c_opts.DataRoot}
-	default:
-		logger.Fatalf("Unknown storage backend type %v\n", c_opts.BackEndType)
+	if u, err := url.Parse(c_opts.BackEndType); err == nil && u.Scheme != "" {
+		backendStore, err = store.Open(c_opts.BackEndType)
+	} else {
+		storeURI := fmt.Sprintf("%s://%s", c_opts.BackEndType, c_opts.DataRoot)
+		backendStore, err = store.Open(storeURI)
 	}
-	if err := backendStore.Open(store.DefaultCodec); err != nil {
+	if err != nil {
 		logger.Fatalf("Error using backing store %s: %v", c_opts.BackEndType, err)
 	}
-
 	// We have a backend, now get default assets
 	logger.Printf("Extracting Default Assets\n")
 	if err := ExtractAssets(c_opts.FileRoot); err != nil {
