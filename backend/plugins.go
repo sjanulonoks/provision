@@ -73,7 +73,7 @@ func (n *Plugin) Indexes() map[string]index.Maker {
 	}
 }
 
-func (n *Plugin) Backend() store.SimpleStore {
+func (n *Plugin) Backend() store.Store {
 	return n.p.getBackend(n)
 }
 

@@ -76,10 +76,10 @@ func Create(objs []store.KeySaver) *Index {
 
 type Fake string
 
-func (f Fake) Prefix() string             { return "fake" }
-func (f Fake) Key() string                { return string(f) }
-func (f Fake) New() store.KeySaver        { return f }
-func (f Fake) Backend() store.SimpleStore { return nil }
+func (f Fake) Prefix() string       { return "fake" }
+func (f Fake) Key() string          { return string(f) }
+func (f Fake) New() store.KeySaver  { return f }
+func (f Fake) Backend() store.Store { return nil }
 
 func MakeKey() Maker {
 	return Maker{

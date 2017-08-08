@@ -22,7 +22,7 @@ func (t testThing) New() store.KeySaver {
 	return t
 }
 
-func (t testThing) Backend() store.SimpleStore {
+func (t testThing) Backend() store.Store {
 	return nil
 }
 

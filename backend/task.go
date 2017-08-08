@@ -52,7 +52,7 @@ func AsTasks(o []store.KeySaver) []*Task {
 	return res
 }
 
-func (t *Task) Backend() store.SimpleStore {
+func (t *Task) Backend() store.Store {
 	return t.p.getBackend(t)
 }
 

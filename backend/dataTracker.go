@@ -73,12 +73,12 @@ type AuthSaver interface {
 type Store struct {
 	sync.Mutex
 	index.Index
-	backingStore store.SimpleStore
+	backingStore store.Store
 }
 
 type ObjectValidator func(Stores, store.KeySaver, store.KeySaver) error
 
-func (s *Store) getBackend(obj store.KeySaver) store.SimpleStore {
+func (s *Store) getBackend(obj store.KeySaver) store.Store {
 	return s.backingStore
 }
 
@@ -175,7 +175,7 @@ func (p *DataTracker) ApiURL(remoteIP net.IP) string {
 }
 
 // Create a new DataTracker that will use passed store to save all operational data
-func NewDataTracker(backend store.SimpleStore,
+func NewDataTracker(backend store.Store,
 	fileRoot, logRoot, addr string,
 	staticPort, apiPort int,
 	logger *log.Logger,
@@ -217,7 +217,7 @@ func NewDataTracker(backend store.SimpleStore,
 	res.objs = map[string]*Store{}
 	for _, obj := range objs {
 		prefix := obj.Prefix()
-		bk, err := backend.Sub(prefix)
+		bk, err := backend.MakeSub(prefix)
 		if err != nil {
 			res.Logger.Fatalf("dataTracker: Error creating substore %s: %v", prefix, err)
 		}
@@ -392,7 +392,7 @@ func (p *DataTracker) RenderUnknown(d Stores) error {
 	return err.OrNil()
 }
 
-func (p *DataTracker) getBackend(t store.KeySaver) store.SimpleStore {
+func (p *DataTracker) getBackend(t store.KeySaver) store.Store {
 	res, ok := p.objs[t.Prefix()]
 	if !ok {
 		p.Logger.Fatalf("%s: No registered storage backend!", t.Prefix())

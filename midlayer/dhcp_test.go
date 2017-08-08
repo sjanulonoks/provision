@@ -51,8 +51,8 @@ func TestMain(m *testing.M) {
 		log.Printf("Creating temp dir for file root failed: %v", err)
 		os.Exit(1)
 	}
-	bs, err := store.NewDirBackend(tmpDir, nil)
-	if err != nil {
+	bs := &store.Directory{Path: tmpDir}
+	if err := bs.Open(nil); err != nil {
 		log.Printf("Could not create directory: %v", err)
 		os.Exit(1)
 	}

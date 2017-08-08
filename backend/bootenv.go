@@ -202,7 +202,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 	}
 }
 
-func (b *BootEnv) Backend() store.SimpleStore {
+func (b *BootEnv) Backend() store.Store {
 	return b.p.getBackend(b)
 }
 

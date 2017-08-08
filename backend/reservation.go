@@ -149,7 +149,7 @@ func (r *Reservation) AuthKey() string {
 	return r.Key()
 }
 
-func (r *Reservation) Backend() store.SimpleStore {
+func (r *Reservation) Backend() store.Store {
 	return r.p.getBackend(r)
 }
 

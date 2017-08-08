@@ -173,7 +173,7 @@ func (l *Lease) AuthKey() string {
 	return l.Key()
 }
 
-func (l *Lease) Backend() store.SimpleStore {
+func (l *Lease) Backend() store.Store {
 	return l.p.getBackend(l)
 }
 

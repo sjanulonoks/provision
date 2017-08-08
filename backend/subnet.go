@@ -397,7 +397,7 @@ func (s *Subnet) AuthKey() string {
 	return s.Key()
 }
 
-func (s *Subnet) Backend() store.SimpleStore {
+func (s *Subnet) Backend() store.Store {
 	return s.p.getBackend(s)
 }
 
