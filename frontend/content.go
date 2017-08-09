@@ -139,7 +139,6 @@ func buildSummary(st store.Store) *ContentSummary {
 }
 
 func (f *Frontend) buildContent(st store.Store) (*Content, *backend.Error) {
-	// GREG: Locking
 	content := &Content{}
 
 	var md map[string]string
@@ -354,10 +353,15 @@ func (f *Frontend) InitContentApi() {
 				_, unlocker := f.dt.LockAll()
 				defer unlocker()
 
-				// GREG: Add store
+				err := f.dt.AddStore(newStore)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError,
+						backend.NewError("API_ERROR", http.StatusInternalServerError,
+							fmt.Sprintf("content load: error: %s: %v", name, err)))
+				} else {
+					c.JSON(http.StatusCreated, cs)
+				}
 			}()
-
-			c.JSON(http.StatusCreated, cs)
 		})
 
 	// swagger:route PUT /contents/:name Contents uploadContent

@@ -113,6 +113,24 @@ type DataTracker struct {
 
 type Stores func(string) *Store
 
+func allKeySavers(res *DataTracker) []store.KeySaver {
+	return []store.KeySaver{
+		&Task{p: res},
+		&Job{p: res},
+		&Param{p: res},
+		&Profile{p: res},
+		&User{p: res},
+		&Template{p: res},
+		&BootEnv{p: res},
+		&Machine{p: res},
+		&Subnet{p: res},
+		&Reservation{p: res},
+		&Lease{p: res},
+		&Pref{p: res},
+		&Plugin{p: res},
+	}
+}
+
 // LockEnts grabs the requested Store locks a consistent order.
 // It returns a function to get an Index that was requested, and
 // a function that unlocks the taken locks in the right order.
@@ -153,11 +171,14 @@ func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) 
 }
 
 func (p *DataTracker) LockAll() (stores Stores, unlocker func()) {
-	keys := make([]string, len(p.objs))
-	i := 0
+	keys := make([]string, 0)
 	for k := range p.objs {
-		keys[i] = k
+		if k == "" {
+			continue
+		}
+		keys = append(keys, k)
 	}
+
 	return p.LockEnts(keys...)
 }
 
@@ -182,6 +203,35 @@ func (p *DataTracker) FileURL(remoteIP net.IP) string {
 
 func (p *DataTracker) ApiURL(remoteIP net.IP) string {
 	return p.urlFor("https", remoteIP, p.ApiPort)
+}
+
+func (p *DataTracker) rebuildCache() error {
+	p.objs = map[string]*Store{}
+	objs := allKeySavers(p)
+	for _, obj := range objs {
+		prefix := obj.Prefix()
+		bk := p.Backend.GetSub(prefix)
+		p.objs[prefix] = &Store{backingStore: bk}
+		storeObjs, err := store.List(obj)
+		if err != nil {
+			return fmt.Errorf("%s: %v", prefix, err)
+		}
+		p.objs[prefix].Index = *index.Create(storeObjs)
+		if obj.Prefix() == "templates" {
+			buf := &bytes.Buffer{}
+			for _, thing := range p.objs["templates"].Items() {
+				tmpl := AsTemplate(thing)
+				fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}`, tmpl.ID, tmpl.Contents)
+			}
+			root, err := template.New("").Parse(buf.String())
+			if err != nil {
+				return fmt.Errorf("Unable to load root templates: %v", err)
+			}
+			p.rootTemplate = root
+			p.rootTemplate.Option("missingkey=error")
+		}
+	}
+	return nil
 }
 
 // Create a new DataTracker that will use passed store to save all operational data
@@ -209,22 +259,9 @@ func NewDataTracker(backend store.Store,
 		thunkMux:          &sync.Mutex{},
 		publishers:        publishers,
 	}
-	objs := []store.KeySaver{
-		&Task{p: res},
-		&Job{p: res},
-		&Param{p: res},
-		&Profile{p: res},
-		&User{p: res},
-		&Template{p: res},
-		&BootEnv{p: res},
-		&Machine{p: res},
-		&Subnet{p: res},
-		&Reservation{p: res},
-		&Lease{p: res},
-		&Pref{p: res},
-		&Plugin{p: res},
-	}
+
 	// Make sure incoming writable backend has all stores created
+	objs := allKeySavers(res)
 	for _, obj := range objs {
 		prefix := obj.Prefix()
 		_, err := backend.MakeSub(prefix)
@@ -244,29 +281,9 @@ func NewDataTracker(backend store.Store,
 	backend = stackBackend
 
 	// Setup stores.
-	res.objs = map[string]*Store{}
-	for _, obj := range objs {
-		prefix := obj.Prefix()
-		bk := backend.GetSub(prefix)
-		res.objs[prefix] = &Store{backingStore: bk}
-		storeObjs, err := store.List(obj)
-		if err != nil {
-			res.Logger.Fatalf("dataTracker: Error loading data for %s: %v", prefix, err)
-		}
-		res.objs[prefix].Index = *index.Create(storeObjs)
-		if obj.Prefix() == "templates" {
-			buf := &bytes.Buffer{}
-			for _, thing := range res.objs["templates"].Items() {
-				tmpl := AsTemplate(thing)
-				fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}`, tmpl.ID, tmpl.Contents)
-			}
-			root, err := template.New("").Parse(buf.String())
-			if err != nil {
-				logger.Fatalf("Unable to load root templates: %v", err)
-			}
-			res.rootTemplate = root
-			res.rootTemplate.Option("missingkey=error")
-		}
+	err = res.rebuildCache()
+	if err != nil {
+		res.Logger.Fatalf("dataTracker: Error loading data: %v", err)
 	}
 
 	d, unlocker := res.LockEnts("bootenvs", "preferences", "users", "machines", "profiles", "params")
@@ -689,6 +706,20 @@ func (p *DataTracker) Backup() ([]byte, error) {
 		res[k] = p.objs[k].Items()
 	}
 	return json.Marshal(res)
+}
+
+// Assumes that all locks are held
+func (p *DataTracker) AddStore(st store.Store) error {
+	stack, ok := p.Backend.(*store.StackedStore)
+	if !ok {
+		return fmt.Errorf("Push not allowed with current store")
+	}
+	err := stack.Push(st)
+	if err != nil {
+		return err
+	}
+
+	return p.rebuildCache()
 }
 
 func (p *DataTracker) NewToken(id string, ttl int, scope, action, specific string) (string, error) {
