@@ -41,6 +41,8 @@ func TestServer(t *testing.T) {
 		"--static-port", "10002",
 		"--tftp-port", "10003",
 		"--disable-dhcp",
+		"--local-content", "",
+		"--default-content", "",
 	}
 
 	c_opts := generateArgs(testArgs)

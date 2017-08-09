@@ -59,7 +59,9 @@ type ProgOpts struct {
 	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
 	OurAddress          string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
 
-	BackEndType string `long:"backend" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI" default:"directory"`
+	BackEndType    string `long:"backend" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI" default:"directory"`
+	LocalContent   string `long:"local-content" description:"Storage to use for local overrides." default:"directory:///etc/dr-provision?codec=yaml"`
+	DefaultContent string `long:"default-content" description:"Store URL for local content" default:"directory:///usr/share/dr-provision?codec=yaml"`
 
 	BaseRoot   string `long:"base-root" description:"Base directory for other root dirs." default:"/var/lib/dr-provision"`
 	DataRoot   string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
@@ -117,6 +119,13 @@ func Server(c_opts *ProgOpts) {
 	mkdir(c_opts.PluginRoot, logger)
 	mkdir(c_opts.DataRoot, logger)
 	mkdir(c_opts.LogRoot, logger)
+	logger.Printf("Extracting Default Assets\n")
+	if err := ExtractAssets(c_opts.FileRoot); err != nil {
+		logger.Fatalf("Unable to extract assets: %v", err)
+	}
+
+	dtStore := &store.StackedStore{}
+	dtStore.Open(nil)
 	var backendStore store.Store
 	if u, err := url.Parse(c_opts.BackEndType); err == nil && u.Scheme != "" {
 		backendStore, err = store.Open(c_opts.BackEndType)
@@ -127,16 +136,29 @@ func Server(c_opts *ProgOpts) {
 	if err != nil {
 		logger.Fatalf("Error using backing store %s: %v", c_opts.BackEndType, err)
 	}
-	// We have a backend, now get default assets
-	logger.Printf("Extracting Default Assets\n")
-	if err := ExtractAssets(c_opts.FileRoot); err != nil {
-		logger.Fatalf("Unable to extract assets: %v", err)
+	dtStore.Push(backendStore)
+	if c_opts.LocalContent != "" {
+		etcStore, err := store.Open(c_opts.LocalContent)
+		if err != nil {
+			logger.Fatalf("Failed to open local content")
+		}
+		dtStore.Push(etcStore)
 	}
 
+	// Add SAAS content stores to the DataTracker store here
+
+	if c_opts.DefaultContent != "" {
+		defaultStore, err := store.Open(c_opts.DefaultContent)
+		if err != nil {
+			logger.Fatalf("Failed to open local content")
+		}
+		dtStore.Push(defaultStore)
+	}
+	// We have a backend, now get default assets
 	services := make([]midlayer.Service, 0, 0)
 	publishers := backend.NewPublishers(logger)
 
-	dt := backend.NewDataTracker(backendStore,
+	dt := backend.NewDataTracker(dtStore,
 		c_opts.FileRoot,
 		c_opts.LogRoot,
 		c_opts.OurAddress,
