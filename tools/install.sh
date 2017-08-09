@@ -267,9 +267,9 @@ case $1 in
                  set +e
                  ./dr-provision --help | grep -q base-root
                  if [[ $? -eq 0 ]] ; then
-                     echo "sudo ./dr-provision $IPADDR --base-root=`pwd`/drp-data &"
+                     echo "sudo ./dr-provision $IPADDR --base-root=`pwd`/drp-data --local-store=\"\" --default-store=\"\" &"
                  else
-                     echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar &"
+                     echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar --local-store=\"\" --default-store=\"\" &"
                  fi
                  set -e
                  echo
