@@ -11,7 +11,7 @@ import (
 
 //
 // Isos???
-// Contents??
+// Files??
 //
 // swagger:model
 type Content struct {
@@ -23,7 +23,7 @@ type Content struct {
 		        These are the sections:
 
 			tasks        map[string]*backend.Task
-			bootEnvs     map[string]*backend.BootEnv
+			bootenvs     map[string]*backend.BootEnv
 			templates    map[string]*backend.Template
 			profiles     map[string]*backend.Profile
 			params       map[string]*backend.Param
@@ -35,8 +35,11 @@ type Content struct {
 			machines     map[string]*backend.Machine
 			leases       map[string]*backend.Lease
 	*/
-	Sections map[string]map[string]interface{}
+	Sections Sections
 }
+
+type Section map[string]interface{}
+type Sections map[string]Section
 
 // swagger:model
 type ContentSummary struct {
@@ -128,7 +131,7 @@ func (f *Frontend) buildContent(st store.Store) (*Content, *backend.Error) {
 	}
 
 	// Walk subs to build content sets
-	content.Sections = map[string]map[string]interface{}{}
+	content.Sections = Sections{}
 	for prefix, sub := range st.Subs() {
 		obj := f.dt.NewKeySaver(prefix)
 
@@ -137,7 +140,7 @@ func (f *Frontend) buildContent(st store.Store) (*Content, *backend.Error) {
 			berr := backend.NewError("ServerError", http.StatusInternalServerError, err.Error())
 			return nil, berr
 		}
-		objs := make(map[string]interface{}, 0)
+		objs := make(Section, 0)
 		for _, k := range keys {
 			v := obj.New()
 			// GREG: Should this go through the load hooks??
@@ -281,7 +284,7 @@ func (f *Frontend) InitContentApi() {
 			}
 			name := content.Name
 
-			newStore, err := store.Open("file:///tmp/newstore")
+			newStore, err := store.Open("file:///tmp/newstore?codec=yaml")
 			if err != nil {
 				c.JSON(http.StatusInternalServerError,
 					backend.NewError("API_ERROR", http.StatusInternalServerError,
