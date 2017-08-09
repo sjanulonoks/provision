@@ -136,13 +136,19 @@ func Server(c_opts *ProgOpts) {
 	if err != nil {
 		logger.Fatalf("Error using backing store %s: %v", c_opts.BackEndType, err)
 	}
+	if md, ok := backendStore.(store.MetaSaver); ok {
+		data := map[string]string{"Name": "BackingStore", "Description": "Writable backing store", "Version": "user"}
+		md.SetMetaData(data)
+	}
 	dtStore.Push(backendStore)
+
 	if c_opts.LocalContent != "" {
 		etcStore, err := store.Open(c_opts.LocalContent)
 		if err != nil {
 			logger.Fatalf("Failed to open local content: %v", err)
 		}
 		dtStore.Push(etcStore)
+
 	}
 
 	// Add SAAS content stores to the DataTracker store here

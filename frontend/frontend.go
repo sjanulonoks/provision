@@ -197,6 +197,7 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, ap
 	me.InitTaskApi()
 	me.InitJobApi()
 	me.InitEventApi()
+	me.InitContentApi()
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("swagger.json")

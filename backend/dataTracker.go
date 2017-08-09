@@ -96,6 +96,7 @@ type DataTracker struct {
 	StaticPort, ApiPort int
 	Logger              *log.Logger
 	FS                  *FileSystem
+	Backend             store.Store
 	objs                map[string]*Store
 	defaultPrefs        map[string]string
 	runningPrefs        map[string]string
@@ -214,13 +215,30 @@ func NewDataTracker(backend store.Store,
 		&Pref{p: res},
 		&Plugin{p: res},
 	}
-	res.objs = map[string]*Store{}
+	// Make sure incoming writable backend has all stores created
 	for _, obj := range objs {
 		prefix := obj.Prefix()
-		bk, err := backend.MakeSub(prefix)
+		_, err := backend.MakeSub(prefix)
 		if err != nil {
 			res.Logger.Fatalf("dataTracker: Error creating substore %s: %v", prefix, err)
 		}
+	}
+
+	// Use stacked store instead!!
+	sb, err := store.Open("stack://")
+	if err != nil {
+		logger.Fatalf("Error using stack store: %v", err)
+	}
+	stackBackend := sb.(*store.StackedStore)
+	stackBackend.Push(backend)
+	res.Backend = stackBackend
+	backend = stackBackend
+
+	// Setup stores.
+	res.objs = map[string]*Store{}
+	for _, obj := range objs {
+		prefix := obj.Prefix()
+		bk := backend.GetSub(prefix)
 		res.objs[prefix] = &Store{backingStore: bk}
 		storeObjs, err := store.List(obj)
 		if err != nil {
@@ -241,6 +259,7 @@ func NewDataTracker(backend store.Store,
 			res.rootTemplate.Option("missingkey=error")
 		}
 	}
+
 	d, unlocker := res.LockEnts("bootenvs", "preferences", "users", "machines", "profiles", "params")
 	defer unlocker()
 	if d("bootenvs").Find(ignoreBoot.Key()) == nil {
@@ -406,6 +425,41 @@ func (p *DataTracker) setDT(s store.KeySaver) {
 	}
 }
 
+func (p *DataTracker) NewKeySaver(t string) store.KeySaver {
+	var res store.KeySaver
+	switch t {
+	case "machines":
+		res = p.NewMachine()
+	case "params":
+		res = p.NewParam()
+	case "profiles":
+		res = p.NewProfile()
+	case "users":
+		res = p.NewUser()
+	case "templates":
+		res = p.NewTemplate()
+	case "bootenvs":
+		res = p.NewBootEnv()
+	case "leases":
+		res = p.NewLease()
+	case "reservations":
+		res = p.NewReservation()
+	case "subnets":
+		res = p.NewSubnet()
+	case "preferences":
+		res = p.NewPref()
+	case "tasks":
+		res = p.NewTask()
+	case "jobs":
+		res = p.NewJob()
+	case "plugins":
+		res = p.NewPlugin()
+	default:
+		panic("Unknown type of KeySaver passed to Clone")
+	}
+	return res
+}
+
 func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 	var res store.KeySaver
 	switch ref.(type) {
@@ -433,6 +487,8 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 		res = p.NewTask()
 	case *Job:
 		res = p.NewJob()
+	case *Plugin:
+		res = p.NewPlugin()
 	default:
 		panic("Unknown type of KeySaver passed to Clone")
 	}
