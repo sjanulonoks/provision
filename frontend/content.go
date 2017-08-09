@@ -16,6 +16,7 @@ import (
 // swagger:model
 type Content struct {
 	Name        string
+	Source      string
 	Description string
 	Version     string
 
@@ -44,6 +45,7 @@ type Sections map[string]Section
 // swagger:model
 type ContentSummary struct {
 	Name        string
+	Source      string
 	Description string
 	Version     string
 	Counts      map[string]int
@@ -70,10 +72,44 @@ type ContentsResponse struct {
 	Body []*ContentSummary
 }
 
-// swagger:parameters getContent deleteContent
+// swagger:parameters getContent deleteContent uploadContent
 type ContentParameter struct {
 	// in: path
 	Name string `json:"name"`
+}
+
+func buildNewStore(content *Content) (newStore store.Store, err error) {
+	newStore, err = store.Open("file:///tmp/newstore?codec=yaml")
+	if err != nil {
+		return
+	}
+
+	if md, ok := newStore.(store.MetaSaver); ok {
+		data := map[string]string{
+			"Name":        content.Name,
+			"Source":      content.Source,
+			"Description": content.Description,
+			"Version":     content.Version,
+		}
+		md.SetMetaData(data)
+	}
+
+	for prefix, objs := range content.Sections {
+		var sub store.Store
+		sub, err = newStore.MakeSub(prefix)
+		if err != nil {
+			return
+		}
+
+		for k, obj := range objs {
+			err = sub.Save(k, obj)
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	return
 }
 
 func buildSummary(st store.Store) *ContentSummary {
@@ -85,6 +121,7 @@ func buildSummary(st store.Store) *ContentSummary {
 	metaData := mst.MetaData()
 
 	cs.Name = metaData["Name"]
+	cs.Source = metaData["Source"]
 	cs.Description = metaData["Description"]
 	cs.Version = metaData["Version"]
 	cs.Counts = map[string]int{}
@@ -119,6 +156,11 @@ func (f *Frontend) buildContent(st store.Store) (*Content, *backend.Error) {
 	} else {
 		content.Name = "Unknown"
 	}
+	if val, ok := md["Source"]; ok {
+		content.Source = val
+	} else {
+		content.Source = "Unknown"
+	}
 	if val, ok := md["Description"]; ok {
 		content.Description = val
 	} else {
@@ -143,7 +185,6 @@ func (f *Frontend) buildContent(st store.Store) (*Content, *backend.Error) {
 		objs := make(Section, 0)
 		for _, k := range keys {
 			v := obj.New()
-			// GREG: Should this go through the load hooks??
 			err := sub.Load(k, &v)
 			if err != nil {
 				berr := backend.NewError("ServerError", http.StatusInternalServerError, err.Error())
@@ -204,20 +245,24 @@ func (f *Frontend) InitContentApi() {
 			}
 
 			contents := []*ContentSummary{}
+			func() {
+				_, unlocker := f.dt.LockAll()
+				defer unlocker()
 
-			if stack, ok := f.dt.Backend.(*store.StackedStore); !ok {
-				cs := buildSummary(f.dt.Backend)
-				if cs != nil {
-					contents = append(contents, cs)
-				}
-			} else {
-				for _, st := range stack.Layers() {
-					cs := buildSummary(st)
+				if stack, ok := f.dt.Backend.(*store.StackedStore); !ok {
+					cs := buildSummary(f.dt.Backend)
 					if cs != nil {
 						contents = append(contents, cs)
 					}
+				} else {
+					for _, st := range stack.Layers() {
+						cs := buildSummary(st)
+						if cs != nil {
+							contents = append(contents, cs)
+						}
+					}
 				}
-			}
+			}()
 
 			c.JSON(http.StatusOK, contents)
 		})
@@ -244,23 +289,28 @@ func (f *Frontend) InitContentApi() {
 				return
 			}
 
-			if cst := f.findContent(name); cst == nil {
-				c.JSON(http.StatusNotFound,
-					backend.NewError("API_ERROR", http.StatusNotFound,
-						fmt.Sprintf("content get: not found: %s", name)))
-			} else {
-				content, err := f.buildContent(cst)
-				if err != nil {
-					c.JSON(err.Code, err)
+			func() {
+				_, unlocker := f.dt.LockAll()
+				defer unlocker()
+
+				if cst := f.findContent(name); cst == nil {
+					c.JSON(http.StatusNotFound,
+						backend.NewError("API_ERROR", http.StatusNotFound,
+							fmt.Sprintf("content get: not found: %s", name)))
 				} else {
-					c.JSON(http.StatusOK, content)
+					content, err := f.buildContent(cst)
+					if err != nil {
+						c.JSON(err.Code, err)
+					} else {
+						c.JSON(http.StatusOK, content)
+					}
 				}
-			}
+			}()
 		})
 
-	// swagger:route POST /contents Contents uploadContent
+	// swagger:route POST /contents Contents createContent
 	//
-	// Upload content into Digital Rebar Provision (Create/Update)
+	// Create content into Digital Rebar Provision
 	//
 	//     Responses:
 	//       200: ContentSummaryResponse
@@ -275,55 +325,98 @@ func (f *Frontend) InitContentApi() {
 	//       507: ErrorResponse
 	f.ApiGroup.POST("/contents",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "contents", "post", "*") {
+			if !assureAuth(c, f.Logger, "contents", "create", "*") {
 				return
 			}
 			content := &Content{}
 			if !assureDecode(c, content) {
 				return
 			}
-			name := content.Name
 
-			newStore, err := store.Open("file:///tmp/newstore?codec=yaml")
+			name := content.Name
+			if cst := f.findContent(name); cst != nil {
+				c.JSON(http.StatusConflict,
+					backend.NewError("API_ERROR", http.StatusConflict,
+						fmt.Sprintf("content post: already exists: %s", name)))
+				return
+			}
+
+			newStore, err := buildNewStore(content)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError,
 					backend.NewError("API_ERROR", http.StatusInternalServerError,
 						fmt.Sprintf("content load: error: %s: %v", name, err)))
 				return
 			}
-
-			if md, ok := newStore.(store.MetaSaver); ok {
-				data := map[string]string{
-					"Name":        content.Name,
-					"Description": content.Description,
-					"Version":     content.Version,
-				}
-				md.SetMetaData(data)
-			}
-
-			for prefix, objs := range content.Sections {
-				sub, err := newStore.MakeSub(prefix)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError,
-						backend.NewError("API_ERROR", http.StatusInternalServerError,
-							fmt.Sprintf("content load: error: %s: %v", name, err)))
-					return
-				}
-
-				for k, obj := range objs {
-					err := sub.Save(k, obj)
-					if err != nil {
-						c.JSON(http.StatusInternalServerError,
-							backend.NewError("API_ERROR", http.StatusInternalServerError,
-								fmt.Sprintf("content load: error: %s: %v", name, err)))
-						return
-					}
-				}
-			}
-
-			// GREG: Inject store
-
 			cs := buildSummary(newStore)
+
+			func() {
+				_, unlocker := f.dt.LockAll()
+				defer unlocker()
+
+				// GREG: Add store
+			}()
+
+			c.JSON(http.StatusCreated, cs)
+		})
+
+	// swagger:route PUT /contents/:name Contents uploadContent
+	//
+	// Replace content in Digital Rebar Provision
+	//
+	//     Responses:
+	//       200: ContentSummaryResponse
+	//       400: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       403: ErrorResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	//       415: ErrorResponse
+	//       500: ErrorResponse
+	//       507: ErrorResponse
+	f.ApiGroup.PUT("/contents/:name",
+		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "contents", "update", "*") {
+				return
+			}
+			content := &Content{}
+			if !assureDecode(c, content) {
+				return
+			}
+
+			name := c.Param(`name`)
+			if name != content.Name {
+				c.JSON(http.StatusBadRequest,
+					backend.NewError("API_ERROR", http.StatusBadRequest,
+						fmt.Sprintf("Name must machine: %s != %s\n", name, c.Param(`name`))))
+				return
+
+			}
+
+			if cst := f.findContent(name); cst == nil {
+				c.JSON(http.StatusNotFound,
+					backend.NewError("API_ERROR", http.StatusNotFound,
+						fmt.Sprintf("content put: not found: %s", name)))
+				return
+			}
+
+			newStore, err := buildNewStore(content)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError,
+					backend.NewError("API_ERROR", http.StatusInternalServerError,
+						fmt.Sprintf("content load: error: %s: %v", name, err)))
+				return
+			}
+			cs := buildSummary(newStore)
+
+			func() {
+				_, unlocker := f.dt.LockAll()
+				defer unlocker()
+
+				// GREG: Replace store
+			}()
+
 			c.JSON(http.StatusCreated, cs)
 		})
 
@@ -351,7 +444,12 @@ func (f *Frontend) InitContentApi() {
 				return
 			}
 
-			// GREG: Delete store layer.
+			func() {
+				_, unlocker := f.dt.LockAll()
+				defer unlocker()
+
+				// GREG: Delete store layer.
+			}()
 
 			c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
 		})

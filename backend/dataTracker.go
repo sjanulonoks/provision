@@ -152,6 +152,15 @@ func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) 
 		}
 }
 
+func (p *DataTracker) LockAll() (stores Stores, unlocker func()) {
+	keys := make([]string, len(p.objs))
+	i := 0
+	for k := range p.objs {
+		keys[i] = k
+	}
+	return p.LockEnts(keys...)
+}
+
 func (p *DataTracker) LocalIP(remote net.IP) string {
 	if localIP := LocalFor(remote); localIP != nil {
 		return localIP.String()
