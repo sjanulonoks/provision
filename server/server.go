@@ -130,7 +130,7 @@ func Server(c_opts *ProgOpts) {
 	if u, err := url.Parse(c_opts.BackEndType); err == nil && u.Scheme != "" {
 		backendStore, err = store.Open(c_opts.BackEndType)
 	} else {
-		storeURI := fmt.Sprintf("%s://%s", c_opts.BackEndType, c_opts.DataRoot)
+		storeURI := fmt.Sprintf("%s:%s", c_opts.BackEndType, c_opts.DataRoot)
 		backendStore, err = store.Open(storeURI)
 	}
 	if err != nil {
@@ -140,7 +140,7 @@ func Server(c_opts *ProgOpts) {
 	if c_opts.LocalContent != "" {
 		etcStore, err := store.Open(c_opts.LocalContent)
 		if err != nil {
-			logger.Fatalf("Failed to open local content")
+			logger.Fatalf("Failed to open local content: %v", err)
 		}
 		dtStore.Push(etcStore)
 	}
@@ -150,7 +150,7 @@ func Server(c_opts *ProgOpts) {
 	if c_opts.DefaultContent != "" {
 		defaultStore, err := store.Open(c_opts.DefaultContent)
 		if err != nil {
-			logger.Fatalf("Failed to open local content")
+			logger.Fatalf("Failed to open local content: %v", err)
 		}
 		dtStore.Push(defaultStore)
 	}

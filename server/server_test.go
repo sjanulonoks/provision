@@ -41,8 +41,8 @@ func TestServer(t *testing.T) {
 		"--static-port", "10002",
 		"--tftp-port", "10003",
 		"--disable-dhcp",
-		"--local-content", "",
-		"--default-content", "",
+		"--local-content", "directory:../test-data/etc/?codec=yaml",
+		"--default-content", "directory:../test-data/usr/share/?codec=yaml",
 	}
 
 	c_opts := generateArgs(testArgs)
