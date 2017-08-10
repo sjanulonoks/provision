@@ -200,7 +200,7 @@ func (f *Frontend) buildContent(st store.Store) (*Content, *backend.Error) {
 }
 
 func (f *Frontend) findContent(name string) (cst store.Store) {
-	if stack, ok := f.dt.Backend.(*store.StackedStore); !ok {
+	if stack, ok := f.dt.Backend.(*midlayer.DataStack); !ok {
 		mst, ok := f.dt.Backend.(store.MetaSaver)
 		if !ok {
 			return nil
@@ -249,7 +249,7 @@ func (f *Frontend) InitContentApi() {
 				_, unlocker := f.dt.LockAll()
 				defer unlocker()
 
-				if stack, ok := f.dt.Backend.(*store.StackedStore); !ok {
+				if stack, ok := f.dt.Backend.(*midlayer.DataStack); !ok {
 					cs := buildSummary(f.dt.Backend)
 					if cs != nil {
 						contents = append(contents, cs)
@@ -345,25 +345,21 @@ func (f *Frontend) InitContentApi() {
 					return
 				}
 
-				newStore, err := buildNewStore(content)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError,
-						backend.NewError("API_ERROR", http.StatusInternalServerError,
-							fmt.Sprintf("content load: error: %s: %v", name, err)))
+				if newStore, err := buildNewStore(content); err != nil {
+					jsonError(c, err, http.StatusInternalServerError,
+						fmt.Sprintf("failed to build content: %s", name))
 					return
-				}
-				cs := buildSummary(newStore)
-
-				ds := f.dt.Backend.(*midlayer.DataStack)
-				nbs, err := ds.AddReplaceStore(name, newStore, f.Logger)
-				if err != nil {
-					// GREG: Remove file
-					c.JSON(http.StatusInternalServerError,
-						backend.NewError("API_ERROR", http.StatusInternalServerError,
-							fmt.Sprintf("content load: error: %s: %v", name, err)))
 				} else {
-					f.dt.ReplaceBackend(nbs)
-					c.JSON(http.StatusCreated, cs)
+					cs := buildSummary(newStore)
+
+					ds := f.dt.Backend.(*midlayer.DataStack)
+					if nbs, err := ds.AddReplaceStore(name, newStore, f.Logger); err != nil {
+						jsonError(c, err, http.StatusInternalServerError,
+							fmt.Sprintf("failed to add content: %s", name))
+					} else {
+						f.dt.ReplaceBackend(nbs)
+						c.JSON(http.StatusCreated, cs)
+					}
 				}
 			}()
 		})
@@ -413,25 +409,22 @@ func (f *Frontend) InitContentApi() {
 					return
 				}
 
-				newStore, err := buildNewStore(content)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError,
-						backend.NewError("API_ERROR", http.StatusInternalServerError,
-							fmt.Sprintf("content load: error: %s: %v", name, err)))
+				if newStore, err := buildNewStore(content); err != nil {
+					jsonError(c, err, http.StatusInternalServerError,
+						fmt.Sprintf("failed to build content: %s", name))
 					return
-				}
-				cs := buildSummary(newStore)
-
-				ds := f.dt.Backend.(*midlayer.DataStack)
-				nbs, err := ds.AddReplaceStore(name, newStore, f.Logger)
-				if err != nil {
-					// GREG: Remove file
-					c.JSON(http.StatusInternalServerError,
-						backend.NewError("API_ERROR", http.StatusInternalServerError,
-							fmt.Sprintf("content load: error: %s: %v", name, err)))
 				} else {
-					f.dt.ReplaceBackend(nbs)
-					c.JSON(http.StatusCreated, cs)
+					cs := buildSummary(newStore)
+
+					ds := f.dt.Backend.(*midlayer.DataStack)
+					if nbs, err := ds.AddReplaceStore(name, newStore, f.Logger); err != nil {
+						// GREG: Remove file
+						jsonError(c, err, http.StatusInternalServerError,
+							fmt.Sprintf("failed to replace content: %s", name))
+					} else {
+						f.dt.ReplaceBackend(nbs)
+						c.JSON(http.StatusCreated, cs)
+					}
 				}
 			}()
 		})
@@ -465,11 +458,9 @@ func (f *Frontend) InitContentApi() {
 				}
 
 				ds := f.dt.Backend.(*midlayer.DataStack)
-				nbs, err := ds.RemoveStore(name, f.Logger)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError,
-						backend.NewError("API_ERROR", http.StatusInternalServerError,
-							fmt.Sprintf("content load: error: %s: %v", name, err)))
+				if nbs, err := ds.RemoveStore(name, f.Logger); err != nil {
+					jsonError(c, err, http.StatusInternalServerError,
+						fmt.Sprintf("failed to remove content: %s", name))
 				} else {
 					// GREG: Remove file
 

@@ -106,6 +106,13 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 			return nil, fmt.Errorf("Failed to open local content: %v", err)
 		}
 		dtStore.localContent = etcStore
+		if md, ok := etcStore.(store.MetaSaver); ok {
+			d := md.MetaData()
+			if _, ok := d["Name"]; !ok {
+				data := map[string]string{"Name": "LocalStore", "Description": "Local Override Store", "Version": "user"}
+				md.SetMetaData(data)
+			}
+		}
 	}
 
 	// Add SAAS content stores to the DataTracker store here
@@ -141,6 +148,13 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 			return nil, fmt.Errorf("Failed to open default content: %v", err)
 		}
 		dtStore.defaultContent = defaultStore
+		if md, ok := defaultStore.(store.MetaSaver); ok {
+			d := md.MetaData()
+			if _, ok := d["Name"]; !ok {
+				data := map[string]string{"Name": "DefaultStore", "Description": "Initial Default Content", "Version": "user"}
+				md.SetMetaData(data)
+			}
+		}
 	}
 
 	dtStore.buildStack()

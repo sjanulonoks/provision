@@ -176,7 +176,7 @@ func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) 
 func (p *DataTracker) LockAll() (stores Stores, unlocker func()) {
 	p.allMux.Lock()
 	return func(ref string) *Store {
-			return nil
+			return p.objs[ref]
 		},
 		func() {
 			p.allMux.Unlock()
@@ -264,23 +264,27 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) *Error {
 	}
 
 	keys := make([]string, len(res.objs))
+	i := 0
 	for k := range res.objs {
-		keys = append(keys, k)
+		keys[i] = k
+		i++
 	}
 
-	_, unlocker := res.LockAll()
+	d, unlocker := res.LockAll()
 	defer unlocker()
 
 	berr := &Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
 
 	for _, k := range keys {
+
 		for _, obj := range res.objs[k].Items() {
 			if val, ok := obj.(Validator); ok {
+				obj.(validator).setStores(d)
 				berr.Merge(val.Validate())
 			}
 		}
 	}
-	if berr.OrNil == nil {
+	if berr.OrNil() == nil {
 		return nil
 	}
 	return berr
