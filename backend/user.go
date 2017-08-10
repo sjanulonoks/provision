@@ -108,8 +108,12 @@ func (p *DataTracker) NewUser() *User {
 	return &User{p: p}
 }
 
-func (u *User) BeforeSave() error {
+func (u *User) Validate() error {
 	return index.CheckUnique(u, u.stores("users").Items())
+}
+
+func (u *User) BeforeSave() error {
+	return u.Validate()
 }
 
 var userLockMap = map[string][]string{

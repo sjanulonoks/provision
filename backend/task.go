@@ -4,8 +4,8 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
 
 // Task is a thing that can run on a Machine.
@@ -108,27 +108,25 @@ func (t *Task) genRoot(common *template.Template, e *Error) *template.Template {
 	return MergeTemplates(common, t.Templates, e)
 }
 
-func (t *Task) OnLoad() error {
-	e := &Error{o: t}
-	t.tmplMux.Lock()
-	defer t.tmplMux.Unlock()
-	t.p.tmplMux.Lock()
-	defer t.p.tmplMux.Unlock()
-	t.rootTemplate = t.genRoot(t.p.rootTemplate, e)
-	return e.OrNil()
-}
-
-func (t *Task) BeforeSave() error {
+func (t *Task) Validate() error {
 	e := &Error{Code: 422, Type: ValidationError, o: t}
-	t.p.tmplMux.Lock()
-	defer t.p.tmplMux.Unlock()
 	t.tmplMux.Lock()
 	defer t.tmplMux.Unlock()
+	t.p.tmplMux.Lock()
+	defer t.p.tmplMux.Unlock()
 	root := t.genRoot(t.p.rootTemplate, e)
 	if !e.ContainsError() {
 		t.rootTemplate = root
 	}
 	return e.OrNil()
+}
+
+func (t *Task) OnLoad() error {
+	return t.Validate()
+}
+
+func (t *Task) BeforeSave() error {
+	return t.Validate()
 }
 
 type taskHaver interface {

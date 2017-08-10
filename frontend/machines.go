@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/plugin"
+	"github.com/digitalrebar/store"
 	"github.com/gin-gonic/gin"
 	"github.com/pborman/uuid"
 )
@@ -647,7 +647,7 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 			if pobj != nil {
 				rp := pobj.(*backend.Param)
 
-				if ev := rp.Validate(obj); ev != nil {
+				if ev := rp.ValidateValue(obj); ev != nil {
 					err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
 				}
 			}
@@ -677,7 +677,7 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 			if pobj != nil {
 				rp := pobj.(*backend.Param)
 
-				if ev := rp.Validate(obj); ev != nil {
+				if ev := rp.ValidateValue(obj); ev != nil {
 					err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
 				}
 			}

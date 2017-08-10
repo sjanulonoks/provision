@@ -101,6 +101,7 @@ type DataTracker struct {
 	defaultPrefs        map[string]string
 	runningPrefs        map[string]string
 	prefMux             *sync.Mutex
+	allMux              *sync.RWMutex
 	defaultBootEnv      string
 	GlobalProfileName   string
 	tokenManager        *JwtManager
@@ -135,6 +136,7 @@ func allKeySavers(res *DataTracker) []store.KeySaver {
 // It returns a function to get an Index that was requested, and
 // a function that unlocks the taken locks in the right order.
 func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) {
+	p.allMux.RLock()
 	sortedEnts := make([]string, len(ents))
 	copy(sortedEnts, ents)
 	s := sort.StringSlice(sortedEnts)
@@ -167,19 +169,18 @@ func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) 
 				delete(sortedRes, s[i])
 			}
 			srMux.Unlock()
+			p.allMux.RUnlock()
 		}
 }
 
 func (p *DataTracker) LockAll() (stores Stores, unlocker func()) {
-	keys := make([]string, 0)
-	for k := range p.objs {
-		if k == "" {
-			continue
+	p.allMux.Lock()
+	return func(ref string) *Store {
+			return nil
+		},
+		func() {
+			p.allMux.Unlock()
 		}
-		keys = append(keys, k)
-	}
-
-	return p.LockEnts(keys...)
 }
 
 func (p *DataTracker) LocalIP(remote net.IP) string {
@@ -234,6 +235,57 @@ func (p *DataTracker) rebuildCache() error {
 	return nil
 }
 
+func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) *Error {
+	res := &DataTracker{
+		Backend:           backend,
+		FileRoot:          ".",
+		LogRoot:           ".",
+		StaticPort:        1,
+		ApiPort:           2,
+		OurAddress:        "1.1.1.1",
+		Logger:            logger,
+		defaultPrefs:      map[string]string{},
+		runningPrefs:      map[string]string{},
+		prefMux:           &sync.Mutex{},
+		allMux:            &sync.RWMutex{},
+		FS:                NewFS(".", logger),
+		tokenManager:      NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
+		tmplMux:           &sync.Mutex{},
+		GlobalProfileName: "global",
+		thunks:            make([]func(), 0),
+		thunkMux:          &sync.Mutex{},
+		publishers:        &Publishers{},
+	}
+
+	// Load stores.
+	err := res.rebuildCache()
+	if err != nil {
+		return NewError("LoadError", http.StatusInternalServerError, fmt.Sprintf("Failed to rebuild cache: %v", err))
+	}
+
+	keys := make([]string, len(res.objs))
+	for k := range res.objs {
+		keys = append(keys, k)
+	}
+
+	_, unlocker := res.LockAll()
+	defer unlocker()
+
+	berr := &Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
+
+	for _, k := range keys {
+		for _, obj := range res.objs[k].Items() {
+			if val, ok := obj.(Validator); ok {
+				berr.Merge(val.Validate())
+			}
+		}
+	}
+	if berr.OrNil == nil {
+		return nil
+	}
+	return berr
+}
+
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.Store,
 	fileRoot, logRoot, addr string,
@@ -242,6 +294,7 @@ func NewDataTracker(backend store.Store,
 	defaultPrefs map[string]string,
 	publishers *Publishers) *DataTracker {
 	res := &DataTracker{
+		Backend:           backend,
 		FileRoot:          fileRoot,
 		LogRoot:           logRoot,
 		StaticPort:        staticPort,
@@ -251,6 +304,7 @@ func NewDataTracker(backend store.Store,
 		defaultPrefs:      defaultPrefs,
 		runningPrefs:      map[string]string{},
 		prefMux:           &sync.Mutex{},
+		allMux:            &sync.RWMutex{},
 		FS:                NewFS(fileRoot, logger),
 		tokenManager:      NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
 		tmplMux:           &sync.Mutex{},
@@ -270,22 +324,13 @@ func NewDataTracker(backend store.Store,
 		}
 	}
 
-	// Use stacked store instead!!
-	sb, err := store.Open("stack://")
-	if err != nil {
-		logger.Fatalf("Error using stack store: %v", err)
-	}
-	stackBackend := sb.(*store.StackedStore)
-	stackBackend.Push(backend)
-	res.Backend = stackBackend
-	backend = stackBackend
-
-	// Setup stores.
-	err = res.rebuildCache()
+	// Load stores.
+	err := res.rebuildCache()
 	if err != nil {
 		res.Logger.Fatalf("dataTracker: Error loading data: %v", err)
 	}
 
+	// Create minimal content.
 	d, unlocker := res.LockEnts("bootenvs", "preferences", "users", "machines", "profiles", "params")
 	defer unlocker()
 	if d("bootenvs").Find(ignoreBoot.Key()) == nil {
@@ -481,7 +526,7 @@ func (p *DataTracker) NewKeySaver(t string) store.KeySaver {
 	case "plugins":
 		res = p.NewPlugin()
 	default:
-		panic("Unknown type of KeySaver passed to Clone")
+		panic("Unknown type of KeySaver passed to NewKeySaver")
 	}
 	return res
 }
@@ -709,16 +754,8 @@ func (p *DataTracker) Backup() ([]byte, error) {
 }
 
 // Assumes that all locks are held
-func (p *DataTracker) AddStore(st store.Store) error {
-	stack, ok := p.Backend.(*store.StackedStore)
-	if !ok {
-		return fmt.Errorf("Push not allowed with current store")
-	}
-	err := stack.Push(st)
-	if err != nil {
-		return err
-	}
-
+func (p *DataTracker) ReplaceBackend(st store.Store) error {
+	p.Backend = st
 	return p.rebuildCache()
 }
 

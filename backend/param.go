@@ -1,8 +1,8 @@
 package backend
 
 import (
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -103,6 +103,10 @@ func (p *Param) setValidator() error {
 	return nil
 }
 
+func (p *Param) Validate() error {
+	return p.setValidator()
+}
+
 func (p *Param) BeforeSave() error {
 	return p.setValidator()
 	// Arguably, we should also detect when an attempted schema update happens
@@ -111,7 +115,7 @@ func (p *Param) BeforeSave() error {
 	// However, I don't feel like writing that code for now, so ignore the problem.
 }
 
-func (p *Param) Validate(val interface{}) error {
+func (p *Param) ValidateValue(val interface{}) error {
 	if p.validator == nil {
 		err := p.setValidator()
 		if err != nil {

@@ -15,8 +15,8 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
 
 // OsInfo holds information about the operating system this BootEnv
@@ -329,7 +329,7 @@ func (b *BootEnv) explodeIso(e *Error) {
 	return
 }
 
-func (b *BootEnv) BeforeSave() error {
+func (b *BootEnv) Validate() error {
 	e := &Error{Code: 422, Type: ValidationError, o: b}
 	if err := index.CheckUnique(b, b.stores("bootenvs").Items()); err != nil {
 		e.Merge(err)
@@ -348,12 +348,19 @@ func (b *BootEnv) BeforeSave() error {
 		b.rootTemplate = root
 	}
 	b.tmplMux.Unlock()
+	return e.OrNil()
+}
+
+func (b *BootEnv) BeforeSave() error {
+	if err := b.Validate(); err != nil {
+		return err
+	}
+
+	e := &Error{Code: 422, Type: ValidationError, o: b}
+
 	seenPxeLinux := false
 	seenELilo := false
 	seenIPXE := false
-	if e.ContainsError() {
-		return e
-	}
 	for _, template := range b.Templates {
 		if template.Name == "pxelinux" {
 			seenPxeLinux = true

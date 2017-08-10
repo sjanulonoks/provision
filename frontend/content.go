@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/midlayer"
 	"github.com/digitalrebar/store"
 	"github.com/gin-gonic/gin"
 )
@@ -333,38 +334,41 @@ func (f *Frontend) InitContentApi() {
 			}
 
 			name := content.Name
-			if cst := f.findContent(name); cst != nil {
-				c.JSON(http.StatusConflict,
-					backend.NewError("API_ERROR", http.StatusConflict,
-						fmt.Sprintf("content post: already exists: %s", name)))
-				return
-			}
-
-			newStore, err := buildNewStore(content)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError,
-					backend.NewError("API_ERROR", http.StatusInternalServerError,
-						fmt.Sprintf("content load: error: %s: %v", name, err)))
-				return
-			}
-			cs := buildSummary(newStore)
-
 			func() {
 				_, unlocker := f.dt.LockAll()
 				defer unlocker()
 
-				err := f.dt.AddStore(newStore)
+				if cst := f.findContent(name); cst != nil {
+					c.JSON(http.StatusConflict,
+						backend.NewError("API_ERROR", http.StatusConflict,
+							fmt.Sprintf("content post: already exists: %s", name)))
+					return
+				}
+
+				newStore, err := buildNewStore(content)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError,
 						backend.NewError("API_ERROR", http.StatusInternalServerError,
 							fmt.Sprintf("content load: error: %s: %v", name, err)))
+					return
+				}
+				cs := buildSummary(newStore)
+
+				ds := f.dt.Backend.(*midlayer.DataStack)
+				nbs, err := ds.AddReplaceStore(name, newStore, f.Logger)
+				if err != nil {
+					// GREG: Remove file
+					c.JSON(http.StatusInternalServerError,
+						backend.NewError("API_ERROR", http.StatusInternalServerError,
+							fmt.Sprintf("content load: error: %s: %v", name, err)))
 				} else {
+					f.dt.ReplaceBackend(nbs)
 					c.JSON(http.StatusCreated, cs)
 				}
 			}()
 		})
 
-	// swagger:route PUT /contents/:name Contents uploadContent
+	// swagger:route PUT /contents/{name} Contents uploadContent
 	//
 	// Replace content in Digital Rebar Provision
 	//
@@ -398,30 +402,38 @@ func (f *Frontend) InitContentApi() {
 
 			}
 
-			if cst := f.findContent(name); cst == nil {
-				c.JSON(http.StatusNotFound,
-					backend.NewError("API_ERROR", http.StatusNotFound,
-						fmt.Sprintf("content put: not found: %s", name)))
-				return
-			}
-
-			newStore, err := buildNewStore(content)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError,
-					backend.NewError("API_ERROR", http.StatusInternalServerError,
-						fmt.Sprintf("content load: error: %s: %v", name, err)))
-				return
-			}
-			cs := buildSummary(newStore)
-
 			func() {
 				_, unlocker := f.dt.LockAll()
 				defer unlocker()
 
-				// GREG: Replace store
-			}()
+				if cst := f.findContent(name); cst == nil {
+					c.JSON(http.StatusNotFound,
+						backend.NewError("API_ERROR", http.StatusNotFound,
+							fmt.Sprintf("content put: not found: %s", name)))
+					return
+				}
 
-			c.JSON(http.StatusCreated, cs)
+				newStore, err := buildNewStore(content)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError,
+						backend.NewError("API_ERROR", http.StatusInternalServerError,
+							fmt.Sprintf("content load: error: %s: %v", name, err)))
+					return
+				}
+				cs := buildSummary(newStore)
+
+				ds := f.dt.Backend.(*midlayer.DataStack)
+				nbs, err := ds.AddReplaceStore(name, newStore, f.Logger)
+				if err != nil {
+					// GREG: Remove file
+					c.JSON(http.StatusInternalServerError,
+						backend.NewError("API_ERROR", http.StatusInternalServerError,
+							fmt.Sprintf("content load: error: %s: %v", name, err)))
+				} else {
+					f.dt.ReplaceBackend(nbs)
+					c.JSON(http.StatusCreated, cs)
+				}
+			}()
 		})
 
 	// swagger:route DELETE /contents/{name} Contents deleteContent
@@ -440,21 +452,31 @@ func (f *Frontend) InitContentApi() {
 				return
 			}
 
-			cst := f.findContent(name)
-			if cst == nil {
-				c.JSON(http.StatusNotFound,
-					backend.NewError("API_ERROR", http.StatusNotFound,
-						fmt.Sprintf("content get: not found: %s", name)))
-				return
-			}
-
 			func() {
 				_, unlocker := f.dt.LockAll()
 				defer unlocker()
 
-				// GREG: Delete store layer.
-			}()
+				cst := f.findContent(name)
+				if cst == nil {
+					c.JSON(http.StatusNotFound,
+						backend.NewError("API_ERROR", http.StatusNotFound,
+							fmt.Sprintf("content get: not found: %s", name)))
+					return
+				}
 
-			c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
+				ds := f.dt.Backend.(*midlayer.DataStack)
+				nbs, err := ds.RemoveStore(name, f.Logger)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError,
+						backend.NewError("API_ERROR", http.StatusInternalServerError,
+							fmt.Sprintf("content load: error: %s: %v", name, err)))
+				} else {
+					// GREG: Remove file
+
+					f.dt.ReplaceBackend(nbs)
+					c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
+				}
+
+			}()
 		})
 }
