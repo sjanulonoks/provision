@@ -16,6 +16,7 @@ import (
 //
 // swagger:model
 type Content struct {
+	// required: true
 	Name        string
 	Source      string
 	Description string
@@ -71,6 +72,12 @@ type ContentSummaryResponse struct {
 type ContentsResponse struct {
 	// in: body
 	Body []*ContentSummary
+}
+
+// swagger:parameters uploadContent createContent
+type ContentBodyParameter struct {
+	// in: body
+	Body *Content
 }
 
 // swagger:parameters getContent deleteContent uploadContent
@@ -347,7 +354,7 @@ func (f *Frontend) InitContentApi() {
 
 				if newStore, err := buildNewStore(content); err != nil {
 					jsonError(c, err, http.StatusInternalServerError,
-						fmt.Sprintf("failed to build content: %s", name))
+						fmt.Sprintf("failed to build content: %s: ", name))
 					return
 				} else {
 					cs := buildSummary(newStore)
@@ -355,7 +362,7 @@ func (f *Frontend) InitContentApi() {
 					ds := f.dt.Backend.(*midlayer.DataStack)
 					if nbs, err := ds.AddReplaceStore(name, newStore, f.Logger); err != nil {
 						jsonError(c, err, http.StatusInternalServerError,
-							fmt.Sprintf("failed to add content: %s", name))
+							fmt.Sprintf("failed to add content: %s: ", name))
 					} else {
 						f.dt.ReplaceBackend(nbs)
 						c.JSON(http.StatusCreated, cs)
@@ -411,7 +418,7 @@ func (f *Frontend) InitContentApi() {
 
 				if newStore, err := buildNewStore(content); err != nil {
 					jsonError(c, err, http.StatusInternalServerError,
-						fmt.Sprintf("failed to build content: %s", name))
+						fmt.Sprintf("failed to build content: %s: ", name))
 					return
 				} else {
 					cs := buildSummary(newStore)
@@ -420,7 +427,7 @@ func (f *Frontend) InitContentApi() {
 					if nbs, err := ds.AddReplaceStore(name, newStore, f.Logger); err != nil {
 						// GREG: Remove file
 						jsonError(c, err, http.StatusInternalServerError,
-							fmt.Sprintf("failed to replace content: %s", name))
+							fmt.Sprintf("failed to replace content: %s: ", name))
 					} else {
 						f.dt.ReplaceBackend(nbs)
 						c.JSON(http.StatusCreated, cs)
@@ -460,7 +467,7 @@ func (f *Frontend) InitContentApi() {
 				ds := f.dt.Backend.(*midlayer.DataStack)
 				if nbs, err := ds.RemoveStore(name, f.Logger); err != nil {
 					jsonError(c, err, http.StatusInternalServerError,
-						fmt.Sprintf("failed to remove content: %s", name))
+						fmt.Sprintf("failed to remove content: %s: ", name))
 				} else {
 					// GREG: Remove file
 

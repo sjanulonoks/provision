@@ -420,7 +420,7 @@ func jsonError(c *gin.Context, err error, code int, base string) {
 	if ne, ok := err.(*backend.Error); ok {
 		c.JSON(ne.Code, ne)
 	} else {
-		c.JSON(code, backend.NewError("API_ERROR", code, fmt.Sprintf(base+" %v", err.Error())))
+		c.JSON(code, backend.NewError("API_ERROR", code, fmt.Sprintf(base+"%v", err.Error())))
 	}
 }
 
