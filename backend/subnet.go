@@ -9,8 +9,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 	dhcp "github.com/krolaw/dhcp4"
 )
 
@@ -490,7 +490,8 @@ func AsSubnets(o []store.KeySaver) []*Subnet {
 	return res
 }
 
-func (s *Subnet) BeforeSave() error {
+func (s *Subnet) Validate() error {
+
 	e := &Error{Code: 422, Type: ValidationError, o: s}
 	_, subnet, err := net.ParseCIDR(s.Subnet)
 	if err != nil {
@@ -577,6 +578,10 @@ func (s *Subnet) BeforeSave() error {
 	}
 	e.Merge(index.CheckUnique(s, s.stores("subnets").Items()))
 	return e.OrNil()
+}
+
+func (s *Subnet) BeforeSave() error {
+	return s.Validate()
 }
 
 func (s *Subnet) next(used map[string]store.KeySaver, token string, hint net.IP) (*Lease, bool) {

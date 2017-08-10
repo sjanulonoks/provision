@@ -318,7 +318,7 @@ func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error
 			if err != nil {
 				return nil, err
 			}
-			if err := param.Validate(obj); err != nil {
+			if err := param.ValidateValue(obj); err != nil {
 				return nil, err
 			}
 			res.Profile.Params[parameter] = obj
@@ -435,7 +435,7 @@ func (n *Machine) OnCreate() error {
 	return nil
 }
 
-func (n *Machine) BeforeSave() error {
+func (n *Machine) Validate() error {
 	e := &Error{Code: 422, Type: ValidationError, o: n}
 	if n.Uuid == nil {
 		e.Errorf("Machine %#v was not assigned a uuid!", n)
@@ -472,6 +472,21 @@ func (n *Machine) BeforeSave() error {
 			e.Errorf("Task %s (at %d) does not exist", taskName, i)
 		}
 	}
+	if nbFound := bootenvs.Find(n.BootEnv); nbFound == nil {
+		e.Errorf("Bootenv %s does not exist", n.BootEnv)
+	}
+	return e.OrNil()
+}
+
+func (n *Machine) BeforeSave() error {
+	if err := n.Validate(); err != nil {
+		return err
+	}
+
+	e := &Error{Code: 422, Type: ValidationError, o: n}
+	objs := n.stores
+	bootenvs := objs("bootenvs")
+
 	var env, oldEnv *BootEnv
 	if nbFound := bootenvs.Find(n.BootEnv); nbFound == nil {
 		e.Errorf("Bootenv %s does not exist", n.BootEnv)

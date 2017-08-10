@@ -1,8 +1,8 @@
 package backend
 
 import (
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
 
 // Profile represents a set of key/values to use in
@@ -149,15 +149,14 @@ func AsProfiles(o []store.KeySaver) []*Profile {
 	}
 	return res
 }
-
-func (p *Profile) BeforeSave() error {
+func (p *Profile) Validate() error {
 	err := &Error{Code: 422, Type: ValidationError, o: p}
 	err.Merge(index.CheckUnique(p, p.stores("profiles").Items()))
 	params := p.stores("params")
 	for k, v := range p.Params {
 		if pIdx := params.Find(k); pIdx != nil {
 			param := AsParam(pIdx)
-			err.Merge(param.Validate(v))
+			err.Merge(param.ValidateValue(v))
 		}
 	}
 	for i, taskName := range p.Tasks {
@@ -166,6 +165,10 @@ func (p *Profile) BeforeSave() error {
 		}
 	}
 	return err.OrNil()
+}
+
+func (p *Profile) BeforeSave() error {
+	return p.Validate()
 }
 
 var profileLockMap = map[string][]string{

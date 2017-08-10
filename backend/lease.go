@@ -7,8 +7,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
 
 var hexDigit = []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'}
@@ -250,8 +250,12 @@ func (l *Lease) Expired() bool {
 	return l.ExpireTime.Before(time.Now())
 }
 
-func (l *Lease) BeforeSave() error {
+func (l *Lease) Validate() error {
 	return index.CheckUnique(l, l.stores("leases").Items())
+}
+
+func (l *Lease) BeforeSave() error {
+	return l.Validate()
 }
 
 func (l *Lease) Expire() {

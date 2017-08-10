@@ -197,6 +197,7 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, ap
 	me.InitTaskApi()
 	me.InitJobApi()
 	me.InitEventApi()
+	me.InitContentApi()
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("swagger.json")
@@ -415,6 +416,14 @@ func (f *Frontend) processFilters(d backend.Stores, ref store.KeySaver, params m
 	return filters, nil
 }
 
+func jsonError(c *gin.Context, err error, code int, base string) {
+	if ne, ok := err.(*backend.Error); ok {
+		c.JSON(ne.Code, ne)
+	} else {
+		c.JSON(code, backend.NewError("API_ERROR", code, fmt.Sprintf(base+"%v", err.Error())))
+	}
+}
+
 // XXX: Auth enforce may need to limit return values based up access to get - one day.
 func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
@@ -523,12 +532,7 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver, ov backend.ObjectV
 		_, err = f.dt.Create(d, val, ov)
 	}()
 	if err != nil {
-		be, ok := err.(*backend.Error)
-		if ok {
-			c.JSON(be.Code, be)
-		} else {
-			c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-		}
+		jsonError(c, err, http.StatusBadRequest, "")
 	} else {
 		s, ok := val.(Sanitizable)
 		if ok {
@@ -571,12 +575,7 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string, ov back
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	ne, ok := err.(*backend.Error)
-	if ok {
-		c.JSON(ne.Code, ne)
-	} else {
-		c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-	}
+	jsonError(c, err, http.StatusBadRequest, "")
 }
 
 func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string, ov backend.ObjectValidator) {
@@ -620,12 +619,7 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string, ov bac
 		c.JSON(http.StatusOK, ref)
 		return
 	}
-	ne, ok := err.(*backend.Error)
-	if ok {
-		c.JSON(ne.Code, ne)
-	} else {
-		c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-	}
+	jsonError(c, err, http.StatusBadRequest, "")
 }
 
 func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, ov backend.ObjectValidator) {
@@ -647,12 +641,7 @@ func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, ov backend.ObjectV
 		return
 	}
 	if err != nil {
-		ne, ok := err.(*backend.Error)
-		if ok {
-			c.JSON(ne.Code, ne)
-		} else {
-			c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-		}
+		jsonError(c, err, http.StatusNotFound, "")
 	} else {
 		s, ok := ref.(Sanitizable)
 		if ok {

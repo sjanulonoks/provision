@@ -14,6 +14,15 @@ const (
 	StillInUseError     = "StillInUseError"
 )
 
+//
+// model object may define a Validate method that can
+// be used to return errors about if the model is valid
+// in the current datatracker.
+//
+type Validator interface {
+	Validate() error
+}
+
 // Validation holds information about whether the current model
 // is valid or not.  It is designed to be embedded into structs
 // that need post-operation validation.

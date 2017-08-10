@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
 
 // TemplateInfo holds information on the templates in the boot
@@ -194,7 +194,7 @@ func (t *Template) checkSubs(root *template.Template, e *Error) {
 	}
 }
 
-func (t *Template) BeforeSave() error {
+func (t *Template) Validate() error {
 	e := &Error{Code: 422, Type: ValidationError, o: t}
 	if t.ID == "" {
 		e.Errorf("Template must have an ID")
@@ -217,6 +217,10 @@ func (t *Template) BeforeSave() error {
 	}
 	t.checkSubs(root, e)
 	return e.OrNil()
+}
+
+func (t *Template) BeforeSave() error {
+	return t.Validate()
 }
 
 func (t *Template) updateOthers() {

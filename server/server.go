@@ -31,7 +31,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -43,7 +42,6 @@ import (
 	"github.com/digitalrebar/provision/frontend"
 	"github.com/digitalrebar/provision/midlayer"
 	"github.com/digitalrebar/provision/plugin"
-	"github.com/digitalrebar/store"
 )
 
 type ProgOpts struct {
@@ -63,11 +61,12 @@ type ProgOpts struct {
 	LocalContent   string `long:"local-content" description:"Storage to use for local overrides." default:"directory:///etc/dr-provision?codec=yaml"`
 	DefaultContent string `long:"default-content" description:"Store URL for local content" default:"directory:///usr/share/dr-provision?codec=yaml"`
 
-	BaseRoot   string `long:"base-root" description:"Base directory for other root dirs." default:"/var/lib/dr-provision"`
-	DataRoot   string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
-	PluginRoot string `long:"plugin-root" description:"Directory for plugins" default:"plugins"`
-	LogRoot    string `long:"log-root" description:"Directory for job logs" default:"job-logs"`
-	FileRoot   string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
+	BaseRoot        string `long:"base-root" description:"Base directory for other root dirs." default:"/var/lib/dr-provision"`
+	DataRoot        string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
+	PluginRoot      string `long:"plugin-root" description:"Directory for plugins" default:"plugins"`
+	LogRoot         string `long:"log-root" description:"Directory for job logs" default:"job-logs"`
+	SaasContentRoot string `long:"saas-content-root" description:"Directory for additional content" default:"saas-content"`
+	FileRoot        string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
 
 	DevUI          string `long:"dev-ui" description:"Root of UI Pages for Development"`
 	DhcpInterfaces string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
@@ -115,45 +114,26 @@ func Server(c_opts *ProgOpts) {
 	if strings.IndexRune(c_opts.LogRoot, filepath.Separator) != 0 {
 		c_opts.LogRoot = filepath.Join(c_opts.BaseRoot, c_opts.LogRoot)
 	}
+	if strings.IndexRune(c_opts.SaasContentRoot, filepath.Separator) != 0 {
+		c_opts.SaasContentRoot = filepath.Join(c_opts.BaseRoot, c_opts.SaasContentRoot)
+	}
 	mkdir(c_opts.FileRoot, logger)
 	mkdir(c_opts.PluginRoot, logger)
 	mkdir(c_opts.DataRoot, logger)
 	mkdir(c_opts.LogRoot, logger)
+	mkdir(c_opts.SaasContentRoot, logger)
 	logger.Printf("Extracting Default Assets\n")
 	if err := ExtractAssets(c_opts.FileRoot); err != nil {
 		logger.Fatalf("Unable to extract assets: %v", err)
 	}
 
-	dtStore := &store.StackedStore{}
-	dtStore.Open(nil)
-	var backendStore store.Store
-	if u, err := url.Parse(c_opts.BackEndType); err == nil && u.Scheme != "" {
-		backendStore, err = store.Open(c_opts.BackEndType)
-	} else {
-		storeURI := fmt.Sprintf("%s:%s", c_opts.BackEndType, c_opts.DataRoot)
-		backendStore, err = store.Open(storeURI)
-	}
+	// Make data store
+	dtStore, err := midlayer.DefaultDataStack(c_opts.DataRoot, c_opts.BackEndType,
+		c_opts.LocalContent, c_opts.DefaultContent, c_opts.SaasContentRoot)
 	if err != nil {
-		logger.Fatalf("Error using backing store %s: %v", c_opts.BackEndType, err)
-	}
-	dtStore.Push(backendStore)
-	if c_opts.LocalContent != "" {
-		etcStore, err := store.Open(c_opts.LocalContent)
-		if err != nil {
-			logger.Fatalf("Failed to open local content: %v", err)
-		}
-		dtStore.Push(etcStore)
+		logger.Fatalf("Unable to create DataStack: %v", err)
 	}
 
-	// Add SAAS content stores to the DataTracker store here
-
-	if c_opts.DefaultContent != "" {
-		defaultStore, err := store.Open(c_opts.DefaultContent)
-		if err != nil {
-			logger.Fatalf("Failed to open local content: %v", err)
-		}
-		dtStore.Push(defaultStore)
-	}
 	// We have a backend, now get default assets
 	services := make([]midlayer.Service, 0, 0)
 	publishers := backend.NewPublishers(logger)

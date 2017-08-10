@@ -5,8 +5,8 @@ import (
 	"math/big"
 	"net"
 
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
 
 // Reservation tracks persistent DHCP IP address reservations.
@@ -206,7 +206,7 @@ func (r *Reservation) OnCreate() error {
 	return e.OrNil()
 }
 
-func (r *Reservation) BeforeSave() error {
+func (r *Reservation) Validate() error {
 	e := &Error{Code: 422, Type: ValidationError, o: r}
 	validateIP4(e, r.Addr)
 	validateMaybeZeroIP4(e, r.NextServer)
@@ -232,6 +232,10 @@ func (r *Reservation) BeforeSave() error {
 	}
 	e.Merge(index.CheckUnique(r, r.stores("reservations").Items()))
 	return e.OrNil()
+}
+
+func (r *Reservation) BeforeSave() error {
+	return r.Validate()
 }
 
 var reservationLockMap = map[string][]string{

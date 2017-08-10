@@ -1,8 +1,8 @@
 package backend
 
 import (
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
 
 // Plugin represents a single instance of a running plugin.
@@ -122,13 +122,17 @@ func (n *Plugin) setDT(p *DataTracker) {
 	n.p = p
 }
 
+func (n *Plugin) Validate() error {
+	return index.CheckUnique(n, n.stores("plugins").Items())
+}
+
 func (n *Plugin) BeforeSave() error {
 	e := &Error{Code: 422, Type: ValidationError, o: n}
+	if err := n.Validate(); err != nil {
+		e.Merge(err)
+	}
 	if n.Provider == "" {
 		e.Errorf("Plugin %s must have a provider", n.Name)
-	}
-	if err := index.CheckUnique(n, n.stores("plugins").Items()); err != nil {
-		e.Merge(err)
 	}
 	return e.OrNil()
 }

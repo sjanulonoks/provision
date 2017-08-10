@@ -96,10 +96,12 @@ type DataTracker struct {
 	StaticPort, ApiPort int
 	Logger              *log.Logger
 	FS                  *FileSystem
+	Backend             store.Store
 	objs                map[string]*Store
 	defaultPrefs        map[string]string
 	runningPrefs        map[string]string
 	prefMux             *sync.Mutex
+	allMux              *sync.RWMutex
 	defaultBootEnv      string
 	GlobalProfileName   string
 	tokenManager        *JwtManager
@@ -112,10 +114,29 @@ type DataTracker struct {
 
 type Stores func(string) *Store
 
+func allKeySavers(res *DataTracker) []store.KeySaver {
+	return []store.KeySaver{
+		&Task{p: res},
+		&Job{p: res},
+		&Param{p: res},
+		&Profile{p: res},
+		&User{p: res},
+		&Template{p: res},
+		&BootEnv{p: res},
+		&Machine{p: res},
+		&Subnet{p: res},
+		&Reservation{p: res},
+		&Lease{p: res},
+		&Pref{p: res},
+		&Plugin{p: res},
+	}
+}
+
 // LockEnts grabs the requested Store locks a consistent order.
 // It returns a function to get an Index that was requested, and
 // a function that unlocks the taken locks in the right order.
 func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) {
+	p.allMux.RLock()
 	sortedEnts := make([]string, len(ents))
 	copy(sortedEnts, ents)
 	s := sort.StringSlice(sortedEnts)
@@ -148,6 +169,17 @@ func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) 
 				delete(sortedRes, s[i])
 			}
 			srMux.Unlock()
+			p.allMux.RUnlock()
+		}
+}
+
+func (p *DataTracker) LockAll() (stores Stores, unlocker func()) {
+	p.allMux.Lock()
+	return func(ref string) *Store {
+			return p.objs[ref]
+		},
+		func() {
+			p.allMux.Unlock()
 		}
 }
 
@@ -174,6 +206,90 @@ func (p *DataTracker) ApiURL(remoteIP net.IP) string {
 	return p.urlFor("https", remoteIP, p.ApiPort)
 }
 
+func (p *DataTracker) rebuildCache() error {
+	p.objs = map[string]*Store{}
+	objs := allKeySavers(p)
+	for _, obj := range objs {
+		prefix := obj.Prefix()
+		bk := p.Backend.GetSub(prefix)
+		p.objs[prefix] = &Store{backingStore: bk}
+		storeObjs, err := store.List(obj)
+		if err != nil {
+			return fmt.Errorf("%s: %v", prefix, err)
+		}
+		p.objs[prefix].Index = *index.Create(storeObjs)
+		if obj.Prefix() == "templates" {
+			buf := &bytes.Buffer{}
+			for _, thing := range p.objs["templates"].Items() {
+				tmpl := AsTemplate(thing)
+				fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}`, tmpl.ID, tmpl.Contents)
+			}
+			root, err := template.New("").Parse(buf.String())
+			if err != nil {
+				return fmt.Errorf("Unable to load root templates: %v", err)
+			}
+			p.rootTemplate = root
+			p.rootTemplate.Option("missingkey=error")
+		}
+	}
+	return nil
+}
+
+func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) *Error {
+	res := &DataTracker{
+		Backend:           backend,
+		FileRoot:          ".",
+		LogRoot:           ".",
+		StaticPort:        1,
+		ApiPort:           2,
+		OurAddress:        "1.1.1.1",
+		Logger:            logger,
+		defaultPrefs:      map[string]string{},
+		runningPrefs:      map[string]string{},
+		prefMux:           &sync.Mutex{},
+		allMux:            &sync.RWMutex{},
+		FS:                NewFS(".", logger),
+		tokenManager:      NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
+		tmplMux:           &sync.Mutex{},
+		GlobalProfileName: "global",
+		thunks:            make([]func(), 0),
+		thunkMux:          &sync.Mutex{},
+		publishers:        &Publishers{},
+	}
+
+	// Load stores.
+	err := res.rebuildCache()
+	if err != nil {
+		return NewError("LoadError", http.StatusInternalServerError, fmt.Sprintf("Failed to rebuild cache: %v", err))
+	}
+
+	keys := make([]string, len(res.objs))
+	i := 0
+	for k := range res.objs {
+		keys[i] = k
+		i++
+	}
+
+	d, unlocker := res.LockAll()
+	defer unlocker()
+
+	berr := &Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
+
+	for _, k := range keys {
+
+		for _, obj := range res.objs[k].Items() {
+			if val, ok := obj.(Validator); ok {
+				obj.(validator).setStores(d)
+				berr.Merge(val.Validate())
+			}
+		}
+	}
+	if berr.OrNil() == nil {
+		return nil
+	}
+	return berr
+}
+
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.Store,
 	fileRoot, logRoot, addr string,
@@ -182,6 +298,7 @@ func NewDataTracker(backend store.Store,
 	defaultPrefs map[string]string,
 	publishers *Publishers) *DataTracker {
 	res := &DataTracker{
+		Backend:           backend,
 		FileRoot:          fileRoot,
 		LogRoot:           logRoot,
 		StaticPort:        staticPort,
@@ -191,6 +308,7 @@ func NewDataTracker(backend store.Store,
 		defaultPrefs:      defaultPrefs,
 		runningPrefs:      map[string]string{},
 		prefMux:           &sync.Mutex{},
+		allMux:            &sync.RWMutex{},
 		FS:                NewFS(fileRoot, logger),
 		tokenManager:      NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
 		tmplMux:           &sync.Mutex{},
@@ -199,48 +317,24 @@ func NewDataTracker(backend store.Store,
 		thunkMux:          &sync.Mutex{},
 		publishers:        publishers,
 	}
-	objs := []store.KeySaver{
-		&Task{p: res},
-		&Job{p: res},
-		&Param{p: res},
-		&Profile{p: res},
-		&User{p: res},
-		&Template{p: res},
-		&BootEnv{p: res},
-		&Machine{p: res},
-		&Subnet{p: res},
-		&Reservation{p: res},
-		&Lease{p: res},
-		&Pref{p: res},
-		&Plugin{p: res},
-	}
-	res.objs = map[string]*Store{}
+
+	// Make sure incoming writable backend has all stores created
+	objs := allKeySavers(res)
 	for _, obj := range objs {
 		prefix := obj.Prefix()
-		bk, err := backend.MakeSub(prefix)
+		_, err := backend.MakeSub(prefix)
 		if err != nil {
 			res.Logger.Fatalf("dataTracker: Error creating substore %s: %v", prefix, err)
 		}
-		res.objs[prefix] = &Store{backingStore: bk}
-		storeObjs, err := store.List(obj)
-		if err != nil {
-			res.Logger.Fatalf("dataTracker: Error loading data for %s: %v", prefix, err)
-		}
-		res.objs[prefix].Index = *index.Create(storeObjs)
-		if obj.Prefix() == "templates" {
-			buf := &bytes.Buffer{}
-			for _, thing := range res.objs["templates"].Items() {
-				tmpl := AsTemplate(thing)
-				fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}`, tmpl.ID, tmpl.Contents)
-			}
-			root, err := template.New("").Parse(buf.String())
-			if err != nil {
-				logger.Fatalf("Unable to load root templates: %v", err)
-			}
-			res.rootTemplate = root
-			res.rootTemplate.Option("missingkey=error")
-		}
 	}
+
+	// Load stores.
+	err := res.rebuildCache()
+	if err != nil {
+		res.Logger.Fatalf("dataTracker: Error loading data: %v", err)
+	}
+
+	// Create minimal content.
 	d, unlocker := res.LockEnts("bootenvs", "preferences", "users", "machines", "profiles", "params")
 	defer unlocker()
 	if d("bootenvs").Find(ignoreBoot.Key()) == nil {
@@ -406,6 +500,41 @@ func (p *DataTracker) setDT(s store.KeySaver) {
 	}
 }
 
+func (p *DataTracker) NewKeySaver(t string) store.KeySaver {
+	var res store.KeySaver
+	switch t {
+	case "machines":
+		res = p.NewMachine()
+	case "params":
+		res = p.NewParam()
+	case "profiles":
+		res = p.NewProfile()
+	case "users":
+		res = p.NewUser()
+	case "templates":
+		res = p.NewTemplate()
+	case "bootenvs":
+		res = p.NewBootEnv()
+	case "leases":
+		res = p.NewLease()
+	case "reservations":
+		res = p.NewReservation()
+	case "subnets":
+		res = p.NewSubnet()
+	case "preferences":
+		res = p.NewPref()
+	case "tasks":
+		res = p.NewTask()
+	case "jobs":
+		res = p.NewJob()
+	case "plugins":
+		res = p.NewPlugin()
+	default:
+		panic("Unknown type of KeySaver passed to NewKeySaver")
+	}
+	return res
+}
+
 func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 	var res store.KeySaver
 	switch ref.(type) {
@@ -433,6 +562,8 @@ func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
 		res = p.NewTask()
 	case *Job:
 		res = p.NewJob()
+	case *Plugin:
+		res = p.NewPlugin()
 	default:
 		panic("Unknown type of KeySaver passed to Clone")
 	}
@@ -624,6 +755,12 @@ func (p *DataTracker) Backup() ([]byte, error) {
 		res[k] = p.objs[k].Items()
 	}
 	return json.Marshal(res)
+}
+
+// Assumes that all locks are held
+func (p *DataTracker) ReplaceBackend(st store.Store) error {
+	p.Backend = st
+	return p.rebuildCache()
 }
 
 func (p *DataTracker) NewToken(id string, ttl int, scope, action, specific string) (string, error) {
