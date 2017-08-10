@@ -320,7 +320,7 @@ func (f *Frontend) InitContentApi() {
 	// Create content into Digital Rebar Provision
 	//
 	//     Responses:
-	//       200: ContentSummaryResponse
+	//       201: ContentSummaryResponse
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
@@ -430,7 +430,7 @@ func (f *Frontend) InitContentApi() {
 							fmt.Sprintf("failed to replace content: %s: ", name))
 					} else {
 						f.dt.ReplaceBackend(nbs)
-						c.JSON(http.StatusCreated, cs)
+						c.JSON(http.StatusOK, cs)
 					}
 				}
 			}()
