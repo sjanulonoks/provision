@@ -54,9 +54,9 @@ func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *l
 }
 
 func (d *DataStack) buildStack() {
-	d.Push(d.writeContent)
+	d.Push(d.writeContent, false, true)
 	if d.localContent != nil {
-		d.Push(d.localContent)
+		d.Push(d.localContent, false, false)
 	}
 
 	// Sort Names
@@ -69,11 +69,11 @@ func (d *DataStack) buildStack() {
 	sort.Strings(saas)
 
 	for _, k := range saas {
-		d.Push(d.saasContents[k])
+		d.Push(d.saasContents[k], true, false)
 	}
 
 	if d.defaultContent != nil {
-		d.Push(d.defaultContent)
+		d.Push(d.defaultContent, false, false)
 	}
 }
 
@@ -85,7 +85,7 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 	if u, err := url.Parse(backendType); err == nil && u.Scheme != "" {
 		backendStore, err = store.Open(backendType)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to open backend content: %v", backendType, err)
+			return nil, fmt.Errorf("Failed to open backend content %v: %v", backendType, err)
 		}
 	} else {
 		storeURI := fmt.Sprintf("%s://%s", backendType, dataRoot)
