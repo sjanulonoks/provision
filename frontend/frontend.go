@@ -60,6 +60,7 @@ type Frontend struct {
 	NoDhcp     bool
 	NoTftp     bool
 	NoProv     bool
+	SaasDir    string
 }
 
 type AuthSource interface {
@@ -85,7 +86,7 @@ func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	return
 }
 
-func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, apiport, provport int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers, drpid string, pc *plugin.PluginController, noDhcp, noTftp, noProv bool) (me *Frontend) {
+func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, apiport, provport int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers, drpid string, pc *plugin.PluginController, noDhcp, noTftp, noProv bool, saasDir string) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {
@@ -175,7 +176,7 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, ap
 	apiGroup := mgmtApi.Group("/api/v3")
 	apiGroup.Use(userAuth())
 
-	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt, pubs: pubs, pc: pc, ApiPort: apiport, ProvPort: provport, NoDhcp: noDhcp, NoTftp: noTftp, NoProv: noProv}
+	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt, pubs: pubs, pc: pc, ApiPort: apiport, ProvPort: provport, NoDhcp: noDhcp, NoTftp: noTftp, NoProv: noProv, SaasDir: saasDir}
 
 	me.InitWebSocket()
 	me.InitBootEnvApi()
