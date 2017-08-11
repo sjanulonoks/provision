@@ -58,7 +58,9 @@ func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, *b
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	delete(dtStore.saasContents, name)
-	dtStore.buildStack()
+	if err := dtStore.buildStack(); err != nil {
+		return nil, backend.NewError("ValidationError", 422, err.Error())
+	}
 	err := backend.ValidateDataTrackerStore(dtStore, logger)
 	if err == nil && oldStore != nil {
 		CleanUpStore(oldStore)
@@ -70,7 +72,9 @@ func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *l
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	dtStore.saasContents[name] = newStore
-	dtStore.buildStack()
+	if err := dtStore.buildStack(); err != nil {
+		return nil, backend.NewError("ValidationError", 422, err.Error())
+	}
 	err := backend.ValidateDataTrackerStore(dtStore, logger)
 	if err == nil && oldStore != nil {
 		CleanUpStore(oldStore)
@@ -78,10 +82,14 @@ func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *l
 	return dtStore, err
 }
 
-func (d *DataStack) buildStack() {
-	d.Push(d.writeContent, false, true)
+func (d *DataStack) buildStack() error {
+	if err := d.Push(d.writeContent, false, true); err != nil {
+		return err
+	}
 	if d.localContent != nil {
-		d.Push(d.localContent, false, false)
+		if err := d.Push(d.localContent, false, false); err != nil {
+			return err
+		}
 	}
 
 	// Sort Names
@@ -94,12 +102,18 @@ func (d *DataStack) buildStack() {
 	sort.Strings(saas)
 
 	for _, k := range saas {
-		d.Push(d.saasContents[k], true, false)
+		if err := d.Push(d.saasContents[k], true, false); err != nil {
+			return err
+		}
 	}
 
 	if d.defaultContent != nil {
-		d.Push(d.defaultContent, false, false)
+		if err := d.Push(d.defaultContent, false, false); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasDir string) (*DataStack, error) {
@@ -182,7 +196,6 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 		}
 	}
 
-	dtStore.buildStack()
-
-	return dtStore, nil
+	err = dtStore.buildStack()
+	return dtStore, err
 }
