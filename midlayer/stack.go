@@ -22,6 +22,23 @@ type DataStack struct {
 	defaultContent store.Store
 }
 
+func CleanUpStore(st store.Store) error {
+	st.Close()
+	switch st.Type() {
+	case "bolt":
+		fst, _ := st.(*store.Bolt)
+		return os.Remove(fst.Path)
+	case "file":
+		fst, _ := st.(*store.File)
+		return os.Remove(fst.Path)
+	case "directory":
+		fst, _ := st.(*store.Directory)
+		return os.RemoveAll(fst.Path)
+	default:
+		return nil
+	}
+}
+
 func (d *DataStack) Clone() *DataStack {
 	dtStore := &DataStack{store.StackedStore{}, nil, nil, make(map[string]store.Store), nil}
 	dtStore.Open(store.DefaultCodec)
@@ -39,17 +56,25 @@ func (d *DataStack) Clone() *DataStack {
 
 func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, *backend.Error) {
 	dtStore := d.Clone()
+	oldStore, _ := dtStore.saasContents[name]
 	delete(dtStore.saasContents, name)
 	dtStore.buildStack()
 	err := backend.ValidateDataTrackerStore(dtStore, logger)
+	if err == nil && oldStore != nil {
+		CleanUpStore(oldStore)
+	}
 	return dtStore, err
 }
 
 func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *log.Logger) (*DataStack, *backend.Error) {
 	dtStore := d.Clone()
+	oldStore, _ := dtStore.saasContents[name]
 	dtStore.saasContents[name] = newStore
 	dtStore.buildStack()
 	err := backend.ValidateDataTrackerStore(dtStore, logger)
+	if err == nil && oldStore != nil {
+		CleanUpStore(oldStore)
+	}
 	return dtStore, err
 }
 
@@ -121,16 +146,16 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 		if !info.IsDir() {
 			ext := path.Ext(filepath)
 			codec := "json"
-			if ext == "yaml" || ext == "yml" {
+			if ext == ".yaml" || ext == ".yml" {
 				codec = "yaml"
 			}
 
-			fs, err := store.Open(fmt.Sprintf("file:%s?codec=%s", filepath, codec))
+			fs, err := store.Open(fmt.Sprintf("file://%s?codec=%s", filepath, codec))
 			if err != nil {
 				return err
 			}
 
-			mst, _ := backendStore.(store.MetaSaver)
+			mst, _ := fs.(store.MetaSaver)
 			md := mst.MetaData()
 			name := md["Name"]
 

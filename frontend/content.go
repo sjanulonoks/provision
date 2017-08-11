@@ -86,8 +86,10 @@ type ContentParameter struct {
 	Name string `json:"name"`
 }
 
-func buildNewStore(content *Content) (newStore store.Store, err error) {
-	newStore, err = store.Open("file:///tmp/newstore?codec=yaml")
+func (f *Frontend) buildNewStore(content *Content) (newStore store.Store, err error) {
+	filename := fmt.Sprintf("file:///%s/%s-%s.yaml?codec=yaml", f.SaasDir, content.Name, content.Version)
+
+	newStore, err = store.Open(filename)
 	if err != nil {
 		return
 	}
@@ -352,7 +354,7 @@ func (f *Frontend) InitContentApi() {
 					return
 				}
 
-				if newStore, err := buildNewStore(content); err != nil {
+				if newStore, err := f.buildNewStore(content); err != nil {
 					jsonError(c, err, http.StatusInternalServerError,
 						fmt.Sprintf("failed to build content: %s: ", name))
 					return
@@ -361,6 +363,7 @@ func (f *Frontend) InitContentApi() {
 
 					ds := f.dt.Backend.(*midlayer.DataStack)
 					if nbs, err := ds.AddReplaceStore(name, newStore, f.Logger); err != nil {
+						midlayer.CleanUpStore(newStore)
 						jsonError(c, err, http.StatusInternalServerError,
 							fmt.Sprintf("failed to add content: %s: ", name))
 					} else {
@@ -416,7 +419,7 @@ func (f *Frontend) InitContentApi() {
 					return
 				}
 
-				if newStore, err := buildNewStore(content); err != nil {
+				if newStore, err := f.buildNewStore(content); err != nil {
 					jsonError(c, err, http.StatusInternalServerError,
 						fmt.Sprintf("failed to build content: %s: ", name))
 					return
@@ -425,7 +428,7 @@ func (f *Frontend) InitContentApi() {
 
 					ds := f.dt.Backend.(*midlayer.DataStack)
 					if nbs, err := ds.AddReplaceStore(name, newStore, f.Logger); err != nil {
-						// GREG: Remove file
+						midlayer.CleanUpStore(newStore)
 						jsonError(c, err, http.StatusInternalServerError,
 							fmt.Sprintf("failed to replace content: %s: ", name))
 					} else {
@@ -469,8 +472,6 @@ func (f *Frontend) InitContentApi() {
 					jsonError(c, err, http.StatusInternalServerError,
 						fmt.Sprintf("failed to remove content: %s: ", name))
 				} else {
-					// GREG: Remove file
-
 					f.dt.ReplaceBackend(nbs)
 					c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
 				}
