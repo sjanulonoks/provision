@@ -405,7 +405,7 @@ func (f *Frontend) InitContentApi() {
 			if name != content.Name {
 				c.JSON(http.StatusBadRequest,
 					backend.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("Name must machine: %s != %s\n", name, c.Param(`name`))))
+						fmt.Sprintf("Name must match: %s != %s\n", content.Name, c.Param(`name`))))
 				return
 
 			}
