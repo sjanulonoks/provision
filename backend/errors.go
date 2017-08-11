@@ -38,24 +38,7 @@ type Validation struct {
 	// If there are any errors in the validation process, they will be
 	// available here.
 	// read only: true
-	Errors  []string
-	proceed chan bool
-}
-
-func (v *Validation) canProceed() bool {
-	return <-v.proceed
-}
-
-// The thunk is required to set Validated to true under locks.
-func (v *Validation) deferred(thunk func() bool) {
-	if v.proceed == nil {
-		v.proceed = make(chan bool)
-	}
-	v.Validated = false
-	go func() {
-		res := thunk()
-		v.proceed <- res
-	}()
+	Errors []string
 }
 
 type validator interface {
@@ -73,10 +56,6 @@ func (v *validate) setStores(s Stores) {
 
 func (v *validate) clearStores() {
 	v.stores = nil
-}
-
-type postValidator interface {
-	canProceed() bool
 }
 
 func validateIP4(e *Error, a net.IP) {
