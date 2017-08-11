@@ -7,6 +7,7 @@ packages="github.com/digitalrebar/provision,\
 github.com/digitalrebar/provision/backend,\
 github.com/digitalrebar/provision/backend/index,\
 github.com/digitalrebar/provision/midlayer,\
+github.com/digitalrebar/provision/models,\
 github.com/digitalrebar/provision/frontend,\
 github.com/digitalrebar/provision/embedded,\
 github.com/digitalrebar/provision/server,\
@@ -14,7 +15,7 @@ github.com/digitalrebar/provision/plugin,\
 github.com/digitalrebar/provision/cli\
 "
 
-for d in $(go list ./... 2>/dev/null | grep -v cmds | grep -v vendor | grep -v github.com/digitalrebar/provision/client  | grep -v github.com/digitalrebar/provision/models) ; do
+for d in $(go list ./... 2>/dev/null | grep -v cmds | grep -v vendor | grep -v github.com/digitalrebar/provision/client  | grep -v github.com/digitalrebar/provision/genmodels) ; do
     tdir=$PWD
     dir=${d//github.com\/digitalrebar\/provision}
     echo "----------- TESTING $dir -----------"

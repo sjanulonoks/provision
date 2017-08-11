@@ -37,7 +37,7 @@ for tool in go-bindata swagger glide; do
 done
 
 glide install
-rm -rf client models embedded/assets/swagger.json
+rm -rf client genmodels embedded/assets/swagger.json
 go generate server/assets.go
 
 # Update cli docs if needed. - does change date.
