@@ -7,7 +7,6 @@ packages="github.com/digitalrebar/provision,\
 github.com/digitalrebar/provision/backend,\
 github.com/digitalrebar/provision/backend/index,\
 github.com/digitalrebar/provision/midlayer,\
-github.com/digitalrebar/provision/models,\
 github.com/digitalrebar/provision/frontend,\
 github.com/digitalrebar/provision/embedded,\
 github.com/digitalrebar/provision/server,\

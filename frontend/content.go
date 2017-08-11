@@ -330,6 +330,7 @@ func (f *Frontend) InitContentApi() {
 	//       404: ErrorResponse
 	//       409: ErrorResponse
 	//       415: ErrorResponse
+	//       422: ErrorResponse
 	//       500: ErrorResponse
 	//       507: ErrorResponse
 	f.ApiGroup.POST("/contents",
@@ -387,6 +388,7 @@ func (f *Frontend) InitContentApi() {
 	//       404: ErrorResponse
 	//       409: ErrorResponse
 	//       415: ErrorResponse
+	//       422: ErrorResponse
 	//       500: ErrorResponse
 	//       507: ErrorResponse
 	f.ApiGroup.PUT("/contents/:name",
@@ -403,7 +405,7 @@ func (f *Frontend) InitContentApi() {
 			if name != content.Name {
 				c.JSON(http.StatusBadRequest,
 					backend.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("Name must machine: %s != %s\n", name, c.Param(`name`))))
+						fmt.Sprintf("Name must match: %s != %s\n", content.Name, c.Param(`name`))))
 				return
 
 			}
@@ -448,6 +450,7 @@ func (f *Frontend) InitContentApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/contents/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
