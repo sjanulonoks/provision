@@ -59,7 +59,7 @@ type ProgOpts struct {
 
 	BackEndType    string `long:"backend" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI" default:"directory"`
 	LocalContent   string `long:"local-content" description:"Storage to use for local overrides." default:"directory:///etc/dr-provision?codec=yaml"`
-	DefaultContent string `long:"default-content" description:"Store URL for local content" default:"directory:///usr/share/dr-provision?codec=yaml"`
+	DefaultContent string `long:"default-content" description:"Store URL for local content" default:"file:///usr/share/dr-provision/default.yaml?codec=yaml"`
 
 	BaseRoot        string `long:"base-root" description:"Base directory for other root dirs." default:"/var/lib/dr-provision"`
 	DataRoot        string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
