@@ -2,6 +2,7 @@ package backend
 
 import (
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -12,29 +13,17 @@ import (
 // the param must match to be considered valid.
 // swagger:model
 type Param struct {
+	*models.Param
 	validate
-	// Name is the name of the param.  Params must be uniquely named.
-	//
-	// required: true
-	Name string
-	// Description is a one-line description of the parameter.
-	Description string
-	// Documentation details what the parameter does, what values it can
-	// take, what it is used for, etc.
-	Documentation string
-	// Schema must be a valid JSONSchema as of draft v4.
-	//
-	// required: true
-	Schema    interface{}
 	p         *DataTracker
 	validator *gojsonschema.Schema
 }
 
-func AsParam(o store.KeySaver) *Param {
+func AsParam(o models.Model) *Param {
 	return o.(*Param)
 }
 
-func AsParams(o []store.KeySaver) []*Param {
+func AsParams(o []models.Model) []*Param {
 	res := make([]*Param, len(o))
 	for i := range o {
 		res[i] = AsParam(o[i])
@@ -46,25 +35,12 @@ func (p *Param) Backend() store.Store {
 	return p.p.getBackend(p)
 }
 
-func (p *Param) Prefix() string {
-	return "params"
-}
-
-func (p *Param) Key() string {
-	return p.Name
-}
-
 func (p *Param) AuthKey() string {
 	return p.Key()
 }
 
 func (p *Param) New() store.KeySaver {
-	res := &Param{Name: p.Name, p: p.p}
-	return store.KeySaver(res)
-}
-
-func (d *DataTracker) NewParam() *Param {
-	return &Param{p: d}
+	return &Param{Param: &models.Param{}}
 }
 
 func (p *Param) setDT(dp *DataTracker) {
@@ -78,37 +54,44 @@ func (p *Param) Indexes() map[string]index.Maker {
 		"Name": index.Make(
 			true,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+			func(ref models.Model) (gte, gt index.Test) {
 				refName := fix(ref).Name
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).Name >= refName
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Name > refName
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &Param{Name: s}, nil
+			func(s string) (models.Model, error) {
+				param := &Param{}
+				param.Name = s
+				return param, nil
 			}),
 	}
 }
 
-func (p *Param) setValidator() error {
+func (p *Param) setValidator() {
 	schema, err := gojsonschema.NewSchema(gojsonschema.NewGoLoader(p.Schema))
 	if err != nil {
-		return err
+		p.AddError(err)
 	}
 	p.validator = schema
-	return nil
 }
 
-func (p *Param) Validate() error {
-	return p.setValidator()
+func (p *Param) Validate() {
+	p.setValidator()
+	p.SetValid()
+	p.SetAvailable()
 }
 
 func (p *Param) BeforeSave() error {
-	return p.setValidator()
+	p.Validate()
+	if !p.Useable() {
+		return p.MakeError(422, ValidationError, p)
+	}
+	return nil
 	// Arguably, we should also detect when an attempted schema update happens
 	// and verify that it does not break validation, or at least report on what
 	// previously-valid values would become invalid.
@@ -116,11 +99,8 @@ func (p *Param) BeforeSave() error {
 }
 
 func (p *Param) ValidateValue(val interface{}) error {
-	if p.validator == nil {
-		err := p.setValidator()
-		if err != nil {
-			return err
-		}
+	if !p.Useable() {
+		return p.MakeError(422, ValidationError, p)
 	}
 	res, err := p.validator.Validate(gojsonschema.NewGoLoader(val))
 	if err != nil {
@@ -129,7 +109,7 @@ func (p *Param) ValidateValue(val interface{}) error {
 	if res.Valid() {
 		return nil
 	}
-	e := &Error{}
+	e := &models.Error{}
 	for _, i := range res.Errors() {
 		e.Errorf(i.String())
 	}

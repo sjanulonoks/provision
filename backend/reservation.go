@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
 
@@ -13,29 +14,9 @@ import (
 //
 // swagger:model
 type Reservation struct {
+	*models.Reservation
 	validate
-	// Addr is the IP address permanently assigned to the strategy/token combination.
-	//
-	// required: true
-	// swagger:strfmt ipv4
-	Addr net.IP
-	// Token is the unique identifier that the strategy for this Reservation should use.
-	//
-	// required: true
-	Token string
-	// NextServer is the address the server should contact next.
-	//
-	// required: false
-	// swagger:strfmt ipv4
-	NextServer net.IP
-	// Options is the list of DHCP options that apply to this Reservation
-	Options []DhcpOption
-	// Strategy is the leasing strategy that will be used determine what to use from
-	// the DHCP packet to handle lease management.
-	//
-	// required: true
-	Strategy string
-	p        *DataTracker
+	p *DataTracker
 }
 
 func (l *Reservation) Indexes() map[string]index.Maker {
@@ -45,104 +26,104 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 		"Addr": index.Make(
 			false,
 			"IP Address",
-			func(i, j store.KeySaver) bool {
+			func(i, j models.Model) bool {
 				n, o := big.Int{}, big.Int{}
 				n.SetBytes(fix(i).Addr.To16())
 				o.SetBytes(fix(j).Addr.To16())
 				return n.Cmp(&o) == -1
 			},
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(ref models.Model) (gte, gt index.Test) {
 				addr := &big.Int{}
 				addr.SetBytes(fix(ref).Addr.To16())
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						o := big.Int{}
 						o.SetBytes(fix(s).Addr.To16())
 						return o.Cmp(addr) != -1
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						o := big.Int{}
 						o.SetBytes(fix(s).Addr.To16())
 						return o.Cmp(addr) == 1
 					}
 			},
-			func(s string) (store.KeySaver, error) {
+			func(s string) (models.Model, error) {
 				addr := net.ParseIP(s)
 				if addr == nil {
 					return nil, fmt.Errorf("Invalid Address: %s", s)
 				}
-				return &Reservation{Addr: addr}, nil
+				res := &Reservation{}
+				res.Addr = addr
+				return res, nil
 			}),
 		"Token": index.Make(
 			false,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).Token < fix(j).Token },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).Token < fix(j).Token },
+			func(ref models.Model) (gte, gt index.Test) {
 				token := fix(ref).Token
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).Token >= token
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Token > token
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &Reservation{Token: s}, nil
+			func(s string) (models.Model, error) {
+				res := &Reservation{}
+				res.Token = s
+				return res, nil
 			}),
 		"Strategy": index.Make(
 			false,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).Strategy < fix(j).Strategy },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).Strategy < fix(j).Strategy },
+			func(ref models.Model) (gte, gt index.Test) {
 				strategy := fix(ref).Strategy
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).Strategy >= strategy
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Strategy > strategy
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &Reservation{Strategy: s}, nil
+			func(s string) (models.Model, error) {
+				res := &Reservation{}
+				res.Strategy = s
+				return res, nil
 			}),
 		"NextServer": index.Make(
 			false,
 			"IP Address",
-			func(i, j store.KeySaver) bool {
+			func(i, j models.Model) bool {
 				n, o := big.Int{}, big.Int{}
 				n.SetBytes(fix(i).NextServer.To16())
 				o.SetBytes(fix(j).NextServer.To16())
 				return n.Cmp(&o) == -1
 			},
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(ref models.Model) (gte, gt index.Test) {
 				addr := &big.Int{}
 				addr.SetBytes(fix(ref).NextServer.To16())
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						o := big.Int{}
 						o.SetBytes(fix(s).NextServer.To16())
 						return o.Cmp(addr) != -1
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						o := big.Int{}
 						o.SetBytes(fix(s).NextServer.To16())
 						return o.Cmp(addr) == 1
 					}
 			},
-			func(s string) (store.KeySaver, error) {
+			func(s string) (models.Model, error) {
 				addr := net.ParseIP(s)
 				if addr == nil {
 					return nil, fmt.Errorf("Invalid Address: %s", s)
 				}
-				return &Reservation{NextServer: addr}, nil
+				res := &Reservation{}
+				res.NextServer = addr
+				return res, nil
 			}),
 	}
-}
-
-func (r *Reservation) Prefix() string {
-	return "reservations"
-}
-
-func (r *Reservation) Key() string {
-	return Hexaddr(r.Addr)
 }
 
 func (r *Reservation) AuthKey() string {
@@ -154,22 +135,18 @@ func (r *Reservation) Backend() store.Store {
 }
 
 func (r *Reservation) New() store.KeySaver {
-	return &Reservation{p: r.p}
+	return &Reservation{Reservation: &models.Reservation{}}
 }
 
 func (r *Reservation) setDT(p *DataTracker) {
 	r.p = p
 }
 
-func (p *DataTracker) NewReservation() *Reservation {
-	return &Reservation{p: p}
-}
-
-func AsReservation(o store.KeySaver) *Reservation {
+func AsReservation(o models.Model) *Reservation {
 	return o.(*Reservation)
 }
 
-func AsReservations(o []store.KeySaver) []*Reservation {
+func AsReservations(o []models.Model) []*Reservation {
 	res := make([]*Reservation, len(o))
 	for i := range o {
 		res[i] = AsReservation(o[i])
@@ -179,45 +156,40 @@ func AsReservations(o []store.KeySaver) []*Reservation {
 
 func (r *Reservation) OnChange(oldThing store.KeySaver) error {
 	old := AsReservation(oldThing)
-	e := &Error{Code: 422, Type: ValidationError, o: r}
 	if r.Token != old.Token {
-		e.Errorf("Token cannot change")
+		r.Errorf("Token cannot change")
 	}
 	if r.Strategy != old.Strategy {
-		e.Errorf("Strategy cannot change")
+		r.Errorf("Strategy cannot change")
 	}
-	return e.OrNil()
+	return r.MakeError(422, ValidationError, r)
 }
 
 func (r *Reservation) OnCreate() error {
-	e := &Error{Code: 422, Type: ValidationError, o: r}
-	// Make sure we aren't creating a reservation for a network or
-	// a broadcast address in a subnet we know about
 	subnets := AsSubnets(r.stores("subnets").Items())
 	for i := range subnets {
 		if !subnets[i].subnet().Contains(r.Addr) {
 			continue
 		}
 		if !subnets[i].InSubnetRange(r.Addr) {
-			e.Errorf("Address %s is a network or broadcast address for subnet %s", r.Addr.String(), subnets[i].Name)
+			r.Errorf("Address %s is a network or broadcast address for subnet %s", r.Addr.String(), subnets[i].Name)
 		}
 		break
 	}
-	return e.OrNil()
+	return r.MakeError(422, ValidationError, r)
 }
 
-func (r *Reservation) Validate() error {
-	e := &Error{Code: 422, Type: ValidationError, o: r}
-	validateIP4(e, r.Addr)
-	validateMaybeZeroIP4(e, r.NextServer)
+func (r *Reservation) Validate() {
+	validateIP4(r, r.Addr)
+	validateMaybeZeroIP4(r, r.NextServer)
 	if len(r.NextServer) == 0 || r.NextServer.IsUnspecified() {
 		r.NextServer = nil
 	}
 	if r.Token == "" {
-		e.Errorf("Reservation Token cannot be empty!")
+		r.Errorf("Reservation Token cannot be empty!")
 	}
 	if r.Strategy == "" {
-		e.Errorf("Reservation Strategy cannot be empty!")
+		r.Errorf("Reservation Strategy cannot be empty!")
 	}
 	reservations := AsReservations(r.stores("reservations").Items())
 	for i := range reservations {
@@ -226,16 +198,25 @@ func (r *Reservation) Validate() error {
 		}
 		if reservations[i].Token == r.Token &&
 			reservations[i].Strategy == r.Strategy {
-			e.Errorf("Reservation %s alreay has Strategy %s: Token %s", reservations[i].Key(), r.Strategy, r.Token)
+			r.Errorf("Reservation %s alreay has Strategy %s: Token %s", reservations[i].Key(), r.Strategy, r.Token)
 			break
 		}
 	}
-	e.Merge(index.CheckUnique(r, r.stores("reservations").Items()))
-	return e.OrNil()
+	r.AddError(index.CheckUnique(r, r.stores("reservations").Items()))
+	r.SetValid()
+	r.SetAvailable()
 }
 
 func (r *Reservation) BeforeSave() error {
-	return r.Validate()
+	r.Validate()
+	if !r.Useable() {
+		return r.MakeError(422, ValidationError, r)
+	}
+	return nil
+}
+
+func (r *Reservation) OnLoad() error {
+	return r.BeforeSave()
 }
 
 var reservationLockMap = map[string][]string{

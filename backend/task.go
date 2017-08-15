@@ -5,6 +5,7 @@ import (
 	"text/template"
 
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
 
@@ -12,39 +13,18 @@ import (
 //
 // swagger:model
 type Task struct {
+	*models.Task
 	validate
-	// Name is the name of this Task.  Task names must be globally unique
-	//
-	// required: true
-	Name string
-	// Description is a one-line description of this Task.
-	Description string
-	// Documentation should describe in detail what this task should do on a machine.
-	Documentation string
-	// Templates lists the templates that need to be rendered for the Task.
-	//
-	// required: true
-	Templates []TemplateInfo
-	// RequiredParams is the list of parameters that are required to be present on
-	// Machine.Params or in a profile attached to the machine.
-	//
-	// required: true
-	RequiredParams []string
-	// OptionalParams are extra optional parameters that a template rendered for
-	// the Task may use.
-	//
-	// required: true
-	OptionalParams []string
-	p              *DataTracker
-	rootTemplate   *template.Template
-	tmplMux        sync.Mutex
+	p            *DataTracker
+	rootTemplate *template.Template
+	tmplMux      sync.Mutex
 }
 
-func AsTask(o store.KeySaver) *Task {
+func AsTask(o models.Model) *Task {
 	return o.(*Task)
 }
 
-func AsTasks(o []store.KeySaver) []*Task {
+func AsTasks(o []models.Model) []*Task {
 	res := make([]*Task, len(o))
 	for i := range o {
 		res[i] = AsTask(o[i])
@@ -56,25 +36,12 @@ func (t *Task) Backend() store.Store {
 	return t.p.getBackend(t)
 }
 
-func (t *Task) Prefix() string {
-	return "tasks"
-}
-
-func (t *Task) Key() string {
-	return t.Name
-}
-
 func (t *Task) AuthKey() string {
 	return t.Key()
 }
 
 func (t *Task) New() store.KeySaver {
-	res := &Task{Name: t.Name, p: t.p}
-	return store.KeySaver(res)
-}
-
-func (d *DataTracker) NewTask() *Task {
-	return &Task{p: d}
+	return &Task{Task: &models.Task{}}
 }
 
 func (t *Task) setDT(dp *DataTracker) {
@@ -88,54 +55,65 @@ func (t *Task) Indexes() map[string]index.Maker {
 		"Name": index.Make(
 			true,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+			func(ref models.Model) (gte, gt index.Test) {
 				refName := fix(ref).Name
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).Name >= refName
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Name > refName
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &Task{Name: s}, nil
+			func(s string) (models.Model, error) {
+				task := &Task{}
+				task.Name = s
+				return task, nil
 			}),
 	}
 }
 
-func (t *Task) genRoot(common *template.Template, e *Error) *template.Template {
-	return MergeTemplates(common, t.Templates, e)
+func (t *Task) genRoot(common *template.Template, e models.ErrorAdder) *template.Template {
+	res := models.MergeTemplates(common, t.Templates, e)
+	if e.HasError != nil {
+		return nil
+	}
+	return res
 }
 
-func (t *Task) Validate() error {
-	e := &Error{Code: 422, Type: ValidationError, o: t}
+func (t *Task) Validate() {
 	t.tmplMux.Lock()
 	defer t.tmplMux.Unlock()
 	t.p.tmplMux.Lock()
 	defer t.p.tmplMux.Unlock()
-	root := t.genRoot(t.p.rootTemplate, e)
-	if !e.ContainsError() {
+	root := t.genRoot(t.p.rootTemplate, t)
+	t.SetValid()
+	if t.Useable() {
 		t.rootTemplate = root
+		t.SetAvailable()
 	}
-	return e.OrNil()
+	return
 }
 
 func (t *Task) OnLoad() error {
-	return t.Validate()
+	t.Validate()
+	if !t.Useable() {
+		return t.MakeError(422, ValidationError, t)
+	}
+	return nil
 }
 
 func (t *Task) BeforeSave() error {
-	return t.Validate()
+	return t.OnLoad()
 }
 
 type taskHaver interface {
-	store.KeySaver
+	models.Model
 	HasTask(string) bool
 }
 
 func (t *Task) BeforeDelete() error {
-	e := &Error{Code: 409, Type: StillInUseError, o: t}
+	e := &models.Error{Code: 409, Type: StillInUseError, Object: t}
 	for _, objPrefix := range []string{"profiles", "machines", "bootenvs"} {
 		for _, j := range t.stores(objPrefix).Items() {
 			thing := j.(taskHaver)
@@ -144,10 +122,10 @@ func (t *Task) BeforeDelete() error {
 			}
 		}
 	}
-	return e.OrNil()
+	return e.HasError()
 }
 
-func (t *Task) renderInfo() ([]TemplateInfo, []string) {
+func (t *Task) renderInfo() ([]models.TemplateInfo, []string) {
 	return t.Templates, t.RequiredParams
 }
 
@@ -155,7 +133,7 @@ func (t *Task) templates() *template.Template {
 	return t.rootTemplate
 }
 
-func (t *Task) Render(d Stores, m *Machine, e *Error) renderers {
+func (t *Task) Render(d Stores, m *Machine, e *models.Error) renderers {
 	if m == nil {
 		e.Errorf("No machine to render against")
 		return nil

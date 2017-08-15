@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/digitalrebar/store"
+	"github.com/digitalrebar/provision/models"
 )
 
 type renderer struct {
@@ -29,8 +29,8 @@ func (r renderer) deregister(fs *FileSystem) {
 type renderers []renderer
 
 type renderable interface {
-	store.KeySaver
-	renderInfo() ([]TemplateInfo, []string)
+	models.Model
+	renderInfo() ([]models.TemplateInfo, []string)
 	templates() *template.Template
 }
 
@@ -286,7 +286,7 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 	return nil, fmt.Errorf("No such machine parameter %s", key)
 }
 
-func (r *RenderData) makeRenderers(e *Error) renderers {
+func (r *RenderData) makeRenderers(e models.ErrorAdder) renderers {
 	toRender, requiredParams := r.target.renderInfo()
 	for _, param := range requiredParams {
 		if !r.ParamExists(param) {
@@ -297,10 +297,10 @@ func (r *RenderData) makeRenderers(e *Error) renderers {
 	for i := range toRender {
 		tmplPath := ""
 		ti := &toRender[i]
-		if ti.pathTmpl != nil {
+		if ti.PathTemplate() != nil {
 			// first, render the path
 			buf := &bytes.Buffer{}
-			if err := ti.pathTmpl.Execute(buf, r); err != nil {
+			if err := ti.PathTemplate().Execute(buf, r); err != nil {
 				e.Errorf("Error rendering template %s path %s: %v",
 					ti.Name,
 					ti.Path,
@@ -313,7 +313,7 @@ func (r *RenderData) makeRenderers(e *Error) renderers {
 				tmplPath = path.Clean("/" + buf.String())
 			}
 		}
-		rts[i] = newRenderedTemplate(r, ti.id(), tmplPath)
+		rts[i] = newRenderedTemplate(r, ti.Id(), tmplPath)
 	}
 	return renderers(rts)
 }

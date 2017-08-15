@@ -1,30 +1,33 @@
 package backend
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/digitalrebar/provision/models"
+)
 
 func TestTemplateCrud(t *testing.T) {
 	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("templates", "bootenvs", "tasks", "machines")
 	defer unlocker()
 	tests := []crudTest{
-		{"Create Template with No ID", dt.Create, &Template{p: dt}, false, nil},
-		{"Create Valid Empty Template", dt.Create, &Template{p: dt, ID: "test1"}, true, nil},
-		{"Create Valid Nonempty Template", dt.Create, &Template{p: dt, ID: "test2", Contents: "{{ .Foo }}"}, true, nil},
-		{"Create Duplicate Template", dt.Create, &Template{p: dt, ID: "test1"}, false, nil},
-		{"Create Invalid Template", dt.Create, &Template{p: dt, ID: "test4", Contents: "{{ .Bar }"}, false, nil},
-		{"Create Template that refers to another template", dt.Create, &Template{p: dt, ID: "test3", Contents: `{{template "test2"}}`}, true, nil},
-		{"Update Valid Contents", dt.Update, &Template{p: dt, ID: "test1", Contents: "{{ .Bar }}"}, true, nil},
-		{"Update Invalid Contents", dt.Update, &Template{p: dt, ID: "test1", Contents: "{{}"}, false, nil},
-		{"Update ID", dt.Update, &Template{p: dt, ID: "test5"}, false, nil},
-		{"Update with blank ID", dt.Update, &Template{p: dt}, false, nil},
+		{"Create Template with No ID", dt.Create, &models.Template{}, false},
+		{"Create Valid Empty Template", dt.Create, &models.Template{ID: "test1"}, true},
+		{"Create Valid Nonempty Template", dt.Create, &models.Template{ID: "test2", Contents: "{{ .Foo }}"}, true},
+		{"Create Duplicate Template", dt.Create, &models.Template{ID: "test1"}, false},
+		{"Create Invalid Template", dt.Create, &models.Template{ID: "test4", Contents: "{{ .Bar }"}, false},
+		{"Create Template that refers to another template", dt.Create, &models.Template{ID: "test3", Contents: `{{template "test2"}}`}, true},
+		{"Update Valid Contents", dt.Update, &models.Template{ID: "test1", Contents: "{{ .Bar }}"}, true},
+		{"Update Invalid Contents", dt.Update, &models.Template{ID: "test1", Contents: "{{}"}, false},
+		{"Update ID", dt.Update, &models.Template{ID: "test5"}, false},
+		{"Update with blank ID", dt.Update, &models.Template{}, false},
 	}
 	for _, test := range tests {
 		test.Test(t, d)
 	}
-	b := dt.NewBootEnv()
-	b.Name = "scratch"
-	b.Templates = []TemplateInfo{{Name: "ipxe", Path: "default.ipxe", ID: "test1"}}
-	saved, err := dt.Create(d, b, nil)
+	b := &models.BootEnv{Name: "scratch"}
+	b.Templates = []models.TemplateInfo{{Name: "ipxe", Path: "default.ipxe", ID: "test1"}}
+	saved, err := dt.Create(d, b)
 	if !saved {
 		t.Errorf("Error saving scratch bootenv: %v", err)
 	} else {
@@ -32,8 +35,8 @@ func TestTemplateCrud(t *testing.T) {
 	}
 
 	tests = []crudTest{
-		{"Remove Unused Template", dt.Remove, &Template{p: dt, ID: "test2"}, true, nil},
-		{"Remove Used Template", dt.Remove, &Template{p: dt, ID: "test1"}, false, nil},
+		{"Remove Unused Template", dt.Remove, &models.Template{ID: "test2"}, true},
+		{"Remove Used Template", dt.Remove, &models.Template{ID: "test1"}, false},
 	}
 	for _, test := range tests {
 		test.Test(t, d)

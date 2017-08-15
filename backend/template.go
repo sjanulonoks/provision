@@ -6,114 +6,17 @@ import (
 	"text/template"
 
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
-
-// TemplateInfo holds information on the templates in the boot
-// environment that will be expanded into files.
-//
-// swagger:model
-type TemplateInfo struct {
-	// Name of the template
-	//
-	// required: true
-	Name string
-	// A text/template that specifies how to create
-	// the final path the template should be
-	// written to.
-	//
-	// required: true
-	Path string
-	// The ID of the template that should be expanded.  Either
-	// this or Contents should be set
-	//
-	// required: false
-	ID string
-	// The contents that should be used when this template needs
-	// to be expanded.  Either this or ID should be set.
-	//
-	// required: false
-	Contents string
-	pathTmpl *template.Template
-}
-
-func (ti *TemplateInfo) id() string {
-	if ti.ID == "" {
-		return ti.Name
-	}
-	return ti.ID
-}
-
-func MergeTemplates(root *template.Template, tmpls []TemplateInfo, e *Error) *template.Template {
-	var res *template.Template
-	var err error
-	if root == nil {
-		res = template.New("")
-	} else {
-		res, err = root.Clone()
-	}
-	if err != nil {
-		e.Errorf("Error cloning root: %v", err)
-		return nil
-	}
-	buf := &bytes.Buffer{}
-	for i := range tmpls {
-		ti := &tmpls[i]
-		if ti.Name == "" {
-			e.Errorf("Templates[%d] has no Name", i)
-			continue
-		}
-		if ti.Path != "" {
-			pathTmpl, err := template.New(ti.Name).Parse(ti.Path)
-			if err != nil {
-				e.Errorf("Error compiling path template %s (%s): %v",
-					ti.Name,
-					ti.Path,
-					err)
-				continue
-			} else {
-				ti.pathTmpl = pathTmpl.Option("missingkey=error")
-			}
-		}
-		if ti.ID != "" {
-			if res.Lookup(ti.ID) == nil {
-				e.Errorf("Templates[%d]: No common template for %s", i, ti.ID)
-			}
-			continue
-		}
-		if ti.Contents == "" {
-			e.Errorf("Templates[%d] has both an empty ID and contents", i)
-		}
-		fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}\n`, ti.Name, ti.Contents)
-	}
-	_, err = res.Parse(buf.String())
-	if err != nil {
-		e.Errorf("Error parsing inline templates: %v", err)
-		return nil
-	}
-	if e.containsError {
-		return nil
-	}
-	return res
-}
 
 // Template represents a template that will be associated with a boot
 // environment.
 //
 // swagger:model
 type Template struct {
+	*models.Template
 	validate
-	// ID is a unique identifier for this template.  It cannot change once it is set.
-	//
-	// required: true
-	ID string
-	// A description of this template
-	Description string
-	// Contents is the raw template.  It must be a valid template
-	// according to text/template.
-	//
-	// required: true
-	Contents string
 	p        *DataTracker
 	toUpdate *tmplUpdater
 }
@@ -125,32 +28,26 @@ func (p *Template) Indexes() map[string]index.Maker {
 		"ID": index.Make(
 			true,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).ID < fix(j).ID },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).ID < fix(j).ID },
+			func(ref models.Model) (gte, gt index.Test) {
 				refID := fix(ref).ID
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).ID >= refID
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).ID > refID
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &Template{ID: s}, nil
+			func(s string) (models.Model, error) {
+				tmpl := &Template{}
+				tmpl.ID = s
+				return tmpl, nil
 			}),
 	}
 }
 
-func (t *Template) Prefix() string {
-	return "templates"
-}
-
 func (t *Template) Backend() store.Store {
 	return t.p.getBackend(t)
-}
-
-func (t *Template) Key() string {
-	return t.ID
 }
 
 func (t *Template) AuthKey() string {
@@ -158,8 +55,7 @@ func (t *Template) AuthKey() string {
 }
 
 func (t *Template) New() store.KeySaver {
-	res := &Template{ID: t.ID, p: t.p}
-	return store.KeySaver(res)
+	return &Template{Template: &models.Template{}}
 }
 
 func (t *Template) setDT(p *DataTracker) {
@@ -178,7 +74,7 @@ type tmplUpdater struct {
 	taskTmpls, envTmpls []*template.Template
 }
 
-func (t *Template) checkSubs(root *template.Template, e *Error) {
+func (t *Template) checkSubs(root *template.Template, e models.ErrorAdder) {
 	t.toUpdate = &tmplUpdater{
 		root:     root,
 		tasks:    AsTasks(t.stores("tasks").Items()),
@@ -194,33 +90,37 @@ func (t *Template) checkSubs(root *template.Template, e *Error) {
 	}
 }
 
-func (t *Template) Validate() error {
-	e := &Error{Code: 422, Type: ValidationError, o: t}
+func (t *Template) Validate() {
 	if t.ID == "" {
-		e.Errorf("Template must have an ID")
-		return e
+		t.Errorf("Template must have an ID")
+		return
 	}
 	t.p.tmplMux.Lock()
 	root, err := t.p.rootTemplate.Clone()
 	t.p.tmplMux.Unlock()
 	if err != nil {
-		e.Errorf("Error cloning shared template namespace: %v", err)
-		return e
+		t.Errorf("Error cloning shared template namespace: %v", err)
+		return
 	}
 	if err := t.parse(root); err != nil {
-		e.Errorf("Parse error for template %s: %v", t.ID, err)
-		return e
+		t.Errorf("Parse error for template %s: %v", t.ID, err)
+		return
 	}
-	e.Merge(index.CheckUnique(t, t.stores("templates").Items()))
-	if e.ContainsError() {
-		return e
+	t.AddError(index.CheckUnique(t, t.stores("templates").Items()))
+	if t.HasError() != nil {
+		return
 	}
-	t.checkSubs(root, e)
-	return e.OrNil()
+	t.checkSubs(root, t)
+	t.SetValid()
+	t.SetAvailable()
 }
 
 func (t *Template) BeforeSave() error {
-	return t.Validate()
+	t.Validate()
+	if !t.Useable() {
+		return t.MakeError(422, ValidationError, t)
+	}
+	return nil
 }
 
 func (t *Template) updateOthers() {
@@ -244,8 +144,12 @@ func (t *Template) AfterSave() {
 	t.updateOthers()
 }
 
+func (t *Template) OnLoad() error {
+	return t.BeforeSave()
+}
+
 func (t *Template) BeforeDelete() error {
-	e := &Error{Code: 409, Type: StillInUseError, o: t}
+	e := &models.Error{Code: 409, Type: StillInUseError, Object: t}
 	buf := &bytes.Buffer{}
 	for _, i := range t.stores("templates").Items() {
 		tmpl := AsTemplate(i)
@@ -267,15 +171,11 @@ func (t *Template) BeforeDelete() error {
 	return nil
 }
 
-func (p *DataTracker) NewTemplate() *Template {
-	return &Template{p: p}
-}
-
-func AsTemplate(o store.KeySaver) *Template {
+func AsTemplate(o models.Model) *Template {
 	return o.(*Template)
 }
 
-func AsTemplates(o []store.KeySaver) []*Template {
+func AsTemplates(o []models.Model) []*Template {
 	res := make([]*Template, len(o))
 	for i := range o {
 		res[i] = AsTemplate(o[i])

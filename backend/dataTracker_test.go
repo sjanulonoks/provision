@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
 
@@ -18,21 +19,23 @@ var (
 
 type crudTest struct {
 	name string
-	op   func(Stores, store.KeySaver, ObjectValidator) (bool, error)
-	t    store.KeySaver
+	op   func(Stores, models.Model) (bool, error)
+	t    models.Model
 	pass bool
-	ov   ObjectValidator
 }
 
 func (test *crudTest) Test(t *testing.T, d Stores) {
-	passed, err := test.op(d, test.t, test.ov)
+	passed, err := test.op(d, test.t)
 	msg := fmt.Sprintf("%s: wanted to pass: %v, passed: %v", test.name, test.pass, passed)
 	if passed == test.pass {
 		t.Log(msg)
-		t.Logf("   err: %v", err)
+		if !test.pass {
+			t.Logf("   err: %#v", err)
+		}
 	} else {
 		t.Error(msg)
-		t.Errorf("   err: %v", err)
+		t.Errorf("   err: %#v", err)
+		t.Errorf("   obj: %#v", test.t)
 	}
 }
 
@@ -44,31 +47,16 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 	defer buf.Close()
 	d, unlocker := dt.LockEnts(kind)
 	defer unlocker()
-	var res store.KeySaver
-	switch kind {
-	case "users":
-		res = dt.NewUser()
-	case "machines":
-		res = dt.NewMachine()
-	case "profiles":
-		res = dt.NewProfile()
-	case "templates":
-		res = dt.NewTemplate()
-	case "bootenvs":
-		res = dt.NewBootEnv()
-	case "leases":
-		res = dt.NewLease()
-	case "reservations":
-		res = dt.NewReservation()
-	case "subnets":
-		res = dt.NewSubnet()
+	res, err := models.New(kind)
+	if err != nil {
+		log.Panicf("Unknown models %s: %v", kind, err)
 	}
 
 	dec := json.NewDecoder(buf)
 	if err := dec.Decode(&res); err != nil {
 		return false, err
 	}
-	return dt.Create(d, res, nil)
+	return dt.Create(d, res)
 }
 
 func mkDT(bs store.Store) *DataTracker {

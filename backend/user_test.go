@@ -1,17 +1,21 @@
 package backend
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/digitalrebar/provision/models"
+)
 
 func TestUserCrud(t *testing.T) {
 	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("users")
 	defer unlocker()
 	tests := []crudTest{
-		{"Create empty user", dt.Create, &User{p: dt}, false, nil},
-		{"Create new user with name", dt.Create, &User{p: dt, Name: "Test User"}, true, nil},
-		{"Create Duplicate User", dt.Create, &User{p: dt, Name: "Test User"}, false, nil},
-		{"Delete User", dt.Remove, &User{p: dt, Name: "Test User"}, true, nil},
-		{"Delete Nonexistent User", dt.Remove, &User{p: dt, Name: "Test User"}, false, nil},
+		{"Create empty user", dt.Create, &models.User{}, false},
+		{"Create new user with name", dt.Create, &models.User{Name: "Test User"}, true},
+		{"Create Duplicate User", dt.Create, &models.User{Name: "Test User"}, false},
+		{"Delete User", dt.Remove, &models.User{Name: "Test User"}, true},
+		{"Delete Nonexistent User", dt.Remove, &models.User{Name: "Test User"}, false},
 	}
 	for _, test := range tests {
 		test.Test(t, d)
@@ -31,9 +35,10 @@ func TestUserPassword(t *testing.T) {
 	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("users")
 	defer unlocker()
-	u := dt.NewUser()
+	u := &User{}
+	fillEmpty(u)
 	u.Name = "test user"
-	saved, err := dt.Create(d, u, nil)
+	saved, err := dt.Create(d, u)
 	if !saved {
 		t.Errorf("Unable to create test user: %v", err)
 	} else {
@@ -64,8 +69,8 @@ func TestUserPassword(t *testing.T) {
 		t.Logf("CHecking password passed, as expected.")
 	}
 	// Make sure sanitizing the user works as expected
-	newU = AsUser(newU.Sanitize())
-	if len(newU.PasswordHash) != 0 {
+	sanitizedU := newU.Sanitize().(*models.User)
+	if len(sanitizedU.PasswordHash) != 0 {
 		t.Errorf("Sanitize did not strip out the password hash")
 	} else {
 		t.Logf("Sanitize stripped out the password hash")
