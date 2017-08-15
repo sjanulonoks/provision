@@ -11,12 +11,17 @@ import (
 	"strings"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/embedded"
+	"github.com/digitalrebar/provision/plugin"
+	"github.com/digitalrebar/store"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/location"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"gopkg.in/olahol/melody.v1"
 )
 
 // ErrorResponse is returned whenever an error occurs
@@ -32,39 +37,12 @@ type NoContentResponse struct {
 	//description: Nothing
 }
 
-// This interface defines the pieces of the backend.DataTracker that the
-// frontend needs.
-type DTI interface {
-	Create(store.KeySaver) (store.KeySaver, error)
-	Update(store.KeySaver) (store.KeySaver, error)
-	Remove(store.KeySaver) (store.KeySaver, error)
-	Save(store.KeySaver) (store.KeySaver, error)
-	Patch(store.KeySaver, string, jsonpatch2.Patch) (store.KeySaver, error)
-	FetchOne(store.KeySaver, string) (store.KeySaver, bool)
-	FetchAll(store.KeySaver) []store.KeySaver
-	Filter(store.KeySaver, ...index.Filter) ([]store.KeySaver, error)
-
-	NewBootEnv() *backend.BootEnv
-	NewMachine() *backend.Machine
-	NewTemplate() *backend.Template
-	NewLease() *backend.Lease
-	NewReservation() *backend.Reservation
-	NewSubnet() *backend.Subnet
-	NewUser() *backend.User
-	NewProfile() *backend.Profile
-
-	Pref(string) (string, error)
-	Prefs() map[string]string
-	SetPrefs(map[string]string) error
-
-	GetInterfaces() ([]*backend.Interface, error)
-
-	GetToken(string) (*backend.DrpCustomClaims, error)
-	NewToken(string, int, string, string, string) (string, error)
+type Sanitizable interface {
+	Sanitize() store.KeySaver
 }
 
-type Sanitizable interface {
-	Sanitize()
+type Lockable interface {
+	Locks(string) []string
 }
 
 type Frontend struct {
@@ -72,8 +50,17 @@ type Frontend struct {
 	FileRoot   string
 	MgmtApi    *gin.Engine
 	ApiGroup   *gin.RouterGroup
-	dt         DTI
+	dt         *backend.DataTracker
+	pc         *plugin.PluginController
 	authSource AuthSource
+	pubs       *backend.Publishers
+	melody     *melody.Melody
+	ApiPort    int
+	ProvPort   int
+	NoDhcp     bool
+	NoTftp     bool
+	NoProv     bool
+	SaasDir    string
 }
 
 type AuthSource interface {
@@ -81,24 +68,25 @@ type AuthSource interface {
 }
 
 type DefaultAuthSource struct {
-	dt DTI
+	dt *backend.DataTracker
 }
 
-func (d DefaultAuthSource) GetUser(username string) (u *backend.User) {
-	userThing, found := d.dt.FetchOne(d.dt.NewUser(), username)
-	if !found {
-		return
+func (d DefaultAuthSource) GetUser(username string) *backend.User {
+	objs, unlocker := d.dt.LockEnts("users")
+	defer unlocker()
+	u := objs("users").Find(username)
+	if u != nil {
+		return backend.AsUser(u)
 	}
-	u = backend.AsUser(userThing)
-	return
+	return nil
 }
 
-func NewDefaultAuthSource(dt DTI) (das AuthSource) {
+func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	das = DefaultAuthSource{dt: dt}
 	return
 }
 
-func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource AuthSource) (me *Frontend) {
+func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, apiport, provport int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers, drpid string, pc *plugin.PluginController, noDhcp, noTftp, noProv bool, saasDir string) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {
@@ -109,10 +97,19 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 		return func(c *gin.Context) {
 			authHeader := c.Request.Header.Get("Authorization")
 			if len(authHeader) == 0 {
-				logger.Printf("No authentication header")
-				c.Header("WWW-Authenticate", "dr-provision")
-				c.AbortWithStatus(http.StatusUnauthorized)
-				return
+				authHeader = c.Query("token")
+				if len(authHeader) == 0 {
+					logger.Printf("No authentication header or token")
+					c.Header("WWW-Authenticate", "dr-provision")
+					c.AbortWithStatus(http.StatusUnauthorized)
+					return
+				} else {
+					if strings.Contains(authHeader, ":") {
+						authHeader = "Basic " + base64.StdEncoding.EncodeToString([]byte(authHeader))
+					} else {
+						authHeader = "Bearer " + authHeader
+					}
+				}
 			}
 			hdrParts := strings.SplitN(authHeader, " ", 2)
 			if len(hdrParts) != 2 || (hdrParts[0] != "Basic" && hdrParts[0] != "Bearer") {
@@ -165,11 +162,23 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 
 	mgmtApi := gin.Default()
 
+	// CORS Support
+	mgmtApi.Use(cors.New(cors.Config{
+		AllowAllOrigins:  true,
+		AllowCredentials: true,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"},
+		AllowHeaders:     []string{"Origin", "X-Requested-With", "Content-Type", "Cookie", "Authorization", "WWW-Authenticate", "X-Return-Attributes"},
+		ExposeHeaders:    []string{"Content-Length", "WWW-Authenticate", "Set-Cookie", "Access-Control-Allow-Headers", "Access-Control-Allow-Credentials", "Access-Control-Allow-Origin", "X-Return-Attributes"},
+	}))
+
+	mgmtApi.Use(location.Default())
+
 	apiGroup := mgmtApi.Group("/api/v3")
 	apiGroup.Use(userAuth())
 
-	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt}
+	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt, pubs: pubs, pc: pc, ApiPort: apiport, ProvPort: provport, NoDhcp: noDhcp, NoTftp: noTftp, NoProv: noProv, SaasDir: saasDir}
 
+	me.InitWebSocket()
 	me.InitBootEnvApi()
 	me.InitIsoApi()
 	me.InitFileApi()
@@ -179,9 +188,17 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 	me.InitLeaseApi()
 	me.InitReservationApi()
 	me.InitSubnetApi()
-	me.InitUserApi()
+	me.InitUserApi(drpid)
 	me.InitInterfaceApi()
 	me.InitPrefApi()
+	me.InitParamApi()
+	me.InitInfoApi(drpid)
+	me.InitPluginApi()
+	me.InitPluginProviderApi()
+	me.InitTaskApi()
+	me.InitJobApi()
+	me.InitEventApi()
+	me.InitContentApi()
 
 	// Swagger.json serve
 	buf, err := embedded.Asset("swagger.json")
@@ -201,16 +218,25 @@ func NewFrontend(dt DTI, logger *log.Logger, fileRoot, devUI string, authSource 
 	// Server UI with flag to run from local files instead of assets
 	if len(devUI) == 0 {
 		mgmtApi.StaticFS("/ui",
-			&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "ui"})
+			&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "ui/public"})
 	} else {
 		logger.Printf("DEV: Running UI from %s\n", devUI)
 		mgmtApi.Static("/ui", devUI)
 	}
 
+	mgmtApi.GET("/ux", func(c *gin.Context) {
+		incomingUrl := location.Get(c)
+
+		url := fmt.Sprintf("https://rackn.github.io/provision-ux/#/e/%s", incomingUrl.Host)
+		c.Redirect(http.StatusMovedPermanently, url)
+	})
+
 	// root path, forward to UI
 	mgmtApi.GET("/", func(c *gin.Context) {
-		c.Redirect(302, "/ui/")
+		c.Redirect(http.StatusMovedPermanently, "/ui/")
 	})
+
+	pubs.Add(me)
 
 	return
 }
@@ -256,7 +282,7 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	if !assureContentType(c, "application/json") {
 		return false
 	}
-	marshalErr := c.Bind(&val)
+	marshalErr := binding.JSON.Bind(c.Request, &val)
 	if marshalErr == nil {
 		return true
 	}
@@ -313,7 +339,7 @@ func convertValueToFilter(v string) (index.Filter, error) {
 	return nil, fmt.Errorf("Should never get here")
 }
 
-func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string) ([]index.Filter, error) {
+func (f *Frontend) processFilters(d backend.Stores, ref store.KeySaver, params map[string][]string) ([]index.Filter, error) {
 	filters := []index.Filter{}
 
 	var indexes map[string]index.Maker
@@ -328,7 +354,19 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 			continue
 		}
 
-		if maker, ok := indexes[k]; ok {
+		maker, ok := indexes[k]
+		if !ok {
+			if ref.Prefix() != "machines" {
+				return nil, fmt.Errorf("Filter not found: %s", k)
+			}
+			var err error
+			maker, err = ref.(*backend.Machine).ParameterMaker(d, k)
+			if err != nil {
+				return nil, err
+			}
+			ok = true
+		}
+		if ok {
 			filters = append(filters, index.Sort(maker))
 			subfilters := []index.Filter{}
 			for _, v := range vs {
@@ -339,8 +377,6 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 				subfilters = append(subfilters, f)
 			}
 			filters = append(filters, index.Any(subfilters...))
-		} else {
-			return nil, fmt.Errorf("Filter not found: %s", k)
 		}
 	}
 
@@ -381,6 +417,15 @@ func (f *Frontend) processFilters(ref store.KeySaver, params map[string][]string
 	return filters, nil
 }
 
+func jsonError(c *gin.Context, err error, code int, base string) {
+	if ne, ok := err.(*backend.Error); ok {
+		c.JSON(ne.Code, ne)
+	} else {
+		c.JSON(code, backend.NewError("API_ERROR", code, fmt.Sprintf(base+"%v", err.Error())))
+	}
+}
+
+// XXX: Auth enforce may need to limit return values based up access to get - one day.
 func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
 		return
@@ -390,105 +435,152 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 		Type:  "API_ERROR",
 		Model: ref.Prefix(),
 	}
-	filters, err := f.processFilters(ref, c.Request.URL.Query())
+	var idx *index.Index
+	var err error
+	func() {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("get")...)
+		defer unlocker()
+		var filters []index.Filter
+		filters, err = f.processFilters(d, ref, c.Request.URL.Query())
+		if err != nil {
+			return
+		}
+		idx, err = index.All(filters...)(&d(ref.Prefix()).Index)
+	}()
 	if err != nil {
 		res.Merge(err)
 		c.JSON(res.Code, res)
 		return
 	}
-	arr, err := f.dt.Filter(ref, filters...)
-	if err != nil {
-		res.Merge(err)
-		c.JSON(res.Code, res)
-		return
-	}
-	for _, res := range arr {
+	arr := idx.Items()
+	for i, res := range arr {
 		s, ok := res.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			arr[i] = s.Sanitize()
 		}
 	}
 	c.JSON(http.StatusOK, arr)
 }
 
 func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
-	res, ok := f.dt.FetchOne(ref, key)
-	if ok {
-		// TODO: This should really be done before the fetch - it may have issue with HexAddr-based things.
-		if !assureAuth(c, f.Logger, ref.Prefix(), "get", res.Key()) {
+	prefix := ref.Prefix()
+	var err error
+	func() {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("get")...)
+		defer unlocker()
+		objs := d(prefix)
+		idxer, ok := ref.(index.Indexer)
+		found := false
+		if ok {
+			for idxName, idx := range idxer.Indexes() {
+				idxKey := strings.TrimPrefix(key, idxName+":")
+				if key == idxKey {
+					continue
+				}
+				found = true
+				ref = nil
+				if !idx.Unique {
+					break
+				}
+				items, err := index.All(index.Sort(idx))(&objs.Index)
+				if err == nil {
+					ref = items.Find(idxKey)
+				}
+				break
+			}
+		}
+		if !found {
+			ref = objs.Find(key)
+		}
+	}()
+	if ref != nil {
+		aref, _ := ref.(backend.AuthSaver)
+		if !assureAuth(c, f.Logger, prefix, "get", aref.AuthKey()) {
 			return
 		}
-		s, ok := res.(Sanitizable)
+		s, ok := ref.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			ref = s.Sanitize()
 		}
-		c.JSON(http.StatusOK, res)
+		c.JSON(http.StatusOK, ref)
 	} else {
-		err := &backend.Error{
+		rerr := &backend.Error{
 			Code:  http.StatusNotFound,
 			Type:  "API_ERROR",
-			Model: ref.Prefix(),
+			Model: prefix,
 			Key:   key,
 		}
-		err.Errorf("%s GET: %s: Not Found", err.Model, err.Key)
-		c.JSON(err.Code, err)
+		estring := ""
+		if err != nil {
+			estring = err.Error()
+		}
+		rerr.Errorf("%s GET: %s: Not Found%s", rerr.Model, rerr.Key, estring)
+		c.JSON(rerr.Code, rerr)
 	}
 }
 
-func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
+func (f *Frontend) Create(c *gin.Context, val store.KeySaver, ov backend.ObjectValidator) {
 	if !assureDecode(c, val) {
 		return
 	}
 	if !assureAuth(c, f.Logger, val.Prefix(), "create", "") {
 		return
 	}
-	res, err := f.dt.Create(val)
+	var err error
+	func() {
+		d, unlocker := f.dt.LockEnts(val.(Lockable).Locks("create")...)
+		defer unlocker()
+		_, err = f.dt.Create(d, val, ov)
+	}()
 	if err != nil {
-		be, ok := err.(*backend.Error)
-		if ok {
-			c.JSON(be.Code, be)
-		} else {
-			c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-		}
+		jsonError(c, err, http.StatusBadRequest, "")
 	} else {
-		s, ok := res.(Sanitizable)
+		s, ok := val.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			val = s.Sanitize()
 		}
-		c.JSON(http.StatusCreated, res)
+		c.JSON(http.StatusCreated, val)
 	}
 }
 
-func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
+func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string, ov backend.ObjectValidator) {
 	patch := make(jsonpatch2.Patch, 0)
 	if !assureDecode(c, &patch) {
 		return
 	}
-	if !assureAuth(c, f.Logger, ref.Prefix(), "patch", key) {
+	var err error
+	var res store.KeySaver
+	bad := func() bool {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
+		defer unlocker()
+
+		tref := d(ref.Prefix()).Find(key)
+		if tref != nil {
+			aref := tref.(backend.AuthSaver)
+			if !assureAuth(c, f.Logger, ref.Prefix(), "patch", aref.AuthKey()) {
+				return true
+			}
+		}
+		// This will fail with notfound as well.
+		res, err = f.dt.Patch(d, ref, key, patch, ov)
+		return false
+	}()
+	if bad {
 		return
 	}
-	res, err := f.dt.Patch(ref, key, patch)
 	if err == nil {
 		s, ok := res.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			res = s.Sanitize()
 		}
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	ne, ok := err.(*backend.Error)
-	if ok {
-		c.JSON(ne.Code, ne)
-	} else {
-		c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-	}
+	jsonError(c, err, http.StatusBadRequest, "")
 }
 
-func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
+func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string, ov backend.ObjectValidator) {
 	if !assureDecode(c, ref) {
-		return
-	}
-	if !assureAuth(c, f.Logger, ref.Prefix(), "update", key) {
 		return
 	}
 	if ref.Key() != key {
@@ -502,40 +594,60 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 		c.JSON(err.Code, err)
 		return
 	}
-	newThing, err := f.dt.Update(ref)
-	if err == nil {
-		s, ok := newThing.(Sanitizable)
-		if ok {
-			s.Sanitize()
+	var err error
+	bad := func() bool {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
+		defer unlocker()
+
+		tref := d(ref.Prefix()).Find(ref.Key())
+		if tref != nil {
+			aref := tref.(backend.AuthSaver)
+			if !assureAuth(c, f.Logger, ref.Prefix(), "update", aref.AuthKey()) {
+				return true
+			}
 		}
-		c.JSON(http.StatusOK, newThing)
+		_, err = f.dt.Update(d, ref, ov)
+		return false
+	}()
+	if bad {
 		return
 	}
-	ne, ok := err.(*backend.Error)
-	if ok {
-		c.JSON(ne.Code, ne)
-	} else {
-		c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+	if err == nil {
+		s, ok := ref.(Sanitizable)
+		if ok {
+			ref = s.Sanitize()
+		}
+		c.JSON(http.StatusOK, ref)
+		return
 	}
+	jsonError(c, err, http.StatusBadRequest, "")
 }
 
-func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver) {
-	if !assureAuth(c, f.Logger, ref.Prefix(), "delete", ref.Key()) {
+func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, ov backend.ObjectValidator) {
+	var err error
+	bad := func() bool {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("delete")...)
+		defer unlocker()
+		tref := d(ref.Prefix()).Find(ref.Key())
+		if tref != nil {
+			aref := tref.(backend.AuthSaver)
+			if !assureAuth(c, f.Logger, ref.Prefix(), "delete", aref.AuthKey()) {
+				return true
+			}
+		}
+		_, err = f.dt.Remove(d, ref, ov)
+		return false
+	}()
+	if bad {
 		return
 	}
-	res, err := f.dt.Remove(ref)
 	if err != nil {
-		ne, ok := err.(*backend.Error)
-		if ok {
-			c.JSON(ne.Code, ne)
-		} else {
-			c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
-		}
+		jsonError(c, err, http.StatusNotFound, "")
 	} else {
-		s, ok := res.(Sanitizable)
+		s, ok := ref.(Sanitizable)
 		if ok {
-			s.Sanitize()
+			ref = s.Sanitize()
 		}
-		c.JSON(http.StatusOK, res)
+		c.JSON(http.StatusOK, ref)
 	}
 }

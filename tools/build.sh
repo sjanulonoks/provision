@@ -37,7 +37,7 @@ for tool in go-bindata swagger glide; do
 done
 
 glide install
-rm -rf client models embedded/assets/swagger.json
+rm -rf client genmodels embedded/assets/swagger.json
 go generate server/assets.go
 
 # Update cli docs if needed. - does change date.
@@ -64,6 +64,7 @@ for arch in "${arches[@]}"; do
             echo "Building binaries for ${arch} ${os}"
             binpath="bin/$os/$arch"
             mkdir -p "$binpath"
+            go build -ldflags "$VERFLAGS" -o "$binpath/incrementer" cmds/incrementer/incrementer.go
             go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision/dr-provision.go
             go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli/drpcli.go
         )

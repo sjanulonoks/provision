@@ -4,8 +4,6 @@ import (
 	"net"
 	"testing"
 	"time"
-
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 )
 
 type ltf struct {
@@ -16,7 +14,7 @@ type ltf struct {
 }
 
 func (l *ltf) find(t *testing.T, dt *DataTracker) {
-	res, err := FindLease(dt, l.strat, l.token, l.req)
+	res, _, _, err := FindLease(dt, l.strat, l.token, l.req)
 	if l.found {
 		if res == nil {
 			t.Errorf("%s: Expected a lease for %s:%s, failed to get one", l.msg, l.strat, l.token)
@@ -52,19 +50,22 @@ func (l *ltf) find(t *testing.T, dt *DataTracker) {
 }
 
 func TestDHCPRenew(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
-	startObjs := []crudTest{
-		{"Initial Subnet", dt.create, &Subnet{p: dt, Name: "sn", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true},
-		{"Initial Standalone Reservation", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true},
-		{"Valid Subnet Lease", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.80"), Strategy: "mac", Token: "subn1", ExpireTime: time.Now().Add(60 * time.Second)}, true},
-		{"Valid Reservation Lease", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.123.10"), Strategy: "mac", Token: "res1", ExpireTime: time.Now().Add(2 * time.Hour)}, true},
-		{"Conflicting Reservation Lease", dt.create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.81"), Strategy: "mac", Token: "subn2", ExpireTime: time.Now().Add(2 * time.Hour)}, true},
-		{"Initial Conflicting Reservation", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.81"), Token: "res2", Strategy: "mac"}, true},
-	}
-	for _, obj := range startObjs {
-		obj.Test(t)
-	}
+	dt := mkDT(nil)
+	func() {
+		d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
+		defer unlocker()
+		startObjs := []crudTest{
+			{"Initial Subnet", dt.Create, &Subnet{p: dt, Enabled: true, Name: "sn", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true, nil},
+			{"Initial Standalone Reservation", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true, nil},
+			{"Valid Subnet Lease", dt.Create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.80"), Strategy: "mac", Token: "subn1", ExpireTime: time.Now().Add(60 * time.Second)}, true, nil},
+			{"Valid Reservation Lease", dt.Create, &Lease{p: dt, Addr: net.ParseIP("192.168.123.10"), Strategy: "mac", Token: "res1", ExpireTime: time.Now().Add(2 * time.Hour)}, true, nil},
+			{"Conflicting Reservation Lease", dt.Create, &Lease{p: dt, Addr: net.ParseIP("192.168.124.81"), Strategy: "mac", Token: "subn2", ExpireTime: time.Now().Add(2 * time.Hour)}, true, nil},
+			{"Initial Conflicting Reservation", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.81"), Token: "res2", Strategy: "mac"}, true, nil},
+		}
+		for _, obj := range startObjs {
+			obj.Test(t, d)
+		}
+	}()
 	ltfs := []ltf{
 		{"Renew subnet lease using IP address", "mac", "subn1", net.ParseIP("192.168.124.80"), true, false},
 		{"Renew reservation lease using IP address", "mac", "res1", net.ParseIP("192.168.123.10"), true, false},
@@ -75,10 +76,14 @@ func TestDHCPRenew(t *testing.T) {
 	for _, l := range ltfs {
 		l.find(t, dt)
 	}
-	if ok, err := dt.remove(&Reservation{p: dt, Addr: net.ParseIP("192.168.123.10")}); !ok {
-		t.Errorf("Failed to remove reservation for 192.168.123.10: %v", err)
-	}
-	if l, err := FindLease(dt, "mac", "res1", nil); err == nil {
+	func() {
+		d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
+		defer unlocker()
+		if ok, err := dt.Remove(d, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10")}, nil); !ok {
+			t.Errorf("Failed to remove reservation for 192.168.123.10: %v", err)
+		}
+	}()
+	if l, _, _, err := FindLease(dt, "mac", "res1", nil); err == nil {
 		t.Errorf("Should have removed lease for %s:%s, as its backing reservation is gone!", l.Strategy, l.Token)
 	} else {
 		t.Logf("Removed lease that no longer has a Subnet or Reservation covering it: %v", err)
@@ -94,7 +99,7 @@ type ltc struct {
 }
 
 func (l *ltc) test(t *testing.T, dt *DataTracker) {
-	res := FindOrCreateLease(dt, l.strat, l.token, l.req, []net.IP{l.via})
+	res, _, _ := FindOrCreateLease(dt, l.strat, l.token, l.req, []net.IP{l.via})
 	if l.created {
 		if res == nil {
 			t.Errorf("%s: Expected to create a lease with %s:%s, but did not!", l.msg, l.strat, l.token)
@@ -113,15 +118,18 @@ func (l *ltc) test(t *testing.T, dt *DataTracker) {
 }
 
 func TestDHCPCreateReservationOnly(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
-	startObjs := []crudTest{
-		{"Res1", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true},
-		{"Res2", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.10"), Token: "res2", Strategy: "mac"}, true},
-	}
-	for _, obj := range startObjs {
-		obj.Test(t)
-	}
+	dt := mkDT(nil)
+	func() {
+		d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
+		defer unlocker()
+		startObjs := []crudTest{
+			{"Res1", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true, nil},
+			{"Res2", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.10"), Token: "res2", Strategy: "mac"}, true, nil},
+		}
+		for _, obj := range startObjs {
+			obj.Test(t, d)
+		}
+	}()
 	createTests := []ltc{
 		{"Create lease from reservation Res1", "mac", "res1", nil, nil, true, net.ParseIP("192.168.123.10")},
 		{"Attempt to create from wrong token for Res1", "mac", "resn", net.ParseIP("192.168.123.10"), nil, false, nil},
@@ -134,13 +142,17 @@ func TestDHCPCreateReservationOnly(t *testing.T) {
 	for _, obj := range createTests {
 		obj.test(t, dt)
 	}
-	// Expire one lease
-	lease := AsLease(dt.load("leases", Hexaddr(net.ParseIP("192.168.123.10"))))
-	lease.ExpireTime = time.Now().Add(-2 * time.Second)
-	lease.Token = "res3"
-	// Make another refer to a different Token
-	lease = AsLease(dt.load("leases", Hexaddr(net.ParseIP("192.168.124.10"))))
-	lease.Token = "resn"
+	func() {
+		d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
+		defer unlocker()
+		// Expire one lease
+		lease := AsLease(d("leases").Find(Hexaddr(net.ParseIP("192.168.123.10"))))
+		lease.ExpireTime = time.Now().Add(-2 * time.Second)
+		lease.Token = "res3"
+		// Make another refer to a different Token
+		lease = AsLease(d("leases").Find(Hexaddr(net.ParseIP("192.168.124.10"))))
+		lease.Token = "resn"
+	}()
 	renewTests := []ltc{
 		{"Renew expired lease for Res1", "mac", "res1", nil, nil, true, net.ParseIP("192.168.123.10")},
 		{"Fail to create lesase for Res2 when conflicting lease exists", "mac", "res2", nil, nil, false, nil},
@@ -151,18 +163,22 @@ func TestDHCPCreateReservationOnly(t *testing.T) {
 }
 
 func TestDHCPCreateSubnet(t *testing.T) {
-	bs := store.NewSimpleMemoryStore()
-	dt := mkDT(bs)
-	// A subnet with 3 active addresses
-	startObjs := []crudTest{
-		{"Create Subnet", dt.create, &Subnet{p: dt, Name: "test", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.83"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true},
-		{"Create Reservation", dt.create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.83"), Token: "res1", Strategy: "mac"}, true},
-	}
-	for _, obj := range startObjs {
-		obj.Test(t)
-	}
-	subnet := AsSubnet(dt.load("subnets", "test"))
-	subnet.Pickers = []string{"none"}
+	dt := mkDT(nil)
+	var subnet *Subnet
+	func() {
+		d, unlocker := dt.LockEnts("subnets", "leases", "reservations")
+		defer unlocker()
+		// A subnet with 3 active addresses
+		startObjs := []crudTest{
+			{"Create Subnet", dt.Create, &Subnet{p: dt, Enabled: true, Name: "test", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.83"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true, nil},
+			{"Create Reservation", dt.Create, &Reservation{p: dt, Addr: net.ParseIP("192.168.124.83"), Token: "res1", Strategy: "mac"}, true, nil},
+		}
+		for _, obj := range startObjs {
+			obj.Test(t, d)
+		}
+		subnet = AsSubnet(d("subnets").Find("test"))
+		subnet.Pickers = []string{"none"}
+	}()
 	// Even though there are no leases and no reservations, we should fail to create a lease.
 	noneTests := []ltc{
 		{"Fail to create lease for Sub1 when missing via", "mac", "sub1", nil, nil, false, nil},
@@ -185,12 +201,16 @@ func TestDHCPCreateSubnet(t *testing.T) {
 	for _, obj := range nextTests {
 		obj.test(t, dt)
 	}
-	lease := AsLease(dt.load("leases", Hexaddr(net.ParseIP("192.168.124.81"))))
-	lease.ExpireTime = time.Now().Add(-2 * time.Second)
-	lease = AsLease(dt.load("leases", Hexaddr(net.ParseIP("192.168.124.80"))))
-	lease.ExpireTime = time.Now().Add(-2 * time.Hour)
-	lease = AsLease(dt.load("leases", Hexaddr(net.ParseIP("192.168.124.82"))))
-	lease.ExpireTime = time.Now().Add(-48 * time.Hour)
+	func() {
+		d, unlocker := dt.LockEnts("subnets", "leases", "reservations")
+		defer unlocker()
+		lease := AsLease(d("leases").Find(Hexaddr(net.ParseIP("192.168.124.81"))))
+		lease.ExpireTime = time.Now().Add(-2 * time.Second)
+		lease = AsLease(d("leases").Find(Hexaddr(net.ParseIP("192.168.124.80"))))
+		lease.ExpireTime = time.Now().Add(-2 * time.Hour)
+		lease = AsLease(d("leases").Find(Hexaddr(net.ParseIP("192.168.124.82"))))
+		lease.ExpireTime = time.Now().Add(-48 * time.Hour)
+	}()
 	expireTests := []ltc{
 		{"Refuse to create lease from requested addr due to conflicting reservation", "mac", "sub4", net.ParseIP("192.168.124.83"), net.ParseIP("192.168.124.1"), false, nil},
 		{"Take over 2 day expired lease using pickHint", "mac", "sub4", net.ParseIP("192.168.124.82"), net.ParseIP("192.168.124.1"), true, net.ParseIP("192.168.124.82")},

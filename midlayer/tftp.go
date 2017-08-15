@@ -21,7 +21,8 @@ func (h *TftpHandler) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error), logger *log.Logger) (Service, error) {
+func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
+	logger *log.Logger, pubs *backend.Publishers) (Service, error) {
 	a, err := net.ResolveUDPAddr("udp", listen)
 	if err != nil {
 		return nil, err

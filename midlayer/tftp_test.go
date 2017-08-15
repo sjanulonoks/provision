@@ -22,7 +22,7 @@ import (
 func TestTftpFiles(t *testing.T) {
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 	fs := backend.NewFS(".", logger)
-	_, hh := ServeTftp(":3235235", fs.TftpResponder(), logger)
+	_, hh := ServeTftp(":3235235", fs.TftpResponder(), logger, backend.NewPublishers(logger))
 	if hh != nil {
 		if hh.Error() != "address 3235235: invalid port" {
 			t.Errorf("Expected a different error: %v", hh.Error())
@@ -31,7 +31,7 @@ func TestTftpFiles(t *testing.T) {
 		t.Errorf("Should have returned an error")
 	}
 
-	_, hh = ServeTftp("1.1.1.1:11112", fs.TftpResponder(), logger)
+	_, hh = ServeTftp("1.1.1.1:11112", fs.TftpResponder(), logger, backend.NewPublishers(logger))
 	if hh != nil {
 		if !strings.Contains(hh.Error(), "listen udp 1.1.1.1:11112: bind: ") {
 			t.Errorf("Expected a different error: %v", hh.Error())
@@ -45,7 +45,7 @@ func TestTftpFiles(t *testing.T) {
 		panic(err)
 	}
 	fs = backend.NewFS(dir, logger)
-	srv, hh := ServeTftp("127.0.0.1:11112", fs.TftpResponder(), logger)
+	srv, hh := ServeTftp("127.0.0.1:11112", fs.TftpResponder(), logger, backend.NewPublishers(logger))
 	if hh != nil {
 		t.Errorf("Should not return an error: %v", hh)
 	} else {

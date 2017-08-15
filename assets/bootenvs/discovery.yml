@@ -3,13 +3,13 @@ Name: discovery
 Description: "The boot environment to use to have unknown machines boot to Sledgehammer"
 OnlyUnknown: true
 OS:
-  Name: "sledgehammer/708de8b878e3818b1c1bb598a56de968939f9d4b"
-  IsoFile: "sledgehammer-708de8b878e3818b1c1bb598a56de968939f9d4b.tar"
-  IsoUrl: "http://opencrowbar.s3-website-us-east-1.amazonaws.com/sledgehammer/708de8b878e3818b1c1bb598a56de968939f9d4b/sledgehammer-708de8b878e3818b1c1bb598a56de968939f9d4b.tar"
+  Name: "sledgehammer/b3c09ebd5a9c228c66d8a617b6f5d10ccbe1c273"
+  IsoFile: "sledgehammer-b3c09ebd5a9c228c66d8a617b6f5d10ccbe1c273.tar"
+  IsoUrl: "http://opencrowbar.s3-website-us-east-1.amazonaws.com/sledgehammer/b3c09ebd5a9c228c66d8a617b6f5d10ccbe1c273/sledgehammer-b3c09ebd5a9c228c66d8a617b6f5d10ccbe1c273.tar"
 Kernel: vmlinuz0
 Initrds:
   - "stage1.img"
-BootParams: "rootflags=loop root=live:/sledgehammer.iso rootfstype=auto ro liveimg rd_NO_LUKS rd_NO_MD rd_NO_DM provisioner.web={{.ProvisionerURL}} rs.api={{.ApiURL}}"
+BootParams: "rootflags=loop root=live:/sledgehammer.iso rootfstype=auto ro liveimg rd_NO_LUKS rd_NO_MD rd_NO_DM provisioner.web={{.ProvisionerURL}} rs.api={{.ApiURL}} -- console=ttyS0,115200 console=ttyS1,115200 console=tty0"
 Templates:
   - Name: pxelinux
     Path: pxelinux.cfg/default
@@ -121,32 +121,34 @@ Templates:
           dhclient -r && \
               rm /var/lib/dhclient/dhclient.leases && \
               sleep 5 && \
-              dhclient "$BOOTDEV"
-        fi
-        echo "${RS_UUID}" > /etc/rs-uuid
-        # Set our hostname for everything else.
-        if [ -f /etc/sysconfig/network ] ; then
-            sed -i -e "s/HOSTNAME=.*/HOSTNAME=${HOSTNAME}/" /etc/sysconfig/network
-        fi
-        echo "${HOSTNAME#*.}" >/etc/domainname
-        hostname "$HOSTNAME"
+              dhclient --no-pid "$BOOTDEV"
+      fi
+      echo "${RS_UUID}" > /etc/rs-uuid
+      # Set our hostname for everything else.
+      if [ -f /etc/sysconfig/network ] ; then
+          sed -i -e "s/HOSTNAME=.*/HOSTNAME=${HOSTNAME}/" /etc/sysconfig/network
+      fi
+      echo "${HOSTNAME#*.}" >/etc/domainname
+      hostname "$HOSTNAME"
 
-        # Force reliance on DNS
-        echo '127.0.0.1 localhost' >/etc/hosts
+      {{ template "additional-interfaces.tmpl" . }}
 
-        if ! curl -s -f -L -o /tmp/control.sh "$PROVISIONER_WEB/machines/$RS_UUID/control.sh" && \
-            grep -q '^exit 0$' /tmp/control.sh && \
-            head -1 /tmp/control.sh | grep -q '^#!/bin/bash'; then
-            echo "Could not load our control.sh!"
-            exit 1
-        fi
-        chmod 755 /tmp/control.sh
+      # Force reliance on DNS
+      echo '127.0.0.1 localhost' >/etc/hosts
 
-        export RS_UUID BOOTDEV PROVISIONER_WEB MAC DOMAIN DNS_SERVERS HOSTNAME
+      if ! curl -s -f -L -o /tmp/control.sh "$PROVISIONER_WEB/machines/$RS_UUID/control.sh" && \
+          grep -q '^exit 0$' /tmp/control.sh && \
+          head -1 /tmp/control.sh | grep -q '^#!/bin/bash'; then
+          echo "Could not load our control.sh!"
+          exit 1
+      fi
+      chmod 755 /tmp/control.sh
 
-        echo "transfer from start-up to control script"
+      export RS_UUID BOOTDEV PROVISIONER_WEB MAC DOMAIN DNS_SERVERS HOSTNAME
 
-        [[ -x /tmp/control.sh ]] && exec /tmp/control.sh
+      echo "transfer from start-up to control script"
 
-        echo "Did not get control.sh from $PROVISIONER_WEB/machines/$RS_UUID/control.sh"
-        exit 1
+      [[ -x /tmp/control.sh ]] && exec /tmp/control.sh
+
+      echo "Did not get control.sh from $PROVISIONER_WEB/machines/$RS_UUID/control.sh"
+      exit 1

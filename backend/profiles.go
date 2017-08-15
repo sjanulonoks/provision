@@ -1,8 +1,8 @@
 package backend
 
 import (
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
 
 // Profile represents a set of key/values to use in
@@ -14,6 +14,8 @@ import (
 // These can be assigned to a machine's profile list.
 // swagger:model
 type Profile struct {
+	validate
+
 	// The name of the profile.  This must be unique across all
 	// profiles.
 	//
@@ -26,8 +28,19 @@ type Profile struct {
 	// for BootEnv, as documented by that boot environment's
 	// RequiredParams and OptionalParams.
 	Params map[string]interface{}
+	// Profiles can also have an associated list of Tasks
+	Tasks []string
 
 	p *DataTracker
+}
+
+func (p *Profile) HasTask(s string) bool {
+	for _, p := range p.Tasks {
+		if p == s {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Profile) Indexes() map[string]index.Maker {
@@ -53,7 +66,7 @@ func (p *Profile) Indexes() map[string]index.Maker {
 	}
 }
 
-func (p *Profile) Backend() store.SimpleStore {
+func (p *Profile) Backend() store.Store {
 	return p.p.getBackend(p)
 }
 
@@ -65,6 +78,10 @@ func (p *Profile) Key() string {
 	return p.Name
 }
 
+func (p *Profile) AuthKey() string {
+	return p.Key()
+}
+
 func (p *Profile) GetParams() map[string]interface{} {
 	m := p.Params
 	if m == nil {
@@ -73,10 +90,10 @@ func (p *Profile) GetParams() map[string]interface{} {
 	return m
 }
 
-func (p *Profile) SetParams(values map[string]interface{}) error {
+func (p *Profile) SetParams(d Stores, values map[string]interface{}) error {
 	p.Params = values
-	e := &Error{Code: 409, Type: ValidationError, o: p}
-	_, e2 := p.p.save(p)
+	e := &Error{Code: 422, Type: ValidationError, o: p}
+	_, e2 := p.p.Save(d, p, nil)
 	e.Merge(e2)
 	return e.OrNil()
 }
@@ -98,30 +115,15 @@ func (p *Profile) setDT(dp *DataTracker) {
 	p.p = dp
 }
 
-func (p *Profile) OnCreate() error {
-	e := &Error{Code: 409, Type: ValidationError, o: p}
-	// We do not allow duplicate profile names
-	profiles := AsProfiles(p.p.unlockedFetchAll(p.Prefix()))
-	for _, pp := range profiles {
-		if pp.Name == p.Name {
-			e.Errorf("Profile %s is already exists", p.Name)
-			return e
-		}
-	}
-	return nil
-}
-
 func (p *Profile) BeforeDelete() error {
 	e := &Error{Code: 422, Type: ValidationError, o: p}
-
-	// Make sure no machine is using this profile.
-	machines := AsMachines(p.p.unlockedFetchAll(p.p.NewMachine().Prefix()))
-	for _, m := range machines {
+	machines := p.stores("machines")
+	for _, i := range machines.Items() {
+		m := AsMachine(i)
 		if m.HasProfile(p.Name) {
 			e.Errorf("Machine %s is using profile %s", m.UUID(), p.Name)
 		}
 	}
-
 	return e.OrNil()
 }
 
@@ -130,10 +132,6 @@ func (p *Profile) OnLoad() error {
 		p.Params = map[string]interface{}{}
 	}
 	return nil
-}
-
-func (p *Profile) List() []*Profile {
-	return AsProfiles(p.p.FetchAll(p))
 }
 
 func (p *DataTracker) NewProfile() *Profile {
@@ -151,7 +149,36 @@ func AsProfiles(o []store.KeySaver) []*Profile {
 	}
 	return res
 }
+func (p *Profile) Validate() error {
+	err := &Error{Code: 422, Type: ValidationError, o: p}
+	err.Merge(index.CheckUnique(p, p.stores("profiles").Items()))
+	params := p.stores("params")
+	for k, v := range p.Params {
+		if pIdx := params.Find(k); pIdx != nil {
+			param := AsParam(pIdx)
+			err.Merge(param.ValidateValue(v))
+		}
+	}
+	for i, taskName := range p.Tasks {
+		if p.stores("tasks").Find(taskName) == nil {
+			err.Errorf("Task %s (at %d) does not exist", taskName, i)
+		}
+	}
+	return err.OrNil()
+}
 
 func (p *Profile) BeforeSave() error {
-	return index.CheckUnique(p, p.p.objs[p.Prefix()].d)
+	return p.Validate()
+}
+
+var profileLockMap = map[string][]string{
+	"get":    []string{"profiles"},
+	"create": []string{"profiles", "tasks", "params"},
+	"update": []string{"profiles", "tasks", "params"},
+	"patch":  []string{"profiles", "tasks", "params"},
+	"delete": []string{"profiles", "machines"},
+}
+
+func (p *Profile) Locks(action string) []string {
+	return profileLockMap[action]
 }

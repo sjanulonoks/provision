@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 )
 
 const (
@@ -13,6 +13,71 @@ const (
 	TemplateRenderError = "TemplateRenderError"
 	StillInUseError     = "StillInUseError"
 )
+
+//
+// model object may define a Validate method that can
+// be used to return errors about if the model is valid
+// in the current datatracker.
+//
+type Validator interface {
+	Validate() error
+}
+
+// Validation holds information about whether the current model
+// is valid or not.  It is designed to be embedded into structs
+// that need post-operation validation.
+//
+// swagger: model
+type Validation struct {
+	// Validated tracks whether or not the model has been validated.
+	// read only: true
+	Validated bool
+	// Available tracks whether or not the model passed validation.
+	// required: true
+	Available bool
+	// If there are any errors in the validation process, they will be
+	// available here.
+	// read only: true
+	Errors  []string
+	proceed chan bool
+}
+
+func (v *Validation) canProceed() bool {
+	return <-v.proceed
+}
+
+// The thunk is required to set Validated to true under locks.
+func (v *Validation) deferred(thunk func() bool) {
+	if v.proceed == nil {
+		v.proceed = make(chan bool)
+	}
+	v.Validated = false
+	go func() {
+		res := thunk()
+		v.proceed <- res
+	}()
+}
+
+type validator interface {
+	setStores(Stores)
+	clearStores()
+}
+
+type validate struct {
+	stores Stores
+}
+
+func (v *validate) setStores(s Stores) {
+	v.stores = s
+}
+
+func (v *validate) clearStores() {
+	v.stores = nil
+}
+
+type postValidator interface {
+	canProceed() bool
+}
 
 func validateIP4(e *Error, a net.IP) {
 	if a == nil {

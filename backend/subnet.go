@@ -2,14 +2,15 @@ package backend
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"sort"
 	"time"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 	dhcp "github.com/krolaw/dhcp4"
 )
 
@@ -135,11 +136,17 @@ func init() {
 //
 // swagger:model
 type Subnet struct {
+	validate
 	// Name is the name of the subnet.
 	// Subnet names must be unique
 	//
 	// required: true
 	Name string
+	// Enabled indicates if the subnet should hand out leases or continue operating
+	// leases if already running.
+	//
+	// required: true
+	Enabled bool
 	// Subnet is the network address in CIDR form that all leases
 	// acquired in its range will use for options, lease times, and NextServer settings
 	// by default
@@ -335,6 +342,34 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 				}
 				return &Subnet{Subnet: s}, nil
 			}),
+		"Enabled": index.Make(
+			false,
+			"boolean",
+			func(i, j store.KeySaver) bool {
+				return (!fix(i).Enabled) && fix(j).Enabled
+			},
+			func(ref store.KeySaver) (gte, gt index.Test) {
+				avail := fix(ref).Enabled
+				return func(s store.KeySaver) bool {
+						v := fix(s).Enabled
+						return v || (v == avail)
+					},
+					func(s store.KeySaver) bool {
+						return fix(s).Enabled && !avail
+					}
+			},
+			func(s string) (store.KeySaver, error) {
+				res := &Subnet{}
+				switch s {
+				case "true":
+					res.Enabled = true
+				case "false":
+					res.Enabled = false
+				default:
+					return nil, errors.New("Enabled must be true or false")
+				}
+				return res, nil
+			}),
 	}
 }
 
@@ -358,7 +393,11 @@ func (s *Subnet) Key() string {
 	return s.Name
 }
 
-func (s *Subnet) Backend() store.SimpleStore {
+func (s *Subnet) AuthKey() string {
+	return s.Key()
+}
+
+func (s *Subnet) Backend() store.Store {
 	return s.p.getBackend(s)
 }
 
@@ -372,10 +411,6 @@ func (s *Subnet) New() store.KeySaver {
 
 func (p *DataTracker) NewSubnet() *Subnet {
 	return &Subnet{p: p}
-}
-
-func (s *Subnet) List() []*Subnet {
-	return AsSubnets(s.p.FetchAll(s))
 }
 
 func (s *Subnet) sBounds() (func(string) bool, func(string) bool) {
@@ -409,6 +444,15 @@ func (s *Subnet) aBounds() (func(string) bool, func(string) bool) {
 		},
 		func(key string) bool {
 			return key > Hexaddr(s.ActiveEnd)
+		}
+}
+
+func (s *Subnet) idxABounds() (index.Test, index.Test) {
+	return func(o store.KeySaver) bool {
+			return o.Key() >= Hexaddr(s.ActiveStart)
+		},
+		func(o store.KeySaver) bool {
+			return o.Key() > Hexaddr(s.ActiveStart)
 		}
 }
 
@@ -446,7 +490,8 @@ func AsSubnets(o []store.KeySaver) []*Subnet {
 	return res
 }
 
-func (s *Subnet) BeforeSave() error {
+func (s *Subnet) Validate() error {
+
 	e := &Error{Code: 422, Type: ValidationError, o: s}
 	_, subnet, err := net.ParseCIDR(s.Subnet)
 	if err != nil {
@@ -522,7 +567,7 @@ func (s *Subnet) BeforeSave() error {
 	if e.containsError {
 		return e
 	}
-	subnets := AsSubnets(s.p.unlockedFetchAll("subnets"))
+	subnets := AsSubnets(s.stores("subnets").Items())
 	for i := range subnets {
 		if subnets[i].Name == s.Name {
 			continue
@@ -531,25 +576,12 @@ func (s *Subnet) BeforeSave() error {
 			e.Errorf("Overlaps subnet %s", subnets[i].Name)
 		}
 	}
-	if err := index.CheckUnique(s, s.p.objs[s.Prefix()].d); err != nil {
-		e.Merge(err)
-	}
+	e.Merge(index.CheckUnique(s, s.stores("subnets").Items()))
 	return e.OrNil()
 }
 
-func (s *Subnet) leases() []*Lease {
-	lower, upper := s.sBounds()
-	return AsLeases(s.p.fetchSome("leases", lower, upper))
-}
-
-func (s *Subnet) activeLeases() []*Lease {
-	lower, upper := s.aBounds()
-	return AsLeases(s.p.fetchSome("leases", lower, upper))
-}
-
-func (s *Subnet) reservations() []*Reservation {
-	lower, upper := s.sBounds()
-	return AsReservations(s.p.fetchSome("reservations", lower, upper))
+func (s *Subnet) BeforeSave() error {
+	return s.Validate()
 }
 
 func (s *Subnet) next(used map[string]store.KeySaver, token string, hint net.IP) (*Lease, bool) {
@@ -560,4 +592,16 @@ func (s *Subnet) next(used map[string]store.KeySaver, token string, hint net.IP)
 		}
 	}
 	return nil, false
+}
+
+var subnetLockMap = map[string][]string{
+	"get":    []string{"subnets"},
+	"create": []string{"subnets"},
+	"update": []string{"subnets"},
+	"patch":  []string{"subnets"},
+	"delete": []string{"subnets"},
+}
+
+func (s *Subnet) Locks(action string) []string {
+	return subnetLockMap[action]
 }

@@ -6,27 +6,26 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path"
-	"sort"
 	"testing"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 )
 
 var (
-	backingStore store.SimpleStore
+	backingStore store.Store
 	tmpDir       string
 )
 
 type crudTest struct {
 	name string
-	op   func(store.KeySaver) (bool, error)
+	op   func(Stores, store.KeySaver, ObjectValidator) (bool, error)
 	t    store.KeySaver
 	pass bool
+	ov   ObjectValidator
 }
 
-func (test *crudTest) Test(t *testing.T) {
-	passed, err := test.op(test.t)
+func (test *crudTest) Test(t *testing.T, d Stores) {
+	passed, err := test.op(d, test.t, test.ov)
 	msg := fmt.Sprintf("%s: wanted to pass: %v, passed: %v", test.name, test.pass, passed)
 	if passed == test.pass {
 		t.Log(msg)
@@ -37,52 +36,14 @@ func (test *crudTest) Test(t *testing.T) {
 	}
 }
 
-func TestDTObjs(t *testing.T) {
-	names := []string{"b", "a", "c", "e", "d", "f", "h", "g", "i"}
-	bs := store.NewSimpleMemoryStore()
-	p := mkDT(bs)
-	dt := p.lockFor("users")
-	for _, name := range names {
-		u := &User{p: p, Name: name}
-		dt.add(u)
-	}
-	if len(dt.d) != len(names)+1 {
-		t.Errorf("Failed to add all %d names, only added %d", len(names), len(dt.d))
-		return
-	}
-	t.Logf("All names added")
-	sort.Strings(names)
-	for i, name := range names {
-		if dt.d[i].Key() != name {
-			t.Errorf("Users not added in order. Expected %s, got %s", name, dt.d[i].Key())
-			return
-		}
-
-	}
-	t.Logf("All names added in order")
-	dt.remove(0, 2, 3, 4, 6, 8)
-	names = []string{"b", "f", "h"}
-	if len(dt.d) != len(names)+1 {
-		t.Errorf("Expected only %d to remain, but %d do", len(names), len(dt.d))
-		return
-	}
-	t.Logf("Only %d names remain", len(dt.d))
-	for i, name := range names {
-		if dt.d[i].Key() != name {
-			t.Errorf("Users not removed properly. Expected %s, got %s", name, dt.d[i].Key())
-			return
-		}
-
-	}
-	t.Logf("Removed names match what was expected to remain")
-}
-
 func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 	buf, err := os.Open(p)
 	if err != nil {
 		return false, err
 	}
 	defer buf.Close()
+	d, unlocker := dt.LockEnts(kind)
+	defer unlocker()
 	var res store.KeySaver
 	switch kind {
 	case "users":
@@ -107,93 +68,24 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 	if err := dec.Decode(&res); err != nil {
 		return false, err
 	}
-	return dt.create(res)
+	return dt.Create(d, res, nil)
 }
 
-func mkDT(bs store.SimpleStore) *DataTracker {
+func mkDT(bs store.Store) *DataTracker {
+	if bs == nil {
+		bs, _ = store.Open("memory:///")
+	}
+	logger := log.New(os.Stdout, "dt", 0)
 	dt := NewDataTracker(bs,
+		tmpDir,
 		tmpDir,
 		"127.0.0.1",
 		8091,
 		8092,
-		log.New(os.Stdout, "dt", 0),
-		map[string]string{"defaultBootEnv": "default"})
+		logger,
+		map[string]string{"defaultBootEnv": "default", "unknownBootEnv": "ignore"},
+		NewPublishers(logger))
 	return dt
-}
-
-func TestBackingStorePersistence(t *testing.T) {
-	bs, err := store.NewFileBackend(tmpDir)
-	if err != nil {
-		t.Errorf("Could not create boltdb: %v", err)
-		return
-	}
-	dt := mkDT(bs)
-	explDirs := []string{"users",
-		"templates",
-		"bootenvs",
-		"machines",
-		"profiles",
-		"subnets",
-		"reservations",
-		"leases",
-	}
-
-	for _, d := range explDirs {
-		p := path.Join("test-data", d, "default.json")
-		created, err := loadExample(dt, d, p)
-		if !created {
-			t.Errorf("Error loading test data: %v", err)
-			return
-		}
-	}
-	t.Logf("Example data loaded into the data tracker")
-	t.Logf("Creating new DataTracker using the same backing store")
-	dt = nil
-	dt = mkDT(bs)
-	// There should be one of everything in the cache now.
-	for _, ot := range explDirs {
-		var items []store.KeySaver
-		var cnt int
-		switch ot {
-		case "users":
-			items, cnt = dt.fetchAll(dt.NewUser()), 2
-		case "templates":
-			items, cnt = dt.fetchAll(dt.NewTemplate()), 1
-		case "bootenvs":
-			items, cnt = dt.fetchAll(dt.NewBootEnv()), 2
-		case "machines":
-			items, cnt = dt.fetchAll(dt.NewMachine()), 1
-		case "profiles":
-			items, cnt = dt.fetchAll(dt.NewProfile()), 2
-		case "leases":
-			items, cnt = dt.fetchAll(dt.NewLease()), 1
-		case "reservations":
-			items, cnt = dt.fetchAll(dt.NewReservation()), 1
-		case "subnets":
-			items, cnt = dt.fetchAll(dt.NewSubnet()), 1
-		}
-		if len(items) != cnt {
-			t.Errorf("Expected to find %d %s, instead found %d", cnt, ot, len(items))
-		} else {
-			t.Logf("Found %d %s, as expected", cnt, ot)
-		}
-	}
-
-	s, e := dt.NewToken("fred", 30, "all", "a", "m")
-	if e != nil {
-		t.Errorf("Failed to sign token: %v\n", e)
-	}
-	drpClaim, e := dt.GetToken(s)
-	if e != nil {
-		t.Errorf("Failed to get token: %v\n", e)
-	} else {
-		if drpClaim.Id != "fred" {
-			t.Errorf("Claim ID doesn't match: %v %v\n", "fred", drpClaim.Id)
-		}
-		if !drpClaim.Match("all", "a", "m") {
-			t.Errorf("Claim doesn't match: %v %#v\n", []string{"all", "a", "m"}, drpClaim)
-		}
-	}
 }
 
 func TestMain(m *testing.M) {

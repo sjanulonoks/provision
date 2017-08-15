@@ -22,23 +22,17 @@ type FilesResponse struct {
 	Body FilePaths
 }
 
-// XXX: One day resolve the binary blob appropriately:
-// {
-//   "name": "BinaryData",
-//   "in": "body",
-//   "required": true,
-//   "schema": {
-//     "type": "string",
-//     "format": "byte"
-//   }
-// }
+// This is a HACK - I can't figure out how to get
+// swagger to render this a binary.  So we lie.
+// We also override this object from the server
+// directory to have a binary format which
+// turns it into a stream.
 //
-
 // FileResponse returned on a successful GET of a file
 // swagger:response
 type FileResponse struct {
 	// in: body
-	Body interface{}
+	Body string
 }
 
 // swagger:model

@@ -1,7 +1,7 @@
 package backend
 
 import (
-	"github.com/digitalrebar/digitalrebar/go/common/store"
+	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
 )
 
@@ -10,6 +10,7 @@ import (
 // default bootenv for known systems, etc.
 //
 type Pref struct {
+	validate
 	p    *DataTracker
 	Name string
 	Val  string
@@ -46,7 +47,11 @@ func (p *Pref) Key() string {
 	return p.Name
 }
 
-func (p *Pref) Backend() store.SimpleStore {
+func (p *Pref) AuthKey() string {
+	return p.Key()
+}
+
+func (p *Pref) Backend() store.Store {
 	return p.p.getBackend(p)
 }
 
@@ -66,6 +71,14 @@ func (p *DataTracker) NewPref() *Pref {
 	return &Pref{p: p}
 }
 
-func (p *Pref) BeforeSave() error {
-	return index.CheckUnique(p, p.p.objs[p.Prefix()].d)
+var prefLockMap = map[string][]string{
+	"get":    []string{"preferences"},
+	"create": []string{"preferences", "bootenvs"},
+	"update": []string{"preferences", "bootenvs"},
+	"patch":  []string{"preferences", "bootenvs"},
+	"delete": []string{"preferences", "bootenvs"},
+}
+
+func (p *Pref) Locks(action string) []string {
+	return prefLockMap[action]
 }

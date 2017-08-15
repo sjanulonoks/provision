@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
 )
@@ -81,7 +82,11 @@ func (f *Frontend) InitPrefApi() {
 				}
 			}
 			if !err.ContainsError() {
-				err.Merge(f.dt.SetPrefs(prefs))
+				func() {
+					d, unlocker := f.dt.LockEnts(store.KeySaver(&backend.Pref{}).(Lockable).Locks("update")...)
+					defer unlocker()
+					err.Merge(f.dt.SetPrefs(d, prefs))
+				}()
 			}
 			if err.ContainsError() {
 				c.JSON(err.Code, err)

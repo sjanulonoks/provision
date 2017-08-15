@@ -5,14 +5,15 @@ import (
 	"math/big"
 	"net"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
 
 // Reservation tracks persistent DHCP IP address reservations.
 //
 // swagger:model
 type Reservation struct {
+	validate
 	// Addr is the IP address permanently assigned to the strategy/token combination.
 	//
 	// required: true
@@ -144,7 +145,11 @@ func (r *Reservation) Key() string {
 	return Hexaddr(r.Addr)
 }
 
-func (r *Reservation) Backend() store.SimpleStore {
+func (r *Reservation) AuthKey() string {
+	return r.Key()
+}
+
+func (r *Reservation) Backend() store.Store {
 	return r.p.getBackend(r)
 }
 
@@ -158,10 +163,6 @@ func (r *Reservation) setDT(p *DataTracker) {
 
 func (p *DataTracker) NewReservation() *Reservation {
 	return &Reservation{p: p}
-}
-
-func (r *Reservation) List() []*Reservation {
-	return AsReservations(r.p.FetchAll(r))
 }
 
 func AsReservation(o store.KeySaver) *Reservation {
@@ -192,7 +193,7 @@ func (r *Reservation) OnCreate() error {
 	e := &Error{Code: 422, Type: ValidationError, o: r}
 	// Make sure we aren't creating a reservation for a network or
 	// a broadcast address in a subnet we know about
-	subnets := AsSubnets(r.p.fetchAll(r.p.NewSubnet()))
+	subnets := AsSubnets(r.stores("subnets").Items())
 	for i := range subnets {
 		if !subnets[i].subnet().Contains(r.Addr) {
 			continue
@@ -205,7 +206,7 @@ func (r *Reservation) OnCreate() error {
 	return e.OrNil()
 }
 
-func (r *Reservation) BeforeSave() error {
+func (r *Reservation) Validate() error {
 	e := &Error{Code: 422, Type: ValidationError, o: r}
 	validateIP4(e, r.Addr)
 	validateMaybeZeroIP4(e, r.NextServer)
@@ -218,7 +219,7 @@ func (r *Reservation) BeforeSave() error {
 	if r.Strategy == "" {
 		e.Errorf("Reservation Strategy cannot be empty!")
 	}
-	reservations := AsReservations(r.p.unlockedFetchAll("reservations"))
+	reservations := AsReservations(r.stores("reservations").Items())
 	for i := range reservations {
 		if reservations[i].Addr.Equal(r.Addr) {
 			continue
@@ -229,18 +230,22 @@ func (r *Reservation) BeforeSave() error {
 			break
 		}
 	}
-	if err := index.CheckUnique(r, r.p.objs[r.Prefix()].d); err != nil {
-		e.Merge(err)
-	}
+	e.Merge(index.CheckUnique(r, r.stores("reservations").Items()))
 	return e.OrNil()
 }
 
-func (r *Reservation) subnet() *Subnet {
-	subnets := AsSubnets(r.p.fetchAll(r.p.NewSubnet()))
-	for i := range subnets {
-		if subnets[i].InSubnetRange(r.Addr) {
-			return subnets[i]
-		}
-	}
-	return nil
+func (r *Reservation) BeforeSave() error {
+	return r.Validate()
+}
+
+var reservationLockMap = map[string][]string{
+	"get":    []string{"reservations"},
+	"create": []string{"reservations", "subnets"},
+	"update": []string{"reservations"},
+	"patch":  []string{"reservations"},
+	"delete": []string{"reservations"},
+}
+
+func (r *Reservation) Locks(action string) []string {
+	return reservationLockMap[action]
 }

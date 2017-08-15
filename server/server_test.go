@@ -34,14 +34,15 @@ func generateArgs(args []string) *ProgOpts {
 func TestServer(t *testing.T) {
 
 	testArgs := []string{
-		"--data-root", tmpDir + "/digitalrebar",
-		"--file-root", tmpDir + "/tftpboot",
+		"--base-root", tmpDir,
 		"--tls-key", tmpDir + "/server.key",
 		"--tls-cert", tmpDir + "/server.crt",
 		"--api-port", "10001",
 		"--static-port", "10002",
 		"--tftp-port", "10003",
 		"--disable-dhcp",
+		"--local-content", "directory:../test-data/etc/?codec=yaml",
+		"--default-content", "directory:../test-data/usr/share/?codec=yaml",
 	}
 
 	c_opts := generateArgs(testArgs)

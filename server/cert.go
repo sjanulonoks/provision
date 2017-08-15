@@ -24,7 +24,7 @@ import (
 
 var (
 	validFor   = 365 * 24 * time.Hour
-	isCA       = true
+	isCA       = false
 	rsaBits    = 2048
 	ecdsaCurve = "P384"
 )

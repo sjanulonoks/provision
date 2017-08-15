@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/VictorLowther/jsonpatch2"
+	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
 )
@@ -34,6 +35,7 @@ type UserTokenResponse struct {
 // swagger:model
 type UserToken struct {
 	Token string
+	Info  Info
 }
 
 // swagger:model
@@ -108,7 +110,7 @@ type UserListPathParameter struct {
 	Name string
 }
 
-func (f *Frontend) InitUserApi() {
+func (f *Frontend) InitUserApi(drpid string) {
 	// swagger:route GET /users Users listUsers
 	//
 	// Lists Users filtered by some parameters.
@@ -160,7 +162,7 @@ func (f *Frontend) InitUserApi() {
 	f.ApiGroup.POST("/users",
 		func(c *gin.Context) {
 			b := f.dt.NewUser()
-			f.Create(c, b)
+			f.Create(c, b, nil)
 		})
 
 	// swagger:route GET /users/{name} Users getUser
@@ -193,8 +195,13 @@ func (f *Frontend) InitUserApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/users/:name/token",
 		func(c *gin.Context) {
-			user, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
-			if !ok {
+			var user store.KeySaver
+			func() {
+				d, unlocker := f.dt.LockEnts(f.dt.NewUser().Locks("get")...)
+				defer unlocker()
+				user = d("users").Find(c.Param("name"))
+			}()
+			if user == nil {
 				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
 				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound, s))
 				return
@@ -229,7 +236,10 @@ func (f *Frontend) InitUserApi() {
 					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				c.JSON(http.StatusOK, UserToken{Token: t})
+				// Error is only if stats are not filled in.  User
+				// Token should work regardless of that.
+				info, _ := f.GetInfo(drpid)
+				c.JSON(http.StatusOK, UserToken{Token: t, Info: *info})
 			}
 		})
 
@@ -249,7 +259,7 @@ func (f *Frontend) InitUserApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/users/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewUser(), c.Param(`name`))
+			f.Patch(c, f.dt.NewUser(), c.Param(`name`), nil)
 		})
 
 	// swagger:route PUT /users/{name} Users putUser
@@ -267,7 +277,7 @@ func (f *Frontend) InitUserApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewUser(), c.Param(`name`))
+			f.Update(c, f.dt.NewUser(), c.Param(`name`), nil)
 		})
 
 	// swagger:route PUT /users/{name}/password Users putUserPassword
@@ -285,8 +295,10 @@ func (f *Frontend) InitUserApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name/password",
 		func(c *gin.Context) {
-			obj, ok := f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
-			if !ok {
+			d, unlocker := f.dt.LockEnts(f.dt.NewUser().Locks("update")...)
+			defer unlocker()
+			obj := d("users").Find(c.Param("name"))
+			if obj == nil {
 				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
 				c.JSON(http.StatusNotFound, backend.NewError("API_ERROR", http.StatusNotFound, s))
 				return
@@ -299,8 +311,7 @@ func (f *Frontend) InitUserApi() {
 			if !assureDecode(c, &userPassword) {
 				return
 			}
-
-			if err := user.ChangePassword(userPassword.Password); err != nil {
+			if err := user.ChangePassword(d, userPassword.Password); err != nil {
 				be, ok := err.(*backend.Error)
 				if ok {
 					c.JSON(be.Code, be)
@@ -308,12 +319,8 @@ func (f *Frontend) InitUserApi() {
 					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				obj, _ = f.dt.FetchOne(f.dt.NewUser(), c.Param(`name`))
-				s, _ := obj.(Sanitizable)
-				s.Sanitize()
-				c.JSON(http.StatusOK, obj)
+				c.JSON(http.StatusOK, user.Sanitize())
 			}
-
 		})
 
 	// swagger:route DELETE /users/{name} Users deleteUser
@@ -331,6 +338,6 @@ func (f *Frontend) InitUserApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewUser()
 			b.Name = c.Param(`name`)
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 		})
 }
