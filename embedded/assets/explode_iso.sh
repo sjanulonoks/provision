@@ -112,6 +112,6 @@ mv "${os_install_dir}.extracting" "${os_install_dir}"
 rm -rf "${os_install_dir}.deleting"
 
 if which selinuxenabled && selinuxenabled; then
-    restorecon -R -F /tftpboot
+    restorecon -R -F "$tftpboot"
 fi
 

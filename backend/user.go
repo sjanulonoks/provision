@@ -1,21 +1,21 @@
 package backend
 
 import (
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 	sc "github.com/elithrar/simple-scrypt"
 )
 
 // User is an API user of DigitalRebar Provision
 // swagger:model
 type User struct {
+	validate
 	// Name is the name of the user
 	//
 	// required: true
 	Name string
 	// PasswordHash is the scrypt-hashed version of the user's Password.
 	//
-	// swagger:strfmt password
 	PasswordHash []byte `json:",omitempty"`
 	p            *DataTracker
 }
@@ -51,7 +51,11 @@ func (u *User) Key() string {
 	return u.Name
 }
 
-func (u *User) Backend() store.SimpleStore {
+func (u *User) AuthKey() string {
+	return u.Key()
+}
+
+func (u *User) Backend() store.Store {
 	return u.p.getBackend(u)
 }
 
@@ -70,10 +74,6 @@ func (u *User) CheckPassword(pass string) bool {
 	return false
 }
 
-func (u *User) List() []*User {
-	return AsUsers(u.p.FetchAll(u))
-}
-
 func AsUser(o store.KeySaver) *User {
 	return o.(*User)
 }
@@ -86,18 +86,20 @@ func AsUsers(o []store.KeySaver) []*User {
 	return res
 }
 
-func (u *User) Sanitize() {
-	u.PasswordHash = []byte{}
+func (u *User) Sanitize() store.KeySaver {
+	res := AsUser(u.p.Clone(u))
+	res.PasswordHash = []byte{}
+	return res
 }
 
-func (u *User) ChangePassword(newPass string) error {
+func (u *User) ChangePassword(d Stores, newPass string) error {
 	ph, err := sc.GenerateFromPassword([]byte(newPass), sc.DefaultParams)
 	if err != nil {
 		return err
 	}
 	u.PasswordHash = ph
 	if u.p != nil {
-		_, err = u.p.save(u)
+		_, err = u.p.Save(d, u, nil)
 	}
 	return err
 }
@@ -106,6 +108,22 @@ func (p *DataTracker) NewUser() *User {
 	return &User{p: p}
 }
 
+func (u *User) Validate() error {
+	return index.CheckUnique(u, u.stores("users").Items())
+}
+
 func (u *User) BeforeSave() error {
-	return index.CheckUnique(u, u.p.objs[u.Prefix()].d)
+	return u.Validate()
+}
+
+var userLockMap = map[string][]string{
+	"get":    []string{"users"},
+	"create": []string{"users"},
+	"update": []string{"users"},
+	"patch":  []string{"users"},
+	"delete": []string{"users"},
+}
+
+func (u *User) Locks(action string) []string {
+	return userLockMap[action]
 }

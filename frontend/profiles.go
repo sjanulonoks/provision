@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/VictorLowther/jsonpatch2"
+	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
 )
@@ -124,7 +125,7 @@ func (f *Frontend) InitProfileApi() {
 	f.ApiGroup.POST("/profiles",
 		func(c *gin.Context) {
 			b := f.dt.NewProfile()
-			f.Create(c, b)
+			f.Create(c, b, nil)
 		})
 	// swagger:route GET /profiles/{name} Profiles getProfile
 	//
@@ -158,7 +159,7 @@ func (f *Frontend) InitProfileApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/profiles/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewProfile(), c.Param(`name`))
+			f.Patch(c, f.dt.NewProfile(), c.Param(`name`), nil)
 		})
 
 	// swagger:route PUT /profiles/{name} Profiles putProfile
@@ -176,7 +177,7 @@ func (f *Frontend) InitProfileApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/profiles/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewProfile(), c.Param(`name`))
+			f.Update(c, f.dt.NewProfile(), c.Param(`name`), nil)
 		})
 
 	// swagger:route DELETE /profiles/{name} Profiles deleteProfile
@@ -194,8 +195,7 @@ func (f *Frontend) InitProfileApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewProfile()
 			b.Name = c.Param(`name`)
-			f.Remove(c, b)
-
+			f.Remove(c, b, nil)
 		})
 
 	// swagger:route GET /profiles/{name}/params Profiles getProfileParams
@@ -212,13 +212,18 @@ func (f *Frontend) InitProfileApi() {
 	f.ApiGroup.GET("/profiles/:name/params",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
-			ref := f.dt.NewProfile()
-			res, ok := f.dt.FetchOne(ref, name)
-			if !ok {
+			var res store.KeySaver
+			tp := f.dt.NewProfile()
+			func() {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(tp).(Lockable).Locks("get")...)
+				defer unlocker()
+				res = d("profiles").Find(name)
+			}()
+			if res == nil {
 				err := &backend.Error{
 					Code:  http.StatusNotFound,
 					Type:  "API_ERROR",
-					Model: ref.Prefix(),
+					Model: "profiles",
 					Key:   name,
 				}
 				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
@@ -249,13 +254,18 @@ func (f *Frontend) InitProfileApi() {
 				return
 			}
 			name := c.Param(`name`)
-			ref := f.dt.NewProfile()
-			res, ok := f.dt.FetchOne(ref, name)
-			if !ok {
+			var res store.KeySaver
+			tp := f.dt.NewProfile()
+			func() {
+				d, unlocker := f.dt.LockEnts(store.KeySaver(tp).(Lockable).Locks("get")...)
+				defer unlocker()
+				res = d("profiles").Find(name)
+			}()
+			if res == nil {
 				err := &backend.Error{
 					Code:  http.StatusNotFound,
 					Type:  "API_ERROR",
-					Model: ref.Prefix(),
+					Model: "profiles",
 					Key:   name,
 				}
 				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
@@ -266,7 +276,12 @@ func (f *Frontend) InitProfileApi() {
 				return
 			}
 			m := backend.AsProfile(res)
-			err := m.SetParams(val)
+			var err error
+			func() {
+				d, unlocker := f.dt.LockEnts(res.(Lockable).Locks("update")...)
+				defer unlocker()
+				err = m.SetParams(d, val)
+			}()
 			if err != nil {
 				be, _ := err.(*backend.Error)
 				c.JSON(be.Code, be)

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/gin-gonic/gin"
 )
@@ -176,18 +177,21 @@ func (f *Frontend) InitIsoApi() {
 		})
 }
 
-func reloadBootenvsForIso(dt DTI, name string) {
-	for _, blob := range dt.FetchAll(dt.NewBootEnv()) {
+func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
+	d, unloader := dt.LockEnts(store.KeySaver(dt.NewBootEnv()).(Lockable).Locks("update")...)
+	defer unloader()
+
+	for _, blob := range d("bootenvs").Items() {
 		env := backend.AsBootEnv(blob)
 		if env.Available || env.OS.IsoFile != name {
 			continue
 		}
 		env.Available = true
-		dt.Update(env)
+		dt.Update(d, env, nil)
 	}
 }
 
-func uploadIso(c *gin.Context, fileRoot, name string, dt DTI) {
+func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 	if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
 		c.JSON(http.StatusUnsupportedMediaType,
 			backend.NewError("API ERROR", http.StatusUnsupportedMediaType,
@@ -220,6 +224,7 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt DTI) {
 	}
 
 	copied, err := io.Copy(tgt, c.Request.Body)
+	tgt.Close()
 	if err != nil {
 		os.Remove(isoTmpName)
 		c.JSON(http.StatusInsufficientStorage,

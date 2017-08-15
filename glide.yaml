@@ -8,14 +8,10 @@ import:
 - package: gopkg.in/yaml.v2
   version: v2
   repo: https://github.com/go-yaml/yaml
+- package: github.com/xeipuuv/gojsonschema
 - package: github.com/VictorLowther/jsonpatch2
 - package: github.com/ghodss/yaml
-- package: github.com/digitalrebar/digitalrebar
-  subpackages:
-  - go/common/client
-  - go/common/service
-  - go/common/store
-  - go/common/version
+- package: github.com/digitalrebar/store
 - package: github.com/hashicorp/consul
   subpackages:
   - api
@@ -27,6 +23,10 @@ import:
 - package: github.com/tylerb/graceful
 - package: github.com/elithrar/simple-scrypt
 - package: github.com/krolaw/dhcp4
+- package: github.com/gorilla/websocket
+- package: gopkg.in/olahol/melody.v1
+- package: github.com/fsnotify/fsnotify
 - package: golang.org/x/net
   subpackages:
   - context
+

@@ -107,7 +107,7 @@ func (f *Frontend) InitTemplateApi() {
 	f.ApiGroup.POST("/templates",
 		func(c *gin.Context) {
 			b := f.dt.NewTemplate()
-			f.Create(c, b)
+			f.Create(c, b, nil)
 		})
 
 	// swagger:route GET /templates/{name} Templates getTemplate
@@ -142,7 +142,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/templates/:id",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewTemplate(), c.Param(`id`))
+			f.Patch(c, f.dt.NewTemplate(), c.Param(`id`), nil)
 		})
 
 	// swagger:route PUT /templates/{name} Templates putTemplate
@@ -160,7 +160,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/templates/:id",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewTemplate(), c.Param(`id`))
+			f.Update(c, f.dt.NewTemplate(), c.Param(`id`), nil)
 		})
 
 	// swagger:route DELETE /templates/{name} Templates deleteTemplate
@@ -179,6 +179,6 @@ func (f *Frontend) InitTemplateApi() {
 		func(c *gin.Context) {
 			b := f.dt.NewTemplate()
 			b.ID = c.Param(`id`)
-			f.Remove(c, b)
+			f.Remove(c, b, nil)
 		})
 }

@@ -5,15 +5,104 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/digitalrebar/digitalrebar/go/common/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/store"
 )
+
+// TemplateInfo holds information on the templates in the boot
+// environment that will be expanded into files.
+//
+// swagger:model
+type TemplateInfo struct {
+	// Name of the template
+	//
+	// required: true
+	Name string
+	// A text/template that specifies how to create
+	// the final path the template should be
+	// written to.
+	//
+	// required: true
+	Path string
+	// The ID of the template that should be expanded.  Either
+	// this or Contents should be set
+	//
+	// required: false
+	ID string
+	// The contents that should be used when this template needs
+	// to be expanded.  Either this or ID should be set.
+	//
+	// required: false
+	Contents string
+	pathTmpl *template.Template
+}
+
+func (ti *TemplateInfo) id() string {
+	if ti.ID == "" {
+		return ti.Name
+	}
+	return ti.ID
+}
+
+func MergeTemplates(root *template.Template, tmpls []TemplateInfo, e *Error) *template.Template {
+	var res *template.Template
+	var err error
+	if root == nil {
+		res = template.New("")
+	} else {
+		res, err = root.Clone()
+	}
+	if err != nil {
+		e.Errorf("Error cloning root: %v", err)
+		return nil
+	}
+	buf := &bytes.Buffer{}
+	for i := range tmpls {
+		ti := &tmpls[i]
+		if ti.Name == "" {
+			e.Errorf("Templates[%d] has no Name", i)
+			continue
+		}
+		if ti.Path != "" {
+			pathTmpl, err := template.New(ti.Name).Parse(ti.Path)
+			if err != nil {
+				e.Errorf("Error compiling path template %s (%s): %v",
+					ti.Name,
+					ti.Path,
+					err)
+				continue
+			} else {
+				ti.pathTmpl = pathTmpl.Option("missingkey=error")
+			}
+		}
+		if ti.ID != "" {
+			if res.Lookup(ti.ID) == nil {
+				e.Errorf("Templates[%d]: No common template for %s", i, ti.ID)
+			}
+			continue
+		}
+		if ti.Contents == "" {
+			e.Errorf("Templates[%d] has both an empty ID and contents", i)
+		}
+		fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}\n`, ti.Name, ti.Contents)
+	}
+	_, err = res.Parse(buf.String())
+	if err != nil {
+		e.Errorf("Error parsing inline templates: %v", err)
+		return nil
+	}
+	if e.containsError {
+		return nil
+	}
+	return res
+}
 
 // Template represents a template that will be associated with a boot
 // environment.
 //
 // swagger:model
 type Template struct {
+	validate
 	// ID is a unique identifier for this template.  It cannot change once it is set.
 	//
 	// required: true
@@ -26,6 +115,7 @@ type Template struct {
 	// required: true
 	Contents string
 	p        *DataTracker
+	toUpdate *tmplUpdater
 }
 
 func (p *Template) Indexes() map[string]index.Maker {
@@ -55,12 +145,16 @@ func (t *Template) Prefix() string {
 	return "templates"
 }
 
-func (t *Template) Backend() store.SimpleStore {
+func (t *Template) Backend() store.Store {
 	return t.p.getBackend(t)
 }
 
 func (t *Template) Key() string {
 	return t.ID
+}
+
+func (t *Template) AuthKey() string {
+	return t.Key()
 }
 
 func (t *Template) New() store.KeySaver {
@@ -72,16 +166,35 @@ func (t *Template) setDT(p *DataTracker) {
 	t.p = p
 }
 
-func (t *Template) List() []*Template {
-	return AsTemplates(t.p.FetchAll(t))
-}
-
 func (t *Template) parse(root *template.Template) error {
 	_, err := root.New(t.ID).Parse(t.Contents)
 	return err
 }
 
-func (t *Template) BeforeSave() error {
+type tmplUpdater struct {
+	root                *template.Template
+	tasks               []*Task
+	bootenvs            []*BootEnv
+	taskTmpls, envTmpls []*template.Template
+}
+
+func (t *Template) checkSubs(root *template.Template, e *Error) {
+	t.toUpdate = &tmplUpdater{
+		root:     root,
+		tasks:    AsTasks(t.stores("tasks").Items()),
+		bootenvs: AsBootEnvs(t.stores("bootenvs").Items()),
+	}
+	t.toUpdate.taskTmpls = make([]*template.Template, len(t.toUpdate.tasks))
+	t.toUpdate.envTmpls = make([]*template.Template, len(t.toUpdate.bootenvs))
+	for i, task := range t.toUpdate.tasks {
+		t.toUpdate.taskTmpls[i] = task.genRoot(root, e)
+	}
+	for i, bootenv := range t.toUpdate.bootenvs {
+		t.toUpdate.envTmpls[i] = bootenv.genRoot(root, e)
+	}
+}
+
+func (t *Template) Validate() error {
 	e := &Error{Code: 422, Type: ValidationError, o: t}
 	if t.ID == "" {
 		e.Errorf("Template must have an ID")
@@ -98,61 +211,44 @@ func (t *Template) BeforeSave() error {
 		e.Errorf("Parse error for template %s: %v", t.ID, err)
 		return e
 	}
-	if err := index.CheckUnique(t, t.p.objs[t.Prefix()].d); err != nil {
-		e.Merge(err)
+	e.Merge(index.CheckUnique(t, t.stores("templates").Items()))
+	if e.ContainsError() {
 		return e
 	}
-	bootEnvs := t.p.lockFor("bootenvs")
-	defer bootEnvs.Unlock()
-	for _, env := range bootEnvs.d {
-		AsBootEnv(env).genRoot(root, e)
-	}
+	t.checkSubs(root, e)
 	return e.OrNil()
 }
 
-func (t *Template) AfterSave() {
-	t.p.tmplMux.Lock()
-	defer t.p.tmplMux.Unlock()
-	root, err := t.p.rootTemplate.Clone()
-	if err != nil {
-		t.p.Printf("Error cloning shared template namespace: %v", err)
-		return
-	}
-	if err := t.parse(root); err != nil {
-		t.p.Printf("Parse error for template %s: %v", t.ID, err)
-		return
-	}
-	bootEnvs := t.p.lockFor("bootenvs")
-	defer bootEnvs.Unlock()
-	newRoots := make([]*template.Template, len(bootEnvs.d))
-	for i, envIsh := range bootEnvs.d {
-		env := AsBootEnv(envIsh)
-		env.tmplMux.Lock()
-		defer env.tmplMux.Unlock()
-		e := &Error{o: env}
-		newRoots[i] = env.genRoot(root, e)
-		if e.containsError {
-			t.p.Logger.Print(e.Error())
-			return
-		}
-	}
-	t.p.rootTemplate = root
-	for i, envIsh := range bootEnvs.d {
-		env := AsBootEnv(envIsh)
-		env.rootTemplate = newRoots[i]
-	}
+func (t *Template) BeforeSave() error {
+	return t.Validate()
 }
 
-func (t *Template) BootEnvs() []*BootEnv {
-	return AsBootEnvs(t.p.FetchAll(t.p.NewBootEnv()))
+func (t *Template) updateOthers() {
+	t.p.tmplMux.Lock()
+	t.p.rootTemplate = t.toUpdate.root
+	t.p.tmplMux.Unlock()
+	for i, task := range t.toUpdate.tasks {
+		task.tmplMux.Lock()
+		task.rootTemplate = t.toUpdate.taskTmpls[i]
+		task.tmplMux.Unlock()
+	}
+	for i, bootenv := range t.toUpdate.bootenvs {
+		bootenv.tmplMux.Lock()
+		bootenv.rootTemplate = t.toUpdate.envTmpls[i]
+		bootenv.tmplMux.Unlock()
+	}
+	t.toUpdate = nil
+}
+
+func (t *Template) AfterSave() {
+	t.updateOthers()
 }
 
 func (t *Template) BeforeDelete() error {
 	e := &Error{Code: 409, Type: StillInUseError, o: t}
 	buf := &bytes.Buffer{}
-	templates := t.p.objs["templates"].d
-	for i := range templates {
-		tmpl := AsTemplate(templates[i])
+	for _, i := range t.stores("templates").Items() {
+		tmpl := AsTemplate(i)
 		if tmpl.ID == t.ID {
 			continue
 		}
@@ -163,25 +259,11 @@ func (t *Template) BeforeDelete() error {
 		e.Errorf("Template %s still required: %v", t.ID, err)
 		return e
 	}
-	t.p.tmplMux.Lock()
-	defer t.p.tmplMux.Unlock()
-	bootEnvs := t.p.lockFor("bootenvs")
-	benvRoots := make([]*template.Template, len(bootEnvs.d))
-	defer bootEnvs.Unlock()
-	for i := range bootEnvs.d {
-		env := AsBootEnv(bootEnvs.d[i])
-		benvRoots[i] = env.genRoot(root, e)
-	}
-	if e.containsError {
+	t.checkSubs(root, e)
+	if e.ContainsError() {
 		return e
 	}
-	for i := range benvRoots {
-		env := AsBootEnv(bootEnvs.d[i])
-		env.tmplMux.Lock()
-		env.rootTemplate = benvRoots[i]
-		env.tmplMux.Unlock()
-	}
-	t.p.rootTemplate = root
+	t.updateOthers()
 	return nil
 }
 
@@ -199,4 +281,16 @@ func AsTemplates(o []store.KeySaver) []*Template {
 		res[i] = AsTemplate(o[i])
 	}
 	return res
+}
+
+var templateLockMap = map[string][]string{
+	"get":    []string{"templates"},
+	"create": []string{"templates", "bootenvs", "machines", "tasks"},
+	"update": []string{"templates", "bootenvs", "machines", "tasks"},
+	"patch":  []string{"templates", "bootenvs", "machines", "tasks"},
+	"delete": []string{"templates", "bootenvs", "machines", "tasks"},
+}
+
+func (t *Template) Locks(action string) []string {
+	return templateLockMap[action]
 }

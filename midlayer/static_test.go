@@ -15,7 +15,7 @@ import (
 
 func TestStaticFiles(t *testing.T) {
 	logger := log.New(os.Stderr, "", log.LstdFlags)
-	svr, hh := ServeStatic(":3235235", backend.NewFS(".", logger), logger)
+	svr, hh := ServeStatic(":3235235", backend.NewFS(".", logger), logger, backend.NewPublishers(logger))
 	if hh != nil {
 		if hh.Error() != "listen tcp: address 3235235: invalid port" {
 			t.Errorf("Expected a different error: %v", hh.Error())
@@ -24,7 +24,7 @@ func TestStaticFiles(t *testing.T) {
 		t.Errorf("Should have returned an error")
 	}
 
-	svr, hh = ServeStatic(":32134", backend.NewFS(".", logger), logger)
+	svr, hh = ServeStatic(":32134", backend.NewFS(".", logger), logger, backend.NewPublishers(logger))
 	if hh != nil {
 		t.Errorf("Should not have returned an error: %v", hh)
 	}
