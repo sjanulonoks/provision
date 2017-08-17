@@ -273,10 +273,15 @@ func (h *DhcpHandler) Serve() error {
 				return err
 			}
 
-			if net.ParseIP(ipStr).Equal(net.IPv4zero) || req.Broadcast() {
-				port, _ := strconv.Atoi(portStr)
-				srcAddr = &net.UDPAddr{IP: net.IPv4bcast, Port: port}
+			port, _ := strconv.Atoi(portStr)
+			if req.GIAddr().Equal(net.IPv4zero) {
+				if net.ParseIP(ipStr).Equal(net.IPv4zero) || req.Broadcast() {
+					srcAddr = &net.UDPAddr{IP: net.IPv4bcast, Port: port}
+				}
+			} else {
+				srcAddr = &net.UDPAddr{IP: req.GIAddr(), Port: port}
 			}
+
 			h.cm.Src = nil
 			if _, e := h.conn.WriteTo(res, h.cm, srcAddr); e != nil {
 				return e
