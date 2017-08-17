@@ -305,19 +305,19 @@ type Stores func(string) *Store
 
 func allKeySavers(res *DataTracker) []models.Model {
 	return []models.Model{
-		&Task{p: res},
-		&Job{p: res},
+		&Pref{p: res},
 		&Param{p: res},
 		&Profile{p: res},
 		&User{p: res},
 		&Template{p: res},
+		&Task{p: res},
 		&BootEnv{p: res},
 		&Machine{p: res},
 		&Subnet{p: res},
 		&Reservation{p: res},
 		&Lease{p: res},
-		&Pref{p: res},
 		&Plugin{p: res},
+		&Job{p: res},
 	}
 }
 
