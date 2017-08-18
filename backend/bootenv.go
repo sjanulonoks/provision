@@ -34,6 +34,12 @@ type BootEnv struct {
 	tmplMux        sync.Mutex
 }
 
+func (obj *BootEnv) SaveClean() store.KeySaver {
+	mod := *obj.BootEnv
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func (b *BootEnv) HasTask(s string) bool {
 	for _, p := range b.Tasks {
 		if p == s {

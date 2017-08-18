@@ -21,6 +21,12 @@ type Template struct {
 	toUpdate *tmplUpdater
 }
 
+func (obj *Template) SaveClean() store.KeySaver {
+	mod := *obj.Template
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func (p *Template) Indexes() map[string]index.Maker {
 	fix := AsTemplate
 	return map[string]index.Maker{

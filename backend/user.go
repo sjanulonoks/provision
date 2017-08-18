@@ -15,6 +15,12 @@ type User struct {
 	p *DataTracker
 }
 
+func (obj *User) SaveClean() store.KeySaver {
+	mod := *obj.User
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func (p *User) Indexes() map[string]index.Maker {
 	fix := AsUser
 	return map[string]index.Maker{

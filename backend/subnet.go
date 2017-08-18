@@ -140,6 +140,12 @@ type Subnet struct {
 	sn             *net.IPNet
 }
 
+func (obj *Subnet) SaveClean() store.KeySaver {
+	mod := *obj.Subnet
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func (s *Subnet) Indexes() map[string]index.Maker {
 	fix := AsSubnet
 	return map[string]index.Maker{

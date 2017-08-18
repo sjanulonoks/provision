@@ -19,6 +19,12 @@ type Param struct {
 	validator *gojsonschema.Schema
 }
 
+func (obj *Param) SaveClean() store.KeySaver {
+	mod := *obj.Param
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func AsParam(o models.Model) *Param {
 	return o.(*Param)
 }

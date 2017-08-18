@@ -27,6 +27,12 @@ type Machine struct {
 	oldBootEnv string
 }
 
+func (obj *Machine) SaveClean() store.KeySaver {
+	mod := *obj.Machine
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func (n *Machine) HasTask(s string) bool {
 	for _, p := range n.Tasks {
 		if p == s {

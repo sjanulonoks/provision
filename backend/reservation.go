@@ -19,6 +19,12 @@ type Reservation struct {
 	p *DataTracker
 }
 
+func (obj *Reservation) SaveClean() store.KeySaver {
+	mod := *obj.Reservation
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func (l *Reservation) Indexes() map[string]index.Maker {
 	fix := AsReservation
 	return map[string]index.Maker{
