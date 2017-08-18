@@ -92,6 +92,7 @@ func (p *Profile) New() store.KeySaver {
 	res := &Profile{Profile: &models.Profile{}}
 	res.Params = map[string]interface{}{}
 	res.Tasks = []string{}
+	res.p = p.p
 	return res
 }
 
@@ -152,6 +153,9 @@ func (p *Profile) BeforeSave() error {
 
 func (p *Profile) OnLoad() error {
 	p.Params = map[string]interface{}{}
+	stores, unlocker := p.p.LockAll()
+	p.stores = stores
+	defer func() { unlocker(); p.stores = nil }()
 	return p.BeforeSave()
 }
 

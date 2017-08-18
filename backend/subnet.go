@@ -318,7 +318,9 @@ func (s *Subnet) setDT(p *DataTracker) {
 }
 
 func (s *Subnet) New() store.KeySaver {
-	return &Subnet{Subnet: &models.Subnet{}}
+	res := &Subnet{Subnet: &models.Subnet{}}
+	res.p = s.p
+	return res
 }
 
 func (s *Subnet) sBounds() (func(string) bool, func(string) bool) {
@@ -496,6 +498,9 @@ func (s *Subnet) BeforeSave() error {
 }
 
 func (s *Subnet) OnLoad() error {
+	stores, unlocker := s.p.LockAll()
+	s.stores = stores
+	defer func() { unlocker(); s.stores = nil }()
 	return s.BeforeSave()
 }
 

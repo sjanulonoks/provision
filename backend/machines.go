@@ -372,6 +372,7 @@ func (n *Machine) New() store.KeySaver {
 	res := &Machine{Machine: &models.Machine{}}
 	res.Tasks = []string{}
 	res.Profiles = []string{}
+	res.p = n.p
 	return res
 }
 
@@ -457,6 +458,9 @@ func (n *Machine) BeforeSave() error {
 }
 
 func (n *Machine) OnLoad() error {
+	stores, unlocker := n.p.LockAll()
+	n.stores = stores
+	defer func() { unlocker(); n.stores = nil }()
 	return n.BeforeSave()
 }
 

@@ -105,6 +105,7 @@ func (n *Plugin) GetParam(d Stores, key string, searchProfiles bool) (interface{
 
 func (n *Plugin) New() store.KeySaver {
 	res := &Plugin{Plugin: &models.Plugin{}}
+	res.p = n.p
 	return res
 }
 
@@ -129,6 +130,9 @@ func (n *Plugin) BeforeSave() error {
 }
 
 func (n *Plugin) OnLoad() error {
+	stores, unlocker := n.p.LockAll()
+	n.stores = stores
+	defer func() { unlocker(); n.stores = nil }()
 	return n.BeforeSave()
 }
 

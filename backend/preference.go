@@ -46,7 +46,9 @@ func (p *Pref) Backend() store.Store {
 }
 
 func (p *Pref) New() store.KeySaver {
-	return &Pref{Pref: &models.Pref{}}
+	res := &Pref{Pref: &models.Pref{}}
+	res.p = p.p
+	return res
 }
 
 func (p *Pref) setDT(dt *DataTracker) {

@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -319,6 +318,7 @@ type DataTracker struct {
 	Logger              *log.Logger
 	FS                  *FileSystem
 	Backend             store.Store
+	backendMux          *sync.RWMutex
 	objs                map[string]*Store
 	defaultPrefs        map[string]string
 	runningPrefs        map[string]string
@@ -332,6 +332,14 @@ type DataTracker struct {
 	thunks              []func()
 	thunkMux            *sync.Mutex
 	publishers          *Publishers
+}
+
+func (dt *DataTracker) Stop() {
+	dt.backendMux.Lock()
+}
+
+func (dt *DataTracker) Start() {
+	dt.backendMux.Unlock()
 }
 
 type Stores func(string) *Store
@@ -358,6 +366,7 @@ func allKeySavers(res *DataTracker) []models.Model {
 // It returns a function to get an Index that was requested, and
 // a function that unlocks the taken locks in the right order.
 func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) {
+	p.backendMux.RLock()
 	p.allMux.RLock()
 	sortedEnts := make([]string, len(ents))
 	copy(sortedEnts, ents)
@@ -392,16 +401,19 @@ func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) 
 			}
 			srMux.Unlock()
 			p.allMux.RUnlock()
+			p.backendMux.RUnlock()
 		}
 }
 
 func (p *DataTracker) LockAll() (stores Stores, unlocker func()) {
+	p.backendMux.RLock()
 	p.allMux.Lock()
 	return func(ref string) *Store {
 			return p.objs[ref]
 		},
 		func() {
 			p.allMux.Unlock()
+			p.backendMux.RUnlock()
 		}
 }
 
@@ -428,7 +440,16 @@ func (p *DataTracker) ApiURL(remoteIP net.IP) string {
 	return p.urlFor("https", remoteIP, p.ApiPort)
 }
 
-func (p *DataTracker) rebuildCache() error {
+func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
+	hard = &models.Error{Code: 500, Type: "Failed to load backing objects from cache"}
+	soft = &models.Error{Code: 422, Type: ValidationError}
+	root, err := template.New("").Parse("")
+	if err != nil {
+		hard.Errorf("Unable to create root template: %v", err)
+		return
+	}
+	p.rootTemplate = root
+	p.rootTemplate.Option("missingkey=error")
 	p.objs = map[string]*Store{}
 	objs := allKeySavers(p)
 	for _, obj := range objs {
@@ -437,34 +458,25 @@ func (p *DataTracker) rebuildCache() error {
 		p.objs[prefix] = &Store{backingStore: bk}
 		storeObjs, err := store.List(bk, toBackend(p, nil, obj))
 		if err != nil {
-			return fmt.Errorf("%s: %v", prefix, err)
+			hard.Errorf("Unable to load %s: %v", prefix, err)
+			continue
 		}
 		res := make([]models.Model, len(storeObjs))
 		for i := range storeObjs {
-			p.setDT(storeObjs[i])
+			if v, ok := res[i].(Validator); ok && !v.Useable() {
+				soft.AddError(v.HasError())
+			}
 			res[i] = models.Model(storeObjs[i])
 		}
 		p.objs[prefix].Index = *index.Create(res)
-		if obj.Prefix() == "templates" {
-			buf := &bytes.Buffer{}
-			for _, thing := range p.objs["templates"].Items() {
-				tmpl := AsTemplate(thing)
-				fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}`, tmpl.ID, tmpl.Contents)
-			}
-			root, err := template.New("").Parse(buf.String())
-			if err != nil {
-				return fmt.Errorf("Unable to load root templates: %v", err)
-			}
-			p.rootTemplate = root
-			p.rootTemplate.Option("missingkey=error")
-		}
 	}
-	return nil
+	return
 }
 
-func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) error {
+func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, soft error) {
 	res := &DataTracker{
 		Backend:           backend,
+		backendMux:        &sync.RWMutex{},
 		FileRoot:          ".",
 		LogRoot:           ".",
 		StaticPort:        1,
@@ -485,37 +497,8 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) error {
 	}
 
 	// Load stores.
-	err := res.rebuildCache()
-	if err != nil {
-		return models.NewError("LoadError", http.StatusInternalServerError, fmt.Sprintf("Failed to rebuild cache: %v", err))
-	}
-
-	keys := make([]string, len(res.objs))
-	i := 0
-	for k := range res.objs {
-		keys[i] = k
-		i++
-	}
-
-	d, unlocker := res.LockAll()
-	defer unlocker()
-
-	berr := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
-
-	for _, k := range keys {
-
-		for _, obj := range res.objs[k].Items() {
-			if val, ok := obj.(Validator); ok {
-				obj.(validator).setStores(d)
-				val.ClearValidation()
-				val.Validate()
-				if !val.Useable() {
-					berr.AddError(val.HasError())
-				}
-			}
-		}
-	}
-	return berr.HasError()
+	a, b := res.rebuildCache()
+	return a.HasError(), b.HasError()
 }
 
 // Create a new DataTracker that will use passed store to save all operational data
@@ -527,6 +510,7 @@ func NewDataTracker(backend store.Store,
 	publishers *Publishers) *DataTracker {
 	res := &DataTracker{
 		Backend:           backend,
+		backendMux:        &sync.RWMutex{},
 		FileRoot:          fileRoot,
 		LogRoot:           logRoot,
 		StaticPort:        staticPort,
@@ -557,9 +541,9 @@ func NewDataTracker(backend store.Store,
 	}
 
 	// Load stores.
-	err := res.rebuildCache()
-	if err != nil {
-		res.Logger.Fatalf("dataTracker: Error loading data: %v", err)
+	hard, _ := res.rebuildCache()
+	if hard.HasError() != nil {
+		res.Logger.Fatalf("dataTracker: Error loading data: %v", hard.HasError())
 	}
 
 	// Create minimal content.
@@ -615,6 +599,8 @@ func NewDataTracker(backend store.Store,
 }
 
 func (p *DataTracker) Prefs() map[string]string {
+	p.backendMux.RLock()
+	defer p.backendMux.RUnlock()
 	vals := map[string]string{}
 	p.prefMux.Lock()
 	for k, v := range p.defaultPrefs {
@@ -628,6 +614,8 @@ func (p *DataTracker) Prefs() map[string]string {
 }
 
 func (p *DataTracker) Pref(name string) (string, error) {
+	p.backendMux.RLock()
+	defer p.backendMux.RUnlock()
 	res, ok := p.Prefs()[name]
 	if !ok {
 		return "", fmt.Errorf("No such preference %s", name)
@@ -909,7 +897,7 @@ func (p *DataTracker) Backup() ([]byte, error) {
 }
 
 // Assumes that all locks are held
-func (p *DataTracker) ReplaceBackend(st store.Store) error {
+func (p *DataTracker) ReplaceBackend(st store.Store) (hard, soft error) {
 	p.Backend = st
 	return p.rebuildCache()
 }

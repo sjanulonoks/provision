@@ -51,7 +51,9 @@ func (u *User) Backend() store.Store {
 }
 
 func (u *User) New() store.KeySaver {
-	return &User{User: &models.User{}}
+	res := &User{User: &models.User{}}
+	res.p = u.p
+	return res
 }
 
 func (u *User) setDT(p *DataTracker) {
@@ -96,6 +98,9 @@ func (u *User) BeforeSave() error {
 }
 
 func (u *User) OnLoad() error {
+	stores, unlocker := u.p.LockAll()
+	u.stores = stores
+	defer func() { unlocker(); u.stores = nil }()
 	return u.BeforeSave()
 }
 

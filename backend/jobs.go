@@ -82,7 +82,9 @@ func (j *Job) Backend() store.Store {
 }
 
 func (j *Job) New() store.KeySaver {
-	return &Job{Job: &models.Job{}}
+	res := &Job{Job: &models.Job{}}
+	res.p = j.p
+	return res
 }
 
 func (j *Job) setDT(dp *DataTracker) {
@@ -285,6 +287,9 @@ var JobValidStates []string = []string{
 }
 
 func (j *Job) OnLoad() error {
+	stores, unlocker := j.p.LockAll()
+	j.stores = stores
+	defer func() { unlocker(); j.stores = nil }()
 	j.Validate()
 	if !j.Validated {
 		return j.HasError()

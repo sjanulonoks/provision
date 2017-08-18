@@ -137,7 +137,9 @@ func (r *Reservation) Backend() store.Store {
 }
 
 func (r *Reservation) New() store.KeySaver {
-	return &Reservation{Reservation: &models.Reservation{}}
+	res := &Reservation{Reservation: &models.Reservation{}}
+	res.p = r.p
+	return res
 }
 
 func (r *Reservation) setDT(p *DataTracker) {
@@ -218,6 +220,9 @@ func (r *Reservation) BeforeSave() error {
 }
 
 func (r *Reservation) OnLoad() error {
+	stores, unlocker := r.p.LockAll()
+	r.stores = stores
+	defer func() { unlocker(); r.stores = nil }()
 	return r.BeforeSave()
 }
 

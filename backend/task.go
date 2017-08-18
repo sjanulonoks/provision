@@ -43,7 +43,9 @@ func (t *Task) Backend() store.Store {
 }
 
 func (t *Task) New() store.KeySaver {
-	return &Task{Task: &models.Task{}}
+	res := &Task{Task: &models.Task{}}
+	res.p = t.p
+	return res
 }
 
 func (t *Task) setDT(dp *DataTracker) {
@@ -98,6 +100,9 @@ func (t *Task) Validate() {
 }
 
 func (t *Task) OnLoad() error {
+	stores, unlocker := t.p.LockAll()
+	t.stores = stores
+	defer func() { unlocker(); t.stores = nil }()
 	t.Validate()
 	if !t.Useable() {
 		return t.MakeError(422, ValidationError, t)

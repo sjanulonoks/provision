@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -314,19 +315,27 @@ func (b *BootEnv) Validate() {
 		b.renderers = append(b.renderers, b.Render(b.stores, nil, b)...)
 	} else {
 		machines := b.stores("machines")
-		for _, i := range machines.Items() {
-			machine := AsMachine(i)
-			if machine.BootEnv != b.Name {
-				continue
+		if machines != nil {
+			for _, i := range machines.Items() {
+				machine := AsMachine(i)
+				if machine.BootEnv != b.Name {
+					continue
+				}
+				b.renderers = append(b.renderers, b.Render(b.stores, machine, b)...)
 			}
-			b.renderers = append(b.renderers, b.Render(b.stores, machine, b)...)
 		}
 	}
 	b.SetAvailable()
 }
 
 func (b *BootEnv) OnLoad() error {
+	log.Printf("OnLoad called: %s:%s", b.Prefix(), b.Key())
+	stores, unlocker := b.p.LockAll()
+	b.stores = stores
 	b.Validate()
+	unlocker()
+	b.stores = nil
+	log.Printf("Onload: %s:%s finished validation", b.Prefix(), b.Key())
 	if !b.Validated {
 		return b.HasError()
 	}
@@ -334,7 +343,9 @@ func (b *BootEnv) OnLoad() error {
 }
 
 func (b *BootEnv) New() store.KeySaver {
-	return &BootEnv{BootEnv: &models.BootEnv{}}
+	res := &BootEnv{BootEnv: &models.BootEnv{}}
+	res.p = b.p
+	return res
 }
 
 func (b *BootEnv) setDT(p *DataTracker) {

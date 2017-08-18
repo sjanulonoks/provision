@@ -62,11 +62,14 @@ func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, er
 	if err := dtStore.buildStack(); err != nil {
 		return nil, models.NewError("ValidationError", 422, err.Error())
 	}
-	err := backend.ValidateDataTrackerStore(dtStore, logger)
-	if err == nil && oldStore != nil {
+	hard, soft := backend.ValidateDataTrackerStore(dtStore, logger)
+	if hard == nil && soft == nil && oldStore != nil {
 		CleanUpStore(oldStore)
 	}
-	return dtStore, err
+	if hard != nil {
+		return dtStore, hard
+	}
+	return dtStore, soft
 }
 
 func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *log.Logger) (*DataStack, error) {
@@ -76,11 +79,14 @@ func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *l
 	if err := dtStore.buildStack(); err != nil {
 		return nil, models.NewError("ValidationError", 422, err.Error())
 	}
-	err := backend.ValidateDataTrackerStore(dtStore, logger)
-	if err == nil && oldStore != nil {
+	hard, soft := backend.ValidateDataTrackerStore(dtStore, logger)
+	if hard == nil && soft == nil && oldStore != nil {
 		CleanUpStore(oldStore)
 	}
-	return dtStore, err
+	if hard != nil {
+		return dtStore, hard
+	}
+	return dtStore, soft
 }
 
 func (d *DataStack) buildStack() error {
