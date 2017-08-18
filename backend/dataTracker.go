@@ -53,12 +53,14 @@ exit
 		},
 	}
 
-	localBoot = &BootEnv{
+	localBoot = &models.BootEnv{
 		Name:        "local",
 		Description: "The boot environment you should use to have known machines boot off their local hard drive",
-		OS:          OsInfo{Name: "local"},
+		OS: models.OsInfo{
+			Name: "local",
+		},
 		OnlyUnknown: false,
-		Templates: []TemplateInfo{
+		Templates: []models.TemplateInfo{
 			{
 				Name: "pxelinux",
 				Path: "pxelinux.cfg/{{.Machine.HexAddress}}",
@@ -566,8 +568,8 @@ func NewDataTracker(backend store.Store,
 	if d("bootenvs").Find("ignore") == nil {
 		res.Create(d, ignoreBoot)
 	}
-	if d("bootenvs").Find(localBoot.Key()) == nil {
-		res.Create(d, localBoot, nil)
+	if d("bootenvs").Find("local") == nil {
+		res.Create(d, localBoot)
 	}
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)
