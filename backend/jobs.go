@@ -60,6 +60,11 @@ type Job struct {
 	oldState string
 }
 
+func (obj *Job) SaveClean() store.KeySaver {
+	mod := *obj.Job
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
 func AsJob(o models.Model) *Job {
 	return o.(*Job)
 }

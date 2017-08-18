@@ -18,6 +18,12 @@ type Plugin struct {
 	p *DataTracker
 }
 
+func (obj *Plugin) SaveClean() store.KeySaver {
+	mod := *obj.Plugin
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func (n *Plugin) Indexes() map[string]index.Maker {
 	fix := AsPlugin
 	return map[string]index.Maker{

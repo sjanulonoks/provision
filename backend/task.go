@@ -20,6 +20,12 @@ type Task struct {
 	tmplMux      sync.Mutex
 }
 
+func (obj *Task) SaveClean() store.KeySaver {
+	mod := *obj.Task
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func AsTask(o models.Model) *Task {
 	return o.(*Task)
 }

@@ -20,6 +20,12 @@ type Lease struct {
 	p *DataTracker
 }
 
+func (obj *Lease) SaveClean() store.KeySaver {
+	mod := *obj.Lease
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func (l *Lease) Indexes() map[string]index.Maker {
 	fix := AsLease
 	return map[string]index.Maker{

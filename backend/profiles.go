@@ -20,6 +20,12 @@ type Profile struct {
 	p *DataTracker
 }
 
+func (obj *Profile) SaveClean() store.KeySaver {
+	mod := *obj.Profile
+	mod.ClearValidation()
+	return toBackend(obj.p, nil, &mod)
+}
+
 func (p *Profile) HasTask(s string) bool {
 	for _, p := range p.Tasks {
 		if p == s {

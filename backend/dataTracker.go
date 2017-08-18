@@ -102,6 +102,8 @@ func Fill(t store.KeySaver) {
 		obj.Machine = &models.Machine{}
 	case *Param:
 		obj.Param = &models.Param{}
+	case *Plugin:
+		obj.Plugin = &models.Plugin{}
 	case *Profile:
 		obj.Profile = &models.Profile{}
 	case *Reservation:
@@ -184,6 +186,16 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Param{}
 		}
 		res.Param = obj
+		p.setDT(&res)
+		return &res
+	case *models.Plugin:
+		var res Plugin
+		if ours != nil {
+			res = *ours.(*Plugin)
+		} else {
+			res = Plugin{}
+		}
+		res.Plugin = obj
 		p.setDT(&res)
 		return &res
 	case *models.Pref:
