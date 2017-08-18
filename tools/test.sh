@@ -4,6 +4,7 @@ set -e
 echo "mode: atomic" > coverage.txt
 
 packages="github.com/digitalrebar/provision,\
+github.com/digitalrebar/provision/models,\
 github.com/digitalrebar/provision/backend,\
 github.com/digitalrebar/provision/backend/index,\
 github.com/digitalrebar/provision/midlayer,\
