@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 	"github.com/pborman/uuid"
 )
@@ -17,21 +17,21 @@ import (
 // swagger:response
 type JobResponse struct {
 	// in: body
-	Body *backend.Job
+	Body *models.Job
 }
 
 // JobsResponse return on a successful GET of all Jobs
 // swagger:response
 type JobsResponse struct {
 	// in: body
-	Body []*backend.Job
+	Body []*models.Job
 }
 
 // JobActionsResponse return on a successful GET of a Job's actions
 // swagger:response
 type JobActionsResponse struct {
 	// in: body
-	Body []*backend.JobAction
+	Body []*models.JobAction
 }
 
 // JobParamsResponse return on a successful GET of all Job's Params
@@ -60,7 +60,7 @@ type JobLogResponse struct {
 type JobBodyParameter struct {
 	// in: body
 	// required: true
-	Body *backend.Job
+	Body *models.Job
 }
 
 // JobPatchBodyParameter used to patch a Job
@@ -163,7 +163,7 @@ func (f *Frontend) InitJobApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/jobs",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewJob())
+			f.List(c, &backend.Job{})
 		})
 
 	// swagger:route POST /jobs Jobs createJob
@@ -187,12 +187,12 @@ func (f *Frontend) InitJobApi() {
 			// We don't use f.Create() because we need to be able to assign random
 			// UUIDs to new Jobs without forcing the client to do so, yet allow them
 			// for testing purposes amd if they alrady have a UUID scheme for jobs.
-			b := f.dt.NewJob()
+			b := &backend.Job{}
 			if !assureDecode(c, b) {
 				return
 			}
 			if b.Machine == nil {
-				c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, "Create request must have Machine field"))
+				c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, "Create request must have Machine field"))
 				return
 			}
 			if !assureAuth(c, f.Logger, "jobs", "create", b.AuthKey()) {
@@ -201,20 +201,20 @@ func (f *Frontend) InitJobApi() {
 			if b.Uuid == nil || len(b.Uuid) == 0 {
 				b.Uuid = uuid.NewRandom()
 			}
-			var res store.KeySaver
+			var res models.Model
 			var err error
 			code := func() int {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("create")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("create")...)
 				defer unlocker()
 
 				// See the backend.Job comments for what is going on.
 				machines := d("machines")
 				jobs := d("jobs")
 
-				var mo store.KeySaver
+				var mo models.Model
 				// XXX?? Should find return a live object.
 				if mo = machines.Find(b.Machine.String()); mo == nil {
-					err = &backend.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError,
+					err = &models.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError,
 						Messages: []string{fmt.Sprintf("Machine %s does not exist", b.Machine.String())}}
 					return http.StatusUnprocessableEntity
 				}
@@ -222,7 +222,7 @@ func (f *Frontend) InitJobApi() {
 
 				// Machine isn't runnable return conflict
 				if !m.Runnable {
-					err = &backend.Error{Code: http.StatusConflict, Type: "Conflict",
+					err = &models.Error{Code: http.StatusConflict, Type: "Conflict",
 						Messages: []string{fmt.Sprintf("Machine %s is not runnable", b.Machine.String())}}
 					return http.StatusConflict
 				}
@@ -231,7 +231,7 @@ func (f *Frontend) InitJobApi() {
 				newCT := m.CurrentTask
 				if newCT < len(m.Tasks) {
 					if jo := jobs.Find(m.CurrentJob.String()); jo != nil && newCT != -1 {
-						cj := backend.AsJob(jo)
+						cj := jo.(*backend.Job)
 						if cj.State == "failed" {
 							// We are re-running the current task
 						} else if cj.State == "finished" {
@@ -242,7 +242,7 @@ func (f *Frontend) InitJobApi() {
 							return http.StatusAccepted
 						} else {
 							// Need to error - running job already running or just created.
-							err = &backend.Error{Code: http.StatusConflict, Type: "Conflict",
+							err = &models.Error{Code: http.StatusConflict, Type: "Conflict",
 								Messages: []string{fmt.Sprintf("Machine %s already has running or created job", b.Machine.String())}}
 							return http.StatusConflict
 						}
@@ -252,10 +252,10 @@ func (f *Frontend) InitJobApi() {
 						// We could have been forced and need to close out a job.
 						// if it is running, created, or incomplete, we need
 						// to mark it failed, but leave us runnable.
-						cj := backend.AsJob(jo)
+						cj := jo.(*backend.Job)
 						if cj.State == "running" || cj.State == "created" || cj.State == "incomplete" {
 							cj.State = "failed"
-							if _, err = f.dt.Update(d, cj, nil); err != nil {
+							if _, err = f.dt.Update(d, cj); err != nil {
 								return http.StatusBadRequest
 							}
 							m.Runnable = true
@@ -272,7 +272,7 @@ func (f *Frontend) InitJobApi() {
 					// Nothing to do.
 					if newCT != m.CurrentTask {
 						m.CurrentTask = newCT
-						_, err = f.dt.Update(d, m, nil)
+						_, err = f.dt.Update(d, m)
 						if err != nil {
 							return http.StatusInternalServerError
 						}
@@ -292,13 +292,13 @@ func (f *Frontend) InitJobApi() {
 				b.Task = m.Tasks[newCT]
 
 				// Create the job, and then update the machine
-				_, err = f.dt.Create(d, b, nil)
+				_, err = f.dt.Create(d, b)
 				if err == nil {
 					m.CurrentTask = newCT
 					m.CurrentJob = b.Uuid
-					_, err = f.dt.Update(d, m, nil)
+					_, err = f.dt.Update(d, m)
 					if err != nil {
-						_, err = f.dt.Remove(d, b, nil)
+						_, err = f.dt.Remove(d, b)
 					}
 				}
 
@@ -306,16 +306,16 @@ func (f *Frontend) InitJobApi() {
 
 			}()
 			if err != nil {
-				be, ok := err.(*backend.Error)
+				be, ok := err.(*models.Error)
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else if code == http.StatusNoContent {
 				c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
 			} else {
-				s, ok := store.KeySaver(b).(Sanitizable)
+				s, ok := models.Model(b).(Sanitizable)
 				if ok {
 					res = s.Sanitize()
 				} else {
@@ -338,7 +338,7 @@ func (f *Frontend) InitJobApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/jobs/:uuid",
 		func(c *gin.Context) {
-			f.Fetch(c, f.dt.NewJob(), c.Param(`uuid`))
+			f.Fetch(c, &backend.Job{}, c.Param(`uuid`))
 		})
 
 	// swagger:route PATCH /jobs/{uuid} Jobs patchJob
@@ -357,7 +357,7 @@ func (f *Frontend) InitJobApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/jobs/:uuid",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewJob(), c.Param(`uuid`), nil)
+			f.Patch(c, &backend.Job{}, c.Param(`uuid`))
 		})
 
 	// swagger:route PUT /jobs/{uuid} Jobs putJob
@@ -375,7 +375,7 @@ func (f *Frontend) InitJobApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/jobs/:uuid",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewJob(), c.Param(`uuid`), nil)
+			f.Update(c, &backend.Job{}, c.Param(`uuid`))
 		})
 
 	// swagger:route DELETE /jobs/{uuid} Jobs deleteJob
@@ -392,9 +392,7 @@ func (f *Frontend) InitJobApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/jobs/:uuid",
 		func(c *gin.Context) {
-			b := f.dt.NewJob()
-			b.Uuid = uuid.Parse(c.Param(`uuid`))
-			f.Remove(c, b, nil)
+			f.Remove(c, &backend.Job{}, c.Param(`uuid`))
 		})
 
 	// swagger:route GET /jobs/{uuid}/actions Jobs getJobActions
@@ -414,14 +412,14 @@ func (f *Frontend) InitJobApi() {
 	f.ApiGroup.GET("/jobs/:uuid/actions",
 		func(c *gin.Context) {
 			uuid := c.Param(`uuid`)
-			j := f.dt.NewJob()
+			j := &backend.Job{}
 			bad := func() bool {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(j).(Lockable).Locks("actions")...)
+				d, unlocker := f.dt.LockEnts(models.Model(j).(Lockable).Locks("actions")...)
 				defer unlocker()
 
-				var jo store.KeySaver
+				var jo models.Model
 				if jo = d("jobs").Find(uuid); jo == nil {
-					err := &backend.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
+					err := &models.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
 						Messages: []string{fmt.Sprintf("Job %s does not exist", uuid)}}
 					c.JSON(err.Code, err)
 					return true
@@ -440,11 +438,11 @@ func (f *Frontend) InitJobApi() {
 			var err error
 			actions, err := j.RenderActions()
 			if err != nil {
-				be, ok := err.(*backend.Error)
+				be, ok := err.(*models.Error)
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			}
 			c.JSON(http.StatusOK, actions)
@@ -470,14 +468,14 @@ func (f *Frontend) InitJobApi() {
 	f.ApiGroup.GET("/jobs/:uuid/log",
 		func(c *gin.Context) {
 			uuid := c.Param(`uuid`)
-			j := f.dt.NewJob()
+			j := &backend.Job{}
 			bad := func() bool {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(j).(Lockable).Locks("get")...)
+				d, unlocker := f.dt.LockEnts(models.Model(j).(Lockable).Locks("get")...)
 				defer unlocker()
 
-				var jo store.KeySaver
+				var jo models.Model
 				if jo = d("jobs").Find(uuid); jo == nil {
-					err := &backend.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
+					err := &models.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
 						Messages: []string{fmt.Sprintf("Job %s does not exist", uuid)}}
 					c.JSON(err.Code, err)
 					return true
@@ -517,26 +515,26 @@ func (f *Frontend) InitJobApi() {
 	f.ApiGroup.PUT("/jobs/:uuid/log",
 		func(c *gin.Context) {
 			if c.Request.Body == nil {
-				err := &backend.Error{Code: http.StatusBadRequest}
+				err := &models.Error{Code: http.StatusBadRequest}
 				c.JSON(err.Code, err)
 				return
 			}
 			defer c.Request.Body.Close()
 			if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
 				c.JSON(http.StatusUnsupportedMediaType,
-					backend.NewError("API ERROR", http.StatusUnsupportedMediaType,
+					models.NewError("API ERROR", http.StatusUnsupportedMediaType,
 						"job log put must have content-type application/octet-stream"))
 				return
 			}
 			uuid := c.Param(`uuid`)
-			j := f.dt.NewJob()
+			j := &backend.Job{}
 			bad := func() bool {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(j).(Lockable).Locks("get")...)
+				d, unlocker := f.dt.LockEnts(models.Model(j).(Lockable).Locks("get")...)
 				defer unlocker()
 
-				var jo store.KeySaver
+				var jo models.Model
 				if jo = d("jobs").Find(uuid); jo == nil {
-					err := &backend.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
+					err := &models.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
 						Messages: []string{fmt.Sprintf("Job %s does not exist", uuid)}}
 					c.JSON(err.Code, err)
 					return true
@@ -553,7 +551,7 @@ func (f *Frontend) InitJobApi() {
 			}
 
 			if err := j.Log(c.Request.Body); err != nil {
-				err2 := &backend.Error{Code: http.StatusInternalServerError, Type: "Server ERROR",
+				err2 := &models.Error{Code: http.StatusInternalServerError, Type: "Server ERROR",
 					Messages: []string{err.Error()}}
 				c.JSON(err2.Code, err2)
 			} else {

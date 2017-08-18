@@ -51,7 +51,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 				if addr == nil {
 					return nil, fmt.Errorf("Invalid Address: %s", s)
 				}
-				res := &Reservation{}
+				res := fix(l.New())
 				res.Addr = addr
 				return res, nil
 			}),
@@ -69,7 +69,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				res := &Reservation{}
+				res := fix(l.New())
 				res.Token = s
 				return res, nil
 			}),
@@ -87,7 +87,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				res := &Reservation{}
+				res := fix(l.New())
 				res.Strategy = s
 				return res, nil
 			}),
@@ -119,15 +119,11 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 				if addr == nil {
 					return nil, fmt.Errorf("Invalid Address: %s", s)
 				}
-				res := &Reservation{}
+				res := fix(l.New())
 				res.NextServer = addr
 				return res, nil
 			}),
 	}
-}
-
-func (r *Reservation) AuthKey() string {
-	return r.Key()
 }
 
 func (r *Reservation) Backend() store.Store {

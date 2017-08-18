@@ -54,7 +54,7 @@ func (d *DataStack) Clone() *DataStack {
 	return dtStore
 }
 
-func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, *backend.Error) {
+func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	delete(dtStore.saasContents, name)
@@ -68,7 +68,7 @@ func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, *b
 	return dtStore, err
 }
 
-func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *log.Logger) (*DataStack, *backend.Error) {
+func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *log.Logger) (*DataStack, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	dtStore.saasContents[name] = newStore

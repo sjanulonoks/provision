@@ -36,7 +36,7 @@ func TestUserPassword(t *testing.T) {
 	d, unlocker := dt.LockEnts("users")
 	defer unlocker()
 	u := &User{}
-	fillEmpty(u)
+	Fill(u)
 	u.Name = "test user"
 	saved, err := dt.Create(d, u)
 	if !saved {

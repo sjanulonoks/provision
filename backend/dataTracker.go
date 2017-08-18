@@ -35,7 +35,8 @@ var (
 PROMPT 0
 TIMEOUT 10
 LABEL local
-localboot 0`,
+localboot 0
+`,
 			},
 			{
 				Name:     `elilo`,
@@ -46,7 +47,8 @@ localboot 0`,
 				Name: `ipxe`,
 				Path: `default.ipxe`,
 				Contents: `#!ipxe
-      chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit`,
+chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
+`,
 			},
 		},
 	}
@@ -88,7 +90,7 @@ type dtSetter interface {
 	setDT(*DataTracker)
 }
 
-func fillEmpty(t store.KeySaver) {
+func Fill(t store.KeySaver) {
 	switch obj := t.(type) {
 	case *BootEnv:
 		obj.BootEnv = &models.BootEnv{}
@@ -119,6 +121,7 @@ func fillEmpty(t store.KeySaver) {
 
 func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 	if res, ok := m.(store.KeySaver); ok {
+		p.setDT(res)
 		return res
 	}
 	var ours store.KeySaver
@@ -380,14 +383,6 @@ func (p *DataTracker) ApiURL(remoteIP net.IP) string {
 	return p.urlFor("https", remoteIP, p.ApiPort)
 }
 
-func toModels(from []store.KeySaver) []models.Model {
-	res := make([]models.Model, len(from))
-	for i := range from {
-		res[i] = models.Model(from[i])
-	}
-	return res
-}
-
 func (p *DataTracker) rebuildCache() error {
 	p.objs = map[string]*Store{}
 	objs := allKeySavers(p)
@@ -399,7 +394,12 @@ func (p *DataTracker) rebuildCache() error {
 		if err != nil {
 			return fmt.Errorf("%s: %v", prefix, err)
 		}
-		p.objs[prefix].Index = *index.Create(toModels(storeObjs))
+		res := make([]models.Model, len(storeObjs))
+		for i := range storeObjs {
+			p.setDT(storeObjs[i])
+			res[i] = models.Model(storeObjs[i])
+		}
+		p.objs[prefix].Index = *index.Create(res)
 		if obj.Prefix() == "templates" {
 			buf := &bytes.Buffer{}
 			for _, thing := range p.objs["templates"].Items() {
@@ -538,7 +538,7 @@ func NewDataTracker(backend store.Store,
 	if users.Count() == 0 {
 		res.Infof("debugBootEnv", "Creating rocketskates user")
 		user := &User{}
-		fillEmpty(user)
+		Fill(user)
 		user.Name = "rocketskates"
 		if err := user.ChangePassword(d, "r0cketsk8ts"); err != nil {
 			logger.Fatalf("Failed to create rocketskates user: %v", err)
@@ -774,7 +774,7 @@ func (p *DataTracker) Patch(d Stores, obj models.Model, key string, patch jsonpa
 	}
 	p.setDT(toSave)
 	toSave.(validator).setStores(d)
-	checker, checkOK := ref.(Validator)
+	checker, checkOK := toSave.(Validator)
 	if checkOK {
 		checker.ClearValidation()
 	}

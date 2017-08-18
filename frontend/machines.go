@@ -5,8 +5,8 @@ import (
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/provision/plugin"
-	"github.com/digitalrebar/store"
 	"github.com/gin-gonic/gin"
 	"github.com/pborman/uuid"
 )
@@ -15,14 +15,14 @@ import (
 // swagger:response
 type MachineResponse struct {
 	// in: body
-	Body *backend.Machine
+	Body *models.Machine
 }
 
 // MachinesResponse return on a successful GET of all Machines
 // swagger:response
 type MachinesResponse struct {
 	// in: body
-	Body []*backend.Machine
+	Body []*models.Machine
 }
 
 // MachineActionResponse return on a successful GET of a single Machine Action
@@ -60,7 +60,7 @@ type MachineBodyParameter struct {
 	Force string `json:"force"`
 	// in: body
 	// required: true
-	Body *backend.Machine
+	Body *models.Machine
 }
 
 // MachinePatchBodyParameter used to patch a Machine
@@ -175,7 +175,7 @@ func (f *Frontend) InitMachineApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/machines",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewMachine())
+			f.List(c, &backend.Machine{})
 		})
 
 	// swagger:route POST /machines Machines createMachine
@@ -195,29 +195,29 @@ func (f *Frontend) InitMachineApi() {
 			// We don't use f.Create() because we need to be able to assign random
 			// UUIDs to new Machines without forcing the client to do so, yet allow them
 			// for testing purposes amd if they alrady have a UUID scheme for machines.
-			b := f.dt.NewMachine()
+			b := &backend.Machine{}
 			if !assureDecode(c, b) {
 				return
 			}
 			if b.Uuid == nil || len(b.Uuid) == 0 {
 				b.Uuid = uuid.NewRandom()
 			}
-			var res store.KeySaver
+			var res models.Model
 			var err error
 			func() {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("create")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("create")...)
 				defer unlocker()
-				_, err = f.dt.Create(d, b, nil)
+				_, err = f.dt.Create(d, b)
 			}()
 			if err != nil {
-				be, ok := err.(*backend.Error)
+				be, ok := err.(*models.Error)
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				s, ok := store.KeySaver(b).(Sanitizable)
+				s, ok := models.Model(b).(Sanitizable)
 				if ok {
 					res = s.Sanitize()
 				} else {
@@ -240,7 +240,7 @@ func (f *Frontend) InitMachineApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/machines/:uuid",
 		func(c *gin.Context) {
-			f.Fetch(c, f.dt.NewMachine(), c.Param(`uuid`))
+			f.Fetch(c, &backend.Machine{}, c.Param(`uuid`))
 		})
 
 	// swagger:route PATCH /machines/{uuid} Machines patchMachine
@@ -259,23 +259,12 @@ func (f *Frontend) InitMachineApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/machines/:uuid",
 		func(c *gin.Context) {
-			force := false
+			machine := &backend.Machine{}
+			backend.Fill(machine)
 			if c.Query("force") == "true" {
-				force = true
+				machine.ForceChange()
 			}
-			f.Patch(c, f.dt.NewMachine(), c.Param(`uuid`), func(d backend.Stores, old, new store.KeySaver) error {
-				oldm := backend.AsMachine(old)
-				newm := backend.AsMachine(new)
-
-				// If we are changing bootenvs and we aren't done running tasks,
-				// Fail unless the users marks a force
-				if oldm.BootEnv != newm.BootEnv && oldm.CurrentTask != len(oldm.Tasks) && !force {
-					e := &backend.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError}
-					e.Errorf("Can not change bootenvs with pending tasks unless forced")
-					return e
-				}
-				return nil
-			})
+			f.Patch(c, machine, c.Param(`uuid`))
 		})
 
 	// swagger:route PUT /machines/{uuid} Machines putMachine
@@ -293,23 +282,12 @@ func (f *Frontend) InitMachineApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/machines/:uuid",
 		func(c *gin.Context) {
-			force := false
+			machine := &backend.Machine{}
+			backend.Fill(machine)
 			if c.Query("force") == "true" {
-				force = true
+				machine.ForceChange()
 			}
-			f.Update(c, f.dt.NewMachine(), c.Param(`uuid`), func(d backend.Stores, old, new store.KeySaver) error {
-				oldm := backend.AsMachine(old)
-				newm := backend.AsMachine(new)
-
-				// If we are changing bootenvs and we aren't done running tasks,
-				// Fail unless the users marks a force
-				if oldm.BootEnv != newm.BootEnv && oldm.CurrentTask != len(oldm.Tasks) && !force {
-					e := &backend.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError}
-					e.Errorf("Can not change bootenvs with pending tasks unless forced")
-					return e
-				}
-				return nil
-			})
+			f.Update(c, machine, c.Param(`uuid`))
 		})
 
 	// swagger:route DELETE /machines/{uuid} Machines deleteMachine
@@ -325,9 +303,7 @@ func (f *Frontend) InitMachineApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/machines/:uuid",
 		func(c *gin.Context) {
-			b := f.dt.NewMachine()
-			b.Uuid = uuid.Parse(c.Param(`uuid`))
-			f.Remove(c, b, nil)
+			f.Remove(c, &backend.Machine{}, c.Param(`uuid`))
 		})
 
 	// swagger:route GET /machines/{uuid}/params Machines getMachineParams
@@ -344,15 +320,15 @@ func (f *Frontend) InitMachineApi() {
 	f.ApiGroup.GET("/machines/:uuid/params",
 		func(c *gin.Context) {
 			uuid := c.Param(`uuid`)
-			b := f.dt.NewMachine()
-			var ref store.KeySaver
+			b := &backend.Machine{}
+			var ref models.Model
 			func() {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("get")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("get")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 			}()
 			if ref == nil {
-				err := &backend.Error{
+				err := &models.Error{
 					Code:  http.StatusNotFound,
 					Type:  "API_ERROR",
 					Model: "machines",
@@ -386,15 +362,15 @@ func (f *Frontend) InitMachineApi() {
 				return
 			}
 			uuid := c.Param(`uuid`)
-			b := f.dt.NewMachine()
-			var ref store.KeySaver
+			b := &backend.Machine{}
+			var ref models.Model
 			func() {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("get")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("get")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 			}()
 			if ref == nil {
-				err := &backend.Error{
+				err := &models.Error{
 					Code:  http.StatusNotFound,
 					Type:  "API_ERROR",
 					Model: "machines",
@@ -416,7 +392,7 @@ func (f *Frontend) InitMachineApi() {
 				err = m.SetParams(d, val)
 			}()
 			if err != nil {
-				be, _ := err.(*backend.Error)
+				be, _ := err.(*models.Error)
 				c.JSON(be.Code, be)
 			} else {
 				c.JSON(http.StatusOK, val)
@@ -440,15 +416,15 @@ func (f *Frontend) InitMachineApi() {
 				return
 			}
 			uuid := c.Param(`uuid`)
-			b := f.dt.NewMachine()
-			var ref store.KeySaver
+			b := &backend.Machine{}
+			var ref models.Model
 			list := make([]*plugin.AvailableAction, 0, 0)
 			bad := func() bool {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("actions")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 				if ref == nil {
-					err := &backend.Error{
+					err := &models.Error{
 						Code:  http.StatusNotFound,
 						Type:  "API_ERROR",
 						Model: "machines",
@@ -492,15 +468,15 @@ func (f *Frontend) InitMachineApi() {
 				return
 			}
 			uuid := c.Param(`uuid`)
-			b := f.dt.NewMachine()
-			var ref store.KeySaver
+			b := &backend.Machine{}
+			var ref models.Model
 			var aa *plugin.AvailableAction
 			bad := func() bool {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("actions")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 				if ref == nil {
-					err := &backend.Error{
+					err := &models.Error{
 						Code:  http.StatusNotFound,
 						Type:  "API_ERROR",
 						Model: "machines",
@@ -511,7 +487,7 @@ func (f *Frontend) InitMachineApi() {
 					return true
 				}
 				m := backend.AsMachine(ref)
-				var err *backend.Error
+				var err *models.Error
 				aa, err = validateMachineAction(f, d, c.Param(`name`), m, make(map[string]interface{}, 0))
 				if err != nil {
 					c.JSON(err.Code, err)
@@ -550,14 +526,14 @@ func (f *Frontend) InitMachineApi() {
 			var aa *plugin.AvailableAction
 			ma := &plugin.MachineAction{Command: name, Params: val}
 
-			b := f.dt.NewMachine()
-			var ref store.KeySaver
+			b := &backend.Machine{}
+			var ref models.Model
 			bad := func() bool {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("actions")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 				if ref == nil {
-					err := &backend.Error{
+					err := &models.Error{
 						Code:  http.StatusNotFound,
 						Type:  "API_ERROR",
 						Model: "machines",
@@ -578,7 +554,7 @@ func (f *Frontend) InitMachineApi() {
 				ma.Address = m.Address
 				ma.BootEnv = m.BootEnv
 
-				var err *backend.Error
+				var err *models.Error
 				aa, err = validateMachineAction(f, d, name, m, val)
 				if err != nil {
 					c.JSON(err.Code, err)
@@ -594,7 +570,7 @@ func (f *Frontend) InitMachineApi() {
 			f.pubs.Publish("machines", name, uuid, ma)
 			err := aa.Run(ma)
 			if err != nil {
-				be, ok := err.(*backend.Error)
+				be, ok := err.(*models.Error)
 				if !ok {
 					c.JSON(409, err)
 				} else {
@@ -607,8 +583,8 @@ func (f *Frontend) InitMachineApi() {
 
 }
 
-func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backend.Machine, val map[string]interface{}) (*plugin.AvailableAction, *backend.Error) {
-	err := &backend.Error{
+func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backend.Machine, val map[string]interface{}) (*plugin.AvailableAction, *models.Error) {
+	err := &models.Error{
 		Code:  http.StatusBadRequest,
 		Type:  "API_ERROR",
 		Model: "machines",
@@ -645,7 +621,7 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 		} else {
 			pobj := d("params").Find(param)
 			if pobj != nil {
-				rp := pobj.(*backend.Param)
+				rp := backend.AsParam(pobj)
 
 				if ev := rp.ValidateValue(obj); ev != nil {
 					err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
@@ -675,7 +651,7 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 		if obj != nil {
 			pobj := d("params").Find(param)
 			if pobj != nil {
-				rp := pobj.(*backend.Param)
+				rp := backend.AsParam(pobj)
 
 				if ev := rp.ValidateValue(obj); ev != nil {
 					err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
@@ -684,7 +660,7 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 		}
 	}
 
-	if err.OrNil() == nil {
+	if err.HasError() == nil {
 		return aa, nil
 	}
 	return aa, err

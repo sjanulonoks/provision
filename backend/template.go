@@ -39,7 +39,7 @@ func (p *Template) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				tmpl := &Template{}
+				tmpl := fix(p.New())
 				tmpl.ID = s
 				return tmpl, nil
 			}),
@@ -48,10 +48,6 @@ func (p *Template) Indexes() map[string]index.Maker {
 
 func (t *Template) Backend() store.Store {
 	return t.p.getBackend(t)
-}
-
-func (t *Template) AuthKey() string {
-	return t.Key()
 }
 
 func (t *Template) New() store.KeySaver {

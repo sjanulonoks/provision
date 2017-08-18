@@ -47,7 +47,7 @@ func (p *Profile) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				profile := &Profile{}
+				profile := fix(p.New())
 				profile.Name = s
 				return profile, nil
 			}),
@@ -56,10 +56,6 @@ func (p *Profile) Indexes() map[string]index.Maker {
 
 func (p *Profile) Backend() store.Store {
 	return p.p.getBackend(p)
-}
-
-func (p *Profile) AuthKey() string {
-	return p.Key()
 }
 
 func (p *Profile) GetParams() map[string]interface{} {

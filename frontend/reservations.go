@@ -7,6 +7,7 @@ import (
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,14 +15,14 @@ import (
 // swagger:response
 type ReservationResponse struct {
 	// in: body
-	Body *backend.Reservation
+	Body *models.Reservation
 }
 
 // ReservationsResponse returned on a successful GET of all the reservations
 // swagger:response
 type ReservationsResponse struct {
 	//in: body
-	Body []*backend.Reservation
+	Body []*models.Reservation
 }
 
 // ReservationBodyParameter used to inject a Reservation
@@ -29,7 +30,7 @@ type ReservationsResponse struct {
 type ReservationBodyParameter struct {
 	// in: body
 	// required: true
-	Body *backend.Reservation
+	Body *models.Reservation
 }
 
 // ReservationPatchBodyParameter used to patch a Reservation
@@ -104,7 +105,7 @@ func (f *Frontend) InitReservationApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/reservations",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewReservation())
+			f.List(c, &backend.Reservation{})
 		})
 
 	// swagger:route POST /reservations Reservations createReservation
@@ -121,8 +122,8 @@ func (f *Frontend) InitReservationApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/reservations",
 		func(c *gin.Context) {
-			b := f.dt.NewReservation()
-			f.Create(c, b, nil)
+			b := &backend.Reservation{}
+			f.Create(c, b)
 		})
 
 	// swagger:route GET /reservations/{address} Reservations getReservation
@@ -142,11 +143,11 @@ func (f *Frontend) InitReservationApi() {
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError("API_ERROR", http.StatusBadRequest,
 						fmt.Sprintf("reservation get: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Fetch(c, f.dt.NewReservation(), backend.Hexaddr(ip))
+			f.Fetch(c, &backend.Reservation{}, models.Hexaddr(ip))
 		})
 
 	// swagger:route PATCH /reservations/{address} Reservations patchReservation
@@ -168,11 +169,11 @@ func (f *Frontend) InitReservationApi() {
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError("API_ERROR", http.StatusBadRequest,
 						fmt.Sprintf("reservation get: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Patch(c, f.dt.NewReservation(), backend.Hexaddr(ip), nil)
+			f.Patch(c, &backend.Reservation{}, models.Hexaddr(ip))
 		})
 
 	// swagger:route PUT /reservations/{address} Reservations putReservation
@@ -193,11 +194,11 @@ func (f *Frontend) InitReservationApi() {
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError("API_ERROR", http.StatusBadRequest,
 						fmt.Sprintf("reservation put: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Update(c, f.dt.NewReservation(), backend.Hexaddr(ip), nil)
+			f.Update(c, &backend.Reservation{}, models.Hexaddr(ip))
 		})
 
 	// swagger:route DELETE /reservations/{address} Reservations deleteReservation
@@ -214,14 +215,13 @@ func (f *Frontend) InitReservationApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/reservations/:address",
 		func(c *gin.Context) {
-			b := f.dt.NewReservation()
-			b.Addr = net.ParseIP(c.Param(`address`))
-			if b.Addr == nil {
+			addr := net.ParseIP(c.Param(`address`))
+			if addr == nil {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError("API_ERROR", http.StatusBadRequest,
 						fmt.Sprintf("reservation delete: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Remove(c, b, nil)
+			f.Remove(c, &backend.Reservation{}, models.Hexaddr(addr))
 		})
 }

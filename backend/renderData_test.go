@@ -121,7 +121,7 @@ func TestRenderData(t *testing.T) {
 			obj.Test(t, d)
 		}
 		machine = &Machine{}
-		fillEmpty(machine)
+		Fill(machine)
 		machine.Uuid = uuid.NewRandom()
 		machine.Name = "Test Name"
 		machine.Address = net.ParseIP("192.168.124.11")

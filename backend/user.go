@@ -33,15 +33,11 @@ func (p *User) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				u := &User{}
+				u := fix(p.New())
 				u.Name = s
 				return u, nil
 			}),
 	}
-}
-
-func (u *User) AuthKey() string {
-	return u.Key()
 }
 
 func (u *User) Backend() store.Store {

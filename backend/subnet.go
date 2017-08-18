@@ -56,7 +56,7 @@ func pickHint(s *Subnet, usedAddrs map[string]models.Model, token string, hint n
 	res, found := usedAddrs[hex]
 	if !found {
 		lease := &Lease{}
-		fillEmpty(lease)
+		Fill(lease)
 		lease.Addr, lease.Token, lease.Strategy = hint, token, s.Strategy
 		return lease, false
 	}
@@ -94,7 +94,7 @@ func pickNextFree(s *Subnet, usedAddrs map[string]models.Model, token string, hi
 		if _, ok := usedAddrs[hex]; !ok {
 			s.nextLeasableIP = addr
 			lease := &Lease{}
-			fillEmpty(lease)
+			Fill(lease)
 			lease.Addr, lease.Token, lease.Strategy = addr, token, s.Strategy
 			return lease, false
 		}
@@ -109,7 +109,7 @@ func pickNextFree(s *Subnet, usedAddrs map[string]models.Model, token string, hi
 		if _, ok := usedAddrs[hex]; !ok {
 			s.nextLeasableIP = addr
 			lease := &Lease{}
-			fillEmpty(lease)
+			Fill(lease)
 			lease.Addr, lease.Token, lease.Strategy = addr, token, s.Strategy
 			return lease, false
 		}
@@ -157,10 +157,9 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 						return fix(s).Name > refName
 					}
 			},
-			func(s string) (models.Model, error) {
-				sub := &Subnet{}
-				fillEmpty(sub)
-				sub.Name = s
+			func(st string) (models.Model, error) {
+				sub := fix(s.New())
+				sub.Name = st
 				return sub, nil
 			}),
 		"Strategy": index.Make(
@@ -176,10 +175,9 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 						return fix(s).Strategy > strategy
 					}
 			},
-			func(s string) (models.Model, error) {
-				sub := &Subnet{}
-				fillEmpty(sub)
-				sub.Strategy = s
+			func(st string) (models.Model, error) {
+				sub := fix(s.New())
+				sub.Strategy = st
 				return sub, nil
 			}),
 		"NextServer": index.Make(
@@ -205,13 +203,12 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 						return o.Cmp(addr) == 1
 					}
 			},
-			func(s string) (models.Model, error) {
-				addr := net.ParseIP(s)
+			func(st string) (models.Model, error) {
+				addr := net.ParseIP(st)
 				if addr == nil {
-					return nil, fmt.Errorf("Invalid Address: %s", s)
+					return nil, fmt.Errorf("Invalid Address: %s", st)
 				}
-				sub := &Subnet{}
-				fillEmpty(sub)
+				sub := fix(s.New())
 				sub.NextServer = addr
 				return sub, nil
 			}),
@@ -255,13 +252,12 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 						return o.Cmp(addr) == 1
 					}
 			},
-			func(s string) (models.Model, error) {
-				if _, _, err := net.ParseCIDR(s); err != nil {
-					return nil, fmt.Errorf("Invalid subnet CIDR: %s", s)
+			func(st string) (models.Model, error) {
+				if _, _, err := net.ParseCIDR(st); err != nil {
+					return nil, fmt.Errorf("Invalid subnet CIDR: %s", st)
 				}
-				sub := &Subnet{}
-				fillEmpty(sub)
-				sub.Subnet.Subnet = s
+				sub := fix(s.New())
+				sub.Subnet.Subnet = st
 				return sub, nil
 			}),
 		"Enabled": index.Make(
@@ -280,9 +276,9 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 						return fix(s).Enabled && !avail
 					}
 			},
-			func(s string) (models.Model, error) {
+			func(st string) (models.Model, error) {
 				res := &Subnet{Subnet: &models.Subnet{}}
-				switch s {
+				switch st {
 				case "true":
 					res.Enabled = true
 				case "false":
@@ -305,10 +301,6 @@ func (s *Subnet) subnet() *net.IPNet {
 	}
 	s.sn = res
 	return res
-}
-
-func (s *Subnet) AuthKey() string {
-	return s.Key()
 }
 
 func (s *Subnet) Backend() store.Store {

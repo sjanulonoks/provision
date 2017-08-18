@@ -35,10 +35,6 @@ func (p *Param) Backend() store.Store {
 	return p.p.getBackend(p)
 }
 
-func (p *Param) AuthKey() string {
-	return p.Key()
-}
-
 func (p *Param) New() store.KeySaver {
 	return &Param{Param: &models.Param{}}
 }
@@ -65,23 +61,15 @@ func (p *Param) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				param := &Param{}
+				param := fix(p.New())
 				param.Name = s
 				return param, nil
 			}),
 	}
 }
 
-func (p *Param) setValidator() {
-	schema, err := gojsonschema.NewSchema(gojsonschema.NewGoLoader(p.Schema))
-	if err != nil {
-		p.AddError(err)
-	}
-	p.validator = schema
-}
-
 func (p *Param) Validate() {
-	p.setValidator()
+	p.AddError(p.ValidateSchema())
 	p.SetValid()
 	p.SetAvailable()
 }
@@ -98,9 +86,16 @@ func (p *Param) BeforeSave() error {
 	// However, I don't feel like writing that code for now, so ignore the problem.
 }
 
+func (p *Param) OnLoad() error {
+	return p.BeforeSave()
+}
+
 func (p *Param) ValidateValue(val interface{}) error {
 	if !p.Useable() {
 		return p.MakeError(422, ValidationError, p)
+	}
+	if p.validator == nil {
+		p.validator, _ = gojsonschema.NewSchema(gojsonschema.NewGoLoader(p.Schema))
 	}
 	res, err := p.validator.Validate(gojsonschema.NewGoLoader(val))
 	if err != nil {

@@ -8,8 +8,8 @@ import (
 	"os"
 	"path"
 
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -87,7 +87,7 @@ func (f *Frontend) InitIsoApi() {
 			ents, err := ioutil.ReadDir(path.Join(f.FileRoot, "isos"))
 			if err != nil {
 				c.JSON(http.StatusNotFound,
-					backend.NewError("API ERROR", http.StatusNotFound, fmt.Sprintf("list: error listing isos: %v", err)))
+					models.NewError("API ERROR", http.StatusNotFound, fmt.Sprintf("list: error listing isos: %v", err)))
 				return
 			}
 			res := []string{}
@@ -170,7 +170,7 @@ func (f *Frontend) InitIsoApi() {
 			isoName := path.Join(f.FileRoot, `isos`, path.Base(name))
 			if err := os.Remove(isoName); err != nil {
 				c.JSON(http.StatusNotFound,
-					backend.NewError("API ERROR", http.StatusNotFound, fmt.Sprintf("delete: unable to delete %s", name)))
+					models.NewError("API ERROR", http.StatusNotFound, fmt.Sprintf("delete: unable to delete %s", name)))
 				return
 			}
 			c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
@@ -178,7 +178,8 @@ func (f *Frontend) InitIsoApi() {
 }
 
 func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
-	d, unloader := dt.LockEnts(store.KeySaver(dt.NewBootEnv()).(Lockable).Locks("update")...)
+	ref := &backend.BootEnv{}
+	d, unloader := dt.LockEnts(ref.Locks("update")...)
 	defer unloader()
 
 	for _, blob := range d("bootenvs").Items() {
@@ -187,39 +188,39 @@ func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
 			continue
 		}
 		env.Available = true
-		dt.Update(d, env, nil)
+		dt.Update(d, env)
 	}
 }
 
 func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 	if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
 		c.JSON(http.StatusUnsupportedMediaType,
-			backend.NewError("API ERROR", http.StatusUnsupportedMediaType,
+			models.NewError("API ERROR", http.StatusUnsupportedMediaType,
 				fmt.Sprintf("upload: iso %s must have content-type application/octet-stream", name)))
 		return
 	}
 	if c.Request.Body == nil {
 		c.JSON(http.StatusBadRequest,
-			backend.NewError("API ERROR", http.StatusBadRequest,
+			models.NewError("API ERROR", http.StatusBadRequest,
 				fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
 		return
 	}
 	if err := os.MkdirAll(path.Join(fileRoot, `isos`), 0755); err != nil {
 		c.JSON(http.StatusConflict,
-			backend.NewError("API_ERROR", http.StatusConflict, fmt.Sprintf("upload: unable to create isos directory")))
+			models.NewError("API_ERROR", http.StatusConflict, fmt.Sprintf("upload: unable to create isos directory")))
 		return
 	}
 	isoTmpName := path.Join(fileRoot, `isos`, fmt.Sprintf(`.%s.part`, path.Base(name)))
 	isoName := path.Join(fileRoot, `isos`, path.Base(name))
 	if _, err := os.Open(isoTmpName); err == nil {
 		c.JSON(http.StatusConflict,
-			backend.NewError("API ERROR", http.StatusConflict, fmt.Sprintf("upload: iso %s already uploading", name)))
+			models.NewError("API ERROR", http.StatusConflict, fmt.Sprintf("upload: iso %s already uploading", name)))
 		return
 	}
 	tgt, err := os.Create(isoTmpName)
 	if err != nil {
 		c.JSON(http.StatusConflict,
-			backend.NewError("API ERROR", http.StatusConflict, fmt.Sprintf("upload: Unable to upload %s: %v", name, err)))
+			models.NewError("API ERROR", http.StatusConflict, fmt.Sprintf("upload: Unable to upload %s: %v", name, err)))
 		return
 	}
 
@@ -228,14 +229,14 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 	if err != nil {
 		os.Remove(isoTmpName)
 		c.JSON(http.StatusInsufficientStorage,
-			backend.NewError("API ERROR",
+			models.NewError("API ERROR",
 				http.StatusInsufficientStorage, fmt.Sprintf("upload: Failed to upload %s: %v", name, err)))
 		return
 	}
 	if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
 		os.Remove(isoTmpName)
 		c.JSON(http.StatusBadRequest,
-			backend.NewError("API ERROR", http.StatusBadRequest,
+			models.NewError("API ERROR", http.StatusBadRequest,
 				fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes received", name, c.Request.ContentLength, copied)))
 		return
 	}

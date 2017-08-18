@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/http"
 	"path"
 	"strings"
 
@@ -57,7 +58,7 @@ func (n *Machine) Indexes() map[string]index.Maker {
 				if id == nil {
 					return nil, fmt.Errorf("Invalid UUID: %s", s)
 				}
-				m := &Machine{}
+				m := fix(n.New())
 				m.Uuid = id
 				return m, nil
 			}),
@@ -75,7 +76,7 @@ func (n *Machine) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				m := &Machine{}
+				m := fix(n.New())
 				m.Name = s
 				return m, nil
 			}),
@@ -93,7 +94,7 @@ func (n *Machine) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				m := &Machine{}
+				m := fix(n.New())
 				m.BootEnv = s
 				return m, nil
 			}),
@@ -125,7 +126,7 @@ func (n *Machine) Indexes() map[string]index.Maker {
 				if addr == nil {
 					return nil, fmt.Errorf("Invalid address: %s", s)
 				}
-				m := &Machine{}
+				m := fix(n.New())
 				m.Address = addr
 				return m, nil
 			}),
@@ -146,7 +147,7 @@ func (n *Machine) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				res := &Machine{}
+				res := fix(n.New())
 				switch s {
 				case "true":
 					res.Runnable = true
@@ -267,7 +268,7 @@ func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error
 				}
 		},
 		func(s string) (models.Model, error) {
-			res := &Machine{}
+			res := fix(n.New())
 			res.Profile = models.Profile{Params: map[string]interface{}{}}
 
 			var obj interface{}
@@ -304,10 +305,6 @@ func (n *Machine) ShortName() string {
 
 func (n *Machine) Path() string {
 	return path.Join(n.Prefix(), n.UUID())
-}
-
-func (n *Machine) AuthKey() string {
-	return n.Key()
 }
 
 func (n *Machine) HasProfile(name string) bool {
@@ -458,7 +455,15 @@ func (n *Machine) OnLoad() error {
 }
 
 func (n *Machine) OnChange(oldThing store.KeySaver) error {
+	oldm := AsMachine(oldThing)
 	n.oldBootEnv = AsMachine(oldThing).BootEnv
+	// If we are changing bootenvs and we aren't done running tasks,
+	// Fail unless the users marks a force
+	if n.oldBootEnv != n.BootEnv && oldm.CurrentTask != len(oldm.Tasks) && !n.ChangeForced() {
+		e := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
+		e.Errorf("Can not change bootenvs with pending tasks unless forced")
+		return e
+	}
 	return nil
 }
 

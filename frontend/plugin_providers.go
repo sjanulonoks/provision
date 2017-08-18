@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/provision/plugin"
 	"github.com/gin-gonic/gin"
 )
@@ -90,7 +90,7 @@ func (f *Frontend) InitPluginProviderApi() {
 				c.JSON(http.StatusOK, pp)
 			} else {
 				c.JSON(http.StatusNotFound,
-					backend.NewError("API_ERROR", http.StatusNotFound,
+					models.NewError("API_ERROR", http.StatusNotFound,
 						fmt.Sprintf("plugin provider get: not found: %s", c.Param(`name`))))
 			}
 
@@ -147,7 +147,7 @@ func (f *Frontend) InitPluginProviderApi() {
 			}
 			if err := f.pc.RemovePlugin(name); err != nil {
 				c.JSON(http.StatusNotFound,
-					backend.NewError("API ERROR", http.StatusNotFound, fmt.Sprintf("delete: unable to delete %s", name)))
+					models.NewError("API ERROR", http.StatusNotFound, fmt.Sprintf("delete: unable to delete %s", name)))
 				return
 			}
 			c.Data(http.StatusNoContent, gin.MIMEJSON, nil)

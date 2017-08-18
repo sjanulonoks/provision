@@ -7,6 +7,7 @@ import (
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,14 +15,14 @@ import (
 // swagger:response
 type LeaseResponse struct {
 	// in: body
-	Body *backend.Lease
+	Body *models.Lease
 }
 
 // LeasesResponse returned on a successful GET of all the leases
 // swagger:response
 type LeasesResponse struct {
 	//in: body
-	Body []*backend.Lease
+	Body []*models.Lease
 }
 
 // LeaseBodyParameter used to inject a Lease
@@ -29,7 +30,7 @@ type LeasesResponse struct {
 type LeaseBodyParameter struct {
 	// in: body
 	// required: true
-	Body *backend.Lease
+	Body *models.Lease
 }
 
 // LeasePatchBodyParameter used to patch a Lease
@@ -104,7 +105,7 @@ func (f *Frontend) InitLeaseApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/leases",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewLease())
+			f.List(c, &backend.Lease{})
 		})
 
 	// swagger:route POST /leases Leases createLease
@@ -121,8 +122,8 @@ func (f *Frontend) InitLeaseApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/leases",
 		func(c *gin.Context) {
-			b := f.dt.NewLease()
-			f.Create(c, b, nil)
+			b := &backend.Lease{}
+			f.Create(c, b)
 		})
 	// swagger:route GET /leases/{address} Leases getLease
 	//
@@ -141,11 +142,11 @@ func (f *Frontend) InitLeaseApi() {
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError("API_ERROR", http.StatusBadRequest,
 						fmt.Sprintf("lease get: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Fetch(c, f.dt.NewLease(), backend.Hexaddr(ip))
+			f.Fetch(c, &backend.Lease{}, models.Hexaddr(ip))
 		})
 
 	// swagger:route PATCH /leases/{address} Leases patchLease
@@ -167,11 +168,11 @@ func (f *Frontend) InitLeaseApi() {
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError("API_ERROR", http.StatusBadRequest,
 						fmt.Sprintf("lease get: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Patch(c, f.dt.NewLease(), backend.Hexaddr(ip), nil)
+			f.Patch(c, &backend.Lease{}, models.Hexaddr(ip))
 		})
 
 	// swagger:route PUT /leases/{address} Leases putLease
@@ -192,11 +193,11 @@ func (f *Frontend) InitLeaseApi() {
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError("API_ERROR", http.StatusBadRequest,
 						fmt.Sprintf("lease put: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Update(c, f.dt.NewLease(), backend.Hexaddr(ip), nil)
+			f.Update(c, &backend.Lease{}, models.Hexaddr(ip))
 		})
 
 	// swagger:route DELETE /leases/{address} Leases deleteLease
@@ -213,14 +214,13 @@ func (f *Frontend) InitLeaseApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/leases/:address",
 		func(c *gin.Context) {
-			b := f.dt.NewLease()
-			b.Addr = net.ParseIP(c.Param(`address`))
-			if b.Addr == nil {
+			addr := net.ParseIP(c.Param(`address`))
+			if addr == nil {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError("API_ERROR", http.StatusBadRequest,
 						fmt.Sprintf("lease delete: address not valid: %v", c.Param(`address`))))
 				return
 			}
-			f.Remove(c, b, nil)
+			f.Remove(c, &backend.Lease{}, models.Hexaddr(addr))
 		})
 }

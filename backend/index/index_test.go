@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
 

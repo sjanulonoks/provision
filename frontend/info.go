@@ -5,8 +5,8 @@ import (
 	"runtime"
 
 	"github.com/digitalrebar/provision"
-	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -48,7 +48,7 @@ type InfoResponse struct {
 	Body *Info
 }
 
-func (f *Frontend) GetInfo(drpid string) (*Info, *backend.Error) {
+func (f *Frontend) GetInfo(drpid string) (*Info, *models.Error) {
 	i := &Info{
 		Arch:               runtime.GOARCH,
 		Os:                 runtime.GOOS,
@@ -62,7 +62,7 @@ func (f *Frontend) GetInfo(drpid string) (*Info, *backend.Error) {
 		Stats:              make([]*Stat, 0, 0),
 	}
 
-	res := &backend.Error{
+	res := &models.Error{
 		Code:  http.StatusInternalServerError,
 		Type:  "API_ERROR",
 		Model: "info",
@@ -73,19 +73,19 @@ func (f *Frontend) GetInfo(drpid string) (*Info, *backend.Error) {
 		defer unlocker()
 
 		if idx, err := index.All(index.Native())(&d("machines").Index); err != nil {
-			res.Merge(err)
+			res.AddError(err)
 		} else {
 			i.Stats = append(i.Stats, &Stat{"machines.count", idx.Count()})
 		}
 
 		if idx, err := index.All(index.Native())(&d("subnets").Index); err != nil {
-			res.Merge(err)
+			res.AddError(err)
 		} else {
 			i.Stats = append(i.Stats, &Stat{"subnets.count", idx.Count()})
 		}
 	}()
 
-	if res.OrNil() == nil {
+	if res.HasError() == nil {
 		res = nil
 	}
 

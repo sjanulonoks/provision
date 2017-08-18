@@ -36,7 +36,7 @@ func (n *Plugin) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				plugin := &Plugin{}
+				plugin := fix(n.New())
 				plugin.Name = s
 				return plugin, nil
 			}),
@@ -54,7 +54,7 @@ func (n *Plugin) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				plugin := &Plugin{}
+				plugin := fix(n.New())
 				plugin.Provider = s
 				return plugin, nil
 			}),
@@ -71,10 +71,6 @@ func (n *Plugin) Prefix() string {
 
 func (n *Plugin) Key() string {
 	return n.Name
-}
-
-func (n *Plugin) AuthKey() string {
-	return n.Key()
 }
 
 func (n *Plugin) GetParams() map[string]interface{} {

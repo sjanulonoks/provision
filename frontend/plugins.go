@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,14 +13,14 @@ import (
 // swagger:response
 type PluginResponse struct {
 	// in: body
-	Body *backend.Plugin
+	Body *models.Plugin
 }
 
 // PluginsResponse return on a successful GET of all Plugins
 // swagger:response
 type PluginsResponse struct {
 	// in: body
-	Body []*backend.Plugin
+	Body []*models.Plugin
 }
 
 // PluginParamsResponse return on a successful GET of all Plugin's Params
@@ -35,7 +35,7 @@ type PluginParamsResponse struct {
 type PluginBodyParameter struct {
 	// in: body
 	// required: true
-	Body *backend.Plugin
+	Body *models.Plugin
 }
 
 // PluginPatchBodyParameter used to patch a Plugin
@@ -111,7 +111,7 @@ func (f *Frontend) InitPluginApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/plugins",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewPlugin())
+			f.List(c, &backend.Plugin{})
 		})
 
 	// swagger:route POST /plugins Plugins createPlugin
@@ -131,26 +131,26 @@ func (f *Frontend) InitPluginApi() {
 			// We don't use f.Create() because we need to be able to assign random
 			// UUIDs to new Plugins without forcing the client to do so, yet allow them
 			// for testing purposes amd if they alrady have a UUID scheme for plugins.
-			b := f.dt.NewPlugin()
+			b := &backend.Plugin{}
 			if !assureDecode(c, b) {
 				return
 			}
-			var res store.KeySaver
+			var res models.Model
 			var err error
 			func() {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("create")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("create")...)
 				defer unlocker()
-				_, err = f.dt.Create(d, b, nil)
+				_, err = f.dt.Create(d, b)
 			}()
 			if err != nil {
-				be, ok := err.(*backend.Error)
+				be, ok := err.(*models.Error)
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				s, ok := store.KeySaver(b).(Sanitizable)
+				s, ok := models.Model(b).(Sanitizable)
 				if ok {
 					res = s.Sanitize()
 				} else {
@@ -173,7 +173,7 @@ func (f *Frontend) InitPluginApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/plugins/:name",
 		func(c *gin.Context) {
-			f.Fetch(c, f.dt.NewPlugin(), c.Param(`name`))
+			f.Fetch(c, &backend.Plugin{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /plugins/{name} Plugins patchPlugin
@@ -192,7 +192,7 @@ func (f *Frontend) InitPluginApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/plugins/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewPlugin(), c.Param(`name`), nil)
+			f.Patch(c, &backend.Plugin{}, c.Param(`name`))
 		})
 
 	// swagger:route PUT /plugins/{name} Plugins putPlugin
@@ -210,7 +210,7 @@ func (f *Frontend) InitPluginApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/plugins/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewPlugin(), c.Param(`name`), nil)
+			f.Update(c, &backend.Plugin{}, c.Param(`name`))
 		})
 
 	// swagger:route DELETE /plugins/{name} Plugins deletePlugin
@@ -226,9 +226,7 @@ func (f *Frontend) InitPluginApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/plugins/:name",
 		func(c *gin.Context) {
-			b := f.dt.NewPlugin()
-			b.Name = c.Param(`name`)
-			f.Remove(c, b, nil)
+			f.Remove(c, &backend.Plugin{}, c.Param(`name`))
 		})
 
 	// swagger:route GET /plugins/{name}/params Plugins getPluginParams
@@ -245,15 +243,15 @@ func (f *Frontend) InitPluginApi() {
 	f.ApiGroup.GET("/plugins/:name/params",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
-			b := f.dt.NewPlugin()
-			var ref store.KeySaver
+			b := &backend.Plugin{}
+			var ref models.Model
 			func() {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("get")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("get")...)
 				defer unlocker()
 				ref = d("plugins").Find(name)
 			}()
 			if ref == nil {
-				err := &backend.Error{
+				err := &models.Error{
 					Code:  http.StatusNotFound,
 					Type:  "API_ERROR",
 					Model: "plugins",
@@ -287,15 +285,15 @@ func (f *Frontend) InitPluginApi() {
 				return
 			}
 			name := c.Param(`name`)
-			b := f.dt.NewPlugin()
-			var ref store.KeySaver
+			b := &backend.Plugin{}
+			var ref models.Model
 			func() {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("get")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("get")...)
 				defer unlocker()
 				ref = d("plugins").Find(name)
 			}()
 			if ref == nil {
-				err := &backend.Error{
+				err := &models.Error{
 					Code:  http.StatusNotFound,
 					Type:  "API_ERROR",
 					Model: "plugins",
@@ -317,7 +315,7 @@ func (f *Frontend) InitPluginApi() {
 				err = m.SetParams(d, val)
 			}()
 			if err != nil {
-				be, _ := err.(*backend.Error)
+				be, _ := err.(*models.Error)
 				c.JSON(be.Code, be)
 			} else {
 				c.JSON(http.StatusOK, val)

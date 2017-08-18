@@ -36,10 +36,6 @@ func (t *Task) Backend() store.Store {
 	return t.p.getBackend(t)
 }
 
-func (t *Task) AuthKey() string {
-	return t.Key()
-}
-
 func (t *Task) New() store.KeySaver {
 	return &Task{Task: &models.Task{}}
 }
@@ -66,7 +62,7 @@ func (t *Task) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				task := &Task{}
+				task := fix(t.New())
 				task.Name = s
 				return task, nil
 			}),
@@ -75,7 +71,7 @@ func (t *Task) Indexes() map[string]index.Maker {
 
 func (t *Task) genRoot(common *template.Template, e models.ErrorAdder) *template.Template {
 	res := models.MergeTemplates(common, t.Templates, e)
-	if e.HasError != nil {
+	if e.HasError() != nil {
 		return nil
 	}
 	return res

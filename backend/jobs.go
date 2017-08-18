@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -59,19 +60,6 @@ type Job struct {
 	oldState string
 }
 
-// Job Action is something that job runner will need to do.
-// If path is specified, then the runner will place the contents into that location.
-// If path is not specified, then the runner will attempt to bash exec the contents.
-// swagger:model
-type JobAction struct {
-	// required: true
-	Name string
-	// required: true
-	Path string
-	// required: true
-	Content string
-}
-
 func AsJob(o models.Model) *Job {
 	return o.(*Job)
 }
@@ -86,10 +74,6 @@ func AsJobs(o []models.Model) []*Job {
 
 func (j *Job) Backend() store.Store {
 	return j.p.getBackend(j)
-}
-
-func (j *Job) AuthKey() string {
-	return j.Machine.String()
 }
 
 func (j *Job) New() store.KeySaver {
@@ -126,7 +110,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 				if id == nil {
 					return nil, fmt.Errorf("Invalid UUID: %s", s)
 				}
-				job := &Job{}
+				job := fix(j.New())
 				job.Uuid = id
 				return job, nil
 			}),
@@ -144,7 +128,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				job := &Job{}
+				job := fix(j.New())
 				job.BootEnv = s
 				return job, nil
 			}),
@@ -162,7 +146,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				job := &Job{}
+				job := fix(j.New())
 				job.Task = s
 				return job, nil
 			}),
@@ -180,7 +164,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				job := &Job{}
+				job := fix(j.New())
 				job.State = s
 				return job, nil
 			}),
@@ -202,7 +186,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 				if id == nil {
 					return nil, fmt.Errorf("Invalid UUID: %s", s)
 				}
-				job := &Job{}
+				job := fix(j.New())
 				job.Machine = id
 				return job, nil
 			}),
@@ -223,7 +207,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				res := &Job{}
+				res := fix(j.New())
 				switch s {
 				case "true":
 					res.Archived = true
@@ -255,7 +239,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 				if err != nil {
 					return nil, err
 				}
-				job := &Job{}
+				job := fix(j.New())
 				job.StartTime = parsedTime
 				return job, nil
 			}),
@@ -280,7 +264,7 @@ func (j *Job) Indexes() map[string]index.Maker {
 				if err != nil {
 					return nil, err
 				}
-				job := &Job{}
+				job := fix(j.New())
 				job.EndTime = parsedTime
 				return job, nil
 			}),
@@ -396,7 +380,7 @@ func (j *Job) BeforeDelete() error {
 	return e.HasError()
 }
 
-func (j *Job) RenderActions() ([]*JobAction, error) {
+func (j *Job) RenderActions() ([]*models.JobAction, error) {
 	renderers, addr, e := func() (renderers, net.IP, error) {
 		d, unlocker := j.p.LockEnts(j.Locks("actions")...)
 		defer unlocker()
@@ -429,12 +413,13 @@ func (j *Job) RenderActions() ([]*JobAction, error) {
 
 		return renderers, m.Address, nil
 	}()
+	log.Printf("%#v, %#v, %#v", renderers, addr, e)
 	if e != nil {
 		return nil, e
 	}
 
 	err := &models.Error{}
-	actions := []*JobAction{}
+	actions := []*models.JobAction{}
 	for _, r := range renderers {
 		rr, err1 := r.write(addr)
 		if err1 != nil {
@@ -444,7 +429,7 @@ func (j *Job) RenderActions() ([]*JobAction, error) {
 			if err2 != nil {
 				err.AddError(err2)
 			} else {
-				na := &JobAction{Name: r.name, Path: r.path, Content: string(b)}
+				na := &models.JobAction{Name: r.name, Path: r.path, Content: string(b)}
 				actions = append(actions, na)
 			}
 		}

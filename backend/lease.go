@@ -52,7 +52,7 @@ func (l *Lease) Indexes() map[string]index.Maker {
 				if ip == nil {
 					return nil, errors.New("Addr must be an IP address")
 				}
-				lease := &Lease{}
+				lease := fix(l.New())
 				lease.Addr = ip
 				return lease, nil
 			}),
@@ -70,7 +70,7 @@ func (l *Lease) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				lease := &Lease{}
+				lease := fix(l.New())
 				lease.Token = s
 				return lease, nil
 			}),
@@ -88,7 +88,7 @@ func (l *Lease) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				lease := &Lease{}
+				lease := fix(l.New())
 				lease.Strategy = s
 				return lease, nil
 			}),
@@ -111,7 +111,7 @@ func (l *Lease) Indexes() map[string]index.Maker {
 				if err := t.UnmarshalText([]byte(s)); err != nil {
 					return nil, fmt.Errorf("ExpireTime is not valid: %v", err)
 				}
-				lease := &Lease{}
+				lease := fix(l.New())
 				lease.ExpireTime = *t
 				return lease, nil
 			}),
@@ -135,10 +135,6 @@ func (l *Lease) Reservation(d Stores) *Reservation {
 		return nil
 	}
 	return AsReservation(r)
-}
-
-func (l *Lease) AuthKey() string {
-	return l.Key()
 }
 
 func (l *Lease) Backend() store.Store {

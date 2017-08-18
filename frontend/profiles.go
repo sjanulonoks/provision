@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,14 +13,14 @@ import (
 // swagger:response
 type ProfileResponse struct {
 	// in: body
-	Body *backend.Profile
+	Body *models.Profile
 }
 
 // ProfilesResponse returned on a successful GET of all the profiles
 // swagger:response
 type ProfilesResponse struct {
 	//in: body
-	Body []*backend.Profile
+	Body []*models.Profile
 }
 
 // ProfileParamsResponse return on a successful GET of all Profile's Params
@@ -35,7 +35,7 @@ type ProfileParamsResponse struct {
 type ProfileBodyParameter struct {
 	// in: body
 	// required: true
-	Body *backend.Profile
+	Body *models.Profile
 }
 
 // ProfilePatchBodyParameter used to patch a Profile
@@ -107,7 +107,7 @@ func (f *Frontend) InitProfileApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/profiles",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewProfile())
+			f.List(c, &backend.Profile{})
 		})
 
 	// swagger:route POST /profiles Profiles createProfile
@@ -124,8 +124,8 @@ func (f *Frontend) InitProfileApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/profiles",
 		func(c *gin.Context) {
-			b := f.dt.NewProfile()
-			f.Create(c, b, nil)
+			b := &backend.Profile{}
+			f.Create(c, b)
 		})
 	// swagger:route GET /profiles/{name} Profiles getProfile
 	//
@@ -140,7 +140,7 @@ func (f *Frontend) InitProfileApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/profiles/:name",
 		func(c *gin.Context) {
-			f.Fetch(c, f.dt.NewProfile(), c.Param(`name`))
+			f.Fetch(c, &backend.Profile{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /profiles/{name} Profiles patchProfile
@@ -159,7 +159,7 @@ func (f *Frontend) InitProfileApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/profiles/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewProfile(), c.Param(`name`), nil)
+			f.Patch(c, &backend.Profile{}, c.Param(`name`))
 		})
 
 	// swagger:route PUT /profiles/{name} Profiles putProfile
@@ -177,7 +177,7 @@ func (f *Frontend) InitProfileApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/profiles/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewProfile(), c.Param(`name`), nil)
+			f.Update(c, &backend.Profile{}, c.Param(`name`))
 		})
 
 	// swagger:route DELETE /profiles/{name} Profiles deleteProfile
@@ -193,9 +193,7 @@ func (f *Frontend) InitProfileApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/profiles/:name",
 		func(c *gin.Context) {
-			b := f.dt.NewProfile()
-			b.Name = c.Param(`name`)
-			f.Remove(c, b, nil)
+			f.Remove(c, &backend.Profile{}, c.Param(`name`))
 		})
 
 	// swagger:route GET /profiles/{name}/params Profiles getProfileParams
@@ -212,15 +210,15 @@ func (f *Frontend) InitProfileApi() {
 	f.ApiGroup.GET("/profiles/:name/params",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
-			var res store.KeySaver
-			tp := f.dt.NewProfile()
+			var res models.Model
+			tp := &backend.Profile{}
 			func() {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(tp).(Lockable).Locks("get")...)
+				d, unlocker := f.dt.LockEnts(models.Model(tp).(Lockable).Locks("get")...)
 				defer unlocker()
 				res = d("profiles").Find(name)
 			}()
 			if res == nil {
-				err := &backend.Error{
+				err := &models.Error{
 					Code:  http.StatusNotFound,
 					Type:  "API_ERROR",
 					Model: "profiles",
@@ -254,15 +252,15 @@ func (f *Frontend) InitProfileApi() {
 				return
 			}
 			name := c.Param(`name`)
-			var res store.KeySaver
-			tp := f.dt.NewProfile()
+			var res models.Model
+			tp := &backend.Profile{}
 			func() {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(tp).(Lockable).Locks("get")...)
+				d, unlocker := f.dt.LockEnts(models.Model(tp).(Lockable).Locks("get")...)
 				defer unlocker()
 				res = d("profiles").Find(name)
 			}()
 			if res == nil {
-				err := &backend.Error{
+				err := &models.Error{
 					Code:  http.StatusNotFound,
 					Type:  "API_ERROR",
 					Model: "profiles",
@@ -283,7 +281,7 @@ func (f *Frontend) InitProfileApi() {
 				err = m.SetParams(d, val)
 			}()
 			if err != nil {
-				be, _ := err.(*backend.Error)
+				be, _ := err.(*models.Error)
 				c.JSON(be.Code, be)
 			} else {
 				c.JSON(http.StatusOK, val)

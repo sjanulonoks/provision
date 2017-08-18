@@ -34,15 +34,11 @@ func (p *Pref) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				pref := &Pref{}
+				pref := fix(p.New())
 				pref.Name = s
 				return pref, nil
 			}),
 	}
-}
-
-func (p *Pref) AuthKey() string {
-	return p.Key()
 }
 
 func (p *Pref) Backend() store.Store {

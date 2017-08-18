@@ -63,7 +63,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				res := &BootEnv{}
+				res := fix(b.New())
 				res.Name = s
 				return res, nil
 			}),
@@ -84,7 +84,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				res := &BootEnv{}
+				res := fix(b.New())
 				switch s {
 				case "true":
 					res.Available = true
@@ -112,7 +112,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 					}
 			},
 			func(s string) (models.Model, error) {
-				res := &BootEnv{}
+				res := fix(b.New())
 				switch s {
 				case "true":
 					res.OnlyUnknown = true
@@ -327,10 +327,6 @@ func (b *BootEnv) OnLoad() error {
 	return nil
 }
 
-func (b *BootEnv) AuthKey() string {
-	return b.Key()
-}
-
 func (b *BootEnv) New() store.KeySaver {
 	return &BootEnv{BootEnv: &models.BootEnv{}}
 }
@@ -381,10 +377,6 @@ func (b *BootEnv) AfterDelete() {
 			rts.deregister(b.p.FS)
 		}
 	}
-}
-
-func (p *DataTracker) NewBootEnv() *BootEnv {
-	return &BootEnv{p: p}
 }
 
 func AsBootEnv(o models.Model) *BootEnv {

@@ -143,7 +143,7 @@ func findViaReservation(leases, reservations *Store, strat, token string, req ne
 	// either there is no lease for this token or that the old lease has been NAK'ed.
 	// We are free to create a new lease for this Reservation.
 	lease = &Lease{}
-	fillEmpty(lease)
+	Fill(lease)
 	lease.Addr = reservation.Addr
 	lease.Strategy = reservation.Strategy
 	lease.Token = reservation.Token
