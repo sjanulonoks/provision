@@ -686,7 +686,8 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			"debugDhcp",
 			"debugRenderer",
 			"debugBootEnv",
-			"debugFrontend":
+			"debugFrontend",
+			"debugPlugins":
 			if intCheck(name, val) {
 				savePref(name, val)
 			}

@@ -135,7 +135,6 @@ func buildKeys(certFile, keyFile string) {
 	}
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	certOut.Close()
-	log.Print("written cert.pem\n")
 
 	keyOut, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
@@ -144,5 +143,4 @@ func buildKeys(certFile, keyFile string) {
 	}
 	pem.Encode(keyOut, pemBlockForKey(priv))
 	keyOut.Close()
-	log.Print("written key.pem\n")
 }

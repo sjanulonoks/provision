@@ -77,6 +77,7 @@ type ProgOpts struct {
 	DebugDhcp     int    `long:"debug-dhcp" description:"Debug level for the DHCP Server - 0 = off, 1 = info, 2 = debug" default:"0"`
 	DebugRenderer int    `long:"debug-renderer" description:"Debug level for the Template Renderer - 0 = off, 1 = info, 2 = debug" default:"0"`
 	DebugFrontend int    `long:"debug-frontend" description:"Debug level for the Frontend - 0 = off, 1 = info, 2 = debug" default:"1"`
+	DebugPlugins  int    `long:"debug-plugins" description:"Debug level for the Plug-in layer - 0 = off, 1 = info, 2 = debug" default:"0"`
 	TlsKeyFile    string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
 	TlsCertFile   string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
 	DrpId         string `long:"drp-id" description:"The id of this Digital Rebar Provision instance" default:""`
@@ -151,6 +152,7 @@ func Server(c_opts *ProgOpts) {
 			"debugDhcp":           fmt.Sprintf("%d", c_opts.DebugDhcp),
 			"debugRenderer":       fmt.Sprintf("%d", c_opts.DebugRenderer),
 			"debugFrontend":       fmt.Sprintf("%d", c_opts.DebugFrontend),
+			"debugPlugins":        fmt.Sprintf("%d", c_opts.DebugPlugins),
 			"defaultBootEnv":      c_opts.DefaultBootEnv,
 			"unknownBootEnv":      c_opts.UnknownBootEnv,
 			"knownTokenTimeout":   fmt.Sprintf("%d", c_opts.KnownTokenTimeout),
@@ -180,7 +182,7 @@ func Server(c_opts *ProgOpts) {
 		}
 	}
 
-	pc, err := plugin.InitPluginController(c_opts.PluginRoot, dt, logger, publishers, c_opts.ApiPort)
+	pc, err := plugin.InitPluginController(c_opts.PluginRoot, dt, publishers, c_opts.ApiPort)
 	if err != nil {
 		logger.Fatalf("Error starting plugin service: %v", err)
 	} else {
