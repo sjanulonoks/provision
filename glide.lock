@@ -12,7 +12,7 @@ imports:
 - name: github.com/dgrijalva/jwt-go
   version: a539ee1a749a2b895533f979515ac7e6e0f5b650
 - name: github.com/digitalrebar/store
-  version: 56067c8a1161608a0e61a0b76eff74276caf1376
+  version: 9ab808871d9f583c1118d2cd083c749454b154a0
 - name: github.com/elazarl/go-bindata-assetfs
   version: 30f82fa23fd844bd5bb1e5f216db87fd77b5eb43
 - name: github.com/elithrar/simple-scrypt
