@@ -161,7 +161,11 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, ap
 		}
 	}
 
-	mgmtApi := gin.Default()
+	mgmtApi := gin.New()
+	if dt.DebugLevel("debugFrontend") > 0 {
+		mgmtApi.Use(gin.Logger())
+	}
+	mgmtApi.Use(gin.Recovery())
 
 	// CORS Support
 	mgmtApi.Use(cors.New(cors.Config{

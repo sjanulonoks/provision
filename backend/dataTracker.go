@@ -47,7 +47,38 @@ localboot 0
 				Name: `ipxe`,
 				Path: `default.ipxe`,
 				Contents: `#!ipxe
-chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
+exit
+`,
+			},
+		},
+	}
+
+	localBoot = &BootEnv{
+		Name:        "local",
+		Description: "The boot environment you should use to have known machines boot off their local hard drive",
+		OS:          OsInfo{Name: "local"},
+		OnlyUnknown: false,
+		Templates: []TemplateInfo{
+			{
+				Name: "pxelinux",
+				Path: "pxelinux.cfg/{{.Machine.HexAddress}}",
+				Contents: `DEFAULT local
+PROMPT 0
+TIMEOUT 10
+LABEL local
+localboot 0
+`,
+			},
+			{
+				Name:     "elilo",
+				Path:     "{{.Machine.HexAddress}}.conf",
+				Contents: "exit",
+			},
+			{
+				Name: "ipxe",
+				Path: "{{.Machine.Address}}.ipxe",
+				Contents: `#!ipxe
+exit
 `,
 			},
 		},
@@ -535,6 +566,9 @@ func NewDataTracker(backend store.Store,
 	if d("bootenvs").Find("ignore") == nil {
 		res.Create(d, ignoreBoot)
 	}
+	if d("bootenvs").Find(localBoot.Key()) == nil {
+		res.Create(d, localBoot, nil)
+	}
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)
 		res.runningPrefs[pref.Name] = pref.Val
@@ -651,7 +685,8 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			"knownTokenTimeout",
 			"debugDhcp",
 			"debugRenderer",
-			"debugBootEnv":
+			"debugBootEnv",
+			"debugFrontend":
 			if intCheck(name, val) {
 				savePref(name, val)
 			}
@@ -884,16 +919,25 @@ func (p *DataTracker) Printf(f string, args ...interface{}) {
 	p.Logger.Printf(f, args...)
 }
 
-func (p *DataTracker) Infof(pref, f string, args ...interface{}) {
+func (p *DataTracker) DebugLevel(pref string) int {
 	debugLevel := 0
 	d2, e := strconv.Atoi(p.pref(pref))
 	if e == nil {
 		debugLevel = d2
 	}
-	if debugLevel > 0 {
+	return debugLevel
+}
+
+func (p *DataTracker) printlevelf(pref string, level int, f string, args ...interface{}) {
+	debugLevel := p.DebugLevel(pref)
+	if debugLevel >= level {
 		p.Logger.Printf(f, args...)
 	}
 }
+
+func (p *DataTracker) Infof(pref, f string, args ...interface{}) {
+	p.printlevelf(pref, 1, f, args...)
+}
 func (p *DataTracker) Debugf(pref, f string, args ...interface{}) {
-	p.Infof(pref, f, args...)
+	p.printlevelf(pref, 2, f, args...)
 }

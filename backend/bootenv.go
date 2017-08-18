@@ -111,7 +111,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 				unknown := fix(ref).OnlyUnknown
 				return func(s models.Model) bool {
 						v := fix(s).OnlyUnknown
-						return v || (v && unknown)
+						return v || (v == unknown)
 					},
 					func(s models.Model) bool {
 						return fix(s).OnlyUnknown && !unknown
