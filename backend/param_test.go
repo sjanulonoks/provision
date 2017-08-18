@@ -1,27 +1,31 @@
 package backend
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/digitalrebar/provision/models"
+)
 
 func TestParamsCrud(t *testing.T) {
 	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("profiles", "params")
 	defer unlocker()
 	tests := []crudTest{
-		{"Create empty profile", dt.Create, &Param{p: dt}, false, nil},
-		{"Create new profile with name", dt.Create, &Param{p: dt, Name: "Test Param"}, false, nil},
-		{"Create new profile with name and schema", dt.Create, &Param{p: dt,
+		{"Create empty profile", dt.Create, &models.Param{}, false},
+		{"Create new profile with name", dt.Create, &models.Param{Name: "Test Param"}, false},
+		{"Create new profile with name and schema", dt.Create, &models.Param{
 			Name:   "Test Param",
 			Schema: map[string]interface{}{},
-		}, true, nil},
-		{"Create new profile with name and schema", dt.Create, &Param{p: dt,
+		}, true},
+		{"Create new profile with name and schema", dt.Create, &models.Param{
 			Name: "Test Param 2",
 			Schema: map[string]interface{}{
 				"type": "boolean",
 			},
-		}, true, nil},
-		{"Create Duplicate Param", dt.Create, &Param{p: dt, Name: "Test Param"}, false, nil},
-		{"Delete Param", dt.Remove, &Param{p: dt, Name: "Test Param"}, true, nil},
-		{"Delete Nonexistent Param", dt.Remove, &Param{p: dt, Name: "Test Param"}, false, nil},
+		}, true},
+		{"Create Duplicate Param", dt.Create, &models.Param{Name: "Test Param"}, false},
+		{"Delete Param", dt.Remove, &models.Param{Name: "Test Param"}, true},
+		{"Delete Nonexistent Param", dt.Remove, &models.Param{Name: "Test Param"}, false},
 	}
 	for _, test := range tests {
 		test.Test(t, d)

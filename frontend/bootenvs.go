@@ -3,6 +3,7 @@ package frontend
 import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,14 +11,14 @@ import (
 // swagger:response
 type BootEnvResponse struct {
 	// in: body
-	Body *backend.BootEnv
+	Body *models.BootEnv
 }
 
 // BootEnvsResponse returned on a successful GET of all the bootenvs
 // swagger:response
 type BootEnvsResponse struct {
 	//in: body
-	Body []*backend.BootEnv
+	Body []*models.BootEnv
 }
 
 // BootEnvBodyParameter used to inject a BootEnv
@@ -25,7 +26,7 @@ type BootEnvsResponse struct {
 type BootEnvBodyParameter struct {
 	// in: body
 	// required: true
-	Body *backend.BootEnv
+	Body *models.BootEnv
 }
 
 // BootEnvPatchBodyParameter used to patch a BootEnv
@@ -96,7 +97,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/bootenvs",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewBootEnv())
+			f.List(c, &backend.BootEnv{})
 		})
 
 	// swagger:route POST /bootenvs BootEnvs createBootEnv
@@ -113,8 +114,8 @@ func (f *Frontend) InitBootEnvApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/bootenvs",
 		func(c *gin.Context) {
-			b := f.dt.NewBootEnv()
-			f.Create(c, b, nil)
+			b := &backend.BootEnv{}
+			f.Create(c, b)
 		})
 	// swagger:route GET /bootenvs/{name} BootEnvs getBootEnv
 	//
@@ -129,7 +130,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/bootenvs/:name",
 		func(c *gin.Context) {
-			f.Fetch(c, f.dt.NewBootEnv(), c.Param(`name`))
+			f.Fetch(c, &backend.BootEnv{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /bootenvs/{name} BootEnvs patchBootEnv
@@ -148,7 +149,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/bootenvs/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewBootEnv(), c.Param(`name`), nil)
+			f.Patch(c, &backend.BootEnv{}, c.Param(`name`))
 		})
 
 	// swagger:route PUT /bootenvs/{name} BootEnvs putBootEnv
@@ -166,7 +167,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/bootenvs/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewBootEnv(), c.Param(`name`), nil)
+			f.Update(c, &backend.BootEnv{}, c.Param(`name`))
 		})
 
 	// swagger:route DELETE /bootenvs/{name} BootEnvs deleteBootEnv
@@ -182,9 +183,6 @@ func (f *Frontend) InitBootEnvApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/bootenvs/:name",
 		func(c *gin.Context) {
-			b := f.dt.NewBootEnv()
-			b.Name = c.Param(`name`)
-			f.Remove(c, b, nil)
-
+			f.Remove(c, &backend.BootEnv{}, c.Param(`name`))
 		})
 }

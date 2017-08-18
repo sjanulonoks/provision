@@ -3,6 +3,7 @@ package frontend
 import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,14 +11,14 @@ import (
 // swagger:response
 type SubnetResponse struct {
 	// in: body
-	Body *backend.Subnet
+	Body *models.Subnet
 }
 
 // SubnetsResponse returned on a successful GET of all the subnets
 // swagger:response
 type SubnetsResponse struct {
 	//in: body
-	Body []*backend.Subnet
+	Body []*models.Subnet
 }
 
 // SubnetBodyParameter used to inject a Subnet
@@ -25,7 +26,7 @@ type SubnetsResponse struct {
 type SubnetBodyParameter struct {
 	// in: body
 	// required: true
-	Body *backend.Subnet
+	Body *models.Subnet
 }
 
 // SubnetPatchBodyParameter used to patch a Subnet
@@ -101,7 +102,7 @@ func (f *Frontend) InitSubnetApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/subnets",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewSubnet())
+			f.List(c, &backend.Subnet{})
 		})
 
 	// swagger:route POST /subnets Subnets createSubnet
@@ -118,8 +119,8 @@ func (f *Frontend) InitSubnetApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/subnets",
 		func(c *gin.Context) {
-			b := f.dt.NewSubnet()
-			f.Create(c, b, nil)
+			b := &backend.Subnet{}
+			f.Create(c, b)
 		})
 
 	// swagger:route GET /subnets/{name} Subnets getSubnet
@@ -135,7 +136,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/subnets/:name",
 		func(c *gin.Context) {
-			f.Fetch(c, f.dt.NewSubnet(), c.Param(`name`))
+			f.Fetch(c, &backend.Subnet{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /subnets/{name} Subnets patchSubnet
@@ -154,7 +155,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/subnets/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewSubnet(), c.Param(`name`), nil)
+			f.Patch(c, &backend.Subnet{}, c.Param(`name`))
 		})
 
 	// swagger:route PUT /subnets/{name} Subnets putSubnet
@@ -172,7 +173,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/subnets/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewSubnet(), c.Param(`name`), nil)
+			f.Update(c, &backend.Subnet{}, c.Param(`name`))
 		})
 
 	// swagger:route DELETE /subnets/{name} Subnets deleteSubnet
@@ -188,8 +189,6 @@ func (f *Frontend) InitSubnetApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/subnets/:name",
 		func(c *gin.Context) {
-			b := f.dt.NewSubnet()
-			b.Name = c.Param(`name`)
-			f.Remove(c, b, nil)
+			f.Remove(c, &backend.Subnet{}, c.Param(`name`))
 		})
 }

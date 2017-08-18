@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,14 +13,14 @@ import (
 // swagger:response
 type TaskResponse struct {
 	// in: body
-	Body *backend.Task
+	Body *models.Task
 }
 
 // TasksResponse return on a successful GET of all Tasks
 // swagger:response
 type TasksResponse struct {
 	// in: body
-	Body []*backend.Task
+	Body []*models.Task
 }
 
 // TaskParamsResponse return on a successful GET of all Task's Params
@@ -35,7 +35,7 @@ type TaskParamsResponse struct {
 type TaskBodyParameter struct {
 	// in: body
 	// required: true
-	Body *backend.Task
+	Body *models.Task
 }
 
 // TaskPatchBodyParameter used to patch a Task
@@ -109,7 +109,7 @@ func (f *Frontend) InitTaskApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/tasks",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewTask())
+			f.List(c, &backend.Task{})
 		})
 
 	// swagger:route POST /tasks Tasks createTask
@@ -129,26 +129,26 @@ func (f *Frontend) InitTaskApi() {
 			// We don't use f.Create() because we need to be able to assign random
 			// UUIDs to new Tasks without forcing the client to do so, yet allow them
 			// for testing purposes amd if they alrady have a UUID scheme for tasks.
-			b := f.dt.NewTask()
+			b := &backend.Task{}
 			if !assureDecode(c, b) {
 				return
 			}
-			var res store.KeySaver
+			var res models.Model
 			var err error
 			func() {
-				d, unlocker := f.dt.LockEnts(store.KeySaver(b).(Lockable).Locks("create")...)
+				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("create")...)
 				defer unlocker()
-				_, err = f.dt.Create(d, b, nil)
+				_, err = f.dt.Create(d, b)
 			}()
 			if err != nil {
-				be, ok := err.(*backend.Error)
+				be, ok := err.(*models.Error)
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				s, ok := store.KeySaver(b).(Sanitizable)
+				s, ok := models.Model(b).(Sanitizable)
 				if ok {
 					res = s.Sanitize()
 				} else {
@@ -171,7 +171,7 @@ func (f *Frontend) InitTaskApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/tasks/:name",
 		func(c *gin.Context) {
-			f.Fetch(c, f.dt.NewTask(), c.Param(`name`))
+			f.Fetch(c, &backend.Task{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /tasks/{name} Tasks patchTask
@@ -190,7 +190,7 @@ func (f *Frontend) InitTaskApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/tasks/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewTask(), c.Param(`name`), nil)
+			f.Patch(c, &backend.Task{}, c.Param(`name`))
 		})
 
 	// swagger:route PUT /tasks/{name} Tasks putTask
@@ -208,7 +208,7 @@ func (f *Frontend) InitTaskApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/tasks/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewTask(), c.Param(`name`), nil)
+			f.Update(c, &backend.Task{}, c.Param(`name`))
 		})
 
 	// swagger:route DELETE /tasks/{name} Tasks deleteTask
@@ -224,8 +224,6 @@ func (f *Frontend) InitTaskApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/tasks/:name",
 		func(c *gin.Context) {
-			b := f.dt.NewTask()
-			b.Name = c.Param(`name`)
-			f.Remove(c, b, nil)
+			f.Remove(c, &backend.Task{}, c.Param(`name`))
 		})
 }

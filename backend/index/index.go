@@ -5,7 +5,7 @@ import (
 	"fmt"
 	s "sort"
 
-	"github.com/digitalrebar/store"
+	"github.com/digitalrebar/provision/models"
 )
 
 type Indexer interface {
@@ -13,21 +13,21 @@ type Indexer interface {
 }
 
 // Tester is a function that tests to see if an item matches a condition
-type Test func(store.KeySaver) bool
+type Test func(models.Model) bool
 
 // Less is a function that tests to see if the first item is less than
 // the second item.
-type Less func(store.KeySaver, store.KeySaver) bool
+type Less func(models.Model, models.Model) bool
 
 // TestMaker is a function that takes a reference object and spits out
 // appropriate Tests for gte and gt, in that order.
-type TestMaker func(store.KeySaver) (Test, Test)
+type TestMaker func(models.Model) (Test, Test)
 
 // Filler takes a value from a query parameter and plugs it into the
 // appropriate slot in the proper model for an index.  It is
 // responsible for doing whatever conversion is needed to translate
 // from a string to the appropriate type for the index.
-type Filler func(string) (store.KeySaver, error)
+type Filler func(string) (models.Model, error)
 
 // Maker is used to hold reference functions for a specific index on a
 // specific struct.  The functions are:
@@ -41,7 +41,7 @@ type Filler func(string) (store.KeySaver, error)
 // and the Subset filter.
 //
 // Fill, which takes a string from a query parameter and turns it into
-// a store.KeySaver that has the appropriate slot filled.
+// a models.Model that has the appropriate slot filled.
 type Maker struct {
 	keyOrder bool
 	Unique   bool
@@ -59,7 +59,7 @@ type Index struct {
 	Maker
 	sorted bool
 	base   bool
-	objs   []store.KeySaver
+	objs   []models.Model
 }
 
 // Make takes a Less function, a TestMaker function, and a Filler
@@ -68,7 +68,7 @@ func Make(unique bool, t string, less Less, maker TestMaker, filler Filler) Make
 	return Maker{Unique: unique, Type: t, Less: less, Tests: maker, Fill: filler}
 }
 
-func Create(objs []store.KeySaver) *Index {
+func Create(objs []models.Model) *Index {
 	res := &Index{Maker: MakeKey(), sorted: true, base: true, objs: objs}
 	s.Slice(res.objs, func(j, k int) bool { return res.Less(res.objs[j], res.objs[k]) })
 	return res
@@ -76,30 +76,28 @@ func Create(objs []store.KeySaver) *Index {
 
 type Fake string
 
-func (f Fake) Prefix() string       { return "fake" }
-func (f Fake) Key() string          { return string(f) }
-func (f Fake) New() store.KeySaver  { return f }
-func (f Fake) Backend() store.Store { return nil }
+func (f Fake) Prefix() string { return "fake" }
+func (f Fake) Key() string    { return string(f) }
 
 func MakeKey() Maker {
 	return Maker{
 		keyOrder: true,
 		Unique:   true,
-		Less: func(i, j store.KeySaver) bool {
+		Less: func(i, j models.Model) bool {
 			return i.Key() < j.Key()
 		},
-		Tests: func(ref store.KeySaver) (gte, gt Test) {
+		Tests: func(ref models.Model) (gte, gt Test) {
 			key := ref.Key()
-			return func(s store.KeySaver) bool { return s.Key() >= key },
-				func(s store.KeySaver) bool { return s.Key() > key }
+			return func(s models.Model) bool { return s.Key() >= key },
+				func(s models.Model) bool { return s.Key() > key }
 		},
-		Fill: func(s string) (store.KeySaver, error) {
+		Fill: func(s string) (models.Model, error) {
 			return Fake(s), nil
 		},
 	}
 }
 
-func CheckUnique(s store.KeySaver, objs []store.KeySaver) error {
+func CheckUnique(s models.Model, objs []models.Model) error {
 	testObj, ok := s.(Indexer)
 	if !ok {
 		return nil
@@ -127,21 +125,21 @@ func CheckUnique(s store.KeySaver, objs []store.KeySaver) error {
 
 // New returns a new Index that is populated with a copy of the
 // passed-in objs.
-func New(objs []store.KeySaver) *Index {
+func New(objs []models.Model) *Index {
 	res := &Index{}
-	res.objs = make([]store.KeySaver, len(objs))
+	res.objs = make([]models.Model, len(objs))
 	copy(res.objs, objs)
 	return res
 }
 
 // Items returns the current items the index has filtered.
-func (i *Index) Items() []store.KeySaver {
-	res := make([]store.KeySaver, len(i.objs))
+func (i *Index) Items() []models.Model {
+	res := make([]models.Model, len(i.objs))
 	copy(res, i.objs)
 	return res
 }
 
-func (i *Index) find(ref store.KeySaver) (int, bool) {
+func (i *Index) find(ref models.Model) (int, bool) {
 	gte, gt := i.Tests(ref)
 	idx := s.Search(len(i.objs), func(j int) bool { return gte(i.objs[j]) })
 	if idx == len(i.objs) {
@@ -150,7 +148,7 @@ func (i *Index) find(ref store.KeySaver) (int, bool) {
 	return idx, !gt(i.objs[idx])
 }
 
-func (i *Index) Find(key string) store.KeySaver {
+func (i *Index) Find(key string) models.Model {
 	ref, err := i.Fill(key)
 	if err == nil {
 		if idx, found := i.find(ref); found {
@@ -160,14 +158,14 @@ func (i *Index) Find(key string) store.KeySaver {
 	return nil
 }
 
-func (i *Index) Add(items ...store.KeySaver) error {
+func (i *Index) Add(items ...models.Model) error {
 	if !i.base {
 		return fmt.Errorf("Can only add to a base index")
 	}
 	if !i.sorted {
 		return fmt.Errorf("Cannot add items to a non-sorted Index")
 	}
-	growers, appenders := []store.KeySaver{}, []store.KeySaver{}
+	growers, appenders := []models.Model{}, []models.Model{}
 	growIndexes := []int{}
 	for _, obj := range items {
 		idx, found := i.find(obj)
@@ -195,7 +193,7 @@ func (i *Index) Add(items ...store.KeySaver) error {
 			return i.Less(growers[j], growers[k])
 		})
 		oldLen := len(i.objs)
-		i.objs = append(i.objs, make([]store.KeySaver, len(growers))...)
+		i.objs = append(i.objs, make([]models.Model, len(growers))...)
 		for j := len(growIndexes) - 1; j >= 0; j-- {
 			idx := growIndexes[j]
 			dest, src := i.objs[idx+j+1:], i.objs[idx:oldLen]
@@ -207,7 +205,7 @@ func (i *Index) Add(items ...store.KeySaver) error {
 	return nil
 }
 
-func (i *Index) Remove(items ...store.KeySaver) error {
+func (i *Index) Remove(items ...models.Model) error {
 	if !i.base {
 		return fmt.Errorf("Cannot remove from a non-base Indes")
 	}
@@ -272,8 +270,8 @@ func (i *Index) Empty() bool {
 
 // cp makes a copy of the current Index with a copy of the passed-in
 // slice of objects that the index should reference.
-func (i *Index) cp(newObjs []store.KeySaver) *Index {
-	objs := make([]store.KeySaver, len(newObjs))
+func (i *Index) cp(newObjs []models.Model) *Index {
+	objs := make([]models.Model, len(newObjs))
 	copy(objs, newObjs)
 	return &Index{
 		Maker:  i.Maker,
@@ -323,7 +321,7 @@ func All(filters ...Filter) Filter {
 // pass any of the filters.  There may be duplicate items.
 func Any(filters ...Filter) Filter {
 	return func(i *Index) (*Index, error) {
-		items := []store.KeySaver{}
+		items := []models.Model{}
 		for j := range filters {
 			q, err := filters[j](i)
 			if err != nil {
@@ -337,7 +335,7 @@ func Any(filters ...Filter) Filter {
 	}
 }
 
-func nativeLess(a, b store.KeySaver) bool {
+func nativeLess(a, b models.Model) bool {
 	return a.Key() < b.Key()
 }
 
@@ -376,8 +374,8 @@ func Sort(m Maker) Filter {
 
 // A couple of helper functions for using Subset to implement the
 // usual comparison operators
-func alwaysFalse(store.KeySaver) bool { return false }
-func alwaysTrue(store.KeySaver) bool  { return true }
+func alwaysFalse(models.Model) bool { return false }
+func alwaysTrue(models.Model) bool  { return true }
 
 // Subset returns a filter that will sort an index based on the lower
 // bound test and the upper bound tests, which correspond to the gte
@@ -509,7 +507,7 @@ func Ne(ref string) Filter {
 // order.
 func Select(t Test) Filter {
 	return func(i *Index) (*Index, error) {
-		objs := []store.KeySaver{}
+		objs := []models.Model{}
 		for _, obj := range i.objs {
 			if t(obj) {
 				objs = append(objs, obj)
@@ -526,7 +524,7 @@ func Offset(num int) Filter {
 			return i, errors.New("Offset cannot be negative")
 		}
 		if num >= len(i.objs) {
-			return i.cp([]store.KeySaver{}), nil
+			return i.cp([]models.Model{}), nil
 		}
 		return i.cp(i.objs[num:]), nil
 	}

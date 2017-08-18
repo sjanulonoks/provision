@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -60,7 +60,7 @@ func (f *Frontend) InitPrefApi() {
 			if !assureDecode(c, &prefs) {
 				return
 			}
-			err := &backend.Error{Type: "API_ERROR", Key: "Preference", Code: http.StatusBadRequest}
+			err := &models.Error{Type: "API_ERROR", Key: "Preference", Code: http.StatusBadRequest}
 			// Filter unknown preferences here
 			for k := range prefs {
 				switch k {
@@ -83,9 +83,9 @@ func (f *Frontend) InitPrefApi() {
 			}
 			if !err.ContainsError() {
 				func() {
-					d, unlocker := f.dt.LockEnts(store.KeySaver(&backend.Pref{}).(Lockable).Locks("update")...)
+					d, unlocker := f.dt.LockEnts(models.Model(&backend.Pref{}).(Lockable).Locks("update")...)
 					defer unlocker()
-					err.Merge(f.dt.SetPrefs(d, prefs))
+					err.AddError(f.dt.SetPrefs(d, prefs))
 				}()
 			}
 			if err.ContainsError() {

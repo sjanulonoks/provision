@@ -2,6 +2,7 @@ package backend
 
 import (
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 	sc "github.com/elithrar/simple-scrypt"
 )
@@ -9,19 +10,9 @@ import (
 // User is an API user of DigitalRebar Provision
 // swagger:model
 type User struct {
+	*models.User
 	validate
-	// Name is the name of the user
-	//
-	// required: true
-	Name string
-	// PasswordHash is the scrypt-hashed version of the user's Password.
-	//
-	PasswordHash []byte `json:",omitempty"`
-	p            *DataTracker
-}
-
-func (u *User) Prefix() string {
-	return "users"
+	p *DataTracker
 }
 
 func (p *User) Indexes() map[string]index.Maker {
@@ -31,28 +22,22 @@ func (p *User) Indexes() map[string]index.Maker {
 		"Name": index.Make(
 			true,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+			func(ref models.Model) (gte, gt index.Test) {
 				refName := fix(ref).Name
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).Name >= refName
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Name > refName
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &User{Name: s}, nil
+			func(s string) (models.Model, error) {
+				u := fix(p.New())
+				u.Name = s
+				return u, nil
 			}),
 	}
-}
-
-func (u *User) Key() string {
-	return u.Name
-}
-
-func (u *User) AuthKey() string {
-	return u.Key()
 }
 
 func (u *User) Backend() store.Store {
@@ -60,35 +45,22 @@ func (u *User) Backend() store.Store {
 }
 
 func (u *User) New() store.KeySaver {
-	return &User{p: u.p}
+	return &User{User: &models.User{}}
 }
 
 func (u *User) setDT(p *DataTracker) {
 	u.p = p
 }
 
-func (u *User) CheckPassword(pass string) bool {
-	if err := sc.CompareHashAndPassword(u.PasswordHash, []byte(pass)); err == nil {
-		return true
-	}
-	return false
-}
-
-func AsUser(o store.KeySaver) *User {
+func AsUser(o models.Model) *User {
 	return o.(*User)
 }
 
-func AsUsers(o []store.KeySaver) []*User {
+func AsUsers(o []models.Model) []*User {
 	res := make([]*User, len(o))
 	for i := range o {
 		res[i] = AsUser(o[i])
 	}
-	return res
-}
-
-func (u *User) Sanitize() store.KeySaver {
-	res := AsUser(u.p.Clone(u))
-	res.PasswordHash = []byte{}
 	return res
 }
 
@@ -99,21 +71,26 @@ func (u *User) ChangePassword(d Stores, newPass string) error {
 	}
 	u.PasswordHash = ph
 	if u.p != nil {
-		_, err = u.p.Save(d, u, nil)
+		_, err = u.p.Save(d, u)
 	}
 	return err
 }
 
-func (p *DataTracker) NewUser() *User {
-	return &User{p: p}
-}
-
-func (u *User) Validate() error {
-	return index.CheckUnique(u, u.stores("users").Items())
+func (u *User) Validate() {
+	u.AddError(index.CheckUnique(u, u.stores("users").Items()))
+	u.SetValid()
+	u.SetAvailable()
 }
 
 func (u *User) BeforeSave() error {
-	return u.Validate()
+	if !u.Useable() {
+		return u.MakeError(422, ValidationError, u)
+	}
+	return nil
+}
+
+func (u *User) OnLoad() error {
+	return u.BeforeSave()
 }
 
 var userLockMap = map[string][]string{

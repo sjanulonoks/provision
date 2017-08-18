@@ -9,7 +9,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -92,7 +92,7 @@ func (f *Frontend) InitFileApi() {
 			ents, err := ioutil.ReadDir(path.Join(f.FileRoot, "files", path.Clean(pathPart)))
 			if err != nil {
 				c.JSON(http.StatusNotFound,
-					backend.NewError("API ERROR", http.StatusNotFound,
+					models.NewError("API ERROR", http.StatusNotFound,
 						fmt.Sprintf("list: error listing files: %v", err)))
 				return
 			}
@@ -162,19 +162,19 @@ func (f *Frontend) InitFileApi() {
 			}
 			if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
 				c.JSON(http.StatusUnsupportedMediaType,
-					backend.NewError("API ERROR", http.StatusUnsupportedMediaType,
+					models.NewError("API ERROR", http.StatusUnsupportedMediaType,
 						fmt.Sprintf("upload: file %s must have content-type application/octet-stream", name)))
 				return
 			}
 			if c.Request.Body == nil {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API ERROR", http.StatusBadRequest,
+					models.NewError("API ERROR", http.StatusBadRequest,
 						fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
 				return
 			}
 			if strings.HasSuffix(name, "/") {
 				c.JSON(http.StatusForbidden,
-					backend.NewError("API ERROR", http.StatusForbidden,
+					models.NewError("API ERROR", http.StatusForbidden,
 						fmt.Sprintf("upload: Cannot upload a directory")))
 				return
 			}
@@ -182,14 +182,14 @@ func (f *Frontend) InitFileApi() {
 			fileName := path.Join(f.FileRoot, `files`, path.Clean(name))
 			if err := os.MkdirAll(path.Dir(fileName), 0755); err != nil {
 				c.JSON(http.StatusConflict,
-					backend.NewError("API ERROR", http.StatusConflict,
+					models.NewError("API ERROR", http.StatusConflict,
 						fmt.Sprintf("upload: unable to create directory %s", path.Clean(path.Dir(name)))))
 				return
 			}
 			if _, err := os.Open(fileTmpName); err == nil {
 				os.Remove(fileName)
 				c.JSON(http.StatusConflict,
-					backend.NewError("API ERROR", http.StatusConflict,
+					models.NewError("API ERROR", http.StatusConflict,
 						fmt.Sprintf("upload: file %s already uploading", name)))
 				return
 			}
@@ -197,7 +197,7 @@ func (f *Frontend) InitFileApi() {
 			if err != nil {
 				os.Remove(fileName)
 				c.JSON(http.StatusConflict,
-					backend.NewError("API ERROR", http.StatusConflict,
+					models.NewError("API ERROR", http.StatusConflict,
 						fmt.Sprintf("upload: Unable to upload %s: %v", name, err)))
 				return
 			}
@@ -207,7 +207,7 @@ func (f *Frontend) InitFileApi() {
 				os.Remove(fileName)
 				os.Remove(fileTmpName)
 				c.JSON(http.StatusInsufficientStorage,
-					backend.NewError("API ERROR", http.StatusInsufficientStorage,
+					models.NewError("API ERROR", http.StatusInsufficientStorage,
 						fmt.Sprintf("upload: Failed to upload %s: %v", name, err)))
 				return
 			}
@@ -216,7 +216,7 @@ func (f *Frontend) InitFileApi() {
 				os.Remove(fileName)
 				os.Remove(fileTmpName)
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API ERROR", http.StatusBadRequest,
+					models.NewError("API ERROR", http.StatusBadRequest,
 						fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes recieved", name, c.Request.ContentLength, copied)))
 				return
 			}
@@ -244,13 +244,13 @@ func (f *Frontend) InitFileApi() {
 			fileName := path.Join(f.FileRoot, `files`, path.Clean(c.Param(`path`)))
 			if fileName == path.Join(f.FileRoot, `files`) {
 				c.JSON(http.StatusForbidden,
-					backend.NewError("API ERROR", http.StatusForbidden,
+					models.NewError("API ERROR", http.StatusForbidden,
 						fmt.Sprintf("delete: Not allowed to remove files dir")))
 				return
 			}
 			if err := os.Remove(fileName); err != nil {
 				c.JSON(http.StatusNotFound,
-					backend.NewError("API ERROR", http.StatusNotFound,
+					models.NewError("API ERROR", http.StatusNotFound,
 						fmt.Sprintf("delete: unable to delete %s", c.Param(`path`))))
 				return
 			}

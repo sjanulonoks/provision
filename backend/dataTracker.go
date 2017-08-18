@@ -13,21 +13,24 @@ import (
 	"text/template"
 
 	"github.com/VictorLowther/jsonpatch2"
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
 
 var (
-	ignoreBoot = &BootEnv{
-		Name:        "ignore",
+	ignoreBoot = &models.BootEnv{
+		Name:        `ignore`,
 		Description: "The boot environment you should use to have unknown machines boot off their local hard drive",
-		OS:          OsInfo{Name: "ignore"},
+		OS: models.OsInfo{
+			Name: `ignore`,
+		},
 		OnlyUnknown: true,
-		Templates: []TemplateInfo{
+		Templates: []models.TemplateInfo{
 			{
 				Name: "pxelinux",
-				Path: "pxelinux.cfg/default",
+				Path: `pxelinux.cfg/default`,
 				Contents: `DEFAULT local
 PROMPT 0
 TIMEOUT 10
@@ -36,13 +39,13 @@ localboot 0
 `,
 			},
 			{
-				Name:     "elilo",
-				Path:     "elilo.conf",
-				Contents: "exit",
+				Name:     `elilo`,
+				Path:     `elilo.conf`,
+				Contents: `exit`,
 			},
 			{
-				Name: "ipxe",
-				Path: "default.ipxe",
+				Name: `ipxe`,
+				Path: `default.ipxe`,
 				Contents: `#!ipxe
 chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 `,
@@ -76,15 +79,189 @@ type Store struct {
 	backingStore store.Store
 }
 
-type ObjectValidator func(Stores, store.KeySaver, store.KeySaver) error
+type ObjectValidator func(Stores, models.Model, models.Model) error
 
-func (s *Store) getBackend(obj store.KeySaver) store.Store {
+func (s *Store) getBackend(obj models.Model) store.Store {
 	return s.backingStore
 }
 
 type dtSetter interface {
-	store.KeySaver
+	models.Model
 	setDT(*DataTracker)
+}
+
+func Fill(t store.KeySaver) {
+	switch obj := t.(type) {
+	case *BootEnv:
+		obj.BootEnv = &models.BootEnv{}
+	case *Job:
+		obj.Job = &models.Job{}
+	case *Lease:
+		obj.Lease = &models.Lease{}
+	case *Machine:
+		obj.Machine = &models.Machine{}
+	case *Param:
+		obj.Param = &models.Param{}
+	case *Profile:
+		obj.Profile = &models.Profile{}
+	case *Reservation:
+		obj.Reservation = &models.Reservation{}
+	case *Subnet:
+		obj.Subnet = &models.Subnet{}
+	case *Task:
+		obj.Task = &models.Task{}
+	case *Template:
+		obj.Template = &models.Template{}
+	case *User:
+		obj.User = &models.User{}
+	default:
+		panic(fmt.Sprintf("Unknown backend model %T", t))
+	}
+}
+
+func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
+	if res, ok := m.(store.KeySaver); ok {
+		p.setDT(res)
+		return res
+	}
+	var ours store.KeySaver
+	if s != nil {
+		backend := s(m.Prefix())
+		if backend == nil {
+			p.Logger.Panicf("No store for %T", m)
+		}
+		if this := backend.Find(m.Key()); this != nil {
+			ours = this.(store.KeySaver)
+		}
+	}
+
+	switch obj := m.(type) {
+	case *models.BootEnv:
+		var res BootEnv
+		if ours != nil {
+			res = *ours.(*BootEnv)
+		} else {
+			res = BootEnv{}
+		}
+		res.BootEnv = obj
+		p.setDT(&res)
+		return &res
+	case *models.Job:
+		var res Job
+		if ours != nil {
+			res = *ours.(*Job)
+		} else {
+			res = Job{}
+		}
+		res.Job = obj
+		p.setDT(&res)
+		return &res
+	case *models.Lease:
+		var res Lease
+		if ours != nil {
+			res = *ours.(*Lease)
+		} else {
+			res = Lease{}
+		}
+		res.Lease = obj
+		p.setDT(&res)
+		return &res
+	case *models.Machine:
+		var res Machine
+		if ours != nil {
+			res = *ours.(*Machine)
+		} else {
+			res = Machine{}
+		}
+		res.Machine = obj
+		p.setDT(&res)
+		return &res
+	case *models.Param:
+		var res Param
+		if ours != nil {
+			res = *ours.(*Param)
+		} else {
+			res = Param{}
+		}
+		res.Param = obj
+		p.setDT(&res)
+		return &res
+	case *models.Pref:
+		var res Pref
+		if ours != nil {
+			res = *ours.(*Pref)
+		} else {
+			res = Pref{}
+		}
+		res.Pref = obj
+		p.setDT(&res)
+		return &res
+	case *models.Profile:
+		var res Profile
+		if ours != nil {
+			res = *ours.(*Profile)
+		} else {
+			res = Profile{}
+		}
+		res.Profile = obj
+		p.setDT(&res)
+		return &res
+	case *models.Reservation:
+		var res Reservation
+		if ours != nil {
+			res = *ours.(*Reservation)
+		} else {
+			res = Reservation{}
+		}
+		res.Reservation = obj
+		p.setDT(&res)
+		return &res
+	case *models.Subnet:
+		var res Subnet
+		if ours != nil {
+			res = *ours.(*Subnet)
+		} else {
+			res = Subnet{}
+		}
+		res.Subnet = obj
+		p.setDT(&res)
+		return &res
+	case *models.Task:
+		var res Task
+		if ours != nil {
+			res = *ours.(*Task)
+		} else {
+			res = Task{}
+		}
+		res.Task = obj
+		p.setDT(&res)
+		return &res
+	case *models.Template:
+		var res Template
+		if ours != nil {
+			res = *ours.(*Template)
+		} else {
+			res = Template{}
+		}
+		res.Template = obj
+		p.setDT(&res)
+		return &res
+
+	case *models.User:
+		var res User
+		if ours != nil {
+			res = *ours.(*User)
+		} else {
+			res = User{}
+		}
+		res.User = obj
+		p.setDT(&res)
+		return &res
+
+	default:
+		p.Logger.Panicf("Unknown model %T", m)
+	}
+	return nil
 }
 
 // DataTracker represents everything there is to know about acting as
@@ -114,8 +291,8 @@ type DataTracker struct {
 
 type Stores func(string) *Store
 
-func allKeySavers(res *DataTracker) []store.KeySaver {
-	return []store.KeySaver{
+func allKeySavers(res *DataTracker) []models.Model {
+	return []models.Model{
 		&Task{p: res},
 		&Job{p: res},
 		&Param{p: res},
@@ -213,11 +390,16 @@ func (p *DataTracker) rebuildCache() error {
 		prefix := obj.Prefix()
 		bk := p.Backend.GetSub(prefix)
 		p.objs[prefix] = &Store{backingStore: bk}
-		storeObjs, err := store.List(obj)
+		storeObjs, err := store.List(bk, toBackend(p, nil, obj))
 		if err != nil {
 			return fmt.Errorf("%s: %v", prefix, err)
 		}
-		p.objs[prefix].Index = *index.Create(storeObjs)
+		res := make([]models.Model, len(storeObjs))
+		for i := range storeObjs {
+			p.setDT(storeObjs[i])
+			res[i] = models.Model(storeObjs[i])
+		}
+		p.objs[prefix].Index = *index.Create(res)
 		if obj.Prefix() == "templates" {
 			buf := &bytes.Buffer{}
 			for _, thing := range p.objs["templates"].Items() {
@@ -235,7 +417,7 @@ func (p *DataTracker) rebuildCache() error {
 	return nil
 }
 
-func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) *Error {
+func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) error {
 	res := &DataTracker{
 		Backend:           backend,
 		FileRoot:          ".",
@@ -260,7 +442,7 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) *Error {
 	// Load stores.
 	err := res.rebuildCache()
 	if err != nil {
-		return NewError("LoadError", http.StatusInternalServerError, fmt.Sprintf("Failed to rebuild cache: %v", err))
+		return models.NewError("LoadError", http.StatusInternalServerError, fmt.Sprintf("Failed to rebuild cache: %v", err))
 	}
 
 	keys := make([]string, len(res.objs))
@@ -273,21 +455,22 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) *Error {
 	d, unlocker := res.LockAll()
 	defer unlocker()
 
-	berr := &Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
+	berr := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
 
 	for _, k := range keys {
 
 		for _, obj := range res.objs[k].Items() {
 			if val, ok := obj.(Validator); ok {
 				obj.(validator).setStores(d)
-				berr.Merge(val.Validate())
+				val.ClearValidation()
+				val.Validate()
+				if !val.Useable() {
+					berr.AddError(val.HasError())
+				}
 			}
 		}
 	}
-	if berr.OrNil() == nil {
-		return nil
-	}
-	return berr
+	return berr.HasError()
 }
 
 // Create a new DataTracker that will use passed store to save all operational data
@@ -337,26 +520,30 @@ func NewDataTracker(backend store.Store,
 	// Create minimal content.
 	d, unlocker := res.LockEnts("bootenvs", "preferences", "users", "machines", "profiles", "params")
 	defer unlocker()
-	if d("bootenvs").Find(ignoreBoot.Key()) == nil {
-		res.Create(d, ignoreBoot, nil)
+	if d("bootenvs").Find("ignore") == nil {
+		res.Create(d, ignoreBoot)
 	}
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)
 		res.runningPrefs[pref.Name] = pref.Val
 	}
 	if d("preferences").Find(res.GlobalProfileName) == nil {
-		gp := AsProfile(res.NewProfile())
-		gp.Name = "global"
-		res.Create(d, gp, nil)
+		res.Create(d, &models.Profile{
+			Name:   res.GlobalProfileName,
+			Params: map[string]interface{}{},
+			Tasks:  []string{},
+		})
 	}
 	users := d("users")
 	if users.Count() == 0 {
 		res.Infof("debugBootEnv", "Creating rocketskates user")
-		user := &User{p: res, Name: "rocketskates"}
+		user := &User{}
+		Fill(user)
+		user.Name = "rocketskates"
 		if err := user.ChangePassword(d, "r0cketsk8ts"); err != nil {
 			logger.Fatalf("Failed to create rocketskates user: %v", err)
 		}
-		res.Create(d, user, nil)
+		res.Create(d, user)
 	}
 	res.defaultBootEnv = defaultPrefs["defaultBootEnv"]
 	machines := d("machines")
@@ -366,9 +553,9 @@ func NewDataTracker(backend store.Store,
 		if bootEnv == nil {
 			continue
 		}
-		err := &Error{o: machine}
+		err := &models.Error{}
 		AsBootEnv(bootEnv).Render(d, machine, err).register(res.FS)
-		if err.containsError {
+		if err.ContainsError() {
 			logger.Printf("Error rendering machine %s at startup:", machine.UUID())
 			logger.Println(err.Error())
 		}
@@ -405,7 +592,7 @@ func (p *DataTracker) pref(name string) string {
 }
 
 func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
-	err := &Error{}
+	err := &models.Error{}
 	bootenvs := d("bootenvs")
 	benvCheck := func(name, val string) *BootEnv {
 		be := bootenvs.Find(val)
@@ -426,8 +613,10 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 	savePref := func(name, val string) bool {
 		p.prefMux.Lock()
 		defer p.prefMux.Unlock()
-		pref := &Pref{p: p, Name: name, Val: val}
-		if _, saveErr := p.Save(d, pref, nil); saveErr != nil {
+		pref := &models.Pref{}
+		pref.Name = name
+		pref.Val = val
+		if _, saveErr := p.Save(d, pref); saveErr != nil {
 			err.Errorf("%s: Failed to save %s: %v", name, val, saveErr)
 			return false
 		}
@@ -444,7 +633,7 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			}
 		case "unknownBootEnv":
 			if benvCheck(name, val) != nil && savePref(name, val) {
-				err.Merge(p.RenderUnknown(d))
+				err.AddError(p.RenderUnknown(d))
 			}
 		case "unknownTokenTimeout",
 			"knownTokenTimeout",
@@ -459,7 +648,7 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			err.Errorf("Unknown preference %s", name)
 		}
 	}
-	return err.OrNil()
+	return err.HasError()
 }
 
 func (p *DataTracker) RenderUnknown(d Stores) error {
@@ -472,10 +661,9 @@ func (p *DataTracker) RenderUnknown(d Stores) error {
 		return fmt.Errorf("No such BootEnv: %s", pref)
 	}
 	env := AsBootEnv(envIsh)
-	err := &Error{o: env, Type: "StartupError"}
+	err := &models.Error{Object: env, Type: "StartupError"}
 	if !env.Available {
-		err.Messages = env.Errors
-		err.containsError = true
+		err.AddError(env)
 		return err
 	}
 	if !env.OnlyUnknown {
@@ -483,10 +671,10 @@ func (p *DataTracker) RenderUnknown(d Stores) error {
 		return err
 	}
 	env.Render(d, nil, err).register(p.FS)
-	return err.OrNil()
+	return err.HasError()
 }
 
-func (p *DataTracker) getBackend(t store.KeySaver) store.Store {
+func (p *DataTracker) getBackend(t models.Model) store.Store {
 	res, ok := p.objs[t.Prefix()]
 	if !ok {
 		p.Logger.Fatalf("%s: No registered storage backend!", t.Prefix())
@@ -494,93 +682,17 @@ func (p *DataTracker) getBackend(t store.KeySaver) store.Store {
 	return res.backingStore
 }
 
-func (p *DataTracker) setDT(s store.KeySaver) {
+func (p *DataTracker) setDT(s models.Model) {
 	if tgt, ok := s.(dtSetter); ok {
 		tgt.setDT(p)
 	}
 }
 
-func (p *DataTracker) NewKeySaver(t string) store.KeySaver {
-	var res store.KeySaver
-	switch t {
-	case "machines":
-		res = p.NewMachine()
-	case "params":
-		res = p.NewParam()
-	case "profiles":
-		res = p.NewProfile()
-	case "users":
-		res = p.NewUser()
-	case "templates":
-		res = p.NewTemplate()
-	case "bootenvs":
-		res = p.NewBootEnv()
-	case "leases":
-		res = p.NewLease()
-	case "reservations":
-		res = p.NewReservation()
-	case "subnets":
-		res = p.NewSubnet()
-	case "preferences":
-		res = p.NewPref()
-	case "tasks":
-		res = p.NewTask()
-	case "jobs":
-		res = p.NewJob()
-	case "plugins":
-		res = p.NewPlugin()
-	default:
-		panic("Unknown type of KeySaver passed to NewKeySaver")
-	}
-	return res
-}
-
-func (p *DataTracker) Clone(ref store.KeySaver) store.KeySaver {
-	var res store.KeySaver
-	switch ref.(type) {
-	case *Machine:
-		res = p.NewMachine()
-	case *Param:
-		res = p.NewParam()
-	case *Profile:
-		res = p.NewProfile()
-	case *User:
-		res = p.NewUser()
-	case *Template:
-		res = p.NewTemplate()
-	case *BootEnv:
-		res = p.NewBootEnv()
-	case *Lease:
-		res = p.NewLease()
-	case *Reservation:
-		res = p.NewReservation()
-	case *Subnet:
-		res = p.NewSubnet()
-	case *Pref:
-		res = p.NewPref()
-	case *Task:
-		res = p.NewTask()
-	case *Job:
-		res = p.NewJob()
-	case *Plugin:
-		res = p.NewPlugin()
-	default:
-		panic("Unknown type of KeySaver passed to Clone")
-	}
-	buf, err := json.Marshal(ref)
-	if err != nil {
-		panic(err.Error())
-	}
-	if err := json.Unmarshal(buf, &res); err != nil {
-		panic(err.Error())
-	}
-	return res
-}
-
-func (p *DataTracker) Create(d Stores, ref store.KeySaver, ov ObjectValidator) (saved bool, err error) {
-	p.setDT(ref)
+func (p *DataTracker) Create(d Stores, obj models.Model) (saved bool, err error) {
+	ref := toBackend(p, d, obj)
 	prefix := ref.Prefix()
 	key := ref.Key()
+	backend := d(prefix).backingStore
 	if key == "" {
 		return false, fmt.Errorf("dataTracker create %s: Empty key not allowed", prefix)
 	}
@@ -588,12 +700,11 @@ func (p *DataTracker) Create(d Stores, ref store.KeySaver, ov ObjectValidator) (
 		return false, fmt.Errorf("dataTracker create %s: %s already exists", prefix, key)
 	}
 	ref.(validator).setStores(d)
-	if ov != nil {
-		if err := ov(d, nil, ref); err != nil {
-			return false, err
-		}
+	checker, checkOK := ref.(Validator)
+	if checkOK {
+		checker.ClearValidation()
 	}
-	saved, err = store.Create(ref)
+	saved, err = store.Create(backend, ref)
 	if saved {
 		ref.(validator).clearStores()
 		d(prefix).Add(ref)
@@ -604,12 +715,14 @@ func (p *DataTracker) Create(d Stores, ref store.KeySaver, ov ObjectValidator) (
 	return saved, err
 }
 
-func (p *DataTracker) Remove(d Stores, ref store.KeySaver, ov ObjectValidator) (removed bool, err error) {
+func (p *DataTracker) Remove(d Stores, obj models.Model) (removed bool, err error) {
+	ref := toBackend(p, d, obj)
 	prefix := ref.Prefix()
 	key := ref.Key()
+	backend := d(prefix).backingStore
 	item := d(prefix).Find(key)
 	if item == nil {
-		err := &Error{
+		err := &models.Error{
 			Code:  http.StatusNotFound,
 			Key:   key,
 			Model: prefix,
@@ -618,12 +731,7 @@ func (p *DataTracker) Remove(d Stores, ref store.KeySaver, ov ObjectValidator) (
 		return false, err
 	}
 	item.(validator).setStores(d)
-	if ov != nil {
-		if err := ov(d, item, nil); err != nil {
-			return false, err
-		}
-	}
-	removed, err = store.Remove(item)
+	removed, err = store.Remove(backend, item.(store.KeySaver))
 	if removed {
 		d(prefix).Remove(item)
 		p.publishers.Publish(prefix, "delete", key, item)
@@ -631,11 +739,13 @@ func (p *DataTracker) Remove(d Stores, ref store.KeySaver, ov ObjectValidator) (
 	return removed, err
 }
 
-func (p *DataTracker) Patch(d Stores, ref store.KeySaver, key string, patch jsonpatch2.Patch, ov ObjectValidator) (store.KeySaver, error) {
+func (p *DataTracker) Patch(d Stores, obj models.Model, key string, patch jsonpatch2.Patch) (models.Model, error) {
+	ref := toBackend(p, d, obj)
 	prefix := ref.Prefix()
+	backend := d(prefix).backingStore
 	target := d(prefix).Find(key)
 	if target == nil {
-		err := &Error{
+		err := &models.Error{
 			Code:  http.StatusNotFound,
 			Key:   key,
 			Model: prefix,
@@ -649,7 +759,7 @@ func (p *DataTracker) Patch(d Stores, ref store.KeySaver, key string, patch json
 	}
 	resBuf, patchErr, loc := patch.Apply(buf)
 	if patchErr != nil {
-		err := &Error{
+		err := &models.Error{
 			Code:  http.StatusNotAcceptable,
 			Key:   key,
 			Model: ref.Prefix(),
@@ -662,16 +772,13 @@ func (p *DataTracker) Patch(d Stores, ref store.KeySaver, key string, patch json
 	if err := json.Unmarshal(resBuf, &toSave); err != nil {
 		return nil, err
 	}
-
-	if ov != nil {
-		if err := ov(d, target, toSave); err != nil {
-			return nil, err
-		}
-	}
-
 	p.setDT(toSave)
 	toSave.(validator).setStores(d)
-	saved, err := store.Update(toSave)
+	checker, checkOK := toSave.(Validator)
+	if checkOK {
+		checker.ClearValidation()
+	}
+	saved, err := store.Update(backend, toSave)
 	toSave.(validator).clearStores()
 	if !saved {
 		return toSave, err
@@ -681,28 +788,28 @@ func (p *DataTracker) Patch(d Stores, ref store.KeySaver, key string, patch json
 	return toSave, nil
 }
 
-func (p *DataTracker) Update(d Stores, ref store.KeySaver, ov ObjectValidator) (saved bool, err error) {
+func (p *DataTracker) Update(d Stores, obj models.Model) (saved bool, err error) {
+	ref := toBackend(p, d, obj)
 	prefix := ref.Prefix()
 	key := ref.Key()
+	backend := d(prefix).backingStore
 	if target := d(prefix).Find(key); target == nil {
-		err := &Error{
+		err := &models.Error{
 			Code:  http.StatusNotFound,
 			Key:   key,
 			Model: prefix,
 		}
 		err.Errorf("%s: PUT %s: Not Found", err.Model, err.Key)
 		return false, err
-	} else {
-		if ov != nil {
-			if err := ov(d, target, ref); err != nil {
-				return false, err
-			}
-		}
 	}
 
 	p.setDT(ref)
 	ref.(validator).setStores(d)
-	saved, err = store.Update(ref)
+	checker, checkOK := ref.(Validator)
+	if checkOK {
+		checker.ClearValidation()
+	}
+	saved, err = store.Update(backend, ref)
 	ref.(validator).clearStores()
 	if saved {
 		d(prefix).Add(ref)
@@ -711,22 +818,16 @@ func (p *DataTracker) Update(d Stores, ref store.KeySaver, ov ObjectValidator) (
 	return saved, err
 }
 
-func (p *DataTracker) Save(d Stores, ref store.KeySaver, ov ObjectValidator) (saved bool, err error) {
-	p.setDT(ref)
+func (p *DataTracker) Save(d Stores, obj models.Model) (saved bool, err error) {
+	ref := toBackend(p, d, obj)
+	prefix := ref.Prefix()
+	backend := d(prefix).backingStore
 	ref.(validator).setStores(d)
-	if ov != nil {
-		prefix := ref.Prefix()
-		key := ref.Key()
-		target := d(prefix).Find(key)
-
-		// Skip target compare if it doesn't exist already. Shouldn't happen.
-		if target != nil {
-			if err := ov(d, target, ref); err != nil {
-				return false, err
-			}
-		}
+	checker, checkOK := ref.(Validator)
+	if checkOK {
+		checker.ClearValidation()
 	}
-	saved, err = store.Save(ref)
+	saved, err = store.Save(backend, ref)
 	ref.(validator).clearStores()
 	if saved {
 		d(ref.Prefix()).Add(ref)
@@ -750,7 +851,7 @@ func (p *DataTracker) Backup() ([]byte, error) {
 	}
 	_, unlocker := p.LockEnts(keys...)
 	defer unlocker()
-	res := map[string][]store.KeySaver{}
+	res := map[string][]models.Model{}
 	for _, k := range keys {
 		res[k] = p.objs[k].Items()
 	}

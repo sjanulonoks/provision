@@ -1,8 +1,9 @@
 package backend
 
 import (
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
+	"github.com/digitalrebar/store"
 )
 
 // Pref tracks a global DigitalRebar Provision preference -- things like the
@@ -10,10 +11,9 @@ import (
 // default bootenv for known systems, etc.
 //
 type Pref struct {
+	*models.Pref
 	validate
-	p    *DataTracker
-	Name string
-	Val  string
+	p *DataTracker
 }
 
 func (p *Pref) Indexes() map[string]index.Maker {
@@ -23,32 +23,22 @@ func (p *Pref) Indexes() map[string]index.Maker {
 		"Name": index.Make(
 			true,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+			func(ref models.Model) (gte, gt index.Test) {
 				refName := fix(ref).Name
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).Name >= refName
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Name > refName
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &Pref{Name: s}, nil
+			func(s string) (models.Model, error) {
+				pref := fix(p.New())
+				pref.Name = s
+				return pref, nil
 			}),
 	}
-}
-
-func (p *Pref) Prefix() string {
-	return "preferences"
-}
-
-func (p *Pref) Key() string {
-	return p.Name
-}
-
-func (p *Pref) AuthKey() string {
-	return p.Key()
 }
 
 func (p *Pref) Backend() store.Store {
@@ -56,19 +46,15 @@ func (p *Pref) Backend() store.Store {
 }
 
 func (p *Pref) New() store.KeySaver {
-	return &Pref{p: p.p}
+	return &Pref{Pref: &models.Pref{}}
 }
 
 func (p *Pref) setDT(dt *DataTracker) {
 	p.p = dt
 }
 
-func AsPref(v store.KeySaver) *Pref {
+func AsPref(v models.Model) *Pref {
 	return v.(*Pref)
-}
-
-func (p *DataTracker) NewPref() *Pref {
-	return &Pref{p: p}
 }
 
 var prefLockMap = map[string][]string{

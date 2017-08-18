@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/olahol/melody.v1"
 )
@@ -22,7 +22,7 @@ func (fe *Frontend) InitWebSocket() {
 // Callers register or deregister values.
 // type.action.key = with * as wildcard spots.
 
-func filterFunction(s *melody.Session, e *backend.Event) bool {
+func filterFunction(s *melody.Session, e *models.Event) bool {
 	val, ok := s.Get("EventMap")
 	if !ok {
 		return false
@@ -45,7 +45,7 @@ func filterFunction(s *melody.Session, e *backend.Event) bool {
 	return false
 }
 
-func (f *Frontend) Publish(e *backend.Event) error {
+func (f *Frontend) Publish(e *models.Event) error {
 	if msg, err := json.Marshal(e); err != nil {
 		return err
 	} else {

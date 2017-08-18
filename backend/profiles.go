@@ -2,6 +2,7 @@ package backend
 
 import (
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
 
@@ -14,23 +15,8 @@ import (
 // These can be assigned to a machine's profile list.
 // swagger:model
 type Profile struct {
+	*models.Profile
 	validate
-
-	// The name of the profile.  This must be unique across all
-	// profiles.
-	//
-	// required: true
-	Name string
-	// A description of this profile.  This can contain any reference
-	// information for humans you want associated with the profile.
-	Description string
-	// Any additional parameters that may be needed to expand templates
-	// for BootEnv, as documented by that boot environment's
-	// RequiredParams and OptionalParams.
-	Params map[string]interface{}
-	// Profiles can also have an associated list of Tasks
-	Tasks []string
-
 	p *DataTracker
 }
 
@@ -50,36 +36,26 @@ func (p *Profile) Indexes() map[string]index.Maker {
 		"Name": index.Make(
 			true,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).Name < fix(j).Name },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+			func(ref models.Model) (gte, gt index.Test) {
 				refName := fix(ref).Name
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).Name >= refName
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Name > refName
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &Profile{Name: s}, nil
+			func(s string) (models.Model, error) {
+				profile := fix(p.New())
+				profile.Name = s
+				return profile, nil
 			}),
 	}
 }
 
 func (p *Profile) Backend() store.Store {
 	return p.p.getBackend(p)
-}
-
-func (p *Profile) Prefix() string {
-	return "profiles"
-}
-
-func (p *Profile) Key() string {
-	return p.Name
-}
-
-func (p *Profile) AuthKey() string {
-	return p.Key()
 }
 
 func (p *Profile) GetParams() map[string]interface{} {
@@ -92,10 +68,10 @@ func (p *Profile) GetParams() map[string]interface{} {
 
 func (p *Profile) SetParams(d Stores, values map[string]interface{}) error {
 	p.Params = values
-	e := &Error{Code: 422, Type: ValidationError, o: p}
-	_, e2 := p.p.Save(d, p, nil)
-	e.Merge(e2)
-	return e.OrNil()
+	e := &models.Error{Code: 422, Type: ValidationError, Object: p}
+	_, e2 := p.p.Save(d, p)
+	e.AddError(e2)
+	return e.HasError()
 }
 
 func (p *Profile) GetParam(key string, searchProfiles bool) (interface{}, bool) {
@@ -107,8 +83,10 @@ func (p *Profile) GetParam(key string, searchProfiles bool) (interface{}, bool) 
 }
 
 func (p *Profile) New() store.KeySaver {
-	res := &Profile{Name: p.Name, p: p.p}
-	return store.KeySaver(res)
+	res := &Profile{Profile: &models.Profile{}}
+	res.Params = map[string]interface{}{}
+	res.Tasks = []string{}
+	return res
 }
 
 func (p *Profile) setDT(dp *DataTracker) {
@@ -116,7 +94,7 @@ func (p *Profile) setDT(dp *DataTracker) {
 }
 
 func (p *Profile) BeforeDelete() error {
-	e := &Error{Code: 422, Type: ValidationError, o: p}
+	e := &models.Error{Code: 422, Type: ValidationError, Object: p}
 	machines := p.stores("machines")
 	for _, i := range machines.Items() {
 		m := AsMachine(i)
@@ -124,51 +102,51 @@ func (p *Profile) BeforeDelete() error {
 			e.Errorf("Machine %s is using profile %s", m.UUID(), p.Name)
 		}
 	}
-	return e.OrNil()
+	return e.HasError()
 }
 
-func (p *Profile) OnLoad() error {
-	if p.Params == nil {
-		p.Params = map[string]interface{}{}
-	}
-	return nil
-}
-
-func (p *DataTracker) NewProfile() *Profile {
-	return &Profile{p: p, Params: map[string]interface{}{}}
-}
-
-func AsProfile(o store.KeySaver) *Profile {
+func AsProfile(o models.Model) *Profile {
 	return o.(*Profile)
 }
 
-func AsProfiles(o []store.KeySaver) []*Profile {
+func AsProfiles(o []models.Model) []*Profile {
 	res := make([]*Profile, len(o))
 	for i := range o {
 		res[i] = AsProfile(o[i])
 	}
 	return res
 }
-func (p *Profile) Validate() error {
-	err := &Error{Code: 422, Type: ValidationError, o: p}
-	err.Merge(index.CheckUnique(p, p.stores("profiles").Items()))
+func (p *Profile) Validate() {
+	p.AddError(index.CheckUnique(p, p.stores("profiles").Items()))
+	p.SetValid()
 	params := p.stores("params")
 	for k, v := range p.Params {
 		if pIdx := params.Find(k); pIdx != nil {
 			param := AsParam(pIdx)
-			err.Merge(param.ValidateValue(v))
+			if err := param.ValidateValue(v); err != nil {
+				p.Errorf("Key '%s': invalid val '%s': %v", k, v, err)
+			}
 		}
 	}
 	for i, taskName := range p.Tasks {
 		if p.stores("tasks").Find(taskName) == nil {
-			err.Errorf("Task %s (at %d) does not exist", taskName, i)
+			p.Errorf("Task %s (at %d) does not exist", taskName, i)
 		}
 	}
-	return err.OrNil()
+	p.SetAvailable()
 }
 
 func (p *Profile) BeforeSave() error {
-	return p.Validate()
+	p.Validate()
+	if !p.Useable() {
+		return p.MakeError(422, ValidationError, p)
+	}
+	return nil
+}
+
+func (p *Profile) OnLoad() error {
+	p.Params = map[string]interface{}{}
+	return p.BeforeSave()
 }
 
 var profileLockMap = map[string][]string{

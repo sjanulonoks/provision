@@ -1,17 +1,21 @@
 package backend
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/digitalrebar/provision/models"
+)
 
 func TestProfilesCrud(t *testing.T) {
 	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("profiles", "params", "machines")
 	defer unlocker()
 	tests := []crudTest{
-		{"Create empty profile", dt.Create, &Profile{p: dt}, false, nil},
-		{"Create new profile with name", dt.Create, &Profile{p: dt, Name: "Test Profile"}, true, nil},
-		{"Create Duplicate Profile", dt.Create, &Profile{p: dt, Name: "Test Profile"}, false, nil},
-		{"Delete Profile", dt.Remove, &Profile{p: dt, Name: "Test Profile"}, true, nil},
-		{"Delete Nonexistent Profile", dt.Remove, &Profile{p: dt, Name: "Test Profile"}, false, nil},
+		{"Create empty profile", dt.Create, &models.Profile{}, false},
+		{"Create new profile with name", dt.Create, &models.Profile{Name: "Test Profile"}, true},
+		{"Create Duplicate Profile", dt.Create, &models.Profile{Name: "Test Profile"}, false},
+		{"Delete Profile", dt.Remove, &models.Profile{Name: "Test Profile"}, true},
+		{"Delete Nonexistent Profile", dt.Remove, &models.Profile{Name: "Test Profile"}, false},
 	}
 	for _, test := range tests {
 		test.Test(t, d)
@@ -35,41 +39,35 @@ func TestProfilesValidation(t *testing.T) {
 		{
 			"Create new Parameter",
 			dt.Create,
-			&Param{
-				p:    dt,
+			&models.Param{
 				Name: "Bool",
 				Schema: map[string]interface{}{
 					"type": "boolean",
 				},
 			},
 			true,
-			nil,
 		},
 		{
 			"Create Passing Profile",
 			dt.Create,
-			&Profile{
-				p:    dt,
+			&models.Profile{
 				Name: "Bool Profile Pass",
 				Params: map[string]interface{}{
 					"Bool": true,
 				},
 			},
 			true,
-			nil,
 		},
 		{
 			"Create Failing Profile",
 			dt.Create,
-			&Profile{
-				p:    dt,
+			&models.Profile{
 				Name: "Bool Profile Fail",
 				Params: map[string]interface{}{
 					"Bool": "true",
 				},
 			},
-			false,
-			nil,
+			true,
 		},
 	}
 	for _, test := range tests {

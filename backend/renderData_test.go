@@ -6,6 +6,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/digitalrebar/provision/models"
 	"github.com/pborman/uuid"
 )
 
@@ -66,33 +67,67 @@ BootParams = default`
 func TestRenderData(t *testing.T) {
 	dt := mkDT(nil)
 	var machine *Machine
-	defaultBootEnv := &BootEnv{p: dt, Name: "default", Templates: []TemplateInfo{{Name: "ipxe", Path: "machines/{{.Machine.UUID}}/file", ID: "default"}}, BootParams: "{{.Env.Name}}"}
-	nothingBootEnv := &BootEnv{p: dt, Name: "nothing", Templates: []TemplateInfo{{Name: "ipxe", Path: "machines/{{.Machine.UUID}}/file", ID: "nothing"}}, BootParams: "{{.Env.Name}}"}
-	badBootEnv := &BootEnv{p: dt, Name: "bad", Templates: []TemplateInfo{{Name: "ipxe", Path: "machines/{{.Machine.UUID}}/file", ID: "nothing"}}, BootParams: "{{.Param \"cow\"}}"}
+	defaultBootEnv := AsBootEnv(toBackend(dt,
+		nil,
+		&models.BootEnv{
+			Name: "default",
+			Templates: []models.TemplateInfo{
+				{
+					Name: "ipxe",
+					Path: "machines/{{.Machine.UUID}}/file",
+					ID:   "default",
+				},
+			},
+			BootParams: "{{.Env.Name}}",
+		}))
+	nothingBootEnv := AsBootEnv(toBackend(dt, nil, &models.BootEnv{
+		Name: "nothing",
+		Templates: []models.TemplateInfo{
+			{
+				Name: "ipxe",
+				Path: "machines/{{.Machine.UUID}}/file",
+				ID:   "nothing",
+			},
+		},
+		BootParams: "{{.Env.Name}}",
+	}))
+	badBootEnv := AsBootEnv(toBackend(dt, nil, &models.BootEnv{
+		Name: "bad",
+		Templates: []models.TemplateInfo{
+			{
+				Name: "ipxe",
+				Path: "machines/{{.Machine.UUID}}/file",
+				ID:   "nothing",
+			},
+		},
+		BootParams: "{{.Param \"cow\"}}",
+	}))
 	func() {
 		d, unlocker := dt.LockEnts("bootenvs", "templates", "machines", "profiles", "params", "tasks")
 		defer unlocker()
 
 		objs := []crudTest{
-			{"Update global profile to have test with a value", dt.Update, &Profile{Name: "global", Params: map[string]interface{}{"test": "foreal"}}, true, nil},
-			{"create test profile to have test with a value", dt.Create, &Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true, nil},
+			{"Update global profile to have test with a value", dt.Update, &models.Profile{Name: "global", Params: map[string]interface{}{"test": "foreal"}}, true},
+			{"create test profile to have test with a value", dt.Create, &models.Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true},
 
-			{"Create included template", dt.Create, &Template{p: dt, ID: "included", Contents: tmplIncluded}, true, nil},
-			{"Create default template", dt.Create, &Template{p: dt, ID: "default", Contents: tmplDefault}, true, nil},
-			{"Create nothing template", dt.Create, &Template{p: dt, ID: "nothing", Contents: tmplNothing}, true, nil},
-			{"Create default bootenv", dt.Create, defaultBootEnv, true, nil},
-			{"Create nothing bootenv", dt.Create, nothingBootEnv, true, nil},
-			{"Create bad bootenv", dt.Create, badBootEnv, true, nil},
+			{"Create included template", dt.Create, &models.Template{ID: "included", Contents: tmplIncluded}, true},
+			{"Create default template", dt.Create, &models.Template{ID: "default", Contents: tmplDefault}, true},
+			{"Create nothing template", dt.Create, &models.Template{ID: "nothing", Contents: tmplNothing}, true},
+			{"Create default bootenv", dt.Create, defaultBootEnv, true},
+			{"Create nothing bootenv", dt.Create, nothingBootEnv, true},
+			{"Create bad bootenv", dt.Create, badBootEnv, true},
 		}
 		for _, obj := range objs {
 			obj.Test(t, d)
 		}
-		machine = dt.NewMachine()
+		machine = &Machine{}
+		Fill(machine)
 		machine.Uuid = uuid.NewRandom()
 		machine.Name = "Test Name"
 		machine.Address = net.ParseIP("192.168.124.11")
 		machine.BootEnv = "default"
-		created, err := dt.Create(d, machine, nil)
+		machine.p = dt
+		created, err := dt.Create(d, machine)
 		if !created {
 			t.Errorf("Failed to create new test machine: %v", err)
 			return
@@ -140,7 +175,7 @@ func TestRenderData(t *testing.T) {
 		d, unlocker := dt.LockEnts("bootenvs", "templates", "machines", "profiles", "params", "tasks")
 		defer unlocker()
 		machine.BootEnv = "nothing"
-		saved, err := dt.Save(d, machine, nil)
+		saved, err := dt.Save(d, machine)
 		if !saved {
 			t.Errorf("Failed to save test machine with new bootenv: %v", err)
 		}
@@ -324,7 +359,7 @@ func TestRenderData(t *testing.T) {
 
 		// Test a machine profile parameter
 		machine.Profiles = []string{"test"}
-		saved, err := dt.Save(d, machine, nil)
+		saved, err := dt.Save(d, machine)
 		if !saved {
 			t.Errorf("Failed to save test machine with new profile list: %v", err)
 		}

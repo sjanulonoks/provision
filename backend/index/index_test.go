@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
 
@@ -18,7 +19,7 @@ func (t testThing) Prefix() string {
 	return "integers"
 }
 
-func (t testThing) New() store.KeySaver {
+func (t testThing) New() models.Model {
 	return t
 }
 
@@ -31,18 +32,18 @@ func (t testThing) Indexes() map[string]Maker {
 		"Base": Make(
 			true,
 			"string",
-			func(i, j store.KeySaver) bool {
+			func(i, j models.Model) bool {
 				return i.(testThing) < j.(testThing)
 			},
-			func(ref store.KeySaver) (gte, gt Test) {
-				return func(s store.KeySaver) bool {
+			func(ref models.Model) (gte, gt Test) {
+				return func(s models.Model) bool {
 						return s.(testThing) >= ref.(testThing)
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return s.(testThing) > ref.(testThing)
 					}
 			},
-			func(s string) (store.KeySaver, error) {
+			func(s string) (models.Model, error) {
 				res, err := strconv.ParseInt(s, 10, 64)
 				return testThing(res), err
 			}),
@@ -61,7 +62,7 @@ func matchIdx(t *testing.T, i *Index, ints ...int64) {
 }
 
 func TestAddIndex(t *testing.T) {
-	objs := make([]store.KeySaver, 10)
+	objs := make([]models.Model, 10)
 	objs[0] = testThing(10)
 	objs[1] = testThing(4)
 	objs[2] = testThing(14)
@@ -72,14 +73,14 @@ func TestAddIndex(t *testing.T) {
 	objs[7] = testThing(16)
 	objs[8] = testThing(6)
 	objs[9] = testThing(8)
-	idx := Create([]store.KeySaver{})
+	idx := Create([]models.Model{})
 	idx.Add(objs...)
 	for i, item := range idx.Items() {
 		if (int64(i) * 2) != int64(item.(testThing)) {
 			t.Errorf("Expected %d, got %d", i, item)
 		}
 	}
-	objs = make([]store.KeySaver, 11)
+	objs = make([]models.Model, 11)
 	objs[0] = testThing(11)
 	objs[1] = testThing(5)
 	objs[2] = testThing(15)
@@ -100,7 +101,7 @@ func TestAddIndex(t *testing.T) {
 }
 
 func TestIndexes(t *testing.T) {
-	objs := make([]store.KeySaver, 100)
+	objs := make([]models.Model, 100)
 	for i := range objs {
 		objs[i] = testThing(len(objs) - i)
 	}
@@ -211,7 +212,7 @@ func TestIndexes(t *testing.T) {
 		t.Errorf("Got unexpected error running Ne: %v", err)
 	}
 	matchIdx(t, lt, 96, 97, 99, 100)
-	lt, err = Select(func(s store.KeySaver) bool { return s.(testThing)%2 == 0 })(lt)
+	lt, err = Select(func(s models.Model) bool { return s.(testThing)%2 == 0 })(lt)
 	if err != nil {
 		t.Errorf("Got unexpected error running Select: %v", err)
 	}

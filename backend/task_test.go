@@ -1,25 +1,29 @@
 package backend
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/digitalrebar/provision/models"
+)
 
 func TestTaskCrud(t *testing.T) {
 	dt := mkDT(nil)
 	d, unlocker := dt.LockEnts("templates", "tasks", "bootenvs")
 	defer unlocker()
-	tmpl := &Template{p: dt, ID: "ok", Contents: "{{ .Env.Name }}"}
-	if ok, err := dt.Create(d, tmpl, nil); !ok {
+	tmpl := &models.Template{ID: "ok", Contents: "{{ .Env.Name }}"}
+	if ok, err := dt.Create(d, tmpl); !ok {
 		t.Errorf("Failed to create test OK template: %v", err)
 		return
 	}
 	tests := []crudTest{
-		{"Create Task with nonexistent Name", dt.Create, &Task{p: dt}, false, nil},
-		{"Create Task with no templates", dt.Create, &Task{p: dt, Name: "test 1"}, true, nil},
-		{"Create Task with invalid TemplateInfo (missing Name)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Path: "{{ .Env.Name }}", ID: "ok"}}}, false, nil},
-		{"Create Task with invalid TemplateInfo (missing ID)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}"}}}, false, nil},
-		{"Create Task with invalid TemplateInfo (invalid ID)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}", ID: "okp"}}}, false, nil},
-		{"Create Task with invalid TemplateInfo (invalid Path)", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }", ID: "ok"}}}, false, nil},
-		{"Create Task with valid TemplateInfo (not available}", dt.Create, &Task{p: dt, Name: "test 3", Templates: []TemplateInfo{{Name: "unavailable", Path: "{{ .Env.Name }}", ID: "ok"}}}, true, nil},
-		{"Create Task with valid TemplateInfo (available)", dt.Create, &Task{p: dt, Name: "available", Templates: []TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "ok"}}}, true, nil},
+		{"Create Task with nonexistent Name", dt.Create, &models.Task{}, false},
+		{"Create Task with no templates", dt.Create, &models.Task{Name: "test 1"}, true},
+		{"Create Task with invalid models.TemplateInfo (missing Name)", dt.Create, &models.Task{Name: "test 3", Templates: []models.TemplateInfo{{Path: "{{ .Env.Name }}", ID: "ok"}}}, false},
+		{"Create Task with invalid models.TemplateInfo (missing ID)", dt.Create, &models.Task{Name: "test 3", Templates: []models.TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}"}}}, false},
+		{"Create Task with invalid models.TemplateInfo (invalid ID)", dt.Create, &models.Task{Name: "test 3", Templates: []models.TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}", ID: "okp"}}}, false},
+		{"Create Task with invalid models.TemplateInfo (invalid Path)", dt.Create, &models.Task{Name: "test 3", Templates: []models.TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }", ID: "ok"}}}, false},
+		{"Create Task with valid models.TemplateInfo (not available}", dt.Create, &models.Task{Name: "test 3", Templates: []models.TemplateInfo{{Name: "unavailable", Path: "{{ .Env.Name }}", ID: "ok"}}}, true},
+		{"Create Task with valid models.TemplateInfo (available)", dt.Create, &models.Task{Name: "available", Templates: []models.TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "ok"}}}, true},
 	}
 
 	for _, test := range tests {
@@ -38,15 +42,15 @@ func TestTaskCrud(t *testing.T) {
 	/*
 		// We need a Machine that refers to one of our Tasks to
 		// test proper delete restrictions
-		machine := &Machine{p: dt, Name: "test 1", Task: "available", Uuid: uuid.NewRandom()}
-		if ok, err := dt.Create(machine); !ok {
+		machine := &models.Machine{ Name: "test 1", Task: "available", Uuid: uuid.NewRandom()}
+		if ok, err := dt.Create(d, machine); !ok {
 			t.Errorf("Failed to create test machine: %v", err)
 			return
 		}
 		rmTests := []crudTest{
-			{"Remove Task that is not in use", dt.Remove, &Task{p: dt, Name: "test 1"}, true},
-			{"Remove nonexistent Task", dt.Remove, &Task{p: dt, Name: "test 1"}, false},
-			{"Remove Task that is in use", dt.Remove, &Task{p: dt, Name: "available"}, false},
+			{"Remove Task that is not in use", dt.Remove, &models.Task{ Name: "test 1"}, true},
+			{"Remove nonexistent Task", dt.Remove, &models.Task{ Name: "test 1"}, false},
+			{"Remove Task that is in use", dt.Remove, &models.Task{ Name: "available"}, false},
 		}
 		for _, test := range rmTests {
 			test.Test(t)

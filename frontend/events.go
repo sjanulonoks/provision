@@ -3,7 +3,7 @@ package frontend
 import (
 	"net/http"
 
-	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -11,7 +11,7 @@ import (
 // swagger:parameters postEvent
 type EventBodyParameter struct {
 	// in: body
-	Body *backend.Event
+	Body *models.Event
 }
 
 func (f *Frontend) InitEventApi() {
@@ -32,17 +32,17 @@ func (f *Frontend) InitEventApi() {
 			if !assureAuth(c, f.Logger, "events", "post", "*") {
 				return
 			}
-			event := backend.Event{}
+			event := models.Event{}
 			if !assureDecode(c, &event) {
 				return
 			}
 
 			if err := f.pubs.PublishEvent(&event); err != nil {
-				be, ok := err.(*backend.Error)
+				be, ok := err.(*models.Error)
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, backend.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 
 			} else {

@@ -5,8 +5,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/digitalrebar/store"
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
 )
 
 // LeaseNAK is the error that shall be returned when we cannot give a
@@ -17,7 +17,7 @@ type LeaseNAK error
 
 func findLease(d Stores, dt *DataTracker, strat, token string, req net.IP) (lease *Lease, err error) {
 	reservations, leases := d("reservations"), d("leases")
-	hexreq := Hexaddr(req.To4())
+	hexreq := models.Hexaddr(req.To4())
 	found := leases.Find(hexreq)
 	if found == nil {
 		err = LeaseNAK(fmt.Errorf("No lease for %s exists", hexreq))
@@ -39,7 +39,7 @@ func findLease(d Stores, dt *DataTracker, strat, token string, req net.IP) (leas
 		if reservation.Strategy != lease.Strategy ||
 			reservation.Token != lease.Token {
 			lease.Invalidate()
-			dt.Save(d, lease, nil)
+			dt.Save(d, lease)
 			err = LeaseNAK(fmt.Errorf("Reservation %s (%s:%s conflicts with %s:%s",
 				reservation.Addr,
 				reservation.Strategy,
@@ -82,19 +82,19 @@ func FindLease(dt *DataTracker,
 		} else if reservation != nil {
 			lease.ExpireTime = time.Now().Add(2 * time.Hour)
 		} else {
-			dt.Remove(d, lease, nil)
+			dt.Remove(d, lease)
 			err = LeaseNAK(fmt.Errorf("Lease %s has no reservation or subnet, it is dead to us.", lease.Addr))
 			lease = nil
 			return
 		}
-		dt.Save(d, lease, nil)
+		dt.Save(d, lease)
 	}
 	return
 }
 
 func findViaReservation(leases, reservations *Store, strat, token string, req net.IP) (lease *Lease, reservation *Reservation) {
 	if req != nil && req.IsGlobalUnicast() {
-		hex := Hexaddr(req)
+		hex := models.Hexaddr(req)
 		ok := reservations.Find(hex)
 		if ok != nil {
 			reservation = AsReservation(ok)
@@ -142,11 +142,11 @@ func findViaReservation(leases, reservations *Store, strat, token string, req ne
 	// We did not find a lease for this IP, and findLease has already guaranteed that
 	// either there is no lease for this token or that the old lease has been NAK'ed.
 	// We are free to create a new lease for this Reservation.
-	lease = &Lease{
-		Addr:     reservation.Addr,
-		Strategy: reservation.Strategy,
-		Token:    reservation.Token,
-	}
+	lease = &Lease{}
+	Fill(lease)
+	lease.Addr = reservation.Addr
+	lease.Strategy = reservation.Strategy
+	lease.Token = reservation.Token
 	leases.Add(lease)
 	return
 }
@@ -173,12 +173,12 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 		return
 	}
 	currLeases, _ := index.Between(
-		Hexaddr(subnet.ActiveStart),
-		Hexaddr(subnet.ActiveEnd))(&leases.Index)
+		models.Hexaddr(subnet.ActiveStart),
+		models.Hexaddr(subnet.ActiveEnd))(&leases.Index)
 	currReservations, _ := index.Between(
-		Hexaddr(subnet.ActiveStart),
-		Hexaddr(subnet.ActiveEnd))(&reservations.Index)
-	usedAddrs := map[string]store.KeySaver{}
+		models.Hexaddr(subnet.ActiveStart),
+		models.Hexaddr(subnet.ActiveEnd))(&reservations.Index)
+	usedAddrs := map[string]models.Model{}
 	for _, i := range currLeases.Items() {
 		currLease := AsLease(i)
 		// While we are iterating over leases, see if we run across a candidate.
@@ -237,7 +237,7 @@ func FindOrCreateLease(dt *DataTracker,
 	}
 	if lease != nil {
 		// Clean up any other leases that have this strategy and token lying around.
-		toRemove := []store.KeySaver{}
+		toRemove := []models.Model{}
 		for _, dup := range leases.Items() {
 			candidate := AsLease(dup)
 			if candidate.Strategy == strat &&
@@ -249,7 +249,7 @@ func FindOrCreateLease(dt *DataTracker,
 		leases.Remove(toRemove...)
 		lease.p = dt
 		lease.ExpireTime = time.Now().Add(time.Minute)
-		dt.Save(d, lease, nil)
+		dt.Save(d, lease)
 	}
 	return
 }

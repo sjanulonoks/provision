@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 	"github.com/pborman/uuid"
 )
@@ -52,60 +54,17 @@ import (
 //
 // swagger:model
 type Job struct {
+	*models.Job
 	validate
-
-	// The UUID of the job.  The primary key.
-	// required: true
-	// swagger:strfmt uuid
-	Uuid uuid.UUID
-	// The UUID of the previous job to run on this machine.
-	// swagger:strfmt uuid
-	Previous uuid.UUID
-	// The machine the job was created for.  This field must be the UUID of the machine.
-	// required: true
-	// swagger:strfmt uuid
-	Machine uuid.UUID
-	// The task the job was created for.  This will be the name of the task.
-	// read only: true
-	Task string
-	// The boot environment that the task was created in.
-	// read only: true
-	BootEnv string
-	// The state the job is in.  Must be one of "created", "running", "failed", "finished", "incomplete"
-	// required: true
-	State string
-	// The time the job entered running.
-	StartTime time.Time
-	// The time the job entered failed or finished.
-	EndTime time.Time
-	// required: true
-	Archived bool
-	// DRP Filesystem path to the log for this job
-	// read only: true
-	LogPath string
-
 	p        *DataTracker
 	oldState string
 }
 
-// Job Action is something that job runner will need to do.
-// If path is specified, then the runner will place the contents into that location.
-// If path is not specified, then the runner will attempt to bash exec the contents.
-// swagger:model
-type JobAction struct {
-	// required: true
-	Name string
-	// required: true
-	Path string
-	// required: true
-	Content string
-}
-
-func AsJob(o store.KeySaver) *Job {
+func AsJob(o models.Model) *Job {
 	return o.(*Job)
 }
 
-func AsJobs(o []store.KeySaver) []*Job {
+func AsJobs(o []models.Model) []*Job {
 	res := make([]*Job, len(o))
 	for i := range o {
 		res[i] = AsJob(o[i])
@@ -117,25 +76,8 @@ func (j *Job) Backend() store.Store {
 	return j.p.getBackend(j)
 }
 
-func (j *Job) Prefix() string {
-	return "jobs"
-}
-
-func (j *Job) Key() string {
-	return j.Uuid.String()
-}
-
-func (j *Job) AuthKey() string {
-	return j.Machine.String()
-}
-
 func (j *Job) New() store.KeySaver {
-	res := &Job{p: j.p}
-	return store.KeySaver(res)
-}
-
-func (d *DataTracker) NewJob() *Job {
-	return &Job{p: d}
+	return &Job{Job: &models.Job{}}
 }
 
 func (j *Job) setDT(dp *DataTracker) {
@@ -153,109 +95,119 @@ func (j *Job) Indexes() map[string]index.Maker {
 		"Uuid": index.Make(
 			true,
 			"UUID string",
-			func(i, j store.KeySaver) bool { return fix(i).Uuid.String() < fix(j).Uuid.String() },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).Uuid.String() < fix(j).Uuid.String() },
+			func(ref models.Model) (gte, gt index.Test) {
 				refUuid := fix(ref).Uuid.String()
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).Uuid.String() >= refUuid
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Uuid.String() > refUuid
 					}
 			},
-			func(s string) (store.KeySaver, error) {
+			func(s string) (models.Model, error) {
 				id := uuid.Parse(s)
 				if id == nil {
 					return nil, fmt.Errorf("Invalid UUID: %s", s)
 				}
-				return &Job{Uuid: id}, nil
+				job := fix(j.New())
+				job.Uuid = id
+				return job, nil
 			}),
 		"BootEnv": index.Make(
 			false,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).BootEnv < fix(j).BootEnv },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).BootEnv < fix(j).BootEnv },
+			func(ref models.Model) (gte, gt index.Test) {
 				refBootEnv := fix(ref).BootEnv
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).BootEnv >= refBootEnv
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).BootEnv > refBootEnv
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &Job{BootEnv: s}, nil
+			func(s string) (models.Model, error) {
+				job := fix(j.New())
+				job.BootEnv = s
+				return job, nil
 			}),
 		"Task": index.Make(
 			false,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).Task < fix(j).Task },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).Task < fix(j).Task },
+			func(ref models.Model) (gte, gt index.Test) {
 				refTask := fix(ref).Task
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).Task >= refTask
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Task > refTask
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &Job{Task: s}, nil
+			func(s string) (models.Model, error) {
+				job := fix(j.New())
+				job.Task = s
+				return job, nil
 			}),
 		"State": index.Make(
 			false,
 			"string",
-			func(i, j store.KeySaver) bool { return fix(i).State < fix(j).State },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).State < fix(j).State },
+			func(ref models.Model) (gte, gt index.Test) {
 				refState := fix(ref).State
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).State >= refState
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).State > refState
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				return &Job{State: s}, nil
+			func(s string) (models.Model, error) {
+				job := fix(j.New())
+				job.State = s
+				return job, nil
 			}),
 		"Machine": index.Make(
 			true,
 			"UUID string",
-			func(i, j store.KeySaver) bool { return fix(i).Machine.String() < fix(j).Machine.String() },
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(i, j models.Model) bool { return fix(i).Machine.String() < fix(j).Machine.String() },
+			func(ref models.Model) (gte, gt index.Test) {
 				refMachine := fix(ref).Machine.String()
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						return fix(s).Machine.String() >= refMachine
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Machine.String() > refMachine
 					}
 			},
-			func(s string) (store.KeySaver, error) {
+			func(s string) (models.Model, error) {
 				id := uuid.Parse(s)
 				if id == nil {
 					return nil, fmt.Errorf("Invalid UUID: %s", s)
 				}
-				return &Job{Machine: id}, nil
+				job := fix(j.New())
+				job.Machine = id
+				return job, nil
 			}),
 		"Archived": index.Make(
 			false,
 			"boolean",
-			func(i, j store.KeySaver) bool {
+			func(i, j models.Model) bool {
 				return (!fix(i).Archived) && fix(j).Archived
 			},
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(ref models.Model) (gte, gt index.Test) {
 				avail := fix(ref).Archived
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						v := fix(s).Archived
 						return v || (v == avail)
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).Archived && !avail
 					}
 			},
-			func(s string) (store.KeySaver, error) {
-				res := &Job{}
+			func(s string) (models.Model, error) {
+				res := fix(j.New())
 				switch s {
 				case "true":
 					res.Archived = true
@@ -269,48 +221,52 @@ func (j *Job) Indexes() map[string]index.Maker {
 		"StartTime": index.Make(
 			false,
 			"dateTime",
-			func(i, j store.KeySaver) bool {
+			func(i, j models.Model) bool {
 				return fix(i).StartTime.Before(fix(j).StartTime)
 			},
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(ref models.Model) (gte, gt index.Test) {
 				refTime := fix(ref).StartTime
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						cmpTime := fix(s).StartTime
 						return refTime.Equal(cmpTime) || cmpTime.After(refTime)
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).StartTime.After(refTime)
 					}
 			},
-			func(s string) (store.KeySaver, error) {
+			func(s string) (models.Model, error) {
 				parsedTime, err := time.Parse(time.RFC3339, s)
 				if err != nil {
 					return nil, err
 				}
-				return &Job{StartTime: parsedTime}, nil
+				job := fix(j.New())
+				job.StartTime = parsedTime
+				return job, nil
 			}),
 		"EndTime": index.Make(
 			false,
 			"dateTime",
-			func(i, j store.KeySaver) bool {
+			func(i, j models.Model) bool {
 				return fix(i).EndTime.Before(fix(j).EndTime)
 			},
-			func(ref store.KeySaver) (gte, gt index.Test) {
+			func(ref models.Model) (gte, gt index.Test) {
 				refTime := fix(ref).EndTime
-				return func(s store.KeySaver) bool {
+				return func(s models.Model) bool {
 						cmpTime := fix(s).EndTime
 						return refTime.Equal(cmpTime) || cmpTime.After(refTime)
 					},
-					func(s store.KeySaver) bool {
+					func(s models.Model) bool {
 						return fix(s).EndTime.After(refTime)
 					}
 			},
-			func(s string) (store.KeySaver, error) {
+			func(s string) (models.Model, error) {
 				parsedTime, err := time.Parse(time.RFC3339, s)
 				if err != nil {
 					return nil, err
 				}
-				return &Job{EndTime: parsedTime}, nil
+				job := fix(j.New())
+				job.EndTime = parsedTime
+				return job, nil
 			}),
 	}
 }
@@ -323,18 +279,31 @@ var JobValidStates []string = []string{
 	"incomplete",
 }
 
+func (j *Job) OnLoad() error {
+	j.Validate()
+	if !j.Validated {
+		return j.HasError()
+	}
+	return nil
+}
+
 func (j *Job) OnChange(oldThing store.KeySaver) error {
 	j.oldState = AsJob(oldThing).State
 	return nil
 }
 
-func (j *Job) BeforeSave() error {
-	e := &Error{Code: 422, Type: ValidationError, o: j}
+func (j *Job) Validate() {
 	if j.Uuid == nil {
-		e.Errorf("Job %#v was not assigned a uuid!", j)
+		j.Errorf("Job %#v was not assigned a uuid!", j)
 	}
 	if j.Previous == nil {
-		e.Errorf("Job %s does not have a Previous job", j.UUID())
+		j.Errorf("Job %s does not have a Previous job", j.UUID())
+	}
+	if j.State == "finished" || j.State == "failed" {
+		if j.oldState != j.State {
+			j.EndTime = time.Now()
+		}
+		j.SetValid()
 	}
 
 	objs := j.stores
@@ -344,23 +313,28 @@ func (j *Job) BeforeSave() error {
 
 	var m *Machine
 	if om := machines.Find(j.Machine.String()); om == nil {
-		e.Errorf("Machine %s does not exist", j.Machine.String())
+		j.Errorf("Machine %s does not exist", j.Machine.String())
 	} else {
 		m = AsMachine(om)
+		if j.State == "failed" {
+			m.Runnable = false
+			_, e2 := j.p.Save(objs, m)
+			j.AddError(e2)
+		}
 	}
 
 	if tasks.Find(j.Task) == nil {
-		e.Errorf("Task %s does not exist", j.Task)
+		j.Errorf("Task %s does not exist", j.Task)
 	}
 
 	var env *BootEnv
 	if nbFound := bootenvs.Find(j.BootEnv); nbFound == nil {
-		e.Errorf("Bootenv %s does not exist", j.BootEnv)
+		j.Errorf("Bootenv %s does not exist", j.BootEnv)
 	} else {
 		env = AsBootEnv(nbFound)
 	}
 	if env != nil && !env.Available {
-		e.Errorf("Jobs %s wants BootEnv %s, which is not available", j.UUID(), j.BootEnv)
+		j.Errorf("Jobs %s wants BootEnv %s, which is not available", j.UUID(), j.BootEnv)
 	}
 
 	found := false
@@ -371,48 +345,42 @@ func (j *Job) BeforeSave() error {
 		}
 	}
 	if !found {
-		e.Errorf("Jobs %s wants State %s, which is not valid", j.UUID(), j.State)
+		j.Errorf("Jobs %s wants State %v, which is not valid", j.UUID(), j.State)
 	}
 
 	if j.LogPath == "" {
 		j.LogPath = filepath.Join(j.p.LogRoot, j.Uuid.String())
 		buf := &bytes.Buffer{}
 		fmt.Fprintf(buf, "Log for Job: %s\n", j.Uuid.String())
-		ee := j.Log(buf)
-		e.Merge(ee)
+		j.AddError(j.Log(buf))
 	}
 
-	if e.OrNil() == nil {
-		if j.oldState != j.State {
-			if j.State == "running" {
-				j.StartTime = time.Now()
-			}
-			if j.State == "failed" || j.State == "finished" {
-				j.EndTime = time.Now()
-			}
-			// We are going to failed.  Mark machine as not Runnable
-			if j.State == "failed" {
-				m.Runnable = false
-				_, e2 := j.p.Save(objs, m, nil)
-				e.Merge(e2)
-			}
-		}
+	j.SetValid()
+	j.SetAvailable()
+	if j.Available && j.oldState != j.State && j.State == "running" {
+		j.StartTime = time.Now()
 	}
+}
 
-	return e.OrNil()
+func (j *Job) BeforeSave() error {
+	j.Validate()
+	if !j.Validated {
+		return j.MakeError(422, ValidationError, j)
+	}
+	return nil
 }
 
 func (j *Job) BeforeDelete() error {
-	e := &Error{Code: 422, Type: ValidationError, o: j}
+	e := &models.Error{Code: 422, Type: ValidationError, Object: j}
 
 	if j.State != "finished" && j.State != "failed" {
-		e.Errorf("Jobs %s is not in a deletable state: %s", j.UUID(), j.State)
+		e.Errorf("Jobs %s is not in a deletable state: %v", j.UUID(), j.State)
 	}
 
-	return e.OrNil()
+	return e.HasError()
 }
 
-func (j *Job) RenderActions() ([]*JobAction, error) {
+func (j *Job) RenderActions() ([]*models.JobAction, error) {
 	renderers, addr, e := func() (renderers, net.IP, error) {
 		d, unlocker := j.p.LockEnts(j.Locks("actions")...)
 		defer unlocker()
@@ -420,53 +388,54 @@ func (j *Job) RenderActions() ([]*JobAction, error) {
 		tasks := d("tasks")
 
 		// This should not happen, but we treat task in the job as soft.
-		var to store.KeySaver
+		var to models.Model
 		if to = tasks.Find(j.Task); to == nil {
-			err := &Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
+			err := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
 				Messages: []string{fmt.Sprintf("Task %s does not exist", j.Task)}}
 			return nil, nil, err
 		}
 		t := AsTask(to)
 
 		// This should not happen, but we treat machine in the job as soft.
-		var mo store.KeySaver
+		var mo models.Model
 		if mo = machines.Find(j.Machine.String()); mo == nil {
-			err := &Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
+			err := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
 				Messages: []string{fmt.Sprintf("Machine %s does not exist", j.Machine.String())}}
 			return nil, nil, err
 		}
 		m := AsMachine(mo)
 
-		err := &Error{}
+		err := &models.Error{}
 		renderers := t.Render(d, m, err)
-		if err.OrNil() != nil {
+		if err.HasError() != nil {
 			return nil, nil, err
 		}
 
 		return renderers, m.Address, nil
 	}()
+	log.Printf("%#v, %#v, %#v", renderers, addr, e)
 	if e != nil {
 		return nil, e
 	}
 
-	err := &Error{}
-	actions := []*JobAction{}
+	err := &models.Error{}
+	actions := []*models.JobAction{}
 	for _, r := range renderers {
 		rr, err1 := r.write(addr)
 		if err1 != nil {
-			err.Merge(err1)
+			err.AddError(err1)
 		} else {
 			b, err2 := ioutil.ReadAll(rr)
 			if err2 != nil {
-				err.Merge(err2)
+				err.AddError(err2)
 			} else {
-				na := &JobAction{Name: r.name, Path: r.path, Content: string(b)}
+				na := &models.JobAction{Name: r.name, Path: r.path, Content: string(b)}
 				actions = append(actions, na)
 			}
 		}
 	}
 
-	return actions, err.OrNil()
+	return actions, err.HasError()
 }
 
 func (j *Job) Log(src io.Reader) error {

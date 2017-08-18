@@ -3,6 +3,7 @@ package frontend
 import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,14 +11,14 @@ import (
 // swagger:response
 type TemplateResponse struct {
 	//in: body
-	Body *backend.Template
+	Body *models.Template
 }
 
 // TemplatesResponse return on a successful GET of all templates
 // swagger:response
 type TemplatesResponse struct {
 	//in: body
-	Body []*backend.Template
+	Body []*models.Template
 }
 
 // TemplateBodyParameter used to inject a Template
@@ -25,7 +26,7 @@ type TemplatesResponse struct {
 type TemplateBodyParameter struct {
 	// in: body
 	// required: true
-	Body *backend.Template
+	Body *models.Template
 }
 
 // TemplatePatchBodyParameter used to patch a Template
@@ -89,7 +90,7 @@ func (f *Frontend) InitTemplateApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/templates",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewTemplate())
+			f.List(c, &backend.Template{})
 		})
 
 	// swagger:route POST /templates Templates createTemplate
@@ -106,8 +107,8 @@ func (f *Frontend) InitTemplateApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/templates",
 		func(c *gin.Context) {
-			b := f.dt.NewTemplate()
-			f.Create(c, b, nil)
+			b := &backend.Template{}
+			f.Create(c, b)
 		})
 
 	// swagger:route GET /templates/{name} Templates getTemplate
@@ -123,7 +124,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/templates/:id",
 		func(c *gin.Context) {
-			f.Fetch(c, f.dt.NewTemplate(), c.Param(`id`))
+			f.Fetch(c, &backend.Template{}, c.Param(`id`))
 		})
 
 	// swagger:route PATCH /templates/{name} Templates patchTemplate
@@ -142,7 +143,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/templates/:id",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewTemplate(), c.Param(`id`), nil)
+			f.Patch(c, &backend.Template{}, c.Param(`id`))
 		})
 
 	// swagger:route PUT /templates/{name} Templates putTemplate
@@ -160,7 +161,7 @@ func (f *Frontend) InitTemplateApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/templates/:id",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewTemplate(), c.Param(`id`), nil)
+			f.Update(c, &backend.Template{}, c.Param(`id`))
 		})
 
 	// swagger:route DELETE /templates/{name} Templates deleteTemplate
@@ -177,8 +178,6 @@ func (f *Frontend) InitTemplateApi() {
 	//       409: ErrorResponse
 	f.ApiGroup.DELETE("/templates/:id",
 		func(c *gin.Context) {
-			b := f.dt.NewTemplate()
-			b.ID = c.Param(`id`)
-			f.Remove(c, b, nil)
+			f.Remove(c, &backend.Template{}, c.Param(`id`))
 		})
 }

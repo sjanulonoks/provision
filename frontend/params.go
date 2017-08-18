@@ -3,6 +3,7 @@ package frontend
 import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,14 +11,14 @@ import (
 // swagger:response
 type ParamResponse struct {
 	// in: body
-	Body *backend.Param
+	Body *models.Param
 }
 
 // ParamsResponse returned on a successful GET of all the params
 // swagger:response
 type ParamsResponse struct {
 	//in: body
-	Body []*backend.Param
+	Body []*models.Param
 }
 
 // ParamParamsResponse return on a successful GET of all Param's Params
@@ -32,7 +33,7 @@ type ParamParamsResponse struct {
 type ParamBodyParameter struct {
 	// in: body
 	// required: true
-	Body *backend.Param
+	Body *models.Param
 }
 
 // ParamPatchBodyParameter used to patch a Param
@@ -104,7 +105,7 @@ func (f *Frontend) InitParamApi() {
 	//    406: ErrorResponse
 	f.ApiGroup.GET("/params",
 		func(c *gin.Context) {
-			f.List(c, f.dt.NewParam())
+			f.List(c, &backend.Param{})
 		})
 
 	// swagger:route POST /params Params createParam
@@ -121,8 +122,8 @@ func (f *Frontend) InitParamApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/params",
 		func(c *gin.Context) {
-			b := f.dt.NewParam()
-			f.Create(c, b, nil)
+			b := &backend.Param{}
+			f.Create(c, b)
 		})
 	// swagger:route GET /params/{name} Params getParam
 	//
@@ -137,7 +138,7 @@ func (f *Frontend) InitParamApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/params/:name",
 		func(c *gin.Context) {
-			f.Fetch(c, f.dt.NewParam(), c.Param(`name`))
+			f.Fetch(c, &backend.Param{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /params/{name} Params patchParam
@@ -156,7 +157,7 @@ func (f *Frontend) InitParamApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/params/:name",
 		func(c *gin.Context) {
-			f.Patch(c, f.dt.NewParam(), c.Param(`name`), nil)
+			f.Patch(c, &backend.Param{}, c.Param(`name`))
 		})
 
 	// swagger:route PUT /params/{name} Params putParam
@@ -174,7 +175,7 @@ func (f *Frontend) InitParamApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/params/:name",
 		func(c *gin.Context) {
-			f.Update(c, f.dt.NewParam(), c.Param(`name`), nil)
+			f.Update(c, &backend.Param{}, c.Param(`name`))
 		})
 
 	// swagger:route DELETE /params/{name} Params deleteParam
@@ -190,9 +191,7 @@ func (f *Frontend) InitParamApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/params/:name",
 		func(c *gin.Context) {
-			b := f.dt.NewParam()
-			b.Name = c.Param(`name`)
-			f.Remove(c, b, nil)
+			f.Remove(c, &backend.Param{}, c.Param(`name`))
 
 		})
 

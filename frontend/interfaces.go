@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -12,14 +12,14 @@ import (
 // swagger:response
 type InterfaceResponse struct {
 	// in: body
-	Body *backend.Interface
+	Body *models.Interface
 }
 
 // InterfacesResponse returned on a successful GET of all interfaces
 // swagger:response
 type InterfacesResponse struct {
 	// in: body
-	Body []*backend.Interface
+	Body []*models.Interface
 }
 
 // swagger:parameters getInterface
@@ -49,7 +49,7 @@ func (f *Frontend) InitInterfaceApi() {
 			intfs, err := f.dt.GetInterfaces()
 			if err != nil {
 				c.JSON(http.StatusInternalServerError,
-					backend.NewError("API_ERROR", http.StatusInternalServerError,
+					models.NewError("API_ERROR", http.StatusInternalServerError,
 						fmt.Sprintf("interfaces list: %v", err)))
 				return
 			}
@@ -79,7 +79,7 @@ func (f *Frontend) InitInterfaceApi() {
 			intfs, err := f.dt.GetInterfaces()
 			if err != nil {
 				c.JSON(http.StatusInternalServerError,
-					backend.NewError("API_ERROR", http.StatusInternalServerError,
+					models.NewError("API_ERROR", http.StatusInternalServerError,
 						fmt.Sprintf("interface get: %v", err)))
 				return
 			}
@@ -91,7 +91,7 @@ func (f *Frontend) InitInterfaceApi() {
 				}
 			}
 			c.JSON(http.StatusNotFound,
-				backend.NewError("API_ERROR", http.StatusNotFound,
+				models.NewError("API_ERROR", http.StatusNotFound,
 					fmt.Sprintf("interface get: not found: %s", c.Param(`name`))))
 
 		})

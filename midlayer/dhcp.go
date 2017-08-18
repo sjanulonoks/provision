@@ -13,6 +13,7 @@ import (
 	"golang.org/x/net/ipv4"
 
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	dhcp "github.com/krolaw/dhcp4"
 )
 
@@ -55,7 +56,7 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 	opts := make(dhcp.Options)
 	srcOpts := map[int]string{}
 	for c, v := range p.ParseOptions() {
-		srcOpts[int(c)] = backend.ConvertByteToOptionValue(c, v)
+		srcOpts[int(c)] = convertByteToOptionValue(c, v)
 		h.Debugf("Received option: %v: %v", c, srcOpts[int(c)])
 	}
 	rt := make([]byte, 4)
@@ -305,7 +306,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 	case dhcp.Decline:
 		d, unlocker := h.bk.LockEnts("leases", "reservations", "subnets")
 		defer unlocker()
-		leaseThing := d("leases").Find(backend.Hexaddr(req))
+		leaseThing := d("leases").Find(models.Hexaddr(req))
 		if leaseThing == nil {
 			h.Infof("%s: Asked to decline a lease we didn't issue by %s, ignoring", xid(p), req)
 			return nil
@@ -315,7 +316,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		if stratfn != nil && stratfn(p, options) == lease.Token {
 			h.Infof("%s: Lease for %s declined, invalidating.", xid(p), lease.Addr)
 			lease.Invalidate()
-			h.bk.Save(d, lease, nil)
+			h.bk.Save(d, lease)
 		} else {
 			h.Infof("%s: Received spoofed decline for %s, ignoring", xid(p), lease.Addr)
 		}
@@ -323,7 +324,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 	case dhcp.Release:
 		d, unlocker := h.bk.LockEnts("leases", "reservations", "subnets")
 		defer unlocker()
-		leaseThing := d("leases").Find(backend.Hexaddr(req))
+		leaseThing := d("leases").Find(models.Hexaddr(req))
 		if leaseThing == nil {
 			h.Infof("%s: Asked to release a lease we didn't issue by %s, ignoring", xid(p), req)
 			return nil
@@ -333,7 +334,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 		if stratfn != nil && stratfn(p, options) == lease.Token {
 			h.Infof("%s: Lease for %s released, expiring.", xid(p), lease.Addr)
 			lease.Expire()
-			h.bk.Save(d, lease, nil)
+			h.bk.Save(d, lease)
 		} else {
 			h.Infof("%s: Received spoofed release for %s, ignoring", xid(p), lease.Addr)
 		}

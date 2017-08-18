@@ -14,6 +14,7 @@ import (
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/embedded"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/provision/plugin"
 	"github.com/digitalrebar/store"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
@@ -28,7 +29,7 @@ import (
 // swagger:response
 type ErrorResponse struct {
 	//in: body
-	Body backend.Error
+	Body models.Error
 }
 
 // NoContentResponse is returned for deletes and auth errors
@@ -38,7 +39,7 @@ type NoContentResponse struct {
 }
 
 type Sanitizable interface {
-	Sanitize() store.KeySaver
+	Sanitize() models.Model
 }
 
 type Lockable interface {
@@ -76,7 +77,7 @@ func (d DefaultAuthSource) GetUser(username string) *backend.User {
 	defer unlocker()
 	u := objs("users").Find(username)
 	if u != nil {
-		return backend.AsUser(u)
+		return u.(*backend.User)
 	}
 	return nil
 }
@@ -252,7 +253,7 @@ func assureContentType(c *gin.Context, ct string) bool {
 	if testContentType(c, ct) {
 		return true
 	}
-	err := &backend.Error{Type: "API_ERROR", Code: http.StatusBadRequest}
+	err := &models.Error{Type: "API_ERROR", Code: http.StatusBadRequest}
 	err.Errorf("Invalid content type: %s", c.ContentType())
 	c.JSON(err.Code, err)
 	return false
@@ -286,8 +287,8 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	if marshalErr == nil {
 		return true
 	}
-	err := &backend.Error{Type: "API_ERROR", Code: http.StatusBadRequest}
-	err.Merge(marshalErr)
+	err := &models.Error{Type: "API_ERROR", Code: http.StatusBadRequest}
+	err.AddError(marshalErr)
 	c.JSON(err.Code, err)
 	return false
 }
@@ -339,9 +340,9 @@ func convertValueToFilter(v string) (index.Filter, error) {
 	return nil, fmt.Errorf("Should never get here")
 }
 
-func (f *Frontend) processFilters(d backend.Stores, ref store.KeySaver, params map[string][]string) ([]index.Filter, error) {
+func (f *Frontend) processFilters(d backend.Stores, ref models.Model, params map[string][]string) ([]index.Filter, error) {
 	filters := []index.Filter{}
-
+	var err error
 	var indexes map[string]index.Maker
 	if indexer, ok := ref.(index.Indexer); ok {
 		indexes = indexer.Indexes()
@@ -353,14 +354,16 @@ func (f *Frontend) processFilters(d backend.Stores, ref store.KeySaver, params m
 		if k == "offset" || k == "limit" || k == "sort" || k == "reverse" {
 			continue
 		}
-
+		type dynParameter interface {
+			ParameterMaker(backend.Stores, string) (index.Maker, error)
+		}
 		maker, ok := indexes[k]
+		pMaker, found := ref.(dynParameter)
 		if !ok {
-			if ref.Prefix() != "machines" {
+			if !found {
 				return nil, fmt.Errorf("Filter not found: %s", k)
 			}
-			var err error
-			maker, err = ref.(*backend.Machine).ParameterMaker(d, k)
+			maker, err = pMaker.ParameterMaker(d, k)
 			if err != nil {
 				return nil, err
 			}
@@ -418,10 +421,10 @@ func (f *Frontend) processFilters(d backend.Stores, ref store.KeySaver, params m
 }
 
 func jsonError(c *gin.Context, err error, code int, base string) {
-	if ne, ok := err.(*backend.Error); ok {
+	if ne, ok := err.(*models.Error); ok {
 		c.JSON(ne.Code, ne)
 	} else {
-		c.JSON(code, backend.NewError("API_ERROR", code, fmt.Sprintf(base+"%v", err.Error())))
+		c.JSON(code, models.NewError("API_ERROR", code, fmt.Sprintf(base+"%v", err.Error())))
 	}
 }
 
@@ -430,7 +433,7 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	if !assureAuth(c, f.Logger, ref.Prefix(), "list", "") {
 		return
 	}
-	res := &backend.Error{
+	res := &models.Error{
 		Code:  http.StatusNotAcceptable,
 		Type:  "API_ERROR",
 		Model: ref.Prefix(),
@@ -448,7 +451,7 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 		idx, err = index.All(filters...)(&d(ref.Prefix()).Index)
 	}()
 	if err != nil {
-		res.Merge(err)
+		res.AddError(err)
 		c.JSON(res.Code, res)
 		return
 	}
@@ -465,6 +468,7 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	prefix := ref.Prefix()
 	var err error
+	var res models.Model
 	func() {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("get")...)
 		defer unlocker()
@@ -484,27 +488,27 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 				}
 				items, err := index.All(index.Sort(idx))(&objs.Index)
 				if err == nil {
-					ref = items.Find(idxKey)
+					res = items.Find(idxKey)
 				}
 				break
 			}
 		}
 		if !found {
-			ref = objs.Find(key)
+			res = objs.Find(key)
 		}
 	}()
-	if ref != nil {
-		aref, _ := ref.(backend.AuthSaver)
+	if res != nil {
+		aref, _ := res.(backend.AuthSaver)
 		if !assureAuth(c, f.Logger, prefix, "get", aref.AuthKey()) {
 			return
 		}
-		s, ok := ref.(Sanitizable)
+		s, ok := res.(Sanitizable)
 		if ok {
-			ref = s.Sanitize()
+			res = s.Sanitize()
 		}
-		c.JSON(http.StatusOK, ref)
+		c.JSON(http.StatusOK, res)
 	} else {
-		rerr := &backend.Error{
+		rerr := &models.Error{
 			Code:  http.StatusNotFound,
 			Type:  "API_ERROR",
 			Model: prefix,
@@ -519,7 +523,7 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	}
 }
 
-func (f *Frontend) Create(c *gin.Context, val store.KeySaver, ov backend.ObjectValidator) {
+func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 	if !assureDecode(c, val) {
 		return
 	}
@@ -530,26 +534,29 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver, ov backend.ObjectV
 	func() {
 		d, unlocker := f.dt.LockEnts(val.(Lockable).Locks("create")...)
 		defer unlocker()
-		_, err = f.dt.Create(d, val, ov)
+		_, err = f.dt.Create(d, val)
 	}()
+	var res models.Model
 	if err != nil {
 		jsonError(c, err, http.StatusBadRequest, "")
 	} else {
 		s, ok := val.(Sanitizable)
 		if ok {
-			val = s.Sanitize()
+			res = s.Sanitize()
+		} else {
+			res = val
 		}
-		c.JSON(http.StatusCreated, val)
+		c.JSON(http.StatusCreated, res)
 	}
 }
 
-func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string, ov backend.ObjectValidator) {
+func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	patch := make(jsonpatch2.Patch, 0)
 	if !assureDecode(c, &patch) {
 		return
 	}
 	var err error
-	var res store.KeySaver
+	var res models.Model
 	bad := func() bool {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
 		defer unlocker()
@@ -562,7 +569,7 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string, ov back
 			}
 		}
 		// This will fail with notfound as well.
-		res, err = f.dt.Patch(d, ref, key, patch, ov)
+		res, err = f.dt.Patch(d, ref, key, patch)
 		return false
 	}()
 	if bad {
@@ -579,12 +586,12 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string, ov back
 	jsonError(c, err, http.StatusBadRequest, "")
 }
 
-func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string, ov backend.ObjectValidator) {
+func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 	if !assureDecode(c, ref) {
 		return
 	}
 	if ref.Key() != key {
-		err := &backend.Error{
+		err := &models.Error{
 			Code:  http.StatusBadRequest,
 			Type:  "API_ERROR",
 			Model: ref.Prefix(),
@@ -606,36 +613,46 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string, ov bac
 				return true
 			}
 		}
-		_, err = f.dt.Update(d, ref, ov)
+		_, err = f.dt.Update(d, ref)
 		return false
 	}()
 	if bad {
 		return
 	}
+	res := ref.(models.Model)
 	if err == nil {
 		s, ok := ref.(Sanitizable)
 		if ok {
-			ref = s.Sanitize()
+			res = s.Sanitize()
 		}
-		c.JSON(http.StatusOK, ref)
+		c.JSON(http.StatusOK, res)
 		return
 	}
 	jsonError(c, err, http.StatusBadRequest, "")
 }
 
-func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, ov backend.ObjectValidator) {
+func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, key string) {
 	var err error
+	var res models.Model
 	bad := func() bool {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("delete")...)
 		defer unlocker()
-		tref := d(ref.Prefix()).Find(ref.Key())
-		if tref != nil {
-			aref := tref.(backend.AuthSaver)
-			if !assureAuth(c, f.Logger, ref.Prefix(), "delete", aref.AuthKey()) {
-				return true
+		res = d(ref.Prefix()).Find(key)
+		if res == nil {
+			ret := &models.Error{
+				Code:  http.StatusNotFound,
+				Key:   key,
+				Model: ref.Prefix(),
 			}
+			ret.Errorf("%s: DELETE %s: Not Found", ret.Model, ret.Key)
+			err = ret
+			return false
 		}
-		_, err = f.dt.Remove(d, ref, ov)
+		aref := res.(backend.AuthSaver)
+		if !assureAuth(c, f.Logger, ref.Prefix(), "delete", aref.AuthKey()) {
+			return true
+		}
+		_, err = f.dt.Remove(d, res)
 		return false
 	}()
 	if bad {
@@ -644,10 +661,10 @@ func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, ov backend.ObjectV
 	if err != nil {
 		jsonError(c, err, http.StatusNotFound, "")
 	} else {
-		s, ok := ref.(Sanitizable)
+		s, ok := res.(Sanitizable)
 		if ok {
-			ref = s.Sanitize()
+			res = s.Sanitize()
 		}
-		c.JSON(http.StatusOK, ref)
+		c.JSON(http.StatusOK, res)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
 
@@ -54,12 +55,12 @@ func (d *DataStack) Clone() *DataStack {
 	return dtStore
 }
 
-func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, *backend.Error) {
+func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	delete(dtStore.saasContents, name)
 	if err := dtStore.buildStack(); err != nil {
-		return nil, backend.NewError("ValidationError", 422, err.Error())
+		return nil, models.NewError("ValidationError", 422, err.Error())
 	}
 	err := backend.ValidateDataTrackerStore(dtStore, logger)
 	if err == nil && oldStore != nil {
@@ -68,12 +69,12 @@ func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, *b
 	return dtStore, err
 }
 
-func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *log.Logger) (*DataStack, *backend.Error) {
+func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *log.Logger) (*DataStack, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	dtStore.saasContents[name] = newStore
 	if err := dtStore.buildStack(); err != nil {
-		return nil, backend.NewError("ValidationError", 422, err.Error())
+		return nil, models.NewError("ValidationError", 422, err.Error())
 	}
 	err := backend.ValidateDataTrackerStore(dtStore, logger)
 	if err == nil && oldStore != nil {

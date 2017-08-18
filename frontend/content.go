@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/midlayer"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 	"github.com/gin-gonic/gin"
 )
@@ -25,18 +25,18 @@ type Content struct {
 	/*
 		        These are the sections:
 
-			tasks        map[string]*backend.Task
-			bootenvs     map[string]*backend.BootEnv
-			templates    map[string]*backend.Template
-			profiles     map[string]*backend.Profile
-			params       map[string]*backend.Param
-			reservations map[string]*backend.Reservation
-			subnets      map[string]*backend.Subnet
-			users        map[string]*backend.User
-			preferences  map[string]*backend.Pref
-			plugins      map[string]*backend.Plugin
-			machines     map[string]*backend.Machine
-			leases       map[string]*backend.Lease
+			tasks        map[string]*models.Task
+			bootenvs     map[string]*models.BootEnv
+			templates    map[string]*models.Template
+			profiles     map[string]*models.Profile
+			params       map[string]*models.Param
+			reservations map[string]*models.Reservation
+			subnets      map[string]*models.Subnet
+			users        map[string]*models.User
+			preferences  map[string]*models.Pref
+			plugins      map[string]*models.Plugin
+			machines     map[string]*models.Machine
+			leases       map[string]*models.Lease
 	*/
 	Sections Sections
 }
@@ -148,7 +148,7 @@ func buildSummary(st store.Store) *ContentSummary {
 	return cs
 }
 
-func (f *Frontend) buildContent(st store.Store) (*Content, *backend.Error) {
+func (f *Frontend) buildContent(st store.Store) (*Content, *models.Error) {
 	content := &Content{}
 
 	var md map[string]string
@@ -184,19 +184,24 @@ func (f *Frontend) buildContent(st store.Store) (*Content, *backend.Error) {
 	// Walk subs to build content sets
 	content.Sections = Sections{}
 	for prefix, sub := range st.Subs() {
-		obj := f.dt.NewKeySaver(prefix)
+		_, err := models.New(prefix)
+		if err != nil {
+			berr := models.NewError("ValidationError", http.StatusUnprocessableEntity, err.Error())
+			return nil, berr
+		}
 
 		keys, err := sub.Keys()
 		if err != nil {
-			berr := backend.NewError("ServerError", http.StatusInternalServerError, err.Error())
+			berr := models.NewError("ServerError", http.StatusInternalServerError, err.Error())
 			return nil, berr
 		}
 		objs := make(Section, 0)
 		for _, k := range keys {
-			v := obj.New()
+			// This is protected by the earlier check
+			v, _ := models.New(prefix)
 			err := sub.Load(k, &v)
 			if err != nil {
-				berr := backend.NewError("ServerError", http.StatusInternalServerError, err.Error())
+				berr := models.NewError("ServerError", http.StatusInternalServerError, err.Error())
 				return nil, berr
 			}
 			objs[k] = v
@@ -304,7 +309,7 @@ func (f *Frontend) InitContentApi() {
 
 				if cst := f.findContent(name); cst == nil {
 					c.JSON(http.StatusNotFound,
-						backend.NewError("API_ERROR", http.StatusNotFound,
+						models.NewError("API_ERROR", http.StatusNotFound,
 							fmt.Sprintf("content get: not found: %s", name)))
 				} else {
 					content, err := f.buildContent(cst)
@@ -350,7 +355,7 @@ func (f *Frontend) InitContentApi() {
 
 				if cst := f.findContent(name); cst != nil {
 					c.JSON(http.StatusConflict,
-						backend.NewError("API_ERROR", http.StatusConflict,
+						models.NewError("API_ERROR", http.StatusConflict,
 							fmt.Sprintf("content post: already exists: %s", name)))
 					return
 				}
@@ -404,7 +409,7 @@ func (f *Frontend) InitContentApi() {
 			name := c.Param(`name`)
 			if name != content.Name {
 				c.JSON(http.StatusBadRequest,
-					backend.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError("API_ERROR", http.StatusBadRequest,
 						fmt.Sprintf("Name must match: %s != %s\n", content.Name, c.Param(`name`))))
 				return
 
@@ -416,7 +421,7 @@ func (f *Frontend) InitContentApi() {
 
 				if cst := f.findContent(name); cst == nil {
 					c.JSON(http.StatusNotFound,
-						backend.NewError("API_ERROR", http.StatusNotFound,
+						models.NewError("API_ERROR", http.StatusNotFound,
 							fmt.Sprintf("content put: not found: %s", name)))
 					return
 				}
@@ -465,7 +470,7 @@ func (f *Frontend) InitContentApi() {
 				cst := f.findContent(name)
 				if cst == nil {
 					c.JSON(http.StatusNotFound,
-						backend.NewError("API_ERROR", http.StatusNotFound,
+						models.NewError("API_ERROR", http.StatusNotFound,
 							fmt.Sprintf("content get: not found: %s", name)))
 					return
 				}
