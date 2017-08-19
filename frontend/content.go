@@ -457,6 +457,7 @@ func (f *Frontend) InitContentApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/contents/:name",
 		func(c *gin.Context) {

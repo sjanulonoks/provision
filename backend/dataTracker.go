@@ -445,13 +445,16 @@ func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 		p.objs[prefix] = &Store{backingStore: bk}
 		storeObjs, err := store.List(bk, toBackend(p, nil, obj))
 		if err != nil {
+			// Make fake index to keep others from failing and exploding.
+			res := make([]models.Model, 0)
+			p.objs[prefix].Index = *index.Create(res)
 			hard.Errorf("Unable to load %s: %v", prefix, err)
 			continue
 		}
 		res := make([]models.Model, len(storeObjs))
 		for i := range storeObjs {
 			res[i] = models.Model(storeObjs[i])
-			if v, ok := res[i].(Validator); ok && !v.Useable() {
+			if v, ok := res[i].(Validator); ok && v.Useable() {
 				soft.AddError(v.HasError())
 			}
 		}
