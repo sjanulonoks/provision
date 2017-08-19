@@ -337,6 +337,9 @@ func (b *BootEnv) OnLoad() error {
 
 func (b *BootEnv) New() store.KeySaver {
 	res := &BootEnv{BootEnv: &models.BootEnv{}}
+	if b.BootEnv != nil && b.ChangeForced() {
+		res.ForceChange()
+	}
 	res.p = b.p
 	return res
 }

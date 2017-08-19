@@ -44,6 +44,9 @@ func (t *Task) Backend() store.Store {
 
 func (t *Task) New() store.KeySaver {
 	res := &Task{Task: &models.Task{}}
+	if t.Task != nil && t.ChangeForced() {
+		res.ForceChange()
+	}
 	res.p = t.p
 	return res
 }

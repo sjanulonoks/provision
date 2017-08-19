@@ -58,6 +58,9 @@ func (t *Template) Backend() store.Store {
 
 func (t *Template) New() store.KeySaver {
 	res := &Template{Template: &models.Template{}}
+	if t.Template != nil && t.ChangeForced() {
+		res.ForceChange()
+	}
 	res.p = t.p
 	return res
 }

@@ -111,8 +111,6 @@ type Store struct {
 	backingStore store.Store
 }
 
-type ObjectValidator func(Stores, models.Model, models.Model) error
-
 func (s *Store) getBackend(obj models.Model) store.Store {
 	return s.backingStore
 }

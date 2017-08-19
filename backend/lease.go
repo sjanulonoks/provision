@@ -149,6 +149,9 @@ func (l *Lease) Backend() store.Store {
 
 func (l *Lease) New() store.KeySaver {
 	res := &Lease{Lease: &models.Lease{}}
+	if l.Lease != nil && l.ChangeForced() {
+		res.ForceChange()
+	}
 	res.p = l.p
 	return res
 }

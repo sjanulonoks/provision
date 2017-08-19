@@ -52,6 +52,9 @@ func (u *User) Backend() store.Store {
 
 func (u *User) New() store.KeySaver {
 	res := &User{User: &models.User{}}
+	if u.User != nil && u.ChangeForced() {
+		res.ForceChange()
+	}
 	res.p = u.p
 	return res
 }

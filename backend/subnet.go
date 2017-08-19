@@ -319,6 +319,9 @@ func (s *Subnet) setDT(p *DataTracker) {
 
 func (s *Subnet) New() store.KeySaver {
 	res := &Subnet{Subnet: &models.Subnet{}}
+	if s.Subnet != nil && s.ChangeForced() {
+		res.ForceChange()
+	}
 	res.p = s.p
 	return res
 }

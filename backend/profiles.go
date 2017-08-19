@@ -90,6 +90,9 @@ func (p *Profile) GetParam(key string, searchProfiles bool) (interface{}, bool) 
 
 func (p *Profile) New() store.KeySaver {
 	res := &Profile{Profile: &models.Profile{}}
+	if p.Profile != nil && p.ChangeForced() {
+		res.ForceChange()
+	}
 	res.Params = map[string]interface{}{}
 	res.Tasks = []string{}
 	res.p = p.p

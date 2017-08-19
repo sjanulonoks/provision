@@ -105,6 +105,9 @@ func (n *Plugin) GetParam(d Stores, key string, searchProfiles bool) (interface{
 
 func (n *Plugin) New() store.KeySaver {
 	res := &Plugin{Plugin: &models.Plugin{}}
+	if n.Plugin != nil && n.ChangeForced() {
+		res.ForceChange()
+	}
 	res.p = n.p
 	return res
 }

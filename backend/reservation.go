@@ -138,6 +138,9 @@ func (r *Reservation) Backend() store.Store {
 
 func (r *Reservation) New() store.KeySaver {
 	res := &Reservation{Reservation: &models.Reservation{}}
+	if r.Reservation != nil && r.ChangeForced() {
+		res.ForceChange()
+	}
 	res.p = r.p
 	return res
 }

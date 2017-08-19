@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -83,6 +82,9 @@ func (j *Job) Backend() store.Store {
 
 func (j *Job) New() store.KeySaver {
 	res := &Job{Job: &models.Job{}}
+	if j.Job != nil && j.ChangeForced() {
+		res.ForceChange()
+	}
 	res.p = j.p
 	return res
 }
@@ -424,7 +426,6 @@ func (j *Job) RenderActions() ([]*models.JobAction, error) {
 
 		return renderers, m.Address, nil
 	}()
-	log.Printf("%#v, %#v, %#v", renderers, addr, e)
 	if e != nil {
 		return nil, e
 	}

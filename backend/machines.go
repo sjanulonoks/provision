@@ -370,6 +370,9 @@ func (n *Machine) GetParam(d Stores, key string, searchProfiles bool) (interface
 
 func (n *Machine) New() store.KeySaver {
 	res := &Machine{Machine: &models.Machine{}}
+	if n.Machine != nil && n.ChangeForced() {
+		res.ForceChange()
+	}
 	res.Tasks = []string{}
 	res.Profiles = []string{}
 	res.p = n.p
@@ -419,6 +422,7 @@ func (n *Machine) Validate() {
 		} else {
 			if alreadyAt, ok := wantedProfiles[profileName]; ok {
 				n.Errorf("Duplicate profile %s: at %d and %d", profileName, alreadyAt, i)
+				n.SetInvalid() // Force Fatal
 			} else {
 				wantedProfiles[profileName] = i
 			}
