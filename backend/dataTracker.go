@@ -339,10 +339,10 @@ func allKeySavers(res *DataTracker) []models.Model {
 	return []models.Model{
 		&Pref{p: res},
 		&Param{p: res},
-		&Profile{p: res},
 		&User{p: res},
 		&Template{p: res},
 		&Task{p: res},
+		&Profile{p: res},
 		&BootEnv{p: res},
 		&Machine{p: res},
 		&Subnet{p: res},
@@ -450,10 +450,10 @@ func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 		}
 		res := make([]models.Model, len(storeObjs))
 		for i := range storeObjs {
+			res[i] = models.Model(storeObjs[i])
 			if v, ok := res[i].(Validator); ok && !v.Useable() {
 				soft.AddError(v.HasError())
 			}
-			res[i] = models.Model(storeObjs[i])
 		}
 		p.objs[prefix].Index = *index.Create(res)
 	}

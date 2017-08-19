@@ -91,6 +91,7 @@ func (u *User) Validate() {
 }
 
 func (u *User) BeforeSave() error {
+	u.Validate()
 	if !u.Useable() {
 		return u.MakeError(422, ValidationError, u)
 	}
