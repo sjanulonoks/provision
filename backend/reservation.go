@@ -220,9 +220,10 @@ func (r *Reservation) BeforeSave() error {
 }
 
 func (r *Reservation) OnLoad() error {
-	stores, unlocker := r.p.LockAll()
-	r.stores = stores
-	defer func() { unlocker(); r.stores = nil }()
+	r.stores = func(ref string) *Store {
+		return r.p.objs[ref]
+	}
+	defer func() { r.stores = nil }()
 	return r.BeforeSave()
 }
 

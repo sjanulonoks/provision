@@ -151,9 +151,10 @@ func (t *Template) AfterSave() {
 }
 
 func (t *Template) OnLoad() error {
-	stores, unlocker := t.p.LockAll()
-	t.stores = stores
-	defer func() { unlocker(); t.stores = nil }()
+	t.stores = func(ref string) *Store {
+		return t.p.objs[ref]
+	}
+	defer func() { t.stores = nil }()
 	return t.BeforeSave()
 }
 

@@ -95,9 +95,10 @@ func (p *Param) BeforeSave() error {
 }
 
 func (p *Param) OnLoad() error {
-	stores, unlocker := p.p.LockAll()
-	p.stores = stores
-	defer func() { unlocker(); p.stores = nil }()
+	p.stores = func(ref string) *Store {
+		return p.p.objs[ref]
+	}
+	defer func() { p.stores = nil }()
 	return p.BeforeSave()
 }
 

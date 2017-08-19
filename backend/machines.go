@@ -458,9 +458,10 @@ func (n *Machine) BeforeSave() error {
 }
 
 func (n *Machine) OnLoad() error {
-	stores, unlocker := n.p.LockAll()
-	n.stores = stores
-	defer func() { unlocker(); n.stores = nil }()
+	n.stores = func(ref string) *Store {
+		return n.p.objs[ref]
+	}
+	defer func() { n.stores = nil }()
 	return n.BeforeSave()
 }
 

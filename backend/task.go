@@ -100,18 +100,19 @@ func (t *Task) Validate() {
 }
 
 func (t *Task) OnLoad() error {
-	stores, unlocker := t.p.LockAll()
-	t.stores = stores
-	defer func() { unlocker(); t.stores = nil }()
+	t.stores = func(ref string) *Store {
+		return t.p.objs[ref]
+	}
+	defer func() { t.stores = nil }()
+	return t.BeforeSave()
+}
+
+func (t *Task) BeforeSave() error {
 	t.Validate()
 	if !t.Useable() {
 		return t.MakeError(422, ValidationError, t)
 	}
 	return nil
-}
-
-func (t *Task) BeforeSave() error {
-	return t.OnLoad()
 }
 
 type taskHaver interface {

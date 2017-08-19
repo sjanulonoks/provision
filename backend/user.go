@@ -98,9 +98,10 @@ func (u *User) BeforeSave() error {
 }
 
 func (u *User) OnLoad() error {
-	stores, unlocker := u.p.LockAll()
-	u.stores = stores
-	defer func() { unlocker(); u.stores = nil }()
+	u.stores = func(ref string) *Store {
+		return u.p.objs[ref]
+	}
+	defer func() { u.stores = nil }()
 	return u.BeforeSave()
 }
 

@@ -498,9 +498,10 @@ func (s *Subnet) BeforeSave() error {
 }
 
 func (s *Subnet) OnLoad() error {
-	stores, unlocker := s.p.LockAll()
-	s.stores = stores
-	defer func() { unlocker(); s.stores = nil }()
+	s.stores = func(ref string) *Store {
+		return s.p.objs[ref]
+	}
+	defer func() { s.stores = nil }()
 	return s.BeforeSave()
 }
 

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -329,17 +328,11 @@ func (b *BootEnv) Validate() {
 }
 
 func (b *BootEnv) OnLoad() error {
-	log.Printf("OnLoad called: %s:%s", b.Prefix(), b.Key())
-	stores, unlocker := b.p.LockAll()
-	b.stores = stores
-	b.Validate()
-	unlocker()
-	b.stores = nil
-	log.Printf("Onload: %s:%s finished validation", b.Prefix(), b.Key())
-	if !b.Validated {
-		return b.HasError()
+	b.stores = func(ref string) *Store {
+		return b.p.objs[ref]
 	}
-	return nil
+	defer func() { b.stores = nil }()
+	return b.BeforeSave()
 }
 
 func (b *BootEnv) New() store.KeySaver {

@@ -153,9 +153,10 @@ func (p *Profile) BeforeSave() error {
 
 func (p *Profile) OnLoad() error {
 	p.Params = map[string]interface{}{}
-	stores, unlocker := p.p.LockAll()
-	p.stores = stores
-	defer func() { unlocker(); p.stores = nil }()
+	p.stores = func(ref string) *Store {
+		return p.p.objs[ref]
+	}
+	defer func() { p.stores = nil }()
 	return p.BeforeSave()
 }
 

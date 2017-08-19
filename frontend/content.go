@@ -262,8 +262,8 @@ func (f *Frontend) InitContentApi() {
 
 			contents := []*ContentSummary{}
 			func() {
-				f.dt.Stop()
-				defer f.dt.Start()
+				_, unlocker := f.dt.LockAll()
+				defer unlocker()
 
 				if stack, ok := f.dt.Backend.(*midlayer.DataStack); !ok {
 					cs := buildSummary(f.dt.Backend)
@@ -306,8 +306,8 @@ func (f *Frontend) InitContentApi() {
 			}
 
 			func() {
-				f.dt.Stop()
-				defer f.dt.Start()
+				_, unlocker := f.dt.LockAll()
+				defer unlocker()
 
 				if cst := f.findContent(name); cst == nil {
 					c.JSON(http.StatusNotFound,
@@ -352,8 +352,8 @@ func (f *Frontend) InitContentApi() {
 
 			name := content.Meta.Name
 			func() {
-				f.dt.Stop()
-				defer f.dt.Start()
+				_, unlocker := f.dt.LockAll()
+				defer unlocker()
 
 				if cst := f.findContent(name); cst != nil {
 					c.JSON(http.StatusConflict,
@@ -418,8 +418,8 @@ func (f *Frontend) InitContentApi() {
 			}
 
 			func() {
-				f.dt.Stop()
-				defer f.dt.Start()
+				_, unlocker := f.dt.LockAll()
+				defer unlocker()
 
 				if cst := f.findContent(name); cst == nil {
 					c.JSON(http.StatusNotFound,
@@ -466,8 +466,8 @@ func (f *Frontend) InitContentApi() {
 			}
 
 			func() {
-				f.dt.Stop()
-				defer f.dt.Start()
+				_, unlocker := f.dt.LockAll()
+				defer unlocker()
 
 				cst := f.findContent(name)
 				if cst == nil {

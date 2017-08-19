@@ -318,7 +318,6 @@ type DataTracker struct {
 	Logger              *log.Logger
 	FS                  *FileSystem
 	Backend             store.Store
-	backendMux          *sync.RWMutex
 	objs                map[string]*Store
 	defaultPrefs        map[string]string
 	runningPrefs        map[string]string
@@ -332,14 +331,6 @@ type DataTracker struct {
 	thunks              []func()
 	thunkMux            *sync.Mutex
 	publishers          *Publishers
-}
-
-func (dt *DataTracker) Stop() {
-	dt.backendMux.Lock()
-}
-
-func (dt *DataTracker) Start() {
-	dt.backendMux.Unlock()
 }
 
 type Stores func(string) *Store
@@ -366,7 +357,6 @@ func allKeySavers(res *DataTracker) []models.Model {
 // It returns a function to get an Index that was requested, and
 // a function that unlocks the taken locks in the right order.
 func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) {
-	p.backendMux.RLock()
 	p.allMux.RLock()
 	sortedEnts := make([]string, len(ents))
 	copy(sortedEnts, ents)
@@ -401,19 +391,16 @@ func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) 
 			}
 			srMux.Unlock()
 			p.allMux.RUnlock()
-			p.backendMux.RUnlock()
 		}
 }
 
 func (p *DataTracker) LockAll() (stores Stores, unlocker func()) {
-	p.backendMux.RLock()
 	p.allMux.Lock()
 	return func(ref string) *Store {
 			return p.objs[ref]
 		},
 		func() {
 			p.allMux.Unlock()
-			p.backendMux.RUnlock()
 		}
 }
 
@@ -473,10 +460,10 @@ func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 	return
 }
 
+// This must be locked with ALL locks from the caller.
 func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, soft error) {
 	res := &DataTracker{
 		Backend:           backend,
-		backendMux:        &sync.RWMutex{},
 		FileRoot:          ".",
 		LogRoot:           ".",
 		StaticPort:        1,
@@ -496,7 +483,7 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, so
 		publishers:        &Publishers{},
 	}
 
-	// Load stores.
+	// Load stores. - This must be All locked by the caller
 	a, b := res.rebuildCache()
 	return a.HasError(), b.HasError()
 }
@@ -510,7 +497,6 @@ func NewDataTracker(backend store.Store,
 	publishers *Publishers) *DataTracker {
 	res := &DataTracker{
 		Backend:           backend,
-		backendMux:        &sync.RWMutex{},
 		FileRoot:          fileRoot,
 		LogRoot:           logRoot,
 		StaticPort:        staticPort,
@@ -540,7 +526,7 @@ func NewDataTracker(backend store.Store,
 		}
 	}
 
-	// Load stores.
+	// Load stores. - This is implicitly locked because we are creating a new one.
 	hard, _ := res.rebuildCache()
 	if hard.HasError() != nil {
 		res.Logger.Fatalf("dataTracker: Error loading data: %v", hard.HasError())
@@ -599,8 +585,6 @@ func NewDataTracker(backend store.Store,
 }
 
 func (p *DataTracker) Prefs() map[string]string {
-	p.backendMux.RLock()
-	defer p.backendMux.RUnlock()
 	vals := map[string]string{}
 	p.prefMux.Lock()
 	for k, v := range p.defaultPrefs {
@@ -614,8 +598,6 @@ func (p *DataTracker) Prefs() map[string]string {
 }
 
 func (p *DataTracker) Pref(name string) (string, error) {
-	p.backendMux.RLock()
-	defer p.backendMux.RUnlock()
 	res, ok := p.Prefs()[name]
 	if !ok {
 		return "", fmt.Errorf("No such preference %s", name)

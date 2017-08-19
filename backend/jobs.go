@@ -287,9 +287,10 @@ var JobValidStates []string = []string{
 }
 
 func (j *Job) OnLoad() error {
-	stores, unlocker := j.p.LockAll()
-	j.stores = stores
-	defer func() { unlocker(); j.stores = nil }()
+	j.stores = func(ref string) *Store {
+		return j.p.objs[ref]
+	}
+	defer func() { j.stores = nil }()
 	j.Validate()
 	if !j.Validated {
 		return j.HasError()

@@ -229,9 +229,10 @@ func (l *Lease) BeforeSave() error {
 }
 
 func (l *Lease) OnLoad() error {
-	stores, unlocker := l.p.LockAll()
-	l.stores = stores
-	defer func() { unlocker(); l.stores = nil }()
+	l.stores = func(ref string) *Store {
+		return l.p.objs[ref]
+	}
+	defer func() { l.stores = nil }()
 	return l.BeforeSave()
 }
 
