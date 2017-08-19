@@ -148,7 +148,12 @@ func (l *Lease) Backend() store.Store {
 }
 
 func (l *Lease) New() store.KeySaver {
-	return &Lease{Lease: &models.Lease{}}
+	res := &Lease{Lease: &models.Lease{}}
+	if l.Lease != nil && l.ChangeForced() {
+		res.ForceChange()
+	}
+	res.p = l.p
+	return res
 }
 
 func (l *Lease) setDT(p *DataTracker) {
@@ -227,6 +232,10 @@ func (l *Lease) BeforeSave() error {
 }
 
 func (l *Lease) OnLoad() error {
+	l.stores = func(ref string) *Store {
+		return l.p.objs[ref]
+	}
+	defer func() { l.stores = nil }()
 	return l.BeforeSave()
 }
 

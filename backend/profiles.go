@@ -90,8 +90,12 @@ func (p *Profile) GetParam(key string, searchProfiles bool) (interface{}, bool) 
 
 func (p *Profile) New() store.KeySaver {
 	res := &Profile{Profile: &models.Profile{}}
+	if p.Profile != nil && p.ChangeForced() {
+		res.ForceChange()
+	}
 	res.Params = map[string]interface{}{}
 	res.Tasks = []string{}
+	res.p = p.p
 	return res
 }
 
@@ -152,6 +156,10 @@ func (p *Profile) BeforeSave() error {
 
 func (p *Profile) OnLoad() error {
 	p.Params = map[string]interface{}{}
+	p.stores = func(ref string) *Store {
+		return p.p.objs[ref]
+	}
+	defer func() { p.stores = nil }()
 	return p.BeforeSave()
 }
 

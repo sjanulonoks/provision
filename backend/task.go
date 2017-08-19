@@ -43,7 +43,12 @@ func (t *Task) Backend() store.Store {
 }
 
 func (t *Task) New() store.KeySaver {
-	return &Task{Task: &models.Task{}}
+	res := &Task{Task: &models.Task{}}
+	if t.Task != nil && t.ChangeForced() {
+		res.ForceChange()
+	}
+	res.p = t.p
+	return res
 }
 
 func (t *Task) setDT(dp *DataTracker) {
@@ -98,15 +103,19 @@ func (t *Task) Validate() {
 }
 
 func (t *Task) OnLoad() error {
+	t.stores = func(ref string) *Store {
+		return t.p.objs[ref]
+	}
+	defer func() { t.stores = nil }()
+	return t.BeforeSave()
+}
+
+func (t *Task) BeforeSave() error {
 	t.Validate()
 	if !t.Useable() {
 		return t.MakeError(422, ValidationError, t)
 	}
 	return nil
-}
-
-func (t *Task) BeforeSave() error {
-	return t.OnLoad()
 }
 
 type taskHaver interface {

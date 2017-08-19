@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -82,7 +81,12 @@ func (j *Job) Backend() store.Store {
 }
 
 func (j *Job) New() store.KeySaver {
-	return &Job{Job: &models.Job{}}
+	res := &Job{Job: &models.Job{}}
+	if j.Job != nil && j.ChangeForced() {
+		res.ForceChange()
+	}
+	res.p = j.p
+	return res
 }
 
 func (j *Job) setDT(dp *DataTracker) {
@@ -285,6 +289,10 @@ var JobValidStates []string = []string{
 }
 
 func (j *Job) OnLoad() error {
+	j.stores = func(ref string) *Store {
+		return j.p.objs[ref]
+	}
+	defer func() { j.stores = nil }()
 	j.Validate()
 	if !j.Validated {
 		return j.HasError()
@@ -418,7 +426,6 @@ func (j *Job) RenderActions() ([]*models.JobAction, error) {
 
 		return renderers, m.Address, nil
 	}()
-	log.Printf("%#v, %#v, %#v", renderers, addr, e)
 	if e != nil {
 		return nil, e
 	}

@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -47,7 +46,40 @@ localboot 0
 				Name: `ipxe`,
 				Path: `default.ipxe`,
 				Contents: `#!ipxe
-chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
+exit
+`,
+			},
+		},
+	}
+
+	localBoot = &models.BootEnv{
+		Name:        "local",
+		Description: "The boot environment you should use to have known machines boot off their local hard drive",
+		OS: models.OsInfo{
+			Name: "local",
+		},
+		OnlyUnknown: false,
+		Templates: []models.TemplateInfo{
+			{
+				Name: "pxelinux",
+				Path: "pxelinux.cfg/{{.Machine.HexAddress}}",
+				Contents: `DEFAULT local
+PROMPT 0
+TIMEOUT 10
+LABEL local
+localboot 0
+`,
+			},
+			{
+				Name:     "elilo",
+				Path:     "{{.Machine.HexAddress}}.conf",
+				Contents: "exit",
+			},
+			{
+				Name: "ipxe",
+				Path: "{{.Machine.Address}}.ipxe",
+				Contents: `#!ipxe
+exit
 `,
 			},
 		},
@@ -78,8 +110,6 @@ type Store struct {
 	index.Index
 	backingStore store.Store
 }
-
-type ObjectValidator func(Stores, models.Model, models.Model) error
 
 func (s *Store) getBackend(obj models.Model) store.Store {
 	return s.backingStore
@@ -305,19 +335,19 @@ type Stores func(string) *Store
 
 func allKeySavers(res *DataTracker) []models.Model {
 	return []models.Model{
-		&Task{p: res},
-		&Job{p: res},
+		&Pref{p: res},
 		&Param{p: res},
-		&Profile{p: res},
 		&User{p: res},
 		&Template{p: res},
+		&Task{p: res},
+		&Profile{p: res},
 		&BootEnv{p: res},
 		&Machine{p: res},
 		&Subnet{p: res},
 		&Reservation{p: res},
 		&Lease{p: res},
-		&Pref{p: res},
 		&Plugin{p: res},
+		&Job{p: res},
 	}
 }
 
@@ -395,7 +425,16 @@ func (p *DataTracker) ApiURL(remoteIP net.IP) string {
 	return p.urlFor("https", remoteIP, p.ApiPort)
 }
 
-func (p *DataTracker) rebuildCache() error {
+func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
+	hard = &models.Error{Code: 500, Type: "Failed to load backing objects from cache"}
+	soft = &models.Error{Code: 422, Type: ValidationError}
+	root, err := template.New("").Parse("")
+	if err != nil {
+		hard.Errorf("Unable to create root template: %v", err)
+		return
+	}
+	p.rootTemplate = root
+	p.rootTemplate.Option("missingkey=error")
 	p.objs = map[string]*Store{}
 	objs := allKeySavers(p)
 	for _, obj := range objs {
@@ -404,32 +443,26 @@ func (p *DataTracker) rebuildCache() error {
 		p.objs[prefix] = &Store{backingStore: bk}
 		storeObjs, err := store.List(bk, toBackend(p, nil, obj))
 		if err != nil {
-			return fmt.Errorf("%s: %v", prefix, err)
+			// Make fake index to keep others from failing and exploding.
+			res := make([]models.Model, 0)
+			p.objs[prefix].Index = *index.Create(res)
+			hard.Errorf("Unable to load %s: %v", prefix, err)
+			continue
 		}
 		res := make([]models.Model, len(storeObjs))
 		for i := range storeObjs {
-			p.setDT(storeObjs[i])
 			res[i] = models.Model(storeObjs[i])
+			if v, ok := res[i].(Validator); ok && v.Useable() {
+				soft.AddError(v.HasError())
+			}
 		}
 		p.objs[prefix].Index = *index.Create(res)
-		if obj.Prefix() == "templates" {
-			buf := &bytes.Buffer{}
-			for _, thing := range p.objs["templates"].Items() {
-				tmpl := AsTemplate(thing)
-				fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}`, tmpl.ID, tmpl.Contents)
-			}
-			root, err := template.New("").Parse(buf.String())
-			if err != nil {
-				return fmt.Errorf("Unable to load root templates: %v", err)
-			}
-			p.rootTemplate = root
-			p.rootTemplate.Option("missingkey=error")
-		}
 	}
-	return nil
+	return
 }
 
-func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) error {
+// This must be locked with ALL locks from the caller.
+func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, soft error) {
 	res := &DataTracker{
 		Backend:           backend,
 		FileRoot:          ".",
@@ -451,38 +484,9 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) error {
 		publishers:        &Publishers{},
 	}
 
-	// Load stores.
-	err := res.rebuildCache()
-	if err != nil {
-		return models.NewError("LoadError", http.StatusInternalServerError, fmt.Sprintf("Failed to rebuild cache: %v", err))
-	}
-
-	keys := make([]string, len(res.objs))
-	i := 0
-	for k := range res.objs {
-		keys[i] = k
-		i++
-	}
-
-	d, unlocker := res.LockAll()
-	defer unlocker()
-
-	berr := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
-
-	for _, k := range keys {
-
-		for _, obj := range res.objs[k].Items() {
-			if val, ok := obj.(Validator); ok {
-				obj.(validator).setStores(d)
-				val.ClearValidation()
-				val.Validate()
-				if !val.Useable() {
-					berr.AddError(val.HasError())
-				}
-			}
-		}
-	}
-	return berr.HasError()
+	// Load stores. - This must be All locked by the caller
+	a, b := res.rebuildCache()
+	return a.HasError(), b.HasError()
 }
 
 // Create a new DataTracker that will use passed store to save all operational data
@@ -523,10 +527,10 @@ func NewDataTracker(backend store.Store,
 		}
 	}
 
-	// Load stores.
-	err := res.rebuildCache()
-	if err != nil {
-		res.Logger.Fatalf("dataTracker: Error loading data: %v", err)
+	// Load stores. - This is implicitly locked because we are creating a new one.
+	hard, _ := res.rebuildCache()
+	if hard.HasError() != nil {
+		res.Logger.Fatalf("dataTracker: Error loading data: %v", hard.HasError())
 	}
 
 	// Create minimal content.
@@ -534,6 +538,9 @@ func NewDataTracker(backend store.Store,
 	defer unlocker()
 	if d("bootenvs").Find("ignore") == nil {
 		res.Create(d, ignoreBoot)
+	}
+	if d("bootenvs").Find("local") == nil {
+		res.Create(d, localBoot)
 	}
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)
@@ -651,7 +658,9 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			"knownTokenTimeout",
 			"debugDhcp",
 			"debugRenderer",
-			"debugBootEnv":
+			"debugBootEnv",
+			"debugFrontend",
+			"debugPlugins":
 			if intCheck(name, val) {
 				savePref(name, val)
 			}
@@ -871,7 +880,7 @@ func (p *DataTracker) Backup() ([]byte, error) {
 }
 
 // Assumes that all locks are held
-func (p *DataTracker) ReplaceBackend(st store.Store) error {
+func (p *DataTracker) ReplaceBackend(st store.Store) (hard, soft error) {
 	p.Backend = st
 	return p.rebuildCache()
 }
@@ -884,16 +893,25 @@ func (p *DataTracker) Printf(f string, args ...interface{}) {
 	p.Logger.Printf(f, args...)
 }
 
-func (p *DataTracker) Infof(pref, f string, args ...interface{}) {
+func (p *DataTracker) DebugLevel(pref string) int {
 	debugLevel := 0
 	d2, e := strconv.Atoi(p.pref(pref))
 	if e == nil {
 		debugLevel = d2
 	}
-	if debugLevel > 0 {
+	return debugLevel
+}
+
+func (p *DataTracker) printlevelf(pref string, level int, f string, args ...interface{}) {
+	debugLevel := p.DebugLevel(pref)
+	if debugLevel >= level {
 		p.Logger.Printf(f, args...)
 	}
 }
+
+func (p *DataTracker) Infof(pref, f string, args ...interface{}) {
+	p.printlevelf(pref, 1, f, args...)
+}
 func (p *DataTracker) Debugf(pref, f string, args ...interface{}) {
-	p.Infof(pref, f, args...)
+	p.printlevelf(pref, 2, f, args...)
 }

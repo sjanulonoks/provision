@@ -10,6 +10,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type ContentMetaData struct {
+	// required: true
+	Name        string
+	Source      string
+	Description string
+	Version     string
+}
+
 //
 // Isos???
 // Files??
@@ -17,10 +25,7 @@ import (
 // swagger:model
 type Content struct {
 	// required: true
-	Name        string
-	Source      string
-	Description string
-	Version     string
+	Meta ContentMetaData `json:"meta"`
 
 	/*
 		        These are the sections:
@@ -38,7 +43,7 @@ type Content struct {
 			machines     map[string]*models.Machine
 			leases       map[string]*models.Lease
 	*/
-	Sections Sections
+	Sections Sections `json:"sections"`
 }
 
 type Section map[string]interface{}
@@ -46,11 +51,8 @@ type Sections map[string]Section
 
 // swagger:model
 type ContentSummary struct {
-	Name        string
-	Source      string
-	Description string
-	Version     string
-	Counts      map[string]int
+	Meta   ContentMetaData `json:"meta"`
+	Counts map[string]int
 }
 
 // ContentsResponse returned on a successful GET of a contents
@@ -87,7 +89,7 @@ type ContentParameter struct {
 }
 
 func (f *Frontend) buildNewStore(content *Content) (newStore store.Store, err error) {
-	filename := fmt.Sprintf("file:///%s/%s-%s.yaml?codec=yaml", f.SaasDir, content.Name, content.Version)
+	filename := fmt.Sprintf("file:///%s/%s-%s.yaml?codec=yaml", f.SaasDir, content.Meta.Name, content.Meta.Version)
 
 	newStore, err = store.Open(filename)
 	if err != nil {
@@ -96,10 +98,10 @@ func (f *Frontend) buildNewStore(content *Content) (newStore store.Store, err er
 
 	if md, ok := newStore.(store.MetaSaver); ok {
 		data := map[string]string{
-			"Name":        content.Name,
-			"Source":      content.Source,
-			"Description": content.Description,
-			"Version":     content.Version,
+			"Name":        content.Meta.Name,
+			"Source":      content.Meta.Source,
+			"Description": content.Meta.Description,
+			"Version":     content.Meta.Version,
 		}
 		md.SetMetaData(data)
 	}
@@ -130,10 +132,10 @@ func buildSummary(st store.Store) *ContentSummary {
 	cs := &ContentSummary{}
 	metaData := mst.MetaData()
 
-	cs.Name = metaData["Name"]
-	cs.Source = metaData["Source"]
-	cs.Description = metaData["Description"]
-	cs.Version = metaData["Version"]
+	cs.Meta.Name = metaData["Name"]
+	cs.Meta.Source = metaData["Source"]
+	cs.Meta.Description = metaData["Description"]
+	cs.Meta.Version = metaData["Version"]
 	cs.Counts = map[string]int{}
 
 	subs := mst.Subs()
@@ -161,24 +163,24 @@ func (f *Frontend) buildContent(st store.Store) (*Content, *models.Error) {
 
 	// Copy in MetaData
 	if val, ok := md["Name"]; ok {
-		content.Name = val
+		content.Meta.Name = val
 	} else {
-		content.Name = "Unknown"
+		content.Meta.Name = "Unknown"
 	}
 	if val, ok := md["Source"]; ok {
-		content.Source = val
+		content.Meta.Source = val
 	} else {
-		content.Source = "Unknown"
+		content.Meta.Source = "Unknown"
 	}
 	if val, ok := md["Description"]; ok {
-		content.Description = val
+		content.Meta.Description = val
 	} else {
-		content.Description = "Unknown"
+		content.Meta.Description = "Unknown"
 	}
 	if val, ok := md["Version"]; ok {
-		content.Version = val
+		content.Meta.Version = val
 	} else {
-		content.Version = "Unknown"
+		content.Meta.Version = "Unknown"
 	}
 
 	// Walk subs to build content sets
@@ -348,7 +350,7 @@ func (f *Frontend) InitContentApi() {
 				return
 			}
 
-			name := content.Name
+			name := content.Meta.Name
 			func() {
 				_, unlocker := f.dt.LockAll()
 				defer unlocker()
@@ -407,10 +409,10 @@ func (f *Frontend) InitContentApi() {
 			}
 
 			name := c.Param(`name`)
-			if name != content.Name {
+			if name != content.Meta.Name {
 				c.JSON(http.StatusBadRequest,
 					models.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("Name must match: %s != %s\n", content.Name, c.Param(`name`))))
+						fmt.Sprintf("Name must match: %s != %s\n", content.Meta.Name, c.Param(`name`))))
 				return
 
 			}
@@ -455,6 +457,7 @@ func (f *Frontend) InitContentApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/contents/:name",
 		func(c *gin.Context) {

@@ -111,7 +111,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 				unknown := fix(ref).OnlyUnknown
 				return func(s models.Model) bool {
 						v := fix(s).OnlyUnknown
-						return v || (v && unknown)
+						return v || (v == unknown)
 					},
 					func(s models.Model) bool {
 						return fix(s).OnlyUnknown && !unknown
@@ -314,27 +314,34 @@ func (b *BootEnv) Validate() {
 		b.renderers = append(b.renderers, b.Render(b.stores, nil, b)...)
 	} else {
 		machines := b.stores("machines")
-		for _, i := range machines.Items() {
-			machine := AsMachine(i)
-			if machine.BootEnv != b.Name {
-				continue
+		if machines != nil {
+			for _, i := range machines.Items() {
+				machine := AsMachine(i)
+				if machine.BootEnv != b.Name {
+					continue
+				}
+				b.renderers = append(b.renderers, b.Render(b.stores, machine, b)...)
 			}
-			b.renderers = append(b.renderers, b.Render(b.stores, machine, b)...)
 		}
 	}
 	b.SetAvailable()
 }
 
 func (b *BootEnv) OnLoad() error {
-	b.Validate()
-	if !b.Validated {
-		return b.HasError()
+	b.stores = func(ref string) *Store {
+		return b.p.objs[ref]
 	}
-	return nil
+	defer func() { b.stores = nil }()
+	return b.BeforeSave()
 }
 
 func (b *BootEnv) New() store.KeySaver {
-	return &BootEnv{BootEnv: &models.BootEnv{}}
+	res := &BootEnv{BootEnv: &models.BootEnv{}}
+	if b.BootEnv != nil && b.ChangeForced() {
+		res.ForceChange()
+	}
+	res.p = b.p
+	return res
 }
 
 func (b *BootEnv) setDT(p *DataTracker) {

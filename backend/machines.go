@@ -370,8 +370,12 @@ func (n *Machine) GetParam(d Stores, key string, searchProfiles bool) (interface
 
 func (n *Machine) New() store.KeySaver {
 	res := &Machine{Machine: &models.Machine{}}
+	if n.Machine != nil && n.ChangeForced() {
+		res.ForceChange()
+	}
 	res.Tasks = []string{}
 	res.Profiles = []string{}
+	res.p = n.p
 	return res
 }
 
@@ -409,37 +413,45 @@ func (n *Machine) Validate() {
 	bootenvs := objs("bootenvs")
 	wantedProfiles := map[string]int{}
 	for i, profileName := range n.Profiles {
-		found := profiles.Find(profileName)
+		var found models.Model
+		if profiles != nil {
+			found = profiles.Find(profileName)
+		}
 		if found == nil {
 			n.Errorf("Profile %s (at %d) does not exist", profileName, i)
 		} else {
 			if alreadyAt, ok := wantedProfiles[profileName]; ok {
 				n.Errorf("Duplicate profile %s: at %d and %d", profileName, alreadyAt, i)
+				n.SetInvalid() // Force Fatal
 			} else {
 				wantedProfiles[profileName] = i
 			}
 		}
 	}
 	for i, taskName := range n.Tasks {
-		if tasks.Find(taskName) == nil {
+		if tasks == nil || tasks.Find(taskName) == nil {
 			n.Errorf("Task %s (at %d) does not exist", taskName, i)
 		}
 	}
 
-	if nbFound := bootenvs.Find(n.BootEnv); nbFound == nil {
+	if bootenvs == nil {
 		n.Errorf("Bootenv %s does not exist", n.BootEnv)
 	} else {
-		env := AsBootEnv(nbFound)
-		if env.OnlyUnknown {
-			n.Errorf("BootEnv %s does not allow Machine assignments, it has the OnlyUnknown flag.", env.Name)
-		} else if !env.Available {
-			n.Errorf("Machine %s wants BootEnv %s, which is not available", n.UUID(), n.BootEnv)
+		if nbFound := bootenvs.Find(n.BootEnv); nbFound == nil {
+			n.Errorf("Bootenv %s does not exist", n.BootEnv)
 		} else {
-			if obFound := bootenvs.Find(n.oldBootEnv); obFound != nil {
-				oldEnv := AsBootEnv(obFound)
-				oldEnv.Render(objs, n, n).deregister(n.p.FS)
+			env := AsBootEnv(nbFound)
+			if env.OnlyUnknown {
+				n.Errorf("BootEnv %s does not allow Machine assignments, it has the OnlyUnknown flag.", env.Name)
+			} else if !env.Available {
+				n.Errorf("Machine %s wants BootEnv %s, which is not available", n.UUID(), n.BootEnv)
+			} else {
+				if obFound := bootenvs.Find(n.oldBootEnv); obFound != nil {
+					oldEnv := AsBootEnv(obFound)
+					oldEnv.Render(objs, n, n).deregister(n.p.FS)
+				}
+				env.Render(objs, n, n).register(n.p.FS)
 			}
-			env.Render(objs, n, n).register(n.p.FS)
 		}
 	}
 	n.SetAvailable()
@@ -457,6 +469,10 @@ func (n *Machine) BeforeSave() error {
 }
 
 func (n *Machine) OnLoad() error {
+	n.stores = func(ref string) *Store {
+		return n.p.objs[ref]
+	}
+	defer func() { n.stores = nil }()
 	return n.BeforeSave()
 }
 

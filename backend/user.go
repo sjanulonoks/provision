@@ -51,7 +51,12 @@ func (u *User) Backend() store.Store {
 }
 
 func (u *User) New() store.KeySaver {
-	return &User{User: &models.User{}}
+	res := &User{User: &models.User{}}
+	if u.User != nil && u.ChangeForced() {
+		res.ForceChange()
+	}
+	res.p = u.p
+	return res
 }
 
 func (u *User) setDT(p *DataTracker) {
@@ -89,6 +94,7 @@ func (u *User) Validate() {
 }
 
 func (u *User) BeforeSave() error {
+	u.Validate()
 	if !u.Useable() {
 		return u.MakeError(422, ValidationError, u)
 	}
@@ -96,6 +102,10 @@ func (u *User) BeforeSave() error {
 }
 
 func (u *User) OnLoad() error {
+	u.stores = func(ref string) *Store {
+		return u.p.objs[ref]
+	}
+	defer func() { u.stores = nil }()
 	return u.BeforeSave()
 }
 

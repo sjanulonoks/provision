@@ -105,6 +105,10 @@ func (n *Plugin) GetParam(d Stores, key string, searchProfiles bool) (interface{
 
 func (n *Plugin) New() store.KeySaver {
 	res := &Plugin{Plugin: &models.Plugin{}}
+	if n.Plugin != nil && n.ChangeForced() {
+		res.ForceChange()
+	}
+	res.p = n.p
 	return res
 }
 
@@ -122,6 +126,7 @@ func (n *Plugin) Validate() {
 }
 
 func (n *Plugin) BeforeSave() error {
+	n.Validate()
 	if !n.Useable() {
 		return n.MakeError(422, ValidationError, n)
 	}
@@ -129,6 +134,10 @@ func (n *Plugin) BeforeSave() error {
 }
 
 func (n *Plugin) OnLoad() error {
+	n.stores = func(ref string) *Store {
+		return n.p.objs[ref]
+	}
+	defer func() { n.stores = nil }()
 	return n.BeforeSave()
 }
 

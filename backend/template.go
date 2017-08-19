@@ -57,7 +57,12 @@ func (t *Template) Backend() store.Store {
 }
 
 func (t *Template) New() store.KeySaver {
-	return &Template{Template: &models.Template{}}
+	res := &Template{Template: &models.Template{}}
+	if t.Template != nil && t.ChangeForced() {
+		res.ForceChange()
+	}
+	res.p = t.p
+	return res
 }
 
 func (t *Template) setDT(p *DataTracker) {
@@ -77,10 +82,12 @@ type tmplUpdater struct {
 }
 
 func (t *Template) checkSubs(root *template.Template, e models.ErrorAdder) {
-	t.toUpdate = &tmplUpdater{
-		root:     root,
-		tasks:    AsTasks(t.stores("tasks").Items()),
-		bootenvs: AsBootEnvs(t.stores("bootenvs").Items()),
+	t.toUpdate = &tmplUpdater{root: root, tasks: []*Task{}, bootenvs: []*BootEnv{}}
+	if foo := t.stores("tasks"); foo != nil {
+		t.toUpdate.tasks = AsTasks(foo.Items())
+	}
+	if foo := t.stores("bootenvs"); foo != nil {
+		t.toUpdate.bootenvs = AsBootEnvs(foo.Items())
 	}
 	t.toUpdate.taskTmpls = make([]*template.Template, len(t.toUpdate.tasks))
 	t.toUpdate.envTmpls = make([]*template.Template, len(t.toUpdate.bootenvs))
@@ -147,6 +154,10 @@ func (t *Template) AfterSave() {
 }
 
 func (t *Template) OnLoad() error {
+	t.stores = func(ref string) *Store {
+		return t.p.objs[ref]
+	}
+	defer func() { t.stores = nil }()
 	return t.BeforeSave()
 }
 

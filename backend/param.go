@@ -42,7 +42,12 @@ func (p *Param) Backend() store.Store {
 }
 
 func (p *Param) New() store.KeySaver {
-	return &Param{Param: &models.Param{}}
+	res := &Param{Param: &models.Param{}}
+	if p.Param != nil && p.ChangeForced() {
+		res.ForceChange()
+	}
+	res.p = p.p
+	return res
 }
 
 func (p *Param) setDT(dp *DataTracker) {
@@ -93,6 +98,10 @@ func (p *Param) BeforeSave() error {
 }
 
 func (p *Param) OnLoad() error {
+	p.stores = func(ref string) *Store {
+		return p.p.objs[ref]
+	}
+	defer func() { p.stores = nil }()
 	return p.BeforeSave()
 }
 

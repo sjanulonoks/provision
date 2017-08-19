@@ -38,8 +38,8 @@ func TestBootEnvCrud(t *testing.T) {
 	// List test.
 	bes := d("bootenvs").Items()
 	if bes != nil {
-		if len(bes) != 5 {
-			t.Errorf("List function should have returned: 5, but got %d\n", len(bes))
+		if len(bes) != 6 {
+			t.Errorf("List function should have returned: 6, but got %d\n", len(bes))
 		}
 	} else {
 		t.Errorf("List function returned nil!!")
