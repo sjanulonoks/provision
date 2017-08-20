@@ -208,6 +208,11 @@ case $1 in
                  $shasum -c sha256sums || exit 1
              fi
 
+             echo "Installing Version $DRP_VERSION of Digital Rebar Provision Community Content"
+             curl -sfL -o drp-community-content.yaml https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.yaml || echo "Failed to dowload content."
+             curl -sfL -o drp-community-content.sha256 https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.sha256 || echo "Failed to download sha of content."
+             $shasum -c drp-community-content.sha256
+
              if [[ $ISOLATED == false ]] ; then
                  sudo cp "$binpath"/* "$bindest"
                  if [[ $initfile ]]; then
@@ -220,6 +225,7 @@ case $1 in
 
                  sudo mkdir -p /usr/share/dr-provision
                  DEFAULT_CONTENT_FILE="/usr/share/dr-provision/default.yaml"
+                 sudo mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
              else
                  mkdir -p drp-data
 
@@ -275,15 +281,10 @@ case $1 in
                      echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar --local-store=\"\" --default-store=\"\" &"
                  fi
                  set -e
-                 sudo mkdir -p "`pwd`/drp-data/saas-content"
+                 mkdir -p "`pwd`/drp-data/saas-content"
                  DEFAULT_CONTENT_FILE="`pwd`/drp-data/saas-content/default.yaml"
+                 mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
              fi
-
-             echo "Installing Version $DRP_VERSION of Digital Rebar Provision Community Content"
-             curl -sfL -o drp-community-content.yaml https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.yaml || echo "Failed to dowload content."
-             curl -sfL -o drp-community-content.sha256 https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.sha256 || echo "Failed to download sha of content."
-             $shasum -c drp-community-content.sha256
-             sudo mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
 
              echo
              echo "# Once dr-provision is started, these commands will install the isos for the community defaults"
