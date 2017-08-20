@@ -1,4 +1,4 @@
-package plugin
+package midlayer
 
 import (
 	"bufio"
@@ -14,6 +14,8 @@ import (
 	"github.com/digitalrebar/provision/models"
 )
 
+type PluginClientRequestTracker chan *models.PluginClientReply
+
 type PluginClient struct {
 	plugin   string
 	cmd      *exec.Cmd
@@ -24,41 +26,11 @@ type PluginClient struct {
 	dt       *backend.DataTracker
 	lock     sync.Mutex
 	nextId   int
-	pending  map[int]*PluginClientRequest
+	pending  map[int]PluginClientRequestTracker
 
 	publock   sync.Mutex
 	inflight  int
 	unloading bool
-}
-
-// Id of request, and JSON blob
-type PluginClientRequest struct {
-	Id     int
-	Action string
-	Data   []byte
-
-	caller chan *PluginClientReply
-}
-
-// If code == 0,2xx, then success and call should json decode.
-// If code != 0,2xx, then error and data is models.Error.
-type PluginClientReply struct {
-	Id   int
-	Code int
-	Data []byte
-}
-
-func (r *PluginClientReply) Error() *models.Error {
-	var err models.Error
-	jerr := json.Unmarshal(r.Data, &err)
-	if jerr != nil {
-		err = models.Error{Code: 400, Messages: []string{jerr.Error()}, Model: "plugin", Type: "plugin"}
-	}
-	return &err
-}
-
-func (r *PluginClientReply) HasError() bool {
-	return r.Code != 0 && (r.Code < 200 || r.Code > 299)
 }
 
 func (pc *PluginClient) ReadLog() {
@@ -79,7 +51,7 @@ func (pc *PluginClient) ReadReply() {
 	for in.Scan() {
 		jsonString := in.Text()
 
-		var resp PluginClientReply
+		var resp models.PluginClientReply
 		err := json.Unmarshal([]byte(jsonString), &resp)
 		if err != nil {
 			pc.dt.Infof("debugPlugins", "Failed to process: %v\n", err)
@@ -91,8 +63,7 @@ func (pc *PluginClient) ReadReply() {
 			pc.dt.Infof("debugPlugins", "Failed to find request for: %v\n", resp.Id)
 			continue
 		}
-
-		req.caller <- &resp
+		req <- &resp
 
 		pc.lock.Lock()
 		delete(pc.pending, resp.Id)
@@ -104,23 +75,25 @@ func (pc *PluginClient) ReadReply() {
 	pc.finished <- true
 }
 
-func (pc *PluginClient) writeRequest(action string, data interface{}) (chan *PluginClientReply, error) {
+func (pc *PluginClient) writeRequest(action string, data interface{}) (chan *models.PluginClientReply, error) {
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
 
-	mychan := make(chan *PluginClientReply)
+	mychan := make(chan *models.PluginClientReply)
 	id := pc.nextId
-	pc.pending[id] = &PluginClientRequest{Id: id, Action: action, caller: mychan}
+	pc.pending[id] = mychan
 	pc.nextId += 1
+
+	req := &models.PluginClientRequest{Id: id, Action: action}
 
 	if dataBytes, err := json.Marshal(data); err != nil {
 		delete(pc.pending, id)
 		return mychan, err
 	} else {
-		pc.pending[id].Data = dataBytes
+		req.Data = dataBytes
 	}
 
-	if bytes, err := json.Marshal(pc.pending[id]); err != nil {
+	if bytes, err := json.Marshal(req); err != nil {
 		delete(pc.pending, id)
 		return mychan, err
 	} else {
@@ -194,7 +167,7 @@ func (pc *PluginClient) Publish(e *models.Event) error {
 	return nil
 }
 
-func (pc *PluginClient) Action(a *MachineAction) error {
+func (pc *PluginClient) Action(a *models.MachineAction) error {
 	if mychan, err := pc.writeRequest("Action", a); err != nil {
 		return err
 	} else {
@@ -220,7 +193,7 @@ func (pc *PluginClient) Stop() error {
 }
 
 func NewPluginClient(plugin string, dt *backend.DataTracker, apiPort int, path string, params map[string]interface{}) (answer *PluginClient, theErr error) {
-	answer = &PluginClient{plugin: plugin, dt: dt, pending: make(map[int]*PluginClientRequest, 0)}
+	answer = &PluginClient{plugin: plugin, dt: dt, pending: make(map[int]PluginClientRequestTracker, 0)}
 
 	answer.cmd = exec.Command(path, "listen")
 	// Setup env vars to run drpcli - auth should be parameters.

@@ -10,76 +10,31 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type ContentMetaData struct {
-	// required: true
-	Name        string
-	Source      string
-	Description string
-	Version     string
-}
-
-//
-// Isos???
-// Files??
-//
-// swagger:model
-type Content struct {
-	// required: true
-	Meta ContentMetaData `json:"meta"`
-
-	/*
-		        These are the sections:
-
-			tasks        map[string]*models.Task
-			bootenvs     map[string]*models.BootEnv
-			templates    map[string]*models.Template
-			profiles     map[string]*models.Profile
-			params       map[string]*models.Param
-			reservations map[string]*models.Reservation
-			subnets      map[string]*models.Subnet
-			users        map[string]*models.User
-			preferences  map[string]*models.Pref
-			plugins      map[string]*models.Plugin
-			machines     map[string]*models.Machine
-			leases       map[string]*models.Lease
-	*/
-	Sections Sections `json:"sections"`
-}
-
-type Section map[string]interface{}
-type Sections map[string]Section
-
-// swagger:model
-type ContentSummary struct {
-	Meta   ContentMetaData `json:"meta"`
-	Counts map[string]int
-}
-
 // ContentsResponse returned on a successful GET of a contents
 // swagger:response
 type ContentResponse struct {
 	// in: body
-	Body *Content
+	Body *models.Content
 }
 
 // ContentSummaryResponse returned on a successful Post of a content
 // swagger:response
 type ContentSummaryResponse struct {
 	// in: body
-	Body *ContentSummary
+	Body *models.ContentSummary
 }
 
 // ContentsResponse returned on a successful GET of all contents
 // swagger:response
 type ContentsResponse struct {
 	// in: body
-	Body []*ContentSummary
+	Body []*models.ContentSummary
 }
 
 // swagger:parameters uploadContent createContent
 type ContentBodyParameter struct {
 	// in: body
-	Body *Content
+	Body *models.Content
 }
 
 // swagger:parameters getContent deleteContent uploadContent
@@ -88,7 +43,7 @@ type ContentParameter struct {
 	Name string `json:"name"`
 }
 
-func (f *Frontend) buildNewStore(content *Content) (newStore store.Store, err error) {
+func (f *Frontend) buildNewStore(content *models.Content) (newStore store.Store, err error) {
 	filename := fmt.Sprintf("file:///%s/%s-%s.yaml?codec=yaml", f.SaasDir, content.Meta.Name, content.Meta.Version)
 
 	newStore, err = store.Open(filename)
@@ -124,12 +79,12 @@ func (f *Frontend) buildNewStore(content *Content) (newStore store.Store, err er
 	return
 }
 
-func buildSummary(st store.Store) *ContentSummary {
+func buildSummary(st store.Store) *models.ContentSummary {
 	mst, ok := st.(store.MetaSaver)
 	if !ok {
 		return nil
 	}
-	cs := &ContentSummary{}
+	cs := &models.ContentSummary{}
 	metaData := mst.MetaData()
 
 	cs.Meta.Name = metaData["Name"]
@@ -150,8 +105,8 @@ func buildSummary(st store.Store) *ContentSummary {
 	return cs
 }
 
-func (f *Frontend) buildContent(st store.Store) (*Content, *models.Error) {
-	content := &Content{}
+func (f *Frontend) buildContent(st store.Store) (*models.Content, *models.Error) {
+	content := &models.Content{}
 
 	var md map[string]string
 	mst, ok := st.(store.MetaSaver)
@@ -184,7 +139,7 @@ func (f *Frontend) buildContent(st store.Store) (*Content, *models.Error) {
 	}
 
 	// Walk subs to build content sets
-	content.Sections = Sections{}
+	content.Sections = models.Sections{}
 	for prefix, sub := range st.Subs() {
 		_, err := models.New(prefix)
 		if err != nil {
@@ -197,7 +152,7 @@ func (f *Frontend) buildContent(st store.Store) (*Content, *models.Error) {
 			berr := models.NewError("ServerError", http.StatusInternalServerError, err.Error())
 			return nil, berr
 		}
-		objs := make(Section, 0)
+		objs := make(models.Section, 0)
 		for _, k := range keys {
 			// This is protected by the earlier check
 			v, _ := models.New(prefix)
@@ -260,7 +215,7 @@ func (f *Frontend) InitContentApi() {
 				return
 			}
 
-			contents := []*ContentSummary{}
+			contents := []*models.ContentSummary{}
 			func() {
 				_, unlocker := f.dt.LockAll()
 				defer unlocker()
@@ -345,7 +300,7 @@ func (f *Frontend) InitContentApi() {
 			if !assureAuth(c, f.Logger, "contents", "create", "*") {
 				return
 			}
-			content := &Content{}
+			content := &models.Content{}
 			if !assureDecode(c, content) {
 				return
 			}
@@ -403,7 +358,7 @@ func (f *Frontend) InitContentApi() {
 			if !assureAuth(c, f.Logger, "contents", "update", "*") {
 				return
 			}
-			content := &Content{}
+			content := &models.Content{}
 			if !assureDecode(c, content) {
 				return
 			}

@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/digitalrebar/provision/models"
-	"github.com/digitalrebar/provision/plugin"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,14 +12,14 @@ import (
 // swagger:response
 type PluginProviderResponse struct {
 	// in: body
-	Body *plugin.PluginProvider
+	Body *models.PluginProvider
 }
 
 // PluginProvidersResponse returned on a successful GET of all plugin_provider
 // swagger:response
 type PluginProvidersResponse struct {
 	// in: body
-	Body []*plugin.PluginProvider
+	Body []*models.PluginProvider
 }
 
 // swagger:parameters getPluginProvider uploadPluginProvider deletePluginProvider
@@ -40,7 +39,7 @@ type PluginProviderData struct {
 // swagger:response
 type PluginProviderInfoResponse struct {
 	// in: body
-	Body *plugin.PluginProviderUploadInfo
+	Body *models.PluginProviderUploadInfo
 }
 
 func (f *Frontend) InitPluginProviderApi() {

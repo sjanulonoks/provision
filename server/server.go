@@ -41,7 +41,6 @@ import (
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/frontend"
 	"github.com/digitalrebar/provision/midlayer"
-	"github.com/digitalrebar/provision/plugin"
 )
 
 type ProgOpts struct {
@@ -182,7 +181,7 @@ func Server(c_opts *ProgOpts) {
 		}
 	}
 
-	pc, err := plugin.InitPluginController(c_opts.PluginRoot, dt, publishers, c_opts.ApiPort)
+	pc, err := midlayer.InitPluginController(c_opts.PluginRoot, dt, publishers, c_opts.ApiPort)
 	if err != nil {
 		logger.Fatalf("Error starting plugin service: %v", err)
 	} else {

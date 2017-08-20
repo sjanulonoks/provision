@@ -1,25 +1,16 @@
-package plugin
+package midlayer
 
 import (
 	"fmt"
-	"net"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/pborman/uuid"
+	"github.com/digitalrebar/provision/models"
 )
 
-// Plugins can provide actions for machines
-// Assumes that there are parameters on the
-// call in addition to the machine.
-//
-// swagger:model
 type AvailableAction struct {
-	Provider       string
-	Command        string
-	RequiredParams []string
-	OptionalParams []string
+	models.AvailableAction
 
 	plugin *RunningPlugin
 	ma     *MachineActions
@@ -27,19 +18,6 @@ type AvailableAction struct {
 	lock      sync.Mutex
 	inflight  int
 	unloading bool
-}
-
-//
-// Params is built from the caller, plus
-// the machine, plus profiles, plus global.
-//
-type MachineAction struct {
-	Name    string
-	Uuid    uuid.UUID
-	Address net.IP
-	BootEnv string
-	Command string
-	Params  map[string]interface{}
 }
 
 type MachineActions struct {
@@ -51,7 +29,11 @@ func NewMachineActions() *MachineActions {
 	return &MachineActions{actions: make(map[string]*AvailableAction, 0)}
 }
 
-func (ma *MachineActions) Add(aa *AvailableAction) error {
+func (ma *MachineActions) Add(model_aa *models.AvailableAction, plugin *RunningPlugin) error {
+	aa := &AvailableAction{}
+	aa.AvailableAction = *model_aa
+	aa.plugin = plugin
+
 	ma.lock.Lock()
 	defer ma.lock.Unlock()
 
@@ -63,21 +45,26 @@ func (ma *MachineActions) Add(aa *AvailableAction) error {
 	return nil
 }
 
-func (ma *MachineActions) Remove(aa *AvailableAction) error {
+func (ma *MachineActions) Remove(aa *models.AvailableAction) error {
 	var err error
+	var the_aa *AvailableAction
 	ma.lock.Lock()
-	if _, ok := ma.actions[aa.Command]; !ok {
+	if ta, ok := ma.actions[aa.Command]; !ok {
 		err = fmt.Errorf("Missing Action %s: already removed\n", aa.Command)
 	} else {
+		the_aa = ta
 		delete(ma.actions, aa.Command)
 	}
 	ma.lock.Unlock()
 
-	aa.Unload()
+	if the_aa != nil {
+		the_aa.Unload()
+	}
+
 	return err
 }
 
-func (ma *MachineActions) List() []*AvailableAction {
+func (ma *MachineActions) List() []*models.AvailableAction {
 	ma.lock.Lock()
 	defer ma.lock.Unlock()
 
@@ -88,20 +75,40 @@ func (ma *MachineActions) List() []*AvailableAction {
 	}
 	sort.Strings(keys)
 
-	answer := []*AvailableAction{}
+	answer := []*models.AvailableAction{}
 	for _, key := range keys {
-		answer = append(answer, ma.actions[key])
+		answer = append(answer, &ma.actions[key].AvailableAction)
 	}
 	return answer
 
 }
 
-func (ma *MachineActions) Get(name string) (a *AvailableAction, ok bool) {
+func (ma *MachineActions) Get(name string) (*models.AvailableAction, bool) {
 	ma.lock.Lock()
 	defer ma.lock.Unlock()
 
-	a, ok = ma.actions[name]
-	return
+	if ta, ok := ma.actions[name]; ok {
+		return &ta.AvailableAction, true
+	}
+	return nil, false
+}
+
+func (ma *MachineActions) Run(maa *models.MachineAction) error {
+	var aa *AvailableAction
+	var ok bool
+	ma.lock.Lock()
+	aa, ok = ma.actions[maa.Command]
+	if !ok {
+		return fmt.Errorf("Action no longer available: %s", aa.Command)
+	}
+	ma.lock.Unlock()
+
+	if err := aa.Reserve(); err != nil {
+		return nil
+	}
+	defer aa.Release()
+
+	return aa.plugin.Client.Action(maa)
 }
 
 func (aa *AvailableAction) Reserve() error {
@@ -109,7 +116,7 @@ func (aa *AvailableAction) Reserve() error {
 	defer aa.lock.Unlock()
 
 	if aa.unloading {
-		return fmt.Errorf("Action not available %s: unloading\n", aa.Command)
+		return fmt.Errorf("Action not available %s: unloading", aa.Command)
 	}
 	aa.inflight += 1
 	return nil
@@ -132,13 +139,4 @@ func (aa *AvailableAction) Unload() {
 	}
 	aa.lock.Unlock()
 	return
-}
-
-func (aa *AvailableAction) Run(maa *MachineAction) error {
-	if err := aa.Reserve(); err != nil {
-		return nil
-	}
-	defer aa.Release()
-
-	return aa.plugin.Client.Action(maa)
 }

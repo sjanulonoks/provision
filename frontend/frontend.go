@@ -14,8 +14,8 @@ import (
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/embedded"
+	"github.com/digitalrebar/provision/midlayer"
 	"github.com/digitalrebar/provision/models"
-	"github.com/digitalrebar/provision/plugin"
 	"github.com/digitalrebar/store"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-contrib/cors"
@@ -52,7 +52,7 @@ type Frontend struct {
 	MgmtApi    *gin.Engine
 	ApiGroup   *gin.RouterGroup
 	dt         *backend.DataTracker
-	pc         *plugin.PluginController
+	pc         *midlayer.PluginController
 	authSource AuthSource
 	pubs       *backend.Publishers
 	melody     *melody.Melody
@@ -87,7 +87,7 @@ func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	return
 }
 
-func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, apiport, provport int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers, drpid string, pc *plugin.PluginController, noDhcp, noTftp, noProv bool, saasDir string) (me *Frontend) {
+func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, apiport, provport int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers, drpid string, pc *midlayer.PluginController, noDhcp, noTftp, noProv bool, saasDir string) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {
