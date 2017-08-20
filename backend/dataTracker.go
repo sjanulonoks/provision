@@ -47,7 +47,7 @@ localboot 0
 				Name: `ipxe`,
 				Path: `default.ipxe`,
 				Contents: `#!ipxe
-exit
+chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 `,
 			},
 		},
