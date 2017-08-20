@@ -1,4 +1,4 @@
-package plugin
+package midlayer
 
 import (
 	"bytes"
@@ -22,40 +22,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Plugin Provider describes the available functions that could be
-// instantiated by a plugin.
-// swagger:model
-type PluginProvider struct {
-	Name    string
-	Version string
-
-	HasPublish       bool
-	AvailableActions []*AvailableAction
-
-	RequiredParams []string
-	OptionalParams []string
-
-	// Ensure that these are in the system.
-	Parameters []*models.Param
-
-	path string
-}
-
-// swagger:model
-type PluginProviderUploadInfo struct {
-	Path string `json:"path"`
-	Size int64  `json:"size"`
-}
-
 type RunningPlugin struct {
 	Plugin   *backend.Plugin
-	Provider *PluginProvider
+	Provider *models.PluginProvider
 	Client   *PluginClient
 }
 
 type PluginController struct {
 	lock               sync.Mutex
-	AvailableProviders map[string]*PluginProvider
+	AvailableProviders map[string]*models.PluginProvider
 	runningPlugins     map[string]*RunningPlugin
 	dt                 *backend.DataTracker
 	pluginDir          string
@@ -70,7 +45,7 @@ type PluginController struct {
 
 func InitPluginController(pluginDir string, dt *backend.DataTracker, pubs *backend.Publishers, apiPort int) (pc *PluginController, err error) {
 	pc = &PluginController{pluginDir: pluginDir, dt: dt, publishers: pubs,
-		AvailableProviders: make(map[string]*PluginProvider, 0), apiPort: apiPort,
+		AvailableProviders: make(map[string]*models.PluginProvider, 0), apiPort: apiPort,
 		runningPlugins: make(map[string]*RunningPlugin, 0)}
 
 	pc.MachineActions = NewMachineActions()
@@ -231,7 +206,7 @@ func (pc *PluginController) Reserve() error {
 func (pc *PluginController) Release() {}
 func (pc *PluginController) Unload()  {}
 
-func (pc *PluginController) GetPluginProvider(name string) *PluginProvider {
+func (pc *PluginController) GetPluginProvider(name string) *models.PluginProvider {
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
 
@@ -242,7 +217,7 @@ func (pc *PluginController) GetPluginProvider(name string) *PluginProvider {
 	}
 }
 
-func (pc *PluginController) GetPluginProviders() []*PluginProvider {
+func (pc *PluginController) GetPluginProviders() []*models.PluginProvider {
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
 
@@ -253,7 +228,7 @@ func (pc *PluginController) GetPluginProviders() []*PluginProvider {
 	}
 	sort.Strings(keys)
 
-	answer := []*PluginProvider{}
+	answer := []*models.PluginProvider{}
 	for _, key := range keys {
 		answer = append(answer, pc.AvailableProviders[key])
 	}
@@ -299,7 +274,8 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 		}
 
 		if len(errors) == 0 {
-			thingee, err := NewPluginClient(plugin.Name, pc.dt, pc.apiPort, pp.path, plugin.Params)
+			ppath := pc.pluginDir + "/" + pp.Name
+			thingee, err := NewPluginClient(plugin.Name, pc.dt, pc.apiPort, ppath, plugin.Params)
 			if err == nil {
 				rp := &RunningPlugin{Plugin: plugin, Client: thingee, Provider: pp}
 				if pp.HasPublish {
@@ -307,8 +283,7 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 				}
 				for _, aa := range pp.AvailableActions {
 					aa.Provider = pp.Name
-					aa.plugin = rp
-					pc.MachineActions.Add(aa)
+					pc.MachineActions.Add(aa, rp)
 				}
 				pc.runningPlugins[plugin.Name] = rp
 			} else {
@@ -363,7 +338,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 	if err != nil {
 		pc.dt.Infof("debugPlugins", "Skipping %s because %s\n", provider, err)
 	} else {
-		var pp PluginProvider
+		var pp models.PluginProvider
 		err = json.Unmarshal(out, &pp)
 		if err != nil {
 			pc.dt.Infof("debugPlugins", "Skipping %s because of bad json: %s\n%s\n", provider, err, out)
@@ -402,7 +377,6 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 				if _, ok := pc.AvailableProviders[pp.Name]; !ok {
 					pc.dt.Infof("debugPlugins", "Adding plugin provider: %s\n", pp.Name)
 					pc.AvailableProviders[pp.Name] = &pp
-					pp.path = pc.pluginDir + "/" + provider
 					for _, aa := range pp.AvailableActions {
 						aa.Provider = pp.Name
 					}
@@ -450,7 +424,7 @@ func (pc *PluginController) removePluginProvider(provider string) {
 	}
 }
 
-func (pc *PluginController) UploadPlugin(c *gin.Context, name string) (*PluginProviderUploadInfo, *models.Error) {
+func (pc *PluginController) UploadPlugin(c *gin.Context, name string) (*models.PluginProviderUploadInfo, *models.Error) {
 	if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
 		return nil, models.NewError("API ERROR", http.StatusUnsupportedMediaType,
 			fmt.Sprintf("upload: plugin_provider %s must have content-type application/octet-stream", name))
@@ -486,7 +460,7 @@ func (pc *PluginController) UploadPlugin(c *gin.Context, name string) (*PluginPr
 	os.Remove(ppName)
 	os.Rename(ppTmpName, ppName)
 	os.Chmod(ppName, 0700)
-	return &PluginProviderUploadInfo{Path: name, Size: copied}, nil
+	return &models.PluginProviderUploadInfo{Path: name, Size: copied}, nil
 }
 
 func (pc *PluginController) RemovePlugin(name string) error {

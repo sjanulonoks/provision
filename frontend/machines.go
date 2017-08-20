@@ -6,7 +6,6 @@ import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
-	"github.com/digitalrebar/provision/plugin"
 	"github.com/gin-gonic/gin"
 	"github.com/pborman/uuid"
 )
@@ -29,14 +28,14 @@ type MachinesResponse struct {
 // swagger:response
 type MachineActionResponse struct {
 	// in: body
-	Body *plugin.AvailableAction
+	Body *models.AvailableAction
 }
 
 // MachineActionsResponse return on a successful GET of all Machine Actions
 // swagger:response
 type MachineActionsResponse struct {
 	// in: body
-	Body []*plugin.AvailableAction
+	Body []*models.AvailableAction
 }
 
 // MachineParamsResponse return on a successful GET of all Machine's Params
@@ -418,7 +417,7 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			b := &backend.Machine{}
 			var ref models.Model
-			list := make([]*plugin.AvailableAction, 0, 0)
+			list := make([]*models.AvailableAction, 0, 0)
 			bad := func() bool {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
@@ -470,7 +469,7 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			b := &backend.Machine{}
 			var ref models.Model
-			var aa *plugin.AvailableAction
+			var aa *models.AvailableAction
 			bad := func() bool {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
@@ -523,8 +522,7 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			name := c.Param(`name`)
 
-			var aa *plugin.AvailableAction
-			ma := &plugin.MachineAction{Command: name, Params: val}
+			ma := &models.MachineAction{Command: name, Params: val}
 
 			b := &backend.Machine{}
 			var ref models.Model
@@ -555,7 +553,7 @@ func (f *Frontend) InitMachineApi() {
 				ma.BootEnv = m.BootEnv
 
 				var err *models.Error
-				aa, err = validateMachineAction(f, d, name, m, val)
+				_, err = validateMachineAction(f, d, name, m, val)
 				if err != nil {
 					c.JSON(err.Code, err)
 					return true
@@ -568,7 +566,7 @@ func (f *Frontend) InitMachineApi() {
 			}
 
 			f.pubs.Publish("machines", name, uuid, ma)
-			err := aa.Run(ma)
+			err := f.pc.MachineActions.Run(ma)
 			if err != nil {
 				be, ok := err.(*models.Error)
 				if !ok {
@@ -583,7 +581,7 @@ func (f *Frontend) InitMachineApi() {
 
 }
 
-func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backend.Machine, val map[string]interface{}) (*plugin.AvailableAction, *models.Error) {
+func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backend.Machine, val map[string]interface{}) (*models.AvailableAction, *models.Error) {
 	err := &models.Error{
 		Code:  http.StatusBadRequest,
 		Type:  "API_ERROR",
