@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -428,13 +429,6 @@ func (p *DataTracker) ApiURL(remoteIP net.IP) string {
 func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 	hard = &models.Error{Code: 500, Type: "Failed to load backing objects from cache"}
 	soft = &models.Error{Code: 422, Type: ValidationError}
-	root, err := template.New("").Parse("")
-	if err != nil {
-		hard.Errorf("Unable to create root template: %v", err)
-		return
-	}
-	p.rootTemplate = root
-	p.rootTemplate.Option("missingkey=error")
 	p.objs = map[string]*Store{}
 	objs := allKeySavers(p)
 	for _, obj := range objs {
@@ -457,6 +451,20 @@ func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 			}
 		}
 		p.objs[prefix].Index = *index.Create(res)
+
+		if obj.Prefix() == "templates" {
+			buf := &bytes.Buffer{}
+			for _, thing := range p.objs["templates"].Items() {
+				tmpl := AsTemplate(thing)
+				fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}`, tmpl.ID, tmpl.Contents)
+			}
+			root, err := template.New("").Parse(buf.String())
+			if err != nil {
+				hard.Errorf("Unable to load root templates: %v", err)
+			}
+			p.rootTemplate = root
+			p.rootTemplate.Option("missingkey=error")
+		}
 	}
 	return
 }

@@ -104,8 +104,14 @@ func (t *Template) Validate() {
 		t.Errorf("Template must have an ID")
 		return
 	}
+	var err error
 	t.p.tmplMux.Lock()
-	root, err := t.p.rootTemplate.Clone()
+	root := t.p.rootTemplate
+	if root == nil {
+		root = template.New("")
+	} else {
+		root, err = root.Clone()
+	}
 	t.p.tmplMux.Unlock()
 	if err != nil {
 		t.Errorf("Error cloning shared template namespace: %v", err)
