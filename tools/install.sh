@@ -212,11 +212,14 @@ case $1 in
                  sudo cp "$binpath"/* "$bindest"
                  if [[ $initfile ]]; then
                      sudo cp "$initfile" "$initdest"
-                     echo "You can start the DigitalRebar Provision service with:"
+                     echo "# You can start the DigitalRebar Provision service with:"
                      echo "$starter"
-                     echo "You can enable the DigitalRebar Provision service with:"
+                     echo "# You can enable the DigitalRebar Provision service with:"
                      echo "$enabler"
                  fi
+
+                 sudo mkdir -p /usr/share/dr-provision
+                 DEFAULT_CONTENT_FILE="/usr/share/dr-provision/default.yaml"
              else
                  mkdir -p drp-data
 
@@ -267,18 +270,29 @@ case $1 in
                  set +e
                  ./dr-provision --help | grep -q base-root
                  if [[ $? -eq 0 ]] ; then
-                     echo "sudo ./dr-provision $IPADDR --base-root=`pwd`/drp-data --local-store=\"\" --default-store=\"\" &"
+                     echo "sudo ./dr-provision $IPADDR --base-root=`pwd`/drp-data --local-content=\"\" --default-content=\"\" &"
                  else
                      echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar --local-store=\"\" --default-store=\"\" &"
                  fi
                  set -e
-                 echo
-                 echo "# Once dr-provision is started, this commmand will gather and upload the tools required to"
-                 echo "# do discovery-based machine management"
-                 echo
-                 echo "tools/discovery-load.sh"
-                 echo
-             fi;;
+                 sudo mkdir -p "`pwd`/drp-data/saas-content"
+                 DEFAULT_CONTENT_FILE="`pwd`/drp-data/saas-content/default.yaml"
+             fi
+
+             echo "Installing Version $DRP_VERSION of Digital Rebar Provision Community Content"
+             curl -sfL -o drp-community-content.yaml https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.yaml || echo "Failed to dowload content."
+             curl -sfL -o drp-community-content.sha256 https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.sha256 || echo "Failed to download sha of content."
+             $shasum -c drp-community-content.sha256
+             sudo mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
+
+             echo
+             echo "# Once dr-provision is started, these commands will install the isos for the community defaults"
+             echo "  drpcli bootenvs uploadiso ce-ubuntu-16.04-install"
+             echo "  drpcli bootenvs uploadiso ce-centos-7.3.1611-install"
+             echo "  drpcli bootenvs uploadiso ce-sledgehammer"
+             echo
+
+             ;;
      remove)
          sudo rm -f "$bindest/dr-provision" "$bindest/drpcli" "$initdest";;
      *)

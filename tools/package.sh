@@ -22,9 +22,9 @@ esac
 tmpdir="$(mktemp -d /tmp/rs-bundle-XXXXXXXX)"
 cp -a bin "$tmpdir"
 mkdir -p "$tmpdir/assets"
-cp -a assets/startup assets/templates assets/bootenvs assets/profiles "$tmpdir/assets"
+cp -a assets/startup "$tmpdir/assets"
 mkdir -p "$tmpdir/tools"
-cp -a tools/install.sh tools/discovery-load.sh "$tmpdir/tools"
+cp -a tools/install.sh "$tmpdir/tools"
 (
     cd "$tmpdir"
     $shasum $(find . -type f) >sha256sums
