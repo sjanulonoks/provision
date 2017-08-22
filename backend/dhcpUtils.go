@@ -234,6 +234,8 @@ func FindOrCreateLease(dt *DataTracker,
 	lease, reservation = findViaReservation(leases, reservations, strat, token, req)
 	if lease == nil {
 		lease, subnet = findViaSubnet(leases, subnets, reservations, strat, token, req, via)
+	} else {
+		subnet = lease.Subnet(d)
 	}
 	if lease != nil {
 		// Clean up any other leases that have this strategy and token lying around.
