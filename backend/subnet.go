@@ -303,6 +303,43 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 				sub.Subnet.Subnet = st
 				return sub, nil
 			}),
+		"ActiveAddress": index.Make(
+			false,
+			"IP Address",
+			func(i, j models.Model) bool {
+				a, _, errA := net.ParseCIDR(fix(i).Subnet.Subnet)
+				b, _, errB := net.ParseCIDR(fix(j).Subnet.Subnet)
+				if errA != nil || errB != nil {
+					fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
+				}
+				n, o := big.Int{}, big.Int{}
+				n.SetBytes(a.To16())
+				o.SetBytes(b.To16())
+				return n.Cmp(&o) == -1
+			},
+			func(ref models.Model) (gte, gt index.Test) {
+				addr := fix(ref).Subnet.Subnet
+				if net.ParseIP(addr) == nil {
+					fix(ref).p.Logger.Panicf("Illegal IP Address: %s", addr)
+				}
+				return func(s models.Model) bool {
+						l, _ := fix(s).aBounds()
+						return l(addr)
+					},
+					func(s models.Model) bool {
+						_, u := fix(s).aBounds()
+						return u(addr)
+					}
+			},
+			func(st string) (models.Model, error) {
+				addr := net.ParseIP(st)
+				if addr == nil {
+					return nil, fmt.Errorf("Invalid IP address: %s", st)
+				}
+				sub := fix(s.New())
+				sub.Subnet.Subnet = st
+				return sub, nil
+			}),
 		"Enabled": index.Make(
 			false,
 			"boolean",
