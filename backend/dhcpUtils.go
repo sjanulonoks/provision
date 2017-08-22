@@ -72,15 +72,15 @@ func FindLease(dt *DataTracker,
 	if lease != nil && err == nil {
 		subnet = lease.Subnet(d)
 		reservation = lease.Reservation(d)
-		if subnet != nil {
+		if reservation != nil {
+			lease.ExpireTime = time.Now().Add(2 * time.Hour)
+		} else if subnet != nil {
 			lease.ExpireTime = time.Now().Add(subnet.LeaseTimeFor(lease.Addr))
-			if !subnet.Enabled {
+			if !subnet.Enabled && reservation == nil {
 				// We aren't enabled, so act like we are silent.
 				lease = nil
 				return
 			}
-		} else if reservation != nil {
-			lease.ExpireTime = time.Now().Add(2 * time.Hour)
 		} else {
 			dt.Remove(d, lease)
 			err = LeaseNAK(fmt.Errorf("Lease %s has no reservation or subnet, it is dead to us.", lease.Addr))
