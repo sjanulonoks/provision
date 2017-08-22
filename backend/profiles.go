@@ -155,7 +155,9 @@ func (p *Profile) BeforeSave() error {
 }
 
 func (p *Profile) OnLoad() error {
-	p.Params = map[string]interface{}{}
+	if p.Params == nil {
+		p.Params = map[string]interface{}{}
+	}
 	p.stores = func(ref string) *Store {
 		return p.p.objs[ref]
 	}
