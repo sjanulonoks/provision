@@ -216,7 +216,7 @@ func (r *RenderData) GenerateToken() string {
 			Add("jobs", "patch", r.Machine.Key()).
 			Add("jobs", "actions", r.Machine.Key()).
 			Add("jobs", "log", r.Machine.Key()).
-			Add("events", "post", r.Machine.Key()).
+			Add("events", "post", "*").
 			Seal(r.p.tokenManager)
 	}
 	return t
