@@ -44,6 +44,6 @@ COPY tools/install.sh ${INSTALLDIR}/
 WORKDIR ${INSTALLDIR}
 VOLUME ["drp-data"]
 # install provision and its deps
-RUN apk add --no-cache bash curl libarchive-tools p7zip && ./install.sh --isolated install --drp-version=tip
+RUN apk add --no-cache bash ipmitool curl libarchive-tools p7zip && ./install.sh --isolated install --drp-version=tip
 # run the api server so we can install sledgehammer image
 CMD ${drp}
