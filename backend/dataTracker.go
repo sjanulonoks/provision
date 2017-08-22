@@ -461,6 +461,7 @@ func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 			root, err := template.New("").Parse(buf.String())
 			if err != nil {
 				hard.Errorf("Unable to load root templates: %v", err)
+				return
 			}
 			p.rootTemplate = root
 			p.rootTemplate.Option("missingkey=error")
@@ -554,7 +555,7 @@ func NewDataTracker(backend store.Store,
 		pref := AsPref(prefIsh)
 		res.runningPrefs[pref.Name] = pref.Val
 	}
-	if d("preferences").Find(res.GlobalProfileName) == nil {
+	if d("profiles").Find(res.GlobalProfileName) == nil {
 		res.Create(d, &models.Profile{
 			Name:   res.GlobalProfileName,
 			Params: map[string]interface{}{},
