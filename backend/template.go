@@ -138,6 +138,12 @@ func (t *Template) BeforeSave() error {
 	return nil
 }
 
+func (t *Template) OnLoad() error {
+	t.Validated = true
+	t.Available = true
+	return nil
+}
+
 func (t *Template) updateOthers() {
 	t.p.tmplMux.Lock()
 	t.p.rootTemplate = t.toUpdate.root
@@ -157,14 +163,6 @@ func (t *Template) updateOthers() {
 
 func (t *Template) AfterSave() {
 	t.updateOthers()
-}
-
-func (t *Template) OnLoad() error {
-	t.stores = func(ref string) *Store {
-		return t.p.objs[ref]
-	}
-	defer func() { t.stores = nil }()
-	return t.BeforeSave()
 }
 
 func (t *Template) BeforeDelete() error {
