@@ -55,6 +55,7 @@ type ProgOpts struct {
 	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
 	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
 	OurAddress          string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
+	ForceStatic         bool   `long:"force-static" description:"Force the system to always use the static IP."`
 
 	BackEndType    string `long:"backend" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI" default:"directory"`
 	LocalContent   string `long:"local-content" description:"Storage to use for local overrides." default:"directory:///etc/dr-provision?codec=yaml"`
@@ -143,6 +144,7 @@ func Server(c_opts *ProgOpts) {
 		c_opts.FileRoot,
 		c_opts.LogRoot,
 		c_opts.OurAddress,
+		c_opts.ForceStatic,
 		c_opts.StaticPort,
 		c_opts.ApiPort,
 		logger,

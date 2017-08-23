@@ -313,6 +313,7 @@ type DataTracker struct {
 	FileRoot            string
 	LogRoot             string
 	OurAddress          string
+	ForceOurAddress     bool
 	StaticPort, ApiPort int
 	Logger              *log.Logger
 	FS                  *FileSystem
@@ -404,6 +405,10 @@ func (p *DataTracker) LockAll() (stores Stores, unlocker func()) {
 }
 
 func (p *DataTracker) LocalIP(remote net.IP) string {
+	// If we are behind a NAT, always use Our Address
+	if p.ForceOurAddress {
+		return p.OurAddress
+	}
 	if localIP := LocalFor(remote); localIP != nil {
 		return localIP.String()
 	}
@@ -500,7 +505,7 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, so
 
 // Create a new DataTracker that will use passed store to save all operational data
 func NewDataTracker(backend store.Store,
-	fileRoot, logRoot, addr string,
+	fileRoot, logRoot, addr string, forceAddr bool,
 	staticPort, apiPort int,
 	logger *log.Logger,
 	defaultPrefs map[string]string,
@@ -512,6 +517,7 @@ func NewDataTracker(backend store.Store,
 		StaticPort:        staticPort,
 		ApiPort:           apiPort,
 		OurAddress:        addr,
+		ForceOurAddress:   forceAddr,
 		Logger:            logger,
 		defaultPrefs:      defaultPrefs,
 		runningPrefs:      map[string]string{},
