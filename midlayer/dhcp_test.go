@@ -61,6 +61,7 @@ func TestMain(m *testing.M) {
 		tmpDir,
 		tmpDir,
 		"127.0.0.1",
+		false,
 		8091,
 		8092,
 		logger,
