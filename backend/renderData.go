@@ -217,6 +217,7 @@ func (r *RenderData) GenerateToken() string {
 			Add("jobs", "actions", r.Machine.Key()).
 			Add("jobs", "log", r.Machine.Key()).
 			Add("events", "post", "*").
+			Add("reservations", "create", "*").
 			Seal(r.p.tokenManager)
 	}
 	return t
