@@ -323,7 +323,6 @@ type DataTracker struct {
 	runningPrefs        map[string]string
 	prefMux             *sync.Mutex
 	allMux              *sync.RWMutex
-	defaultBootEnv      string
 	GlobalProfileName   string
 	tokenManager        *JwtManager
 	rootTemplate        *template.Template
@@ -557,10 +556,12 @@ func NewDataTracker(backend store.Store,
 	if d("bootenvs").Find("local") == nil {
 		res.Create(d, localBoot)
 	}
+
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)
 		res.runningPrefs[pref.Name] = pref.Val
 	}
+
 	if d("profiles").Find(res.GlobalProfileName) == nil {
 		res.Create(d, &models.Profile{
 			Name:   res.GlobalProfileName,
@@ -579,7 +580,6 @@ func NewDataTracker(backend store.Store,
 		}
 		res.Create(d, user)
 	}
-	res.defaultBootEnv = defaultPrefs["defaultBootEnv"]
 	machines := d("machines")
 	for _, obj := range machines.Items() {
 		machine := AsMachine(obj)
@@ -663,7 +663,6 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			be := benvCheck(name, val)
 			if be != nil && !be.OnlyUnknown {
 				savePref(name, val)
-				p.defaultBootEnv = val
 			}
 		case "unknownBootEnv":
 			if benvCheck(name, val) != nil && savePref(name, val) {
