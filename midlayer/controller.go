@@ -424,39 +424,71 @@ func (pc *PluginController) removePluginProvider(provider string) {
 	}
 }
 
-func (pc *PluginController) UploadPlugin(c *gin.Context, name string) (*models.PluginProviderUploadInfo, *models.Error) {
-	if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
-		return nil, models.NewError("API ERROR", http.StatusUnsupportedMediaType,
-			fmt.Sprintf("upload: plugin_provider %s must have content-type application/octet-stream", name))
+func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) (*models.PluginProviderUploadInfo, *models.Error) {
+	if err := os.MkdirAll(path.Join(fileRoot, `plugins`), 0755); err != nil {
+		return nil, models.NewError("API_ERROR", http.StatusConflict,
+			fmt.Sprintf("upload: unable to create plugins directory"))
 	}
-	if c.Request.Body == nil {
-		return nil, models.NewError("API ERROR", http.StatusBadRequest,
-			fmt.Sprintf("upload: Unable to upload %s: missing body", name))
-	}
+	var copied int64
+	ctype := c.Request.Header.Get(`Content-Type`)
+    switch strings.Split(ctype, "; ")[0] {
+    case `application/octet-stream`:
+		if c.Request.Body == nil {
+			return nil, models.NewError("API ERROR", http.StatusBadRequest,
+					fmt.Sprintf("upload: Unable to upload %s: missing body", name))
+		}
+    case `multipart/form-data`:
+        header , err := c.FormFile("file")
+        if err != nil {
+            return nil, models.NewError("API ERROR", http.StatusBadRequest,
+                    fmt.Sprintf("upload: Failed to find multipart file: %v", err))
+        }
+        name = path.Base(header.Filename)
+    default:
+        return nil, models.NewError("API ERROR", http.StatusUnsupportedMediaType,
+                fmt.Sprintf("upload: plugin_provider %s content-type %s is not application/octet-stream or multipart/form-data", name, ctype))
+    }
+
 
 	ppTmpName := path.Join(pc.pluginDir, fmt.Sprintf(`.%s.part`, path.Base(name)))
 	ppName := path.Join(pc.pluginDir, path.Base(name))
 	if _, err := os.Open(ppTmpName); err == nil {
-		return nil, models.NewError("API ERROR", http.StatusConflict, fmt.Sprintf("upload: plugin_provider %s already uploading", name))
+		return nil, models.NewError("API ERROR", http.StatusConflict,
+			fmt.Sprintf("upload: plugin_provider %s already uploading", name))
 	}
 	tgt, err := os.Create(ppTmpName)
+	defer tgt.Close()
 	if err != nil {
-		return nil, models.NewError("API ERROR", http.StatusConflict, fmt.Sprintf("upload: Unable to upload %s: %v", name, err))
+		return nil, models.NewError("API ERROR", http.StatusConflict,
+			fmt.Sprintf("upload: Unable to upload %s: %v", name, err))
 	}
 
-	copied, err := io.Copy(tgt, c.Request.Body)
+    switch strings.Split(ctype, "; ")[0] {
+    case `application/octet-stream`:
+		copied, err := io.Copy(tgt, c.Request.Body)
+		if err != nil {
+			os.Remove(ppTmpName)
+			return nil, models.NewError("API ERROR", http.StatusInsufficientStorage,
+					fmt.Sprintf("upload: Failed to upload %s: %v", name, err))
+		}
+		if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
+			os.Remove(ppTmpName)
+			return nil, models.NewError("API ERROR", http.StatusBadRequest,
+					fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes received", name, c.Request.ContentLength, copied))
+		}
+	case `multipart/form-data`:
+		header , _ := c.FormFile("file")
+        file, err := header.Open()
+        defer file.Close()
+        copied, err = io.Copy(tgt, file)
+        if err != nil {
+			return nil, models.NewError("API ERROR", http.StatusBadRequest,
+					fmt.Sprintf("upload: iso %s could not save", header.Filename))
+        }
+        file.Close()
+    }
 	tgt.Close()
 
-	if err != nil {
-		os.Remove(ppTmpName)
-		return nil, models.NewError("API ERROR",
-			http.StatusInsufficientStorage, fmt.Sprintf("upload: Failed to upload %s: %v", name, err))
-	}
-	if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
-		os.Remove(ppTmpName)
-		return nil, models.NewError("API ERROR", http.StatusBadRequest,
-			fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes received", name, c.Request.ContentLength, copied))
-	}
 	os.Remove(ppName)
 	os.Rename(ppTmpName, ppName)
 	os.Chmod(ppName, 0700)

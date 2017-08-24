@@ -270,6 +270,7 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
                 models.NewError("API ERROR", http.StatusBadRequest, fmt.Sprintf("upload: iso %s could not save", header.Filename)))
             return
         }
+        file.Close()
     }
 
     os.Remove(isoName)
