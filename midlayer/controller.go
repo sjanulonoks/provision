@@ -465,7 +465,7 @@ func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) 
 
     switch strings.Split(ctype, "; ")[0] {
     case `application/octet-stream`:
-		copied, err := io.Copy(tgt, c.Request.Body)
+		copied, err = io.Copy(tgt, c.Request.Body)
 		if err != nil {
 			os.Remove(ppTmpName)
 			return nil, models.NewError("API ERROR", http.StatusInsufficientStorage,

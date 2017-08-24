@@ -160,16 +160,29 @@ func (f *Frontend) InitFileApi() {
 			if !assureAuth(c, f.Logger, "files", "post", name) {
 				return
 			}
-			if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
+			var copied int64
+			ctype := c.Request.Header.Get(`Content-Type`)
+		    switch strings.Split(ctype, "; ")[0] {
+		    case `application/octet-stream`:
+				if c.Request.Body == nil {
+					c.JSON(http.StatusBadRequest,
+						models.NewError("API ERROR", http.StatusBadRequest,
+							fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
+					return
+				}
+		    case `multipart/form-data`:
+		        header, err := c.FormFile("file")
+				if err != nil {
+					c.JSON(http.StatusBadRequest,
+						models.NewError("API ERROR", http.StatusBadRequest,
+							fmt.Sprintf("upload: Failed to find multipart file: %v", err)))
+					return
+				}
+				name = path.Base(header.Filename)
+		    default:
 				c.JSON(http.StatusUnsupportedMediaType,
 					models.NewError("API ERROR", http.StatusUnsupportedMediaType,
 						fmt.Sprintf("upload: file %s must have content-type application/octet-stream", name)))
-				return
-			}
-			if c.Request.Body == nil {
-				c.JSON(http.StatusBadRequest,
-					models.NewError("API ERROR", http.StatusBadRequest,
-						fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
 				return
 			}
 			if strings.HasSuffix(name, "/") {
@@ -178,8 +191,10 @@ func (f *Frontend) InitFileApi() {
 						fmt.Sprintf("upload: Cannot upload a directory")))
 				return
 			}
+
 			fileTmpName := path.Join(f.FileRoot, `files`, fmt.Sprintf(`.%s.part`, path.Clean(name)))
 			fileName := path.Join(f.FileRoot, `files`, path.Clean(name))
+
 			if err := os.MkdirAll(path.Dir(fileName), 0755); err != nil {
 				c.JSON(http.StatusConflict,
 					models.NewError("API ERROR", http.StatusConflict,
@@ -194,6 +209,7 @@ func (f *Frontend) InitFileApi() {
 				return
 			}
 			tgt, err := os.Create(fileTmpName)
+			defer tgt.Close()
 			if err != nil {
 				os.Remove(fileName)
 				c.JSON(http.StatusConflict,
@@ -202,24 +218,41 @@ func (f *Frontend) InitFileApi() {
 				return
 			}
 
-			copied, err := io.Copy(tgt, c.Request.Body)
-			if err != nil {
-				os.Remove(fileName)
-				os.Remove(fileTmpName)
-				c.JSON(http.StatusInsufficientStorage,
-					models.NewError("API ERROR", http.StatusInsufficientStorage,
-						fmt.Sprintf("upload: Failed to upload %s: %v", name, err)))
-				return
-			}
+		    switch strings.Split(ctype, "; ")[0] {
+			case `application/octet-stream`:
+				copied, err = io.Copy(tgt, c.Request.Body)
+				if err != nil {
+					os.Remove(fileName)
+					os.Remove(fileTmpName)
+					c.JSON(http.StatusInsufficientStorage,
+						models.NewError("API ERROR", http.StatusInsufficientStorage,
+							fmt.Sprintf("upload: Failed to upload %s: %v", name, err)))
+					return
+				}
 
-			if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
-				os.Remove(fileName)
-				os.Remove(fileTmpName)
-				c.JSON(http.StatusBadRequest,
-					models.NewError("API ERROR", http.StatusBadRequest,
-						fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes recieved", name, c.Request.ContentLength, copied)))
-				return
-			}
+				if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
+					os.Remove(fileName)
+					os.Remove(fileTmpName)
+					c.JSON(http.StatusBadRequest,
+						models.NewError("API ERROR", http.StatusBadRequest,
+							fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes recieved", name, c.Request.ContentLength, copied)))
+					return
+				}
+			case `multipart/form-data`:
+				header, _ := c.FormFile("file")
+				file, err := header.Open()
+				defer file.Close()
+				copied, err = io.Copy(tgt, file)
+				if err != nil {
+					c.JSON(http.StatusBadRequest,
+						models.NewError("API ERROR", http.StatusBadRequest,
+							fmt.Sprintf("upload: file %s could not save", header.Filename)))
+					return
+				}
+				file.Close()
+		    }
+		    tgt.Close()
+
 			os.Remove(fileName)
 			os.Rename(fileTmpName, fileName)
 			c.JSON(http.StatusCreated, &FileInfo{Path: name, Size: copied})

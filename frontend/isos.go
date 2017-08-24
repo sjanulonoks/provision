@@ -245,7 +245,7 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 
     switch strings.Split(ctype, "; ")[0] {
     case `application/octet-stream`:
-		_, err = io.Copy(out, c.Request.Body)
+		copied, err = io.Copy(out, c.Request.Body)
         if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
             os.Remove(isoTmpName)
             c.JSON(http.StatusBadRequest,
