@@ -386,7 +386,7 @@ func (n *Machine) setDT(p *DataTracker) {
 func (n *Machine) OnCreate() error {
 	bootenvs := n.stores("bootenvs")
 	if n.BootEnv == "" {
-		n.BootEnv = n.p.defaultBootEnv
+		n.BootEnv = n.p.pref("defaultBootEnv")
 	}
 	if bootenvs.Find(n.BootEnv) == nil {
 		n.Errorf("Bootenv %s does not exist", n.BootEnv)
