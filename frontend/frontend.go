@@ -344,6 +344,10 @@ func convertValueToFilter(v string) (index.Filter, error) {
 	return nil, fmt.Errorf("Should never get here")
 }
 
+type dynParameter interface {
+	ParameterMaker(backend.Stores, string) (index.Maker, error)
+}
+
 func (f *Frontend) processFilters(d backend.Stores, ref models.Model, params map[string][]string) ([]index.Filter, error) {
 	filters := []index.Filter{}
 	var err error

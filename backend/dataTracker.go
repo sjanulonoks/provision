@@ -152,6 +152,39 @@ func Fill(t store.KeySaver) {
 	}
 }
 
+func ModelToBackend(m models.Model) store.KeySaver {
+	switch obj := m.(type) {
+	case store.KeySaver:
+		return obj
+	case *models.BootEnv:
+		return &BootEnv{BootEnv: obj}
+	case *models.Job:
+		return &Job{Job: obj}
+	case *models.Lease:
+		return &Lease{Lease: obj}
+	case *models.Machine:
+		return &Machine{Machine: obj}
+	case *models.Param:
+		return &Param{Param: obj}
+	case *models.Plugin:
+		return &Plugin{Plugin: obj}
+	case *models.Profile:
+		return &Profile{Profile: obj}
+	case *models.Reservation:
+		return &Reservation{Reservation: obj}
+	case *models.Subnet:
+		return &Subnet{Subnet: obj}
+	case *models.Task:
+		return &Task{Task: obj}
+	case *models.Template:
+		return &Template{Template: obj}
+	case *models.User:
+		return &User{User: obj}
+	default:
+		panic(fmt.Sprintf("Unknown model %T", m))
+	}
+}
+
 func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 	if res, ok := m.(store.KeySaver); ok {
 		p.setDT(res)
