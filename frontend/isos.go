@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
@@ -193,55 +194,87 @@ func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
 }
 
 func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
-	if c.Request.Header.Get(`Content-Type`) != `application/octet-stream` {
-		c.JSON(http.StatusUnsupportedMediaType,
-			models.NewError("API ERROR", http.StatusUnsupportedMediaType,
-				fmt.Sprintf("upload: iso %s must have content-type application/octet-stream", name)))
-		return
-	}
-	if c.Request.Body == nil {
-		c.JSON(http.StatusBadRequest,
-			models.NewError("API ERROR", http.StatusBadRequest,
-				fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
-		return
-	}
 	if err := os.MkdirAll(path.Join(fileRoot, `isos`), 0755); err != nil {
 		c.JSON(http.StatusConflict,
 			models.NewError("API_ERROR", http.StatusConflict, fmt.Sprintf("upload: unable to create isos directory")))
 		return
 	}
-	isoTmpName := path.Join(fileRoot, `isos`, fmt.Sprintf(`.%s.part`, path.Base(name)))
-	isoName := path.Join(fileRoot, `isos`, path.Base(name))
-	if _, err := os.Open(isoTmpName); err == nil {
+	var copied int64
+
+	ctype := c.Request.Header.Get(`Content-Type`)
+    switch strings.Split(ctype, "; ")[0] {
+    case `application/octet-stream`:
+		if c.Request.Body == nil {
+			c.JSON(http.StatusBadRequest,
+				models.NewError("API ERROR", http.StatusBadRequest,
+					fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
+			return
+		}
+    case `multipart/form-data`:
+        header , err := c.FormFile("file")
+        if err != nil {
+            c.JSON(http.StatusBadRequest,
+                models.NewError("API ERROR", http.StatusBadRequest,
+                    fmt.Sprintf("upload: Failed to find multipart file: %v", err)))
+            return
+        }
+        name = path.Base(header.Filename)
+    default:
+        c.JSON(http.StatusUnsupportedMediaType,
+            models.NewError("API ERROR", http.StatusUnsupportedMediaType,
+                fmt.Sprintf("upload: iso %s content-type %s is not application/octet-stream or multipart/form-data", name, ctype)))
+        return
+    }
+
+    isoTmpName := path.Join(fileRoot, `isos`, fmt.Sprintf(`.%s.part`, path.Base(name)))
+    isoName := path.Join(fileRoot, `isos`, path.Base(name))
+
+    out, err := os.Create(isoTmpName)
+	if err != nil {
 		c.JSON(http.StatusConflict,
 			models.NewError("API ERROR", http.StatusConflict, fmt.Sprintf("upload: iso %s already uploading", name)))
 		return
 	}
-	tgt, err := os.Create(isoTmpName)
+    defer out.Close()
+
 	if err != nil {
 		c.JSON(http.StatusConflict,
 			models.NewError("API ERROR", http.StatusConflict, fmt.Sprintf("upload: Unable to upload %s: %v", name, err)))
 		return
 	}
 
-	copied, err := io.Copy(tgt, c.Request.Body)
-	tgt.Close()
-	if err != nil {
-		os.Remove(isoTmpName)
-		c.JSON(http.StatusInsufficientStorage,
-			models.NewError("API ERROR",
-				http.StatusInsufficientStorage, fmt.Sprintf("upload: Failed to upload %s: %v", name, err)))
-		return
-	}
-	if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
-		os.Remove(isoTmpName)
-		c.JSON(http.StatusBadRequest,
-			models.NewError("API ERROR", http.StatusBadRequest,
-				fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes received", name, c.Request.ContentLength, copied)))
-		return
-	}
-	os.Remove(isoName)
-	os.Rename(isoTmpName, isoName)
+    switch strings.Split(ctype, "; ")[0] {
+    case `application/octet-stream`:
+		copied, err = io.Copy(out, c.Request.Body)
+        if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
+            os.Remove(isoTmpName)
+            c.JSON(http.StatusBadRequest,
+                models.NewError("API ERROR", http.StatusBadRequest,
+                    fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes received", name, c.Request.ContentLength, copied)))
+            return
+        }
+        if err != nil {
+            os.Remove(isoTmpName)
+            c.JSON(http.StatusInsufficientStorage,
+                models.NewError("API ERROR",
+                    http.StatusInsufficientStorage, fmt.Sprintf("upload: Failed to upload %s: %v", name, err)))
+            return
+        }
+    case `multipart/form-data`:
+        header , _ := c.FormFile("file")
+        file, err := header.Open()
+        defer file.Close()
+        copied, err = io.Copy(out, file)
+        if err != nil {
+            c.JSON(http.StatusConflict,
+                models.NewError("API ERROR", http.StatusBadRequest, fmt.Sprintf("upload: iso %s could not save", header.Filename)))
+            return
+        }
+        file.Close()
+    }
+
+    os.Remove(isoName)
+    os.Rename(isoTmpName, isoName)
 	go reloadBootenvsForIso(dt, name)
 	c.JSON(http.StatusCreated, &IsoInfo{Path: name, Size: copied})
 }

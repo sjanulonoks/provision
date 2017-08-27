@@ -119,7 +119,7 @@ func (f *Frontend) InitPluginProviderApi() {
 			if !assureAuth(c, f.Logger, "plugin_providers", "post", c.Param(`name`)) {
 				return
 			}
-			answer, err := f.pc.UploadPlugin(c, c.Param(`name`))
+			answer, err := f.pc.UploadPlugin(c, f.FileRoot, c.Param(`name`))
 			if err != nil {
 				c.JSON(err.Code, err)
 				return
