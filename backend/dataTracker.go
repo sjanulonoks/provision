@@ -152,6 +152,39 @@ func Fill(t store.KeySaver) {
 	}
 }
 
+func ModelToBackend(m models.Model) store.KeySaver {
+	switch obj := m.(type) {
+	case store.KeySaver:
+		return obj
+	case *models.BootEnv:
+		return &BootEnv{BootEnv: obj}
+	case *models.Job:
+		return &Job{Job: obj}
+	case *models.Lease:
+		return &Lease{Lease: obj}
+	case *models.Machine:
+		return &Machine{Machine: obj}
+	case *models.Param:
+		return &Param{Param: obj}
+	case *models.Plugin:
+		return &Plugin{Plugin: obj}
+	case *models.Profile:
+		return &Profile{Profile: obj}
+	case *models.Reservation:
+		return &Reservation{Reservation: obj}
+	case *models.Subnet:
+		return &Subnet{Subnet: obj}
+	case *models.Task:
+		return &Task{Task: obj}
+	case *models.Template:
+		return &Template{Template: obj}
+	case *models.User:
+		return &User{User: obj}
+	default:
+		panic(fmt.Sprintf("Unknown model %T", m))
+	}
+}
+
 func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 	if res, ok := m.(store.KeySaver); ok {
 		p.setDT(res)
@@ -323,7 +356,6 @@ type DataTracker struct {
 	runningPrefs        map[string]string
 	prefMux             *sync.Mutex
 	allMux              *sync.RWMutex
-	defaultBootEnv      string
 	GlobalProfileName   string
 	tokenManager        *JwtManager
 	rootTemplate        *template.Template
@@ -557,10 +589,12 @@ func NewDataTracker(backend store.Store,
 	if d("bootenvs").Find("local") == nil {
 		res.Create(d, localBoot)
 	}
+
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)
 		res.runningPrefs[pref.Name] = pref.Val
 	}
+
 	if d("profiles").Find(res.GlobalProfileName) == nil {
 		res.Create(d, &models.Profile{
 			Name:   res.GlobalProfileName,
@@ -579,7 +613,6 @@ func NewDataTracker(backend store.Store,
 		}
 		res.Create(d, user)
 	}
-	res.defaultBootEnv = defaultPrefs["defaultBootEnv"]
 	machines := d("machines")
 	for _, obj := range machines.Items() {
 		machine := AsMachine(obj)
@@ -663,7 +696,6 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			be := benvCheck(name, val)
 			if be != nil && !be.OnlyUnknown {
 				savePref(name, val)
-				p.defaultBootEnv = val
 			}
 		case "unknownBootEnv":
 			if benvCheck(name, val) != nil && savePref(name, val) {

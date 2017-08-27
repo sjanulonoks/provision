@@ -1,0 +1,178 @@
+package frontend
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/backend/index"
+	"github.com/digitalrebar/provision/models"
+	"github.com/gin-gonic/gin"
+)
+
+type Indexer interface {
+	Indexes() map[string]index.Maker
+}
+
+// IndexResponse lists all of the static indexes for a specific type of object
+// swagger:response
+type IndexResponse struct {
+	// in: body
+	Body map[string]models.Index
+}
+
+// IndexesResponse lists all the static indexes for all the object types
+// swagger:response
+type IndexesResponse struct {
+	// in: body
+	Body map[string]map[string]models.Index
+}
+
+// SingleIndexResponse tests to see if a single specific index exists.
+// Unlike the other index API endpoints, you can probe for dynamic indexes
+// this way.
+// swagger:response
+type SingleIndexResponse struct {
+	// in: body
+	Body models.Index
+}
+
+// swagger:parameters getIndex
+type IndexParameter struct {
+	// in: path
+	Prefix string `json:"prefix"`
+}
+
+// swagger:parameters getSingleIndex
+type SingleIndexParameter struct {
+	// in: path
+	Prefix string `json:"prefix"`
+	// in: path
+	Param string `json:"param"`
+}
+
+func (f *Frontend) InitIndexApi() {
+	//swagger:route GET /indexes Indexes listIndexes
+	//
+	// List all static indexes for objects
+	//
+	//     Produces:
+	//       application/json
+	//
+	//     Responses:
+	//       200: IndexesResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       500: ErrorResponse
+	f.ApiGroup.GET("/indexes",
+		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "indexes", "list", "") {
+				return
+			}
+			res := map[string]map[string]index.Maker{}
+			for _, m := range models.All() {
+				bm := backend.ModelToBackend(m)
+				idxer, ok := bm.(Indexer)
+				if !ok {
+					continue
+				}
+				res[m.Prefix()] = idxer.Indexes()
+			}
+			c.JSON(http.StatusOK, res)
+		})
+
+	// swagger:route GET /indexes/{prefix} Indexes getIndex
+	//
+	// Get static indexes for a specific object type
+	//
+	//     Produces:
+	//       application/json
+	//     Responses:
+	//       200: IndexResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       500: ErrorResponse
+	f.ApiGroup.GET("/indexes/:prefix",
+		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "indexes", "get", "") {
+				return
+			}
+			m, err := models.New(c.Param("prefix"))
+			if err != nil {
+				c.JSON(http.StatusNotFound,
+					models.NewError("API_ERROR", http.StatusNotFound,
+						fmt.Sprintf("index get: not found: %s", c.Param("prefix"))))
+				return
+			}
+			bm := backend.ModelToBackend(m)
+			idxer, ok := bm.(Indexer)
+			if !ok {
+				c.JSON(http.StatusNotFound,
+					models.NewError("API_ERROR", http.StatusNotFound,
+						fmt.Sprintf("index get: not found: %s", c.Param("prefix"))))
+				return
+			}
+			c.JSON(http.StatusOK, idxer.Indexes())
+		})
+
+	// swagger:route GET /indexes/{prefix}/{param} Indexes getSingleIndex
+	//
+	// Get information on a specific index for a specific object type.
+	// Unlike the other routes, you can probe for parameter-defined
+	// indexes using this route.
+	//
+	//     Produces:
+	//       application/json
+	//     Responses:
+	//       200: IndexResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       500: ErrorResponse
+	f.ApiGroup.GET("/indexes/:prefix/:param",
+		func(c *gin.Context) {
+			if !assureAuth(c, f.Logger, "indexes", "get", "") {
+				return
+			}
+			prefix := c.Param("prefix")
+			paramName := c.Param("param")
+			m, err := models.New(prefix)
+			if err != nil {
+				c.JSON(http.StatusNotFound,
+					models.NewError("API_ERROR", http.StatusNotFound,
+						fmt.Sprintf("index get: not found: %s/%s", prefix, paramName)))
+				return
+			}
+			bm := backend.ModelToBackend(m)
+			idxer, ok := bm.(Indexer)
+			if !ok {
+				c.JSON(http.StatusNotFound,
+					models.NewError("API_ERROR", http.StatusNotFound,
+						fmt.Sprintf("index get: not found: %s/%s", prefix, paramName)))
+				return
+			}
+			staticIndexes := idxer.Indexes()
+			if staticIndex, ok := staticIndexes[c.Param("param")]; ok {
+				c.JSON(http.StatusOK, staticIndex)
+			}
+			dpm, ok := bm.(dynParameter)
+			if !ok {
+				c.JSON(http.StatusNotFound,
+					models.NewError("API_ERROR", http.StatusNotFound,
+						fmt.Sprintf("index get: not found: %s/%s", prefix, paramName)))
+				return
+			}
+			param := &backend.Param{}
+			d, unlocker := f.dt.LockEnts(param.Locks("get")...)
+			defer unlocker()
+			dynIndex, err := dpm.ParameterMaker(d, paramName)
+			if err != nil {
+				c.JSON(http.StatusNotFound,
+					models.NewError("API_ERROR", http.StatusNotFound,
+						fmt.Sprintf("index get: not found: %s/%s", prefix, paramName)))
+				return
+			}
+			c.JSON(http.StatusOK, dynIndex)
+		})
+}
