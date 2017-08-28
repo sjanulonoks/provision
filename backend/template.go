@@ -21,6 +21,10 @@ type Template struct {
 	toUpdate *tmplUpdater
 }
 
+func (obj *Template) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *Template) SaveClean() store.KeySaver {
 	mod := *obj.Template
 	mod.ClearValidation()

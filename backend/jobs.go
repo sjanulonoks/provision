@@ -59,6 +59,10 @@ type Job struct {
 	oldState string
 }
 
+func (obj *Job) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *Job) SaveClean() store.KeySaver {
 	mod := *obj.Job
 	mod.ClearValidation()

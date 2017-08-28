@@ -20,6 +20,10 @@ type Task struct {
 	tmplMux      sync.Mutex
 }
 
+func (obj *Task) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *Task) SaveClean() store.KeySaver {
 	mod := *obj.Task
 	mod.ClearValidation()

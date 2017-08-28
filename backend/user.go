@@ -15,6 +15,10 @@ type User struct {
 	p *DataTracker
 }
 
+func (obj *User) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *User) SaveClean() store.KeySaver {
 	mod := *obj.User
 	mod.ClearValidation()
