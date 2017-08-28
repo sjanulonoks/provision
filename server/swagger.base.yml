@@ -36,3 +36,5 @@ tags:
   - name: PluginProviders
   - name: Indexes
   - name: Contents
+  - name: Events
+  - name: Info
