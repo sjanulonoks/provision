@@ -20,6 +20,10 @@ type Profile struct {
 	p *DataTracker
 }
 
+func (obj *Profile) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *Profile) SaveClean() store.KeySaver {
 	mod := *obj.Profile
 	mod.ClearValidation()

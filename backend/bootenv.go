@@ -34,6 +34,10 @@ type BootEnv struct {
 	tmplMux        sync.Mutex
 }
 
+func (obj *BootEnv) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *BootEnv) SaveClean() store.KeySaver {
 	mod := *obj.BootEnv
 	mod.ClearValidation()

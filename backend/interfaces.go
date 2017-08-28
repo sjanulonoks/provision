@@ -65,6 +65,7 @@ func (dt *DataTracker) GetInterfaces() ([]*models.Interface, error) {
 			Addresses:     addrList,
 			ActiveAddress: sip,
 		}
+		ii.ReadOnly = true
 		ifs = append(ifs, ii)
 	}
 

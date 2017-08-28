@@ -18,6 +18,10 @@ type Plugin struct {
 	p *DataTracker
 }
 
+func (obj *Plugin) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *Plugin) SaveClean() store.KeySaver {
 	mod := *obj.Plugin
 	mod.ClearValidation()

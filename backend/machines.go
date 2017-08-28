@@ -27,6 +27,10 @@ type Machine struct {
 	oldBootEnv string
 }
 
+func (obj *Machine) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *Machine) SaveClean() store.KeySaver {
 	mod := *obj.Machine
 	mod.ClearValidation()

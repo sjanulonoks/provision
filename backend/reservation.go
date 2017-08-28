@@ -19,6 +19,10 @@ type Reservation struct {
 	p *DataTracker
 }
 
+func (obj *Reservation) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *Reservation) SaveClean() store.KeySaver {
 	mod := *obj.Reservation
 	mod.ClearValidation()

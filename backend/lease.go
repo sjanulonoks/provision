@@ -20,6 +20,10 @@ type Lease struct {
 	p *DataTracker
 }
 
+func (obj *Lease) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *Lease) SaveClean() store.KeySaver {
 	mod := *obj.Lease
 	mod.ClearValidation()

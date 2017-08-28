@@ -140,6 +140,10 @@ type Subnet struct {
 	sn             *net.IPNet
 }
 
+func (obj *Subnet) SetReadOnly(b bool) {
+	obj.ReadOnly = b
+}
+
 func (obj *Subnet) SaveClean() store.KeySaver {
 	mod := *obj.Subnet
 	mod.ClearValidation()
