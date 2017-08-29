@@ -40,7 +40,6 @@ type DhcpHandler struct {
 	port       int
 	conn       *ipv4.PacketConn
 	bk         *backend.DataTracker
-	cm         *ipv4.ControlMessage
 	pinger     *pinger.Pinger
 	strats     []*Strategy
 	publishers *backend.Publishers
@@ -49,7 +48,8 @@ type DhcpHandler struct {
 func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 	l *backend.Lease,
 	s *backend.Subnet,
-	r *backend.Reservation) (dhcp.Options, time.Duration, net.IP) {
+	r *backend.Reservation,
+	cm *ipv4.ControlMessage) (dhcp.Options, time.Duration, net.IP) {
 	var leaseTime uint32 = 7200
 	if s != nil {
 		leaseTime = uint32(s.LeaseTimeFor(l.Addr) / time.Second)
@@ -67,7 +67,7 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 	binary.BigEndian.PutUint32(rbt, leaseTime*3/4)
 	opts[dhcp.OptionRenewalTimeValue] = rt
 	opts[dhcp.OptionRebindingTimeValue] = rbt
-	nextServer := h.respondFrom(l.Addr)
+	nextServer := h.respondFrom(l.Addr, cm)
 	if s != nil {
 		for _, opt := range s.Options {
 			if opt.Value == "" {
@@ -157,20 +157,20 @@ func reqAddr(p dhcp.Packet, msgType dhcp.MessageType, options dhcp.Options) (add
 	return
 }
 
-func (h *DhcpHandler) intf() *net.Interface {
-	if h.cm == nil {
+func (h *DhcpHandler) intf(cm *ipv4.ControlMessage) *net.Interface {
+	if cm == nil {
 		return nil
 	}
-	iface, err := net.InterfaceByIndex(h.cm.IfIndex)
+	iface, err := net.InterfaceByIndex(cm.IfIndex)
 	if err != nil {
-		h.Printf("Error looking up interface index %d: %v", h.cm.IfIndex, err)
+		h.Printf("Error looking up interface index %d: %v", cm.IfIndex, err)
 	}
 	return iface
 }
 
-func (h *DhcpHandler) listenAddrs() []*net.IPNet {
+func (h *DhcpHandler) listenAddrs(cm *ipv4.ControlMessage) []*net.IPNet {
 	res := []*net.IPNet{}
-	iface := h.intf()
+	iface := h.intf(cm)
 	if iface == nil {
 		return res
 	}
@@ -189,8 +189,8 @@ func (h *DhcpHandler) listenAddrs() []*net.IPNet {
 	return res
 }
 
-func (h *DhcpHandler) listenIPs() []net.IP {
-	addrs := h.listenAddrs()
+func (h *DhcpHandler) listenIPs(cm *ipv4.ControlMessage) []net.IP {
+	addrs := h.listenAddrs(cm)
 	res := make([]net.IP, len(addrs))
 	for i := range addrs {
 		res[i] = addrs[i].IP.To4()
@@ -198,8 +198,8 @@ func (h *DhcpHandler) listenIPs() []net.IP {
 	return res
 }
 
-func (h *DhcpHandler) respondFrom(testAddr net.IP) net.IP {
-	addrs := h.listenAddrs()
+func (h *DhcpHandler) respondFrom(testAddr net.IP, cm *ipv4.ControlMessage) net.IP {
+	addrs := h.listenAddrs(cm)
 	for _, addr := range addrs {
 		if addr.Contains(testAddr) {
 			return addr.IP.To4()
@@ -213,13 +213,62 @@ func (h *DhcpHandler) respondFrom(testAddr net.IP) net.IP {
 	return net.ParseIP(h.bk.OurAddress).To4()
 }
 
-func (h *DhcpHandler) listenOn(testAddr net.IP) bool {
-	for _, addr := range h.listenAddrs() {
+func (h *DhcpHandler) listenOn(testAddr net.IP, cm *ipv4.ControlMessage) bool {
+	for _, addr := range h.listenAddrs(cm) {
 		if addr.Contains(testAddr) {
 			return true
 		}
 	}
 	return false
+}
+
+func (h *DhcpHandler) handleOnePacket(pktBytes []byte, cm *ipv4.ControlMessage, srcAddr net.Addr) {
+	req := dhcp.Packet(pktBytes)
+	if req.HLen() > 16 {
+		return
+	}
+	options := req.ParseOptions()
+	t := options[dhcp.OptionDHCPMessageType]
+	if len(t) != 1 {
+		return
+	}
+	reqType := dhcp.MessageType(t[0])
+	if reqType < dhcp.Discover || reqType > dhcp.Inform {
+		return
+	}
+	if len(h.ifs) > 0 {
+		canProcess := false
+		tgtIf := h.intf(cm)
+		for _, ifName := range h.ifs {
+			if strings.TrimSpace(ifName) == tgtIf.Name {
+				canProcess = true
+				break
+			}
+		}
+		if !canProcess {
+			h.Infof("DHCP: Completly ignoring packet from %s", tgtIf.Name)
+			return
+		}
+	}
+	res := h.ServeDHCP(req, reqType, options, cm)
+	if res == nil {
+		return
+	}
+	// If IP not available, broadcast
+	ipStr, portStr, err := net.SplitHostPort(srcAddr.String())
+	if err != nil {
+		return
+	}
+	port, _ := strconv.Atoi(portStr)
+	if req.GIAddr().Equal(net.IPv4zero) {
+		if net.ParseIP(ipStr).Equal(net.IPv4zero) || req.Broadcast() {
+			srcAddr = &net.UDPAddr{IP: net.IPv4bcast, Port: port}
+		}
+	} else {
+		srcAddr = &net.UDPAddr{IP: req.GIAddr(), Port: port}
+	}
+	cm.Src = nil
+	h.conn.WriteTo(res, cm, srcAddr)
 }
 
 func (h *DhcpHandler) Serve() error {
@@ -228,8 +277,7 @@ func (h *DhcpHandler) Serve() error {
 	buf := make([]byte, 16384) // account for non-Ethernet devices maybe being used.
 	for {
 		h.conn.SetReadDeadline(time.Now().Add(time.Second))
-		h.cm = nil
-		cnt, control, srcAddr, err := h.conn.ReadFrom(buf)
+		cnt, cm, srcAddr, err := h.conn.ReadFrom(buf)
 		if err, ok := err.(net.Error); ok && err.Timeout() {
 			continue
 		}
@@ -239,61 +287,16 @@ func (h *DhcpHandler) Serve() error {
 		if cnt < 240 {
 			continue
 		}
-		req := dhcp.Packet(buf[:cnt])
-		if req.HLen() > 16 {
-			continue
-		}
-		options := req.ParseOptions()
-		var reqType dhcp.MessageType
-		if t := options[dhcp.OptionDHCPMessageType]; len(t) != 1 {
-			continue
-		} else {
-			reqType = dhcp.MessageType(t[0])
-			if reqType < dhcp.Discover || reqType > dhcp.Inform {
-				continue
-			}
-		}
-		h.cm = control
-		if len(h.ifs) > 0 {
-			canProcess := false
-			tgtIf := h.intf()
-			for _, ifName := range h.ifs {
-				if strings.TrimSpace(ifName) == tgtIf.Name {
-					canProcess = true
-					break
-				}
-			}
-			if !canProcess {
-				h.Infof("DHCP: Completly ignoring packet from %s", tgtIf.Name)
-				continue
-			}
-		}
-
-		if res := h.ServeDHCP(req, reqType, options); res != nil {
-			// If IP not available, broadcast
-			ipStr, portStr, err := net.SplitHostPort(srcAddr.String())
-			if err != nil {
-				return err
-			}
-
-			port, _ := strconv.Atoi(portStr)
-			if req.GIAddr().Equal(net.IPv4zero) {
-				if net.ParseIP(ipStr).Equal(net.IPv4zero) || req.Broadcast() {
-					srcAddr = &net.UDPAddr{IP: net.IPv4bcast, Port: port}
-				}
-			} else {
-				srcAddr = &net.UDPAddr{IP: req.GIAddr(), Port: port}
-			}
-
-			h.cm.Src = nil
-			if _, e := h.conn.WriteTo(res, h.cm, srcAddr); e != nil {
-				return e
-			}
-		}
+		pktBytes := make([]byte, cnt)
+		copy(pktBytes, buf)
+		go h.handleOnePacket(pktBytes, cm, srcAddr)
 	}
 }
 
-func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options dhcp.Options) (res dhcp.Packet) {
+func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
+	msgType dhcp.MessageType,
+	options dhcp.Options,
+	cm *ipv4.ControlMessage) (res dhcp.Packet) {
 	h.Infof("Received DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s chaddr %s",
 		msgType.String(),
 		xid(p),
@@ -344,13 +347,13 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 	case dhcp.Request:
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
-		if ok && !h.listenOn(server) {
+		if ok && !h.listenOn(server, cm) {
 			h.Infof("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
 			return nil
 		}
 		if !req.IsGlobalUnicast() {
 			h.Infof("%s: NAK'ing invalid requested IP %s", xid(p), req)
-			return h.nak(p, h.respondFrom(req))
+			return h.nak(p, h.respondFrom(req, cm))
 		}
 		var lease *backend.Lease
 		var reservation *backend.Reservation
@@ -371,7 +374,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 						req,
 						err)
 				}
-				return h.nak(p, h.respondFrom(req))
+				return h.nak(p, h.respondFrom(req, cm))
 			}
 			if lease != nil {
 				break
@@ -383,19 +386,19 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 				return nil
 			} else {
 				h.Infof("%s: No lease for %s in database, NAK'ing", xid(p), req)
-				return h.nak(p, h.respondFrom(req))
+				return h.nak(p, h.respondFrom(req, cm))
 			}
 		}
-		opts, duration, nextServer := h.buildOptions(p, lease, subnet, reservation)
+		opts, duration, nextServer := h.buildOptions(p, lease, subnet, reservation, cm)
 		reply := dhcp.ReplyPacket(p, dhcp.ACK,
-			h.respondFrom(lease.Addr),
+			h.respondFrom(lease.Addr, cm),
 			lease.Addr,
 			duration,
 			opts.SelectOrderOrAll(opts[dhcp.OptionParameterRequestList]))
 		if nextServer.IsGlobalUnicast() {
 			reply.SetSIAddr(nextServer)
 		}
-		h.Infof("%s: Request handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr))
+		h.Infof("%s: Request handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
 		return reply
 	case dhcp.Discover:
 		for _, s := range h.strats {
@@ -403,7 +406,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 			token := s.GenToken(p, options)
 			via := []net.IP{p.GIAddr()}
 			if via[0] == nil || via[0].IsUnspecified() {
-				via = h.listenIPs()
+				via = h.listenIPs(cm)
 			}
 			var (
 				lease       *backend.Lease
@@ -441,13 +444,13 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 					}
 					break
 				}
-				opts, duration, _ := h.buildOptions(p, lease, subnet, reservation)
+				opts, duration, _ := h.buildOptions(p, lease, subnet, reservation, cm)
 				reply := dhcp.ReplyPacket(p, dhcp.Offer,
-					h.respondFrom(lease.Addr),
+					h.respondFrom(lease.Addr, cm),
 					lease.Addr,
 					duration,
 					opts.SelectOrderOrAll(opts[dhcp.OptionParameterRequestList]))
-				h.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr))
+				h.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
 				return reply
 			}
 		}
