@@ -87,7 +87,6 @@ func FindLease(dt *DataTracker,
 			lease = nil
 			return
 		}
-		lease.State = "ACK"
 		dt.Save(d, lease)
 	}
 	return
@@ -148,12 +147,11 @@ func findViaReservation(leases, reservations *Store, strat, token string, req ne
 	lease.Addr = reservation.Addr
 	lease.Strategy = reservation.Strategy
 	lease.Token = reservation.Token
-	lease.State = "OFFER"
 	leases.Add(lease)
 	return
 }
 
-func findViaSubnet(leases, subnets, reservations *Store, strat, token string, req net.IP, vias []net.IP) (lease *Lease, subnet *Subnet, fresh bool) {
+func findViaSubnet(leases, subnets, reservations *Store, strat, token string, req net.IP, vias []net.IP) (lease *Lease, subnet *Subnet) {
 	for _, idx := range subnets.Items() {
 		candidate := AsSubnet(idx)
 		for _, via := range vias {
@@ -212,15 +210,13 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 	subnet.p.Infof("debugDhcp", "Subnet %s: %s:%s is in my range, attempting lease creation.", subnet.Name, strat, token)
 	lease, _ = subnet.next(usedAddrs, token, req)
 	if lease != nil {
-		lease.State = "PROBE"
 		if leases.Find(lease.Key()) == nil {
 			leases.Add(lease)
 		}
-		fresh = true
 		return
 	}
 	subnet.p.Infof("debugDhcp", "Subnet %s: No lease for %s:%s, it gets no IP from us", subnet.Name, strat, token)
-	return nil, nil, false
+	return nil, nil
 }
 
 // FindOrCreateLease will return a lease for the passed information, creating it if it can.
@@ -231,13 +227,13 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 func FindOrCreateLease(dt *DataTracker,
 	strat, token string,
 	req net.IP,
-	via []net.IP) (lease *Lease, subnet *Subnet, reservation *Reservation, fresh bool) {
+	via []net.IP) (lease *Lease, subnet *Subnet, reservation *Reservation) {
 	d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
 	defer unlocker()
 	leases, reservations, subnets := d("leases"), d("reservations"), d("subnets")
 	lease, reservation = findViaReservation(leases, reservations, strat, token, req)
 	if lease == nil {
-		lease, subnet, fresh = findViaSubnet(leases, subnets, reservations, strat, token, req, via)
+		lease, subnet = findViaSubnet(leases, subnets, reservations, strat, token, req, via)
 	} else {
 		subnet = lease.Subnet(d)
 	}

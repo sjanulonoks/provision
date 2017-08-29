@@ -12,7 +12,6 @@ import:
 - package: github.com/VictorLowther/jsonpatch2
 - package: github.com/ghodss/yaml
 - package: github.com/digitalrebar/store
-- package: github.com/digitalrebar/pinger
 - package: github.com/hashicorp/consul
   subpackages:
   - api
@@ -30,3 +29,4 @@ import:
 - package: golang.org/x/net
   subpackages:
   - context
+
