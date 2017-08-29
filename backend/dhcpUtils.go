@@ -68,31 +68,38 @@ func FindLease(dt *DataTracker,
 	d, unlocker := dt.LockEnts("leases", "reservations", "subnets")
 	defer unlocker()
 	lease, err = findLease(d, dt, strat, token, req)
-	if lease == nil && err == nil {
+	if err != nil {
+		return
+	}
+	if lease == nil {
 		fake := &Lease{Lease: &models.Lease{Addr: req}}
 		reservation = fake.Reservation(d)
 		subnet = fake.Subnet(d)
-		return
-	}
-	if err != nil {
+		if reservation != nil {
+			err = LeaseNAK(fmt.Errorf("No lease for %s, convered by reservation %s", req, reservation.Addr))
+		}
+		if subnet != nil {
+			err = LeaseNAK(fmt.Errorf("No lease for %s, covered by subnet %s", req, subnet.subnet().IP))
+		}
 		return
 	}
 	subnet = lease.Subnet(d)
 	reservation = lease.Reservation(d)
+	if reservation == nil && subnet == nil {
+		dt.Remove(d, lease)
+		err = LeaseNAK(fmt.Errorf("Lease %s has no reservation or subnet, it is dead to us.", lease.Addr))
+		return
+	}
 	if reservation != nil {
 		lease.ExpireTime = time.Now().Add(2 * time.Hour)
-	} else if subnet != nil {
+	}
+	if subnet != nil {
 		lease.ExpireTime = time.Now().Add(subnet.LeaseTimeFor(lease.Addr))
 		if !subnet.Enabled && reservation == nil {
 			// We aren't enabled, so act like we are silent.
 			lease = nil
 			return
 		}
-	} else {
-		dt.Remove(d, lease)
-		err = LeaseNAK(fmt.Errorf("Lease %s has no reservation or subnet, it is dead to us.", lease.Addr))
-		lease = nil
-		return
 	}
 	lease.State = "ACK"
 	dt.Save(d, lease)
