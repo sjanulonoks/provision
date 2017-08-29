@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/net/ipv4"
 
+	"github.com/digitalrebar/pinger"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
 	dhcp "github.com/krolaw/dhcp4"
@@ -40,6 +41,7 @@ type DhcpHandler struct {
 	conn       *ipv4.PacketConn
 	bk         *backend.DataTracker
 	cm         *ipv4.ControlMessage
+	pinger     *pinger.Pinger
 	strats     []*Strategy
 	publishers *backend.Publishers
 }
@@ -403,8 +405,42 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet, msgType dhcp.MessageType, options
 			if via[0] == nil || via[0].IsUnspecified() {
 				via = h.listenIPs()
 			}
-			lease, subnet, reservation := backend.FindOrCreateLease(h.bk, strat, token, req, via)
-			if lease != nil {
+			var (
+				lease       *backend.Lease
+				subnet      *backend.Subnet
+				reservation *backend.Reservation
+			)
+			for {
+				var fresh bool
+				lease, subnet, reservation, fresh = backend.FindOrCreateLease(h.bk, strat, token, req, via)
+				if lease == nil {
+					break
+				}
+				if lease.State == "PROBE" {
+					if !fresh {
+						// Someone other goroutine is already working this lease.
+						return nil
+					}
+					addrUsed, closing := <-h.pinger.InUse(lease.Addr, 3*time.Second)
+					if closing {
+						func() {
+							d, unlocker := h.bk.LockEnts("leases")
+							defer unlocker()
+							h.bk.Remove(d, lease)
+						}()
+						return nil
+					}
+					if addrUsed {
+						func() {
+							d, unlocker := h.bk.LockEnts("leases")
+							defer unlocker()
+							lease.Invalidate()
+							h.bk.Save(d, lease)
+						}()
+						continue
+					}
+					break
+				}
 				opts, duration, _ := h.buildOptions(p, lease, subnet, reservation)
 				reply := dhcp.ReplyPacket(p, dhcp.Offer,
 					h.respondFrom(lease.Addr),
@@ -423,6 +459,7 @@ func (h *DhcpHandler) Shutdown(ctx context.Context) error {
 	h.Printf("Shutting down DHCP handler")
 	h.closing = true
 	h.conn.Close()
+	h.pinger.Close()
 	h.waitGroup.Wait()
 	h.Printf("DHCP handler shut down")
 	return nil
@@ -437,8 +474,13 @@ func StartDhcpHandler(dhcpInfo *backend.DataTracker, dhcpIfs string, dhcpPort in
 	if dhcpIfs != "" {
 		ifs = strings.Split(dhcpIfs, ",")
 	}
+	pinger, err := pinger.New()
+	if err != nil {
+		return nil, err
+	}
 	handler := &DhcpHandler{
 		waitGroup:  &sync.WaitGroup{},
+		pinger:     pinger,
 		ifs:        ifs,
 		bk:         dhcpInfo,
 		port:       dhcpPort,
