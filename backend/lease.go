@@ -102,6 +102,24 @@ func (l *Lease) Indexes() map[string]index.Maker {
 				lease.Strategy = s
 				return lease, nil
 			}),
+		"State": index.Make(
+			false,
+			"string",
+			func(i, j models.Model) bool { return fix(i).State < fix(j).State },
+			func(ref models.Model) (gte, gt index.Test) {
+				strategy := fix(ref).State
+				return func(s models.Model) bool {
+						return fix(s).State >= strategy
+					},
+					func(s models.Model) bool {
+						return fix(s).State > strategy
+					}
+			},
+			func(s string) (models.Model, error) {
+				lease := fix(l.New())
+				lease.State = s
+				return lease, nil
+			}),
 		"ExpireTime": index.Make(
 			false,
 			"Date/Time string",
@@ -196,6 +214,9 @@ func (l *Lease) OnChange(oldThing store.KeySaver) error {
 	if l.Strategy != old.Strategy {
 		l.Errorf("Strategy cannot change")
 	}
+	if l.State != old.State {
+		l.Errorf("State cannot change")
+	}
 	return l.MakeError(422, ValidationError, l)
 }
 
@@ -245,12 +266,14 @@ func (l *Lease) OnLoad() error {
 
 func (l *Lease) Expire() {
 	l.ExpireTime = time.Now()
+	l.State = "EXPIRED"
 }
 
 func (l *Lease) Invalidate() {
-	l.ExpireTime = time.Now().Add(2 * time.Second)
+	l.ExpireTime = time.Now().Add(10 * time.Minute)
 	l.Token = ""
 	l.Strategy = ""
+	l.State = "INVALID"
 }
 
 var leaseLockMap = map[string][]string{
