@@ -85,7 +85,7 @@ func TestDHCPRenew(t *testing.T) {
 			t.Errorf("Failed to remove reservation for 192.168.123.10: %v", err)
 		}
 	}()
-	if l, _, _, err := FindLease(dt, "mac", "res1", nil); err == nil {
+	if l, _, _, err := FindLease(dt, "mac", "res1", net.ParseIP("192.168.123.10")); err == nil {
 		t.Errorf("Should have removed lease for %s:%s, as its backing reservation is gone!", l.Strategy, l.Token)
 	} else {
 		t.Logf("Removed lease that no longer has a Subnet or Reservation covering it: %v", err)
