@@ -60,27 +60,26 @@ func (p *Param) setDT(dp *DataTracker) {
 
 func (p *Param) Indexes() map[string]index.Maker {
 	fix := AsParam
-	return map[string]index.Maker{
-		"Key": index.MakeKey(),
-		"Name": index.Make(
-			true,
-			"string",
-			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
-			func(ref models.Model) (gte, gt index.Test) {
-				refName := fix(ref).Name
-				return func(s models.Model) bool {
-						return fix(s).Name >= refName
-					},
-					func(s models.Model) bool {
-						return fix(s).Name > refName
-					}
-			},
-			func(s string) (models.Model, error) {
-				param := fix(p.New())
-				param.Name = s
-				return param, nil
-			}),
-	}
+	res := index.MakeBaseIndexes(p)
+	res["Name"] = index.Make(
+		true,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+		func(ref models.Model) (gte, gt index.Test) {
+			refName := fix(ref).Name
+			return func(s models.Model) bool {
+					return fix(s).Name >= refName
+				},
+				func(s models.Model) bool {
+					return fix(s).Name > refName
+				}
+		},
+		func(s string) (models.Model, error) {
+			param := fix(p.New())
+			param.Name = s
+			return param, nil
+		})
+	return res
 }
 
 func (p *Param) Validate() {

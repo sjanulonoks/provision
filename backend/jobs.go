@@ -103,185 +103,184 @@ func (j *Job) UUID() string {
 
 func (j *Job) Indexes() map[string]index.Maker {
 	fix := AsJob
-	return map[string]index.Maker{
-		"Key": index.MakeKey(),
-		"Uuid": index.Make(
-			true,
-			"UUID string",
-			func(i, j models.Model) bool { return fix(i).Uuid.String() < fix(j).Uuid.String() },
-			func(ref models.Model) (gte, gt index.Test) {
-				refUuid := fix(ref).Uuid.String()
-				return func(s models.Model) bool {
-						return fix(s).Uuid.String() >= refUuid
-					},
-					func(s models.Model) bool {
-						return fix(s).Uuid.String() > refUuid
-					}
-			},
-			func(s string) (models.Model, error) {
-				id := uuid.Parse(s)
-				if id == nil {
-					return nil, fmt.Errorf("Invalid UUID: %s", s)
+	res := index.MakeBaseIndexes(j)
+	res["Uuid"] = index.Make(
+		true,
+		"UUID string",
+		func(i, j models.Model) bool { return fix(i).Uuid.String() < fix(j).Uuid.String() },
+		func(ref models.Model) (gte, gt index.Test) {
+			refUuid := fix(ref).Uuid.String()
+			return func(s models.Model) bool {
+					return fix(s).Uuid.String() >= refUuid
+				},
+				func(s models.Model) bool {
+					return fix(s).Uuid.String() > refUuid
 				}
-				job := fix(j.New())
-				job.Uuid = id
-				return job, nil
-			}),
-		"BootEnv": index.Make(
-			false,
-			"string",
-			func(i, j models.Model) bool { return fix(i).BootEnv < fix(j).BootEnv },
-			func(ref models.Model) (gte, gt index.Test) {
-				refBootEnv := fix(ref).BootEnv
-				return func(s models.Model) bool {
-						return fix(s).BootEnv >= refBootEnv
-					},
-					func(s models.Model) bool {
-						return fix(s).BootEnv > refBootEnv
-					}
-			},
-			func(s string) (models.Model, error) {
-				job := fix(j.New())
-				job.BootEnv = s
-				return job, nil
-			}),
-		"Task": index.Make(
-			false,
-			"string",
-			func(i, j models.Model) bool { return fix(i).Task < fix(j).Task },
-			func(ref models.Model) (gte, gt index.Test) {
-				refTask := fix(ref).Task
-				return func(s models.Model) bool {
-						return fix(s).Task >= refTask
-					},
-					func(s models.Model) bool {
-						return fix(s).Task > refTask
-					}
-			},
-			func(s string) (models.Model, error) {
-				job := fix(j.New())
-				job.Task = s
-				return job, nil
-			}),
-		"State": index.Make(
-			false,
-			"string",
-			func(i, j models.Model) bool { return fix(i).State < fix(j).State },
-			func(ref models.Model) (gte, gt index.Test) {
-				refState := fix(ref).State
-				return func(s models.Model) bool {
-						return fix(s).State >= refState
-					},
-					func(s models.Model) bool {
-						return fix(s).State > refState
-					}
-			},
-			func(s string) (models.Model, error) {
-				job := fix(j.New())
-				job.State = s
-				return job, nil
-			}),
-		"Machine": index.Make(
-			true,
-			"UUID string",
-			func(i, j models.Model) bool { return fix(i).Machine.String() < fix(j).Machine.String() },
-			func(ref models.Model) (gte, gt index.Test) {
-				refMachine := fix(ref).Machine.String()
-				return func(s models.Model) bool {
-						return fix(s).Machine.String() >= refMachine
-					},
-					func(s models.Model) bool {
-						return fix(s).Machine.String() > refMachine
-					}
-			},
-			func(s string) (models.Model, error) {
-				id := uuid.Parse(s)
-				if id == nil {
-					return nil, fmt.Errorf("Invalid UUID: %s", s)
+		},
+		func(s string) (models.Model, error) {
+			id := uuid.Parse(s)
+			if id == nil {
+				return nil, fmt.Errorf("Invalid UUID: %s", s)
+			}
+			job := fix(j.New())
+			job.Uuid = id
+			return job, nil
+		})
+	res["BootEnv"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool { return fix(i).BootEnv < fix(j).BootEnv },
+		func(ref models.Model) (gte, gt index.Test) {
+			refBootEnv := fix(ref).BootEnv
+			return func(s models.Model) bool {
+					return fix(s).BootEnv >= refBootEnv
+				},
+				func(s models.Model) bool {
+					return fix(s).BootEnv > refBootEnv
 				}
-				job := fix(j.New())
-				job.Machine = id
-				return job, nil
-			}),
-		"Archived": index.Make(
-			false,
-			"boolean",
-			func(i, j models.Model) bool {
-				return (!fix(i).Archived) && fix(j).Archived
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				avail := fix(ref).Archived
-				return func(s models.Model) bool {
-						v := fix(s).Archived
-						return v || (v == avail)
-					},
-					func(s models.Model) bool {
-						return fix(s).Archived && !avail
-					}
-			},
-			func(s string) (models.Model, error) {
-				res := fix(j.New())
-				switch s {
-				case "true":
-					res.Archived = true
-				case "false":
-					res.Archived = false
-				default:
-					return nil, errors.New("Archived must be true or false")
+		},
+		func(s string) (models.Model, error) {
+			job := fix(j.New())
+			job.BootEnv = s
+			return job, nil
+		})
+	res["Task"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Task < fix(j).Task },
+		func(ref models.Model) (gte, gt index.Test) {
+			refTask := fix(ref).Task
+			return func(s models.Model) bool {
+					return fix(s).Task >= refTask
+				},
+				func(s models.Model) bool {
+					return fix(s).Task > refTask
 				}
-				return res, nil
-			}),
-		"StartTime": index.Make(
-			false,
-			"dateTime",
-			func(i, j models.Model) bool {
-				return fix(i).StartTime.Before(fix(j).StartTime)
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				refTime := fix(ref).StartTime
-				return func(s models.Model) bool {
-						cmpTime := fix(s).StartTime
-						return refTime.Equal(cmpTime) || cmpTime.After(refTime)
-					},
-					func(s models.Model) bool {
-						return fix(s).StartTime.After(refTime)
-					}
-			},
-			func(s string) (models.Model, error) {
-				parsedTime, err := time.Parse(time.RFC3339, s)
-				if err != nil {
-					return nil, err
+		},
+		func(s string) (models.Model, error) {
+			job := fix(j.New())
+			job.Task = s
+			return job, nil
+		})
+	res["State"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool { return fix(i).State < fix(j).State },
+		func(ref models.Model) (gte, gt index.Test) {
+			refState := fix(ref).State
+			return func(s models.Model) bool {
+					return fix(s).State >= refState
+				},
+				func(s models.Model) bool {
+					return fix(s).State > refState
 				}
-				job := fix(j.New())
-				job.StartTime = parsedTime
-				return job, nil
-			}),
-		"EndTime": index.Make(
-			false,
-			"dateTime",
-			func(i, j models.Model) bool {
-				return fix(i).EndTime.Before(fix(j).EndTime)
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				refTime := fix(ref).EndTime
-				return func(s models.Model) bool {
-						cmpTime := fix(s).EndTime
-						return refTime.Equal(cmpTime) || cmpTime.After(refTime)
-					},
-					func(s models.Model) bool {
-						return fix(s).EndTime.After(refTime)
-					}
-			},
-			func(s string) (models.Model, error) {
-				parsedTime, err := time.Parse(time.RFC3339, s)
-				if err != nil {
-					return nil, err
+		},
+		func(s string) (models.Model, error) {
+			job := fix(j.New())
+			job.State = s
+			return job, nil
+		})
+	res["Machine"] = index.Make(
+		true,
+		"UUID string",
+		func(i, j models.Model) bool { return fix(i).Machine.String() < fix(j).Machine.String() },
+		func(ref models.Model) (gte, gt index.Test) {
+			refMachine := fix(ref).Machine.String()
+			return func(s models.Model) bool {
+					return fix(s).Machine.String() >= refMachine
+				},
+				func(s models.Model) bool {
+					return fix(s).Machine.String() > refMachine
 				}
-				job := fix(j.New())
-				job.EndTime = parsedTime
-				return job, nil
-			}),
-	}
+		},
+		func(s string) (models.Model, error) {
+			id := uuid.Parse(s)
+			if id == nil {
+				return nil, fmt.Errorf("Invalid UUID: %s", s)
+			}
+			job := fix(j.New())
+			job.Machine = id
+			return job, nil
+		})
+	res["Archived"] = index.Make(
+		false,
+		"boolean",
+		func(i, j models.Model) bool {
+			return (!fix(i).Archived) && fix(j).Archived
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			avail := fix(ref).Archived
+			return func(s models.Model) bool {
+					v := fix(s).Archived
+					return v || (v == avail)
+				},
+				func(s models.Model) bool {
+					return fix(s).Archived && !avail
+				}
+		},
+		func(s string) (models.Model, error) {
+			res := fix(j.New())
+			switch s {
+			case "true":
+				res.Archived = true
+			case "false":
+				res.Archived = false
+			default:
+				return nil, errors.New("Archived must be true or false")
+			}
+			return res, nil
+		})
+	res["StartTime"] = index.Make(
+		false,
+		"dateTime",
+		func(i, j models.Model) bool {
+			return fix(i).StartTime.Before(fix(j).StartTime)
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			refTime := fix(ref).StartTime
+			return func(s models.Model) bool {
+					cmpTime := fix(s).StartTime
+					return refTime.Equal(cmpTime) || cmpTime.After(refTime)
+				},
+				func(s models.Model) bool {
+					return fix(s).StartTime.After(refTime)
+				}
+		},
+		func(s string) (models.Model, error) {
+			parsedTime, err := time.Parse(time.RFC3339, s)
+			if err != nil {
+				return nil, err
+			}
+			job := fix(j.New())
+			job.StartTime = parsedTime
+			return job, nil
+		})
+	res["EndTime"] = index.Make(
+		false,
+		"dateTime",
+		func(i, j models.Model) bool {
+			return fix(i).EndTime.Before(fix(j).EndTime)
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			refTime := fix(ref).EndTime
+			return func(s models.Model) bool {
+					cmpTime := fix(s).EndTime
+					return refTime.Equal(cmpTime) || cmpTime.After(refTime)
+				},
+				func(s models.Model) bool {
+					return fix(s).EndTime.After(refTime)
+				}
+		},
+		func(s string) (models.Model, error) {
+			parsedTime, err := time.Parse(time.RFC3339, s)
+			if err != nil {
+				return nil, err
+			}
+			job := fix(j.New())
+			job.EndTime = parsedTime
+			return job, nil
+		})
+	return res
 }
 
 var JobValidStates []string = []string{

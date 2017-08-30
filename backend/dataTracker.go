@@ -487,7 +487,7 @@ func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 		res := make([]models.Model, len(storeObjs))
 		for i := range storeObjs {
 			res[i] = models.Model(storeObjs[i])
-			if v, ok := res[i].(Validator); ok && v.Useable() {
+			if v, ok := res[i].(models.Validator); ok && v.Useable() {
 				soft.AddError(v.HasError())
 			}
 		}
@@ -772,7 +772,7 @@ func (p *DataTracker) Create(d Stores, obj models.Model) (saved bool, err error)
 		return false, fmt.Errorf("dataTracker create %s: %s already exists", prefix, key)
 	}
 	ref.(validator).setStores(d)
-	checker, checkOK := ref.(Validator)
+	checker, checkOK := ref.(models.Validator)
 	if checkOK {
 		checker.ClearValidation()
 	}
@@ -846,7 +846,7 @@ func (p *DataTracker) Patch(d Stores, obj models.Model, key string, patch jsonpa
 	}
 	p.setDT(toSave)
 	toSave.(validator).setStores(d)
-	checker, checkOK := toSave.(Validator)
+	checker, checkOK := toSave.(models.Validator)
 	if checkOK {
 		checker.ClearValidation()
 	}
@@ -877,7 +877,7 @@ func (p *DataTracker) Update(d Stores, obj models.Model) (saved bool, err error)
 
 	p.setDT(ref)
 	ref.(validator).setStores(d)
-	checker, checkOK := ref.(Validator)
+	checker, checkOK := ref.(models.Validator)
 	if checkOK {
 		checker.ClearValidation()
 	}
@@ -895,7 +895,7 @@ func (p *DataTracker) Save(d Stores, obj models.Model) (saved bool, err error) {
 	prefix := ref.Prefix()
 	backend := d(prefix).backingStore
 	ref.(validator).setStores(d)
-	checker, checkOK := ref.(Validator)
+	checker, checkOK := ref.(models.Validator)
 	if checkOK {
 		checker.ClearValidation()
 	}

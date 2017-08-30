@@ -18,27 +18,26 @@ type Pref struct {
 
 func (p *Pref) Indexes() map[string]index.Maker {
 	fix := AsPref
-	return map[string]index.Maker{
-		"Key": index.MakeKey(),
-		"Name": index.Make(
-			true,
-			"string",
-			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
-			func(ref models.Model) (gte, gt index.Test) {
-				refName := fix(ref).Name
-				return func(s models.Model) bool {
-						return fix(s).Name >= refName
-					},
-					func(s models.Model) bool {
-						return fix(s).Name > refName
-					}
-			},
-			func(s string) (models.Model, error) {
-				pref := fix(p.New())
-				pref.Name = s
-				return pref, nil
-			}),
-	}
+	res := index.MakeBaseIndexes(p)
+	res["Name"] = index.Make(
+		true,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+		func(ref models.Model) (gte, gt index.Test) {
+			refName := fix(ref).Name
+			return func(s models.Model) bool {
+					return fix(s).Name >= refName
+				},
+				func(s models.Model) bool {
+					return fix(s).Name > refName
+				}
+		},
+		func(s string) (models.Model, error) {
+			pref := fix(p.New())
+			pref.Name = s
+			return pref, nil
+		})
+	return res
 }
 
 func (p *Pref) Backend() store.Store {

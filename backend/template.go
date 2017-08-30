@@ -33,27 +33,26 @@ func (obj *Template) SaveClean() store.KeySaver {
 
 func (p *Template) Indexes() map[string]index.Maker {
 	fix := AsTemplate
-	return map[string]index.Maker{
-		"Key": index.MakeKey(),
-		"ID": index.Make(
-			true,
-			"string",
-			func(i, j models.Model) bool { return fix(i).ID < fix(j).ID },
-			func(ref models.Model) (gte, gt index.Test) {
-				refID := fix(ref).ID
-				return func(s models.Model) bool {
-						return fix(s).ID >= refID
-					},
-					func(s models.Model) bool {
-						return fix(s).ID > refID
-					}
-			},
-			func(s string) (models.Model, error) {
-				tmpl := fix(p.New())
-				tmpl.ID = s
-				return tmpl, nil
-			}),
-	}
+	res := index.MakeBaseIndexes(p)
+	res["ID"] = index.Make(
+		true,
+		"string",
+		func(i, j models.Model) bool { return fix(i).ID < fix(j).ID },
+		func(ref models.Model) (gte, gt index.Test) {
+			refID := fix(ref).ID
+			return func(s models.Model) bool {
+					return fix(s).ID >= refID
+				},
+				func(s models.Model) bool {
+					return fix(s).ID > refID
+				}
+		},
+		func(s string) (models.Model, error) {
+			tmpl := fix(p.New())
+			tmpl.ID = s
+			return tmpl, nil
+		})
+	return res
 }
 
 func (t *Template) Backend() store.Store {

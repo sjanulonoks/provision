@@ -27,27 +27,26 @@ func (obj *User) SaveClean() store.KeySaver {
 
 func (p *User) Indexes() map[string]index.Maker {
 	fix := AsUser
-	return map[string]index.Maker{
-		"Key": index.MakeKey(),
-		"Name": index.Make(
-			true,
-			"string",
-			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
-			func(ref models.Model) (gte, gt index.Test) {
-				refName := fix(ref).Name
-				return func(s models.Model) bool {
-						return fix(s).Name >= refName
-					},
-					func(s models.Model) bool {
-						return fix(s).Name > refName
-					}
-			},
-			func(s string) (models.Model, error) {
-				u := fix(p.New())
-				u.Name = s
-				return u, nil
-			}),
-	}
+	res := index.MakeBaseIndexes(p)
+	res["Name"] = index.Make(
+		true,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+		func(ref models.Model) (gte, gt index.Test) {
+			refName := fix(ref).Name
+			return func(s models.Model) bool {
+					return fix(s).Name >= refName
+				},
+				func(s models.Model) bool {
+					return fix(s).Name > refName
+				}
+		},
+		func(s string) (models.Model, error) {
+			u := fix(p.New())
+			u.Name = s
+			return u, nil
+		})
+	return res
 }
 
 func (u *User) Backend() store.Store {
