@@ -183,6 +183,7 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, ap
 
 	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt, pubs: pubs, pc: pc, ApiPort: apiport, ProvPort: provport, NoDhcp: noDhcp, NoTftp: noTftp, NoProv: noProv, SaasDir: saasDir}
 
+	me.InitIndexApi()
 	me.InitWebSocket()
 	me.InitBootEnvApi()
 	me.InitIsoApi()
