@@ -135,6 +135,8 @@ func Fill(t store.KeySaver) {
 		obj.Param = &models.Param{}
 	case *Plugin:
 		obj.Plugin = &models.Plugin{}
+	case *Pref:
+		obj.Pref = &models.Pref{}
 	case *Profile:
 		obj.Profile = &models.Profile{}
 	case *Reservation:
@@ -168,6 +170,8 @@ func ModelToBackend(m models.Model) store.KeySaver {
 		return &Param{Param: obj}
 	case *models.Plugin:
 		return &Plugin{Plugin: obj}
+	case *models.Pref:
+		return &Pref{Pref: obj}
 	case *models.Profile:
 		return &Profile{Profile: obj}
 	case *models.Reservation:

@@ -46,9 +46,9 @@ type Maker struct {
 	keyOrder bool
 	Unique   bool
 	Type     string
-	Less     Less
-	Tests    TestMaker
-	Fill     Filler
+	Less     Less      `json:"-"`
+	Tests    TestMaker `json:"-"`
+	Fill     Filler    `json:"-"`
 }
 
 // Index declares a struct field that can be indexed for a given
@@ -83,6 +83,7 @@ func MakeKey() Maker {
 	return Maker{
 		keyOrder: true,
 		Unique:   true,
+		Type:     "string",
 		Less: func(i, j models.Model) bool {
 			return i.Key() < j.Key()
 		},
