@@ -48,134 +48,133 @@ func (n *Machine) HasTask(s string) bool {
 
 func (n *Machine) Indexes() map[string]index.Maker {
 	fix := AsMachine
-	return map[string]index.Maker{
-		"Key": index.MakeKey(),
-		"Uuid": index.Make(
-			true,
-			"UUID string",
-			func(i, j models.Model) bool { return fix(i).Uuid.String() < fix(j).Uuid.String() },
-			func(ref models.Model) (gte, gt index.Test) {
-				refUuid := fix(ref).Uuid.String()
-				return func(s models.Model) bool {
-						return fix(s).Uuid.String() >= refUuid
-					},
-					func(s models.Model) bool {
-						return fix(s).Uuid.String() > refUuid
-					}
-			},
-			func(s string) (models.Model, error) {
-				id := uuid.Parse(s)
-				if id == nil {
-					return nil, fmt.Errorf("Invalid UUID: %s", s)
+	res := index.MakeBaseIndexes(n)
+	res["Uuid"] = index.Make(
+		true,
+		"UUID string",
+		func(i, j models.Model) bool { return fix(i).Uuid.String() < fix(j).Uuid.String() },
+		func(ref models.Model) (gte, gt index.Test) {
+			refUuid := fix(ref).Uuid.String()
+			return func(s models.Model) bool {
+					return fix(s).Uuid.String() >= refUuid
+				},
+				func(s models.Model) bool {
+					return fix(s).Uuid.String() > refUuid
 				}
-				m := fix(n.New())
-				m.Uuid = id
-				return m, nil
-			}),
-		"Name": index.Make(
-			true,
-			"string",
-			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
-			func(ref models.Model) (gte, gt index.Test) {
-				refName := fix(ref).Name
-				return func(s models.Model) bool {
-						return fix(s).Name >= refName
-					},
-					func(s models.Model) bool {
-						return fix(s).Name > refName
-					}
-			},
-			func(s string) (models.Model, error) {
-				m := fix(n.New())
-				m.Name = s
-				return m, nil
-			}),
-		"BootEnv": index.Make(
-			false,
-			"string",
-			func(i, j models.Model) bool { return fix(i).BootEnv < fix(j).BootEnv },
-			func(ref models.Model) (gte, gt index.Test) {
-				refBootEnv := fix(ref).BootEnv
-				return func(s models.Model) bool {
-						return fix(s).BootEnv >= refBootEnv
-					},
-					func(s models.Model) bool {
-						return fix(s).BootEnv > refBootEnv
-					}
-			},
-			func(s string) (models.Model, error) {
-				m := fix(n.New())
-				m.BootEnv = s
-				return m, nil
-			}),
-		"Address": index.Make(
-			false,
-			"IP Address",
-			func(i, j models.Model) bool {
-				n, o := big.Int{}, big.Int{}
-				n.SetBytes(fix(i).Address.To16())
-				o.SetBytes(fix(j).Address.To16())
-				return n.Cmp(&o) == -1
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				addr := &big.Int{}
-				addr.SetBytes(fix(ref).Address.To16())
-				return func(s models.Model) bool {
-						o := big.Int{}
-						o.SetBytes(fix(s).Address.To16())
-						return o.Cmp(addr) != -1
-					},
-					func(s models.Model) bool {
-						o := big.Int{}
-						o.SetBytes(fix(s).Address.To16())
-						return o.Cmp(addr) == 1
-					}
-			},
-			func(s string) (models.Model, error) {
-				addr := net.ParseIP(s)
-				if addr == nil {
-					return nil, fmt.Errorf("Invalid address: %s", s)
+		},
+		func(s string) (models.Model, error) {
+			id := uuid.Parse(s)
+			if id == nil {
+				return nil, fmt.Errorf("Invalid UUID: %s", s)
+			}
+			m := fix(n.New())
+			m.Uuid = id
+			return m, nil
+		})
+	res["Name"] = index.Make(
+		true,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+		func(ref models.Model) (gte, gt index.Test) {
+			refName := fix(ref).Name
+			return func(s models.Model) bool {
+					return fix(s).Name >= refName
+				},
+				func(s models.Model) bool {
+					return fix(s).Name > refName
 				}
-				m := fix(n.New())
-				m.Address = addr
-				return m, nil
-			}),
-		"Runnable": index.Make(
-			false,
-			"boolean",
-			func(i, j models.Model) bool {
-				return (!fix(i).Runnable) && fix(j).Runnable
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				avail := fix(ref).Runnable
-				return func(s models.Model) bool {
-						v := fix(s).Runnable
-						return v || (v == avail)
-					},
-					func(s models.Model) bool {
-						return fix(s).Runnable && !avail
-					}
-			},
-			func(s string) (models.Model, error) {
-				res := fix(n.New())
-				switch s {
-				case "true":
-					res.Runnable = true
-				case "false":
-					res.Runnable = false
-				default:
-					return nil, errors.New("Runnable must be true or false")
+		},
+		func(s string) (models.Model, error) {
+			m := fix(n.New())
+			m.Name = s
+			return m, nil
+		})
+	res["BootEnv"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool { return fix(i).BootEnv < fix(j).BootEnv },
+		func(ref models.Model) (gte, gt index.Test) {
+			refBootEnv := fix(ref).BootEnv
+			return func(s models.Model) bool {
+					return fix(s).BootEnv >= refBootEnv
+				},
+				func(s models.Model) bool {
+					return fix(s).BootEnv > refBootEnv
 				}
-				return res, nil
-			}),
-	}
+		},
+		func(s string) (models.Model, error) {
+			m := fix(n.New())
+			m.BootEnv = s
+			return m, nil
+		})
+	res["Address"] = index.Make(
+		false,
+		"IP Address",
+		func(i, j models.Model) bool {
+			n, o := big.Int{}, big.Int{}
+			n.SetBytes(fix(i).Address.To16())
+			o.SetBytes(fix(j).Address.To16())
+			return n.Cmp(&o) == -1
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			addr := &big.Int{}
+			addr.SetBytes(fix(ref).Address.To16())
+			return func(s models.Model) bool {
+					o := big.Int{}
+					o.SetBytes(fix(s).Address.To16())
+					return o.Cmp(addr) != -1
+				},
+				func(s models.Model) bool {
+					o := big.Int{}
+					o.SetBytes(fix(s).Address.To16())
+					return o.Cmp(addr) == 1
+				}
+		},
+		func(s string) (models.Model, error) {
+			addr := net.ParseIP(s)
+			if addr == nil {
+				return nil, fmt.Errorf("Invalid address: %s", s)
+			}
+			m := fix(n.New())
+			m.Address = addr
+			return m, nil
+		})
+	res["Runnable"] = index.Make(
+		false,
+		"boolean",
+		func(i, j models.Model) bool {
+			return (!fix(i).Runnable) && fix(j).Runnable
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			avail := fix(ref).Runnable
+			return func(s models.Model) bool {
+					v := fix(s).Runnable
+					return v || (v == avail)
+				},
+				func(s models.Model) bool {
+					return fix(s).Runnable && !avail
+				}
+		},
+		func(s string) (models.Model, error) {
+			res := fix(n.New())
+			switch s {
+			case "true":
+				res.Runnable = true
+			case "false":
+				res.Runnable = false
+			default:
+				return nil, errors.New("Runnable must be true or false")
+			}
+			return res, nil
+		})
+	return res
 }
 
 func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error) {
 	fix := AsMachine
 	pobj := d("params").Find(parameter)
 	if pobj == nil {
-		return index.Maker{}, fmt.Errorf("Parameter %s must be defined", parameter)
+		return index.Maker{}, fmt.Errorf("Filter not found: %s", parameter)
 	}
 	param := AsParam(pobj)
 

@@ -152,227 +152,226 @@ func (obj *Subnet) SaveClean() store.KeySaver {
 
 func (s *Subnet) Indexes() map[string]index.Maker {
 	fix := AsSubnet
-	return map[string]index.Maker{
-		"Key": index.MakeKey(),
-		"Name": index.Make(
-			true,
-			"string",
-			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
-			func(ref models.Model) (gte, gt index.Test) {
-				refName := fix(ref).Name
-				return func(s models.Model) bool {
-						return fix(s).Name >= refName
-					},
-					func(s models.Model) bool {
-						return fix(s).Name > refName
+	res := index.MakeBaseIndexes(s)
+	res["Name"] = index.Make(
+		true,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+		func(ref models.Model) (gte, gt index.Test) {
+			refName := fix(ref).Name
+			return func(s models.Model) bool {
+					return fix(s).Name >= refName
+				},
+				func(s models.Model) bool {
+					return fix(s).Name > refName
+				}
+		},
+		func(st string) (models.Model, error) {
+			sub := fix(s.New())
+			sub.Name = st
+			return sub, nil
+		})
+	res["Strategy"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Strategy < fix(j).Strategy },
+		func(ref models.Model) (gte, gt index.Test) {
+			strategy := fix(ref).Strategy
+			return func(s models.Model) bool {
+					return fix(s).Strategy >= strategy
+				},
+				func(s models.Model) bool {
+					return fix(s).Strategy > strategy
+				}
+		},
+		func(st string) (models.Model, error) {
+			sub := fix(s.New())
+			sub.Strategy = st
+			return sub, nil
+		})
+	res["NextServer"] = index.Make(
+		false,
+		"IP Address",
+		func(i, j models.Model) bool {
+			n, o := big.Int{}, big.Int{}
+			n.SetBytes(fix(i).NextServer.To16())
+			o.SetBytes(fix(j).NextServer.To16())
+			return n.Cmp(&o) == -1
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			addr := &big.Int{}
+			addr.SetBytes(fix(ref).NextServer.To16())
+			return func(s models.Model) bool {
+					o := big.Int{}
+					o.SetBytes(fix(s).NextServer.To16())
+					return o.Cmp(addr) != -1
+				},
+				func(s models.Model) bool {
+					o := big.Int{}
+					o.SetBytes(fix(s).NextServer.To16())
+					return o.Cmp(addr) == 1
+				}
+		},
+		func(st string) (models.Model, error) {
+			addr := net.ParseIP(st)
+			if addr == nil {
+				return nil, fmt.Errorf("Invalid Address: %s", st)
+			}
+			sub := fix(s.New())
+			sub.NextServer = addr
+			return sub, nil
+		})
+	res["Subnet"] = index.Make(
+		true,
+		"CIDR Address",
+		func(i, j models.Model) bool {
+			a, _, errA := net.ParseCIDR(fix(i).Subnet.Subnet)
+			b, _, errB := net.ParseCIDR(fix(j).Subnet.Subnet)
+			if errA != nil || errB != nil {
+				fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
+			}
+			n, o := big.Int{}, big.Int{}
+			n.SetBytes(a.To16())
+			o.SetBytes(b.To16())
+			return n.Cmp(&o) == -1
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			cidr, _, err := net.ParseCIDR(fix(ref).Subnet.Subnet)
+			if err != nil {
+				fix(ref).p.Logger.Panicf("Illegal subnet %s: %v", fix(ref).Subnet.Subnet, err)
+			}
+			addr := &big.Int{}
+			addr.SetBytes(cidr.To16())
+			return func(s models.Model) bool {
+					cidr, _, err := net.ParseCIDR(fix(s).Subnet.Subnet)
+					if err != nil {
+						fix(s).p.Logger.Panicf("Illegal subnet %s: %v", fix(s).Subnet.Subnet, err)
 					}
-			},
-			func(st string) (models.Model, error) {
-				sub := fix(s.New())
-				sub.Name = st
-				return sub, nil
-			}),
-		"Strategy": index.Make(
-			false,
-			"string",
-			func(i, j models.Model) bool { return fix(i).Strategy < fix(j).Strategy },
-			func(ref models.Model) (gte, gt index.Test) {
-				strategy := fix(ref).Strategy
-				return func(s models.Model) bool {
-						return fix(s).Strategy >= strategy
-					},
-					func(s models.Model) bool {
-						return fix(s).Strategy > strategy
+					o := big.Int{}
+					o.SetBytes(cidr.To16())
+					return o.Cmp(addr) != -1
+				},
+				func(s models.Model) bool {
+					cidr, _, err := net.ParseCIDR(fix(s).Subnet.Subnet)
+					if err != nil {
+						fix(s).p.Logger.Panicf("Illegal subnet %s: %v", fix(s).Subnet.Subnet, err)
 					}
-			},
-			func(st string) (models.Model, error) {
-				sub := fix(s.New())
-				sub.Strategy = st
-				return sub, nil
-			}),
-		"NextServer": index.Make(
-			false,
-			"IP Address",
-			func(i, j models.Model) bool {
-				n, o := big.Int{}, big.Int{}
-				n.SetBytes(fix(i).NextServer.To16())
-				o.SetBytes(fix(j).NextServer.To16())
-				return n.Cmp(&o) == -1
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				addr := &big.Int{}
-				addr.SetBytes(fix(ref).NextServer.To16())
-				return func(s models.Model) bool {
-						o := big.Int{}
-						o.SetBytes(fix(s).NextServer.To16())
-						return o.Cmp(addr) != -1
-					},
-					func(s models.Model) bool {
-						o := big.Int{}
-						o.SetBytes(fix(s).NextServer.To16())
-						return o.Cmp(addr) == 1
-					}
-			},
-			func(st string) (models.Model, error) {
-				addr := net.ParseIP(st)
-				if addr == nil {
-					return nil, fmt.Errorf("Invalid Address: %s", st)
+					o := big.Int{}
+					o.SetBytes(cidr.To16())
+					return o.Cmp(addr) == 1
 				}
-				sub := fix(s.New())
-				sub.NextServer = addr
-				return sub, nil
-			}),
-		"Subnet": index.Make(
-			true,
-			"CIDR Address",
-			func(i, j models.Model) bool {
-				a, _, errA := net.ParseCIDR(fix(i).Subnet.Subnet)
-				b, _, errB := net.ParseCIDR(fix(j).Subnet.Subnet)
-				if errA != nil || errB != nil {
-					fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
+		},
+		func(st string) (models.Model, error) {
+			if _, _, err := net.ParseCIDR(st); err != nil {
+				return nil, fmt.Errorf("Invalid subnet CIDR: %s", st)
+			}
+			sub := fix(s.New())
+			sub.Subnet.Subnet = st
+			return sub, nil
+		})
+	res["Address"] = index.Make(
+		false,
+		"IP Address",
+		func(i, j models.Model) bool {
+			a, _, errA := net.ParseCIDR(fix(i).Subnet.Subnet)
+			b, _, errB := net.ParseCIDR(fix(j).Subnet.Subnet)
+			if errA != nil || errB != nil {
+				fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
+			}
+			n, o := big.Int{}, big.Int{}
+			n.SetBytes(a.To16())
+			o.SetBytes(b.To16())
+			return n.Cmp(&o) == -1
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			addr := fix(ref).Subnet.Subnet
+			if net.ParseIP(addr) == nil {
+				fix(ref).p.Logger.Panicf("Illegal IP Address: %s", addr)
+			}
+			return func(s models.Model) bool {
+					l, _ := fix(s).sBounds()
+					return l(addr)
+				},
+				func(s models.Model) bool {
+					_, u := fix(s).sBounds()
+					return u(addr)
 				}
-				n, o := big.Int{}, big.Int{}
-				n.SetBytes(a.To16())
-				o.SetBytes(b.To16())
-				return n.Cmp(&o) == -1
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				cidr, _, err := net.ParseCIDR(fix(ref).Subnet.Subnet)
-				if err != nil {
-					fix(ref).p.Logger.Panicf("Illegal subnet %s: %v", fix(ref).Subnet.Subnet, err)
+		},
+		func(st string) (models.Model, error) {
+			addr := net.ParseIP(st)
+			if addr == nil {
+				return nil, fmt.Errorf("Invalid IP address: %s", st)
+			}
+			sub := fix(s.New())
+			sub.Subnet.Subnet = st
+			return sub, nil
+		})
+	res["ActiveAddress"] = index.Make(
+		false,
+		"IP Address",
+		func(i, j models.Model) bool {
+			a, _, errA := net.ParseCIDR(fix(i).Subnet.Subnet)
+			b, _, errB := net.ParseCIDR(fix(j).Subnet.Subnet)
+			if errA != nil || errB != nil {
+				fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
+			}
+			n, o := big.Int{}, big.Int{}
+			n.SetBytes(a.To16())
+			o.SetBytes(b.To16())
+			return n.Cmp(&o) == -1
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			addr := fix(ref).Subnet.Subnet
+			if net.ParseIP(addr) == nil {
+				fix(ref).p.Logger.Panicf("Illegal IP Address: %s", addr)
+			}
+			return func(s models.Model) bool {
+					l, _ := fix(s).aBounds()
+					return l(addr)
+				},
+				func(s models.Model) bool {
+					_, u := fix(s).aBounds()
+					return u(addr)
 				}
-				addr := &big.Int{}
-				addr.SetBytes(cidr.To16())
-				return func(s models.Model) bool {
-						cidr, _, err := net.ParseCIDR(fix(s).Subnet.Subnet)
-						if err != nil {
-							fix(s).p.Logger.Panicf("Illegal subnet %s: %v", fix(s).Subnet.Subnet, err)
-						}
-						o := big.Int{}
-						o.SetBytes(cidr.To16())
-						return o.Cmp(addr) != -1
-					},
-					func(s models.Model) bool {
-						cidr, _, err := net.ParseCIDR(fix(s).Subnet.Subnet)
-						if err != nil {
-							fix(s).p.Logger.Panicf("Illegal subnet %s: %v", fix(s).Subnet.Subnet, err)
-						}
-						o := big.Int{}
-						o.SetBytes(cidr.To16())
-						return o.Cmp(addr) == 1
-					}
-			},
-			func(st string) (models.Model, error) {
-				if _, _, err := net.ParseCIDR(st); err != nil {
-					return nil, fmt.Errorf("Invalid subnet CIDR: %s", st)
+		},
+		func(st string) (models.Model, error) {
+			addr := net.ParseIP(st)
+			if addr == nil {
+				return nil, fmt.Errorf("Invalid IP address: %s", st)
+			}
+			sub := fix(s.New())
+			sub.Subnet.Subnet = st
+			return sub, nil
+		})
+	res["Enabled"] = index.Make(
+		false,
+		"boolean",
+		func(i, j models.Model) bool {
+			return (!fix(i).Enabled) && fix(j).Enabled
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			avail := fix(ref).Enabled
+			return func(s models.Model) bool {
+					v := fix(s).Enabled
+					return v || (v == avail)
+				},
+				func(s models.Model) bool {
+					return fix(s).Enabled && !avail
 				}
-				sub := fix(s.New())
-				sub.Subnet.Subnet = st
-				return sub, nil
-			}),
-		"Address": index.Make(
-			false,
-			"IP Address",
-			func(i, j models.Model) bool {
-				a, _, errA := net.ParseCIDR(fix(i).Subnet.Subnet)
-				b, _, errB := net.ParseCIDR(fix(j).Subnet.Subnet)
-				if errA != nil || errB != nil {
-					fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
-				}
-				n, o := big.Int{}, big.Int{}
-				n.SetBytes(a.To16())
-				o.SetBytes(b.To16())
-				return n.Cmp(&o) == -1
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				addr := fix(ref).Subnet.Subnet
-				if net.ParseIP(addr) == nil {
-					fix(ref).p.Logger.Panicf("Illegal IP Address: %s", addr)
-				}
-				return func(s models.Model) bool {
-						l, _ := fix(s).sBounds()
-						return l(addr)
-					},
-					func(s models.Model) bool {
-						_, u := fix(s).sBounds()
-						return u(addr)
-					}
-			},
-			func(st string) (models.Model, error) {
-				addr := net.ParseIP(st)
-				if addr == nil {
-					return nil, fmt.Errorf("Invalid IP address: %s", st)
-				}
-				sub := fix(s.New())
-				sub.Subnet.Subnet = st
-				return sub, nil
-			}),
-		"ActiveAddress": index.Make(
-			false,
-			"IP Address",
-			func(i, j models.Model) bool {
-				a, _, errA := net.ParseCIDR(fix(i).Subnet.Subnet)
-				b, _, errB := net.ParseCIDR(fix(j).Subnet.Subnet)
-				if errA != nil || errB != nil {
-					fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
-				}
-				n, o := big.Int{}, big.Int{}
-				n.SetBytes(a.To16())
-				o.SetBytes(b.To16())
-				return n.Cmp(&o) == -1
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				addr := fix(ref).Subnet.Subnet
-				if net.ParseIP(addr) == nil {
-					fix(ref).p.Logger.Panicf("Illegal IP Address: %s", addr)
-				}
-				return func(s models.Model) bool {
-						l, _ := fix(s).aBounds()
-						return l(addr)
-					},
-					func(s models.Model) bool {
-						_, u := fix(s).aBounds()
-						return u(addr)
-					}
-			},
-			func(st string) (models.Model, error) {
-				addr := net.ParseIP(st)
-				if addr == nil {
-					return nil, fmt.Errorf("Invalid IP address: %s", st)
-				}
-				sub := fix(s.New())
-				sub.Subnet.Subnet = st
-				return sub, nil
-			}),
-		"Enabled": index.Make(
-			false,
-			"boolean",
-			func(i, j models.Model) bool {
-				return (!fix(i).Enabled) && fix(j).Enabled
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				avail := fix(ref).Enabled
-				return func(s models.Model) bool {
-						v := fix(s).Enabled
-						return v || (v == avail)
-					},
-					func(s models.Model) bool {
-						return fix(s).Enabled && !avail
-					}
-			},
-			func(st string) (models.Model, error) {
-				res := &Subnet{Subnet: &models.Subnet{}}
-				switch st {
-				case "true":
-					res.Enabled = true
-				case "false":
-					res.Enabled = false
-				default:
-					return nil, errors.New("Enabled must be true or false")
-				}
-				return res, nil
-			}),
-	}
+		},
+		func(st string) (models.Model, error) {
+			res := &Subnet{Subnet: &models.Subnet{}}
+			switch st {
+			case "true":
+				res.Enabled = true
+			case "false":
+				res.Enabled = false
+			default:
+				return nil, errors.New("Enabled must be true or false")
+			}
+			return res, nil
+		})
+	return res
 }
 
 func (s *Subnet) subnet() *net.IPNet {

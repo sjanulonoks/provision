@@ -98,6 +98,83 @@ func MakeKey() Maker {
 	}
 }
 
+type FakeValid bool
+
+func (f FakeValid) Prefix() string    { return "fakevalid" }
+func (f FakeValid) Key() string       { return "noID" }
+func (f FakeValid) Validate()         {}
+func (f FakeValid) ClearValidation()  {}
+func (f FakeValid) Useable() bool     { return bool(f) }
+func (f FakeValid) IsAvailable() bool { return bool(f) }
+func (f FakeValid) HasError() error   { return nil }
+
+func MakeBaseIndexes(m models.Model) map[string]Maker {
+	res := map[string]Maker{}
+	res["Key"] = MakeKey()
+	if _, ok := m.(models.Validator); ok {
+		fix := func(m models.Model) models.Validator { return m.(models.Validator) }
+		res["Valid"] = Maker{
+			Unique: false,
+			Type:   "boolean",
+			Less: func(i, j models.Model) bool {
+				return !fix(i).Useable() && fix(j).Useable()
+			},
+			Tests: func(ref models.Model) (gte, gt Test) {
+				valid := fix(ref).Useable()
+				return func(s models.Model) bool {
+						v := fix(s).Useable()
+						return v || (v == valid)
+					},
+					func(s models.Model) bool {
+						return fix(s).Useable() && !valid
+					}
+			},
+			Fill: func(s string) (models.Model, error) {
+				valid := false
+				switch s {
+				case "true":
+					valid = true
+				case "false":
+					valid = false
+				default:
+					return nil, errors.New("Valid must be true of false")
+				}
+				return FakeValid(valid), nil
+			},
+		}
+		res["Available"] = Maker{
+			Unique: false,
+			Type:   "boolean",
+			Less: func(i, j models.Model) bool {
+				return !fix(i).IsAvailable() && fix(j).IsAvailable()
+			},
+			Tests: func(ref models.Model) (gte, gt Test) {
+				valid := fix(ref).IsAvailable()
+				return func(s models.Model) bool {
+						v := fix(s).IsAvailable()
+						return v || (v == valid)
+					},
+					func(s models.Model) bool {
+						return fix(s).IsAvailable() && !valid
+					}
+			},
+			Fill: func(s string) (models.Model, error) {
+				valid := false
+				switch s {
+				case "true":
+					valid = true
+				case "false":
+					valid = false
+				default:
+					return nil, errors.New("Available must be true of false")
+				}
+				return FakeValid(valid), nil
+			},
+		}
+	}
+	return res
+}
+
 func CheckUnique(s models.Model, objs []models.Model) error {
 	testObj, ok := s.(Indexer)
 	if !ok {

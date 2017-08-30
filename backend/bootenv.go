@@ -55,85 +55,56 @@ func (b *BootEnv) HasTask(s string) bool {
 
 func (b *BootEnv) Indexes() map[string]index.Maker {
 	fix := AsBootEnv
-	return map[string]index.Maker{
-		"Key": index.MakeKey(),
-		"Name": index.Make(
-			true,
-			"string",
-			func(i, j models.Model) bool {
-				return fix(i).Name < fix(j).Name
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				name := fix(ref).Name
-				return func(s models.Model) bool {
-						return fix(s).Name >= name
-					},
-					func(s models.Model) bool {
-						return fix(s).Name > name
-					}
-			},
-			func(s string) (models.Model, error) {
-				res := fix(b.New())
-				res.Name = s
-				return res, nil
-			}),
-		"Available": index.Make(
-			false,
-			"boolean",
-			func(i, j models.Model) bool {
-				return (!fix(i).Available) && fix(j).Available
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				avail := fix(ref).Available
-				return func(s models.Model) bool {
-						v := fix(s).Available
-						return v || (v == avail)
-					},
-					func(s models.Model) bool {
-						return fix(s).Available && !avail
-					}
-			},
-			func(s string) (models.Model, error) {
-				res := fix(b.New())
-				switch s {
-				case "true":
-					res.Available = true
-				case "false":
-					res.Available = false
-				default:
-					return nil, errors.New("Available must be true or false")
+	res := index.MakeBaseIndexes(b)
+	res["Name"] = index.Make(
+		true,
+		"string",
+		func(i, j models.Model) bool {
+			return fix(i).Name < fix(j).Name
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			name := fix(ref).Name
+			return func(s models.Model) bool {
+					return fix(s).Name >= name
+				},
+				func(s models.Model) bool {
+					return fix(s).Name > name
 				}
-				return res, nil
-			}),
-		"OnlyUnknown": index.Make(
-			false,
-			"boolean",
-			func(i, j models.Model) bool {
-				return !fix(i).OnlyUnknown && fix(j).OnlyUnknown
-			},
-			func(ref models.Model) (gte, gt index.Test) {
-				unknown := fix(ref).OnlyUnknown
-				return func(s models.Model) bool {
-						v := fix(s).OnlyUnknown
-						return v || (v == unknown)
-					},
-					func(s models.Model) bool {
-						return fix(s).OnlyUnknown && !unknown
-					}
-			},
-			func(s string) (models.Model, error) {
-				res := fix(b.New())
-				switch s {
-				case "true":
-					res.OnlyUnknown = true
-				case "false":
-					res.OnlyUnknown = false
-				default:
-					return nil, errors.New("OnlyUnknown must be true or false")
+		},
+		func(s string) (models.Model, error) {
+			res := fix(b.New())
+			res.Name = s
+			return res, nil
+		})
+	res["OnlyUnknown"] = index.Make(
+		false,
+		"boolean",
+		func(i, j models.Model) bool {
+			return !fix(i).OnlyUnknown && fix(j).OnlyUnknown
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			unknown := fix(ref).OnlyUnknown
+			return func(s models.Model) bool {
+					v := fix(s).OnlyUnknown
+					return v || (v == unknown)
+				},
+				func(s models.Model) bool {
+					return fix(s).OnlyUnknown && !unknown
 				}
-				return res, nil
-			}),
-	}
+		},
+		func(s string) (models.Model, error) {
+			res := fix(b.New())
+			switch s {
+			case "true":
+				res.OnlyUnknown = true
+			case "false":
+				res.OnlyUnknown = false
+			default:
+				return nil, errors.New("OnlyUnknown must be true or false")
+			}
+			return res, nil
+		})
+	return res
 }
 
 func (b *BootEnv) Backend() store.Store {

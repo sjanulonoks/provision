@@ -61,27 +61,26 @@ func (t *Task) setDT(dp *DataTracker) {
 
 func (t *Task) Indexes() map[string]index.Maker {
 	fix := AsTask
-	return map[string]index.Maker{
-		"Key": index.MakeKey(),
-		"Name": index.Make(
-			true,
-			"string",
-			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
-			func(ref models.Model) (gte, gt index.Test) {
-				refName := fix(ref).Name
-				return func(s models.Model) bool {
-						return fix(s).Name >= refName
-					},
-					func(s models.Model) bool {
-						return fix(s).Name > refName
-					}
-			},
-			func(s string) (models.Model, error) {
-				task := fix(t.New())
-				task.Name = s
-				return task, nil
-			}),
-	}
+	res := index.MakeBaseIndexes(t)
+	res["Name"] = index.Make(
+		true,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+		func(ref models.Model) (gte, gt index.Test) {
+			refName := fix(ref).Name
+			return func(s models.Model) bool {
+					return fix(s).Name >= refName
+				},
+				func(s models.Model) bool {
+					return fix(s).Name > refName
+				}
+		},
+		func(s string) (models.Model, error) {
+			task := fix(t.New())
+			task.Name = s
+			return task, nil
+		})
+	return res
 }
 
 func (t *Task) genRoot(common *template.Template, e models.ErrorAdder) *template.Template {

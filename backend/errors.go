@@ -12,18 +12,6 @@ const (
 	StillInUseError     = "StillInUseError"
 )
 
-//
-// model object may define a Validate method that can
-// be used to return errors about if the model is valid
-// in the current datatracker.
-//
-type Validator interface {
-	Validate()
-	ClearValidation()
-	Useable() bool
-	HasError() error
-}
-
 type validator interface {
 	setStores(Stores)
 	clearStores()
