@@ -258,8 +258,9 @@ case $1 in
                          fi
                      fi
                  fi
+
                  if [[ $IPADDR ]] ; then
-                     IPADDR="--static-ip=${IPADDR///*}"
+                     IPADDR="${IPADDR///*}"
                  fi
 
                  if [[ $OS_FAMILY == darwin ]]; then
@@ -272,6 +273,9 @@ case $1 in
                      fi
                  fi
 
+                 if [[ $IPADDR ]] ; then
+                     IPADDR="--static-ip=${IPADDR}"
+                 fi
 
                  set +e
                  ./dr-provision --help | grep -q base-root
