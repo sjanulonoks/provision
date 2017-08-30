@@ -223,6 +223,14 @@ case $1 in
                      echo "$enabler"
                  fi
 
+                 # handle the v3.0.X to v3.1.0 directory structure.
+                 if [[ ! -e /var/lib/dr-provision/digitalrebar && -e /var/lib/dr-provision ]] ; then
+                     DIR=$(mktemp)
+                     sudo mv /var/lib/dr-provision $DIR
+                     sudo mkdir -p /var/lib/dr-provision
+                     sudo mv $DIR /var/lib/dr-provision/digitalrebar
+                 fi
+
                  sudo mkdir -p /usr/share/dr-provision
                  DEFAULT_CONTENT_FILE="/usr/share/dr-provision/default.yaml"
                  sudo mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
