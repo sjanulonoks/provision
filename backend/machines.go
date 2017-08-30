@@ -174,7 +174,7 @@ func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error
 	fix := AsMachine
 	pobj := d("params").Find(parameter)
 	if pobj == nil {
-		return index.Maker{}, fmt.Errorf("Parameter %s must be defined", parameter)
+		return index.Maker{}, fmt.Errorf("Filter not found: %s", parameter)
 	}
 	param := AsParam(pobj)
 
