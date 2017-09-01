@@ -9,7 +9,7 @@ import (
 
 func TestBootEnvCrud(t *testing.T) {
 	dt := mkDT(nil)
-	d, unlocker := dt.LockEnts("bootenvs", "templates", "tasks", "machines", "profiles")
+	d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "tasks", "machines", "profiles")
 	defer unlocker()
 	tmpl := &models.Template{ID: "ok", Contents: "{{ .Env.Name }}"}
 	if ok, err := dt.Create(d, tmpl); !ok {

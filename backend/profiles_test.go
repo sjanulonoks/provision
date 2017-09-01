@@ -8,7 +8,7 @@ import (
 
 func TestProfilesCrud(t *testing.T) {
 	dt := mkDT(nil)
-	d, unlocker := dt.LockEnts("profiles", "params", "machines")
+	d, unlocker := dt.LockEnts("stages", "profiles", "params", "machines")
 	defer unlocker()
 	tests := []crudTest{
 		{"Create empty profile", dt.Create, &models.Profile{}, false},

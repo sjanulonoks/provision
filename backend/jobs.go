@@ -126,22 +126,22 @@ func (j *Job) Indexes() map[string]index.Maker {
 			job.Uuid = id
 			return job, nil
 		})
-	res["BootEnv"] = index.Make(
+	res["Stage"] = index.Make(
 		false,
 		"string",
-		func(i, j models.Model) bool { return fix(i).BootEnv < fix(j).BootEnv },
+		func(i, j models.Model) bool { return fix(i).Stage < fix(j).Stage },
 		func(ref models.Model) (gte, gt index.Test) {
-			refBootEnv := fix(ref).BootEnv
+			refStage := fix(ref).Stage
 			return func(s models.Model) bool {
-					return fix(s).BootEnv >= refBootEnv
+					return fix(s).Stage >= refStage
 				},
 				func(s models.Model) bool {
-					return fix(s).BootEnv > refBootEnv
+					return fix(s).Stage > refStage
 				}
 		},
 		func(s string) (models.Model, error) {
 			job := fix(j.New())
-			job.BootEnv = s
+			job.Stage = s
 			return job, nil
 		})
 	res["Task"] = index.Make(
@@ -324,7 +324,7 @@ func (j *Job) Validate() {
 
 	objs := j.stores
 	tasks := objs("tasks")
-	bootenvs := objs("bootenvs")
+	stages := objs("stages")
 	machines := objs("machines")
 
 	var m *Machine
@@ -343,14 +343,14 @@ func (j *Job) Validate() {
 		j.Errorf("Task %s does not exist", j.Task)
 	}
 
-	var env *BootEnv
-	if nbFound := bootenvs.Find(j.BootEnv); nbFound == nil {
-		j.Errorf("Bootenv %s does not exist", j.BootEnv)
+	var env *Stage
+	if nbFound := stages.Find(j.Stage); nbFound == nil {
+		j.Errorf("Stage %s does not exist", j.Stage)
 	} else {
-		env = AsBootEnv(nbFound)
+		env = AsStage(nbFound)
 	}
 	if env != nil && !env.Available {
-		j.Errorf("Jobs %s wants BootEnv %s, which is not available", j.UUID(), j.BootEnv)
+		j.Errorf("Jobs %s wants Stage %s, which is not available", j.UUID(), j.Stage)
 	}
 
 	found := false
@@ -469,11 +469,11 @@ func (j *Job) Log(src io.Reader) error {
 
 var jobLockMap = map[string][]string{
 	"get":     []string{"jobs"},
-	"create":  []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
-	"update":  []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
-	"patch":   []string{"jobs", "machines", "tasks", "bootenvs", "profiles"},
+	"create":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
+	"update":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
+	"patch":   []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
 	"delete":  []string{"jobs"},
-	"actions": []string{"jobs", "machines", "tasks", "profiles"},
+	"actions": []string{"stages", "jobs", "machines", "tasks", "profiles"},
 }
 
 func (j *Job) Locks(action string) []string {

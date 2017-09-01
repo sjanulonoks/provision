@@ -104,9 +104,13 @@ type JobListPathParameter struct {
 	// in: query
 	Limit int `json:"limit"`
 	// in: query
+	Available string
+	// in: query
+	Valid string
+	// in: query
 	Uuid string
 	// in: query
-	BootEnv string
+	Stage string
 	// in: query
 	Task string
 	// in: query
@@ -134,13 +138,15 @@ func (f *Frontend) InitJobApi() {
 	//
 	// Functional Indexs:
 	//    Uuid = string
-	//    BootEnv = string
+	//    Stage = string
 	//    Task = string
 	//    State = string
 	//    Machine = string
 	//    Archived = boolean
 	//    StartTime = datetime
 	//    EndTime = datetime
+	//    Available = boolean
+	//    Valid = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value
@@ -288,7 +294,7 @@ func (f *Frontend) InitJobApi() {
 				} else {
 					b.Previous = m.CurrentJob
 				}
-				b.BootEnv = m.BootEnv
+				b.Stage = m.Stage
 				b.Task = m.Tasks[newCT]
 
 				// Create the job, and then update the machine

@@ -48,7 +48,7 @@ func (p *patchTest) test(t *testing.T, target models.Model) {
 
 func TestMachineCrud(t *testing.T) {
 	dt := mkDT(nil)
-	d, unlocker := dt.LockEnts("templates", "machines", "tasks", "bootenvs", "profiles")
+	d, unlocker := dt.LockEnts("stages", "templates", "machines", "tasks", "bootenvs", "profiles")
 	defer unlocker()
 	okUUID := uuid.NewRandom()
 	tests := []crudTest{

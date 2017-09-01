@@ -137,7 +137,7 @@ func MakeBaseIndexes(m models.Model) map[string]Maker {
 				case "false":
 					valid = false
 				default:
-					return nil, errors.New("Valid must be true of false")
+					return nil, errors.New("Valid must be true or false")
 				}
 				return FakeValid(valid), nil
 			},
@@ -166,7 +166,7 @@ func MakeBaseIndexes(m models.Model) map[string]Maker {
 				case "false":
 					valid = false
 				default:
-					return nil, errors.New("Available must be true of false")
+					return nil, errors.New("Available must be true or false")
 				}
 				return FakeValid(valid), nil
 			},

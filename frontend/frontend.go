@@ -186,6 +186,7 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, ap
 	me.InitIndexApi()
 	me.InitWebSocket()
 	me.InitBootEnvApi()
+	me.InitStageApi()
 	me.InitIsoApi()
 	me.InitFileApi()
 	me.InitTemplateApi()

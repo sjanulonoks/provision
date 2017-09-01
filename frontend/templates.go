@@ -53,6 +53,10 @@ type TemplateListPathParameter struct {
 	// in: query
 	Limit int `json:"limit"`
 	// in: query
+	Available string
+	// in: query
+	Valid string
+	// in: query
 	ID string
 }
 
@@ -69,6 +73,8 @@ func (f *Frontend) InitTemplateApi() {
 	//
 	// Functional Indexs:
 	//    ID = string
+	//    Available = boolean
+	//    Valid = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value

@@ -25,6 +25,8 @@ type Machine struct {
 	p *DataTracker
 	// used during AfterSave() and AfterRemove() to handle boot environment changes.
 	oldBootEnv string
+	// used during AfterSave() and AfterRemove() to handle boot environment changes.
+	oldStage string
 }
 
 func (obj *Machine) SetReadOnly(b bool) {
@@ -333,10 +335,55 @@ func (n *Machine) getProfile(d Stores, key string) *Profile {
 	return nil
 }
 
-func (n *Machine) GetParams() map[string]interface{} {
-	m := n.Profile.Params
-	if m == nil {
-		m = map[string]interface{}{}
+func (n *Machine) getStage(d Stores) *Stage {
+	if n.Stage == "" {
+		return nil
+	}
+	s := d("stages").Find(n.Stage)
+	if s != nil {
+		return AsStage(s)
+	}
+	return nil
+}
+
+func (n *Machine) GetParams(d Stores, aggregate bool) map[string]interface{} {
+	m := map[string]interface{}{}
+	if aggregate {
+		// Check the global profile.
+		if gp := n.getProfile(d, n.p.GlobalProfileName); gp != nil && gp.Params != nil {
+			for k, v := range gp.Params {
+				m[k] = v
+			}
+		}
+		// Check the stage's profiles if it exists
+		stage := n.getStage(d)
+		if stage != nil {
+			for _, pn := range stage.Profiles {
+				if p := n.getProfile(d, pn); p != nil && p.Params != nil {
+					for k, v := range p.Params {
+						m[k] = v
+					}
+				}
+			}
+		}
+		// Check profiles for params
+		for _, e := range n.Profiles {
+			if p := n.getProfile(d, e); p != nil && p.Params != nil {
+				for k, v := range p.Params {
+					m[k] = v
+				}
+			}
+		}
+		// The machine's Params
+		if n.Profile.Params != nil {
+			for k, v := range n.Profile.Params {
+				m[k] = v
+			}
+		}
+	} else {
+		if n.Profile.Params != nil {
+			m = n.Profile.Params
+		}
 	}
 	return m
 }
@@ -350,11 +397,12 @@ func (n *Machine) SetParams(d Stores, values map[string]interface{}) error {
 }
 
 func (n *Machine) GetParam(d Stores, key string, searchProfiles bool) (interface{}, bool) {
-	mm := n.GetParams()
+	mm := n.GetParams(d, false)
 	if v, found := mm[key]; found {
 		return v, true
 	}
 	if searchProfiles {
+		// Check profiles for params
 		for _, e := range n.Profiles {
 			if p := n.getProfile(d, e); p != nil {
 				if v, ok := p.GetParam(key, false); ok {
@@ -362,6 +410,18 @@ func (n *Machine) GetParam(d Stores, key string, searchProfiles bool) (interface
 				}
 			}
 		}
+		// Check the stage's profiles if it exists
+		stage := n.getStage(d)
+		if stage != nil {
+			for _, pn := range stage.Profiles {
+				if p := n.getProfile(d, pn); p != nil {
+					if v, ok := p.GetParam(key, false); ok {
+						return v, true
+					}
+				}
+			}
+		}
+		// Check the global profile.
 		if gp := n.getProfile(d, n.p.GlobalProfileName); gp != nil {
 			if v, ok := gp.Params[key]; ok {
 				return v, true
@@ -414,6 +474,7 @@ func (n *Machine) Validate() {
 	tasks := objs("tasks")
 	profiles := objs("profiles")
 	bootenvs := objs("bootenvs")
+	stages := objs("stages")
 	wantedProfiles := map[string]int{}
 	for i, profileName := range n.Profiles {
 		var found models.Model
@@ -434,6 +495,37 @@ func (n *Machine) Validate() {
 	for i, taskName := range n.Tasks {
 		if tasks == nil || tasks.Find(taskName) == nil {
 			n.Errorf("Task %s (at %d) does not exist", taskName, i)
+		}
+	}
+
+	if n.Stage != "" {
+		if stages == nil {
+			n.Errorf("Stage %s does not exist", n.Stage)
+		} else {
+			if nbFound := stages.Find(n.Stage); nbFound == nil {
+				n.CurrentTask = 0
+				n.Tasks = []string{}
+				n.Errorf("Stage %s does not exist", n.Stage)
+			} else {
+				stage := AsStage(nbFound)
+				if !stage.Available {
+					n.CurrentTask = 0
+					n.Tasks = []string{}
+					n.Errorf("Machine %s wants Stage %s, which is not available", n.UUID(), n.Stage)
+				} else {
+					// BootEnv should still be valid because Stage is valid.
+					n.BootEnv = stage.BootEnv
+
+					// XXX: For sanity, check the path of templates to make sure not overlap
+					// with the bootenv.  This is hard - do this last
+
+					if obFound := stages.Find(n.oldStage); obFound != nil {
+						oldStage := AsStage(obFound)
+						oldStage.Render(objs, n, n).deregister(n.p.FS)
+					}
+					stage.Render(objs, n, n).register(n.p.FS)
+				}
+			}
 		}
 	}
 
@@ -482,41 +574,45 @@ func (n *Machine) OnLoad() error {
 func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	oldm := AsMachine(oldThing)
 	n.oldBootEnv = AsMachine(oldThing).BootEnv
-	// If we are changing bootenvs and we aren't done running tasks,
+	n.oldStage = AsMachine(oldThing).Stage
+
+	// If we are changing stages and we aren't done running tasks,
 	// Fail unless the users marks a force
-	if n.oldBootEnv != n.BootEnv && oldm.CurrentTask != len(oldm.Tasks) && !n.ChangeForced() {
+	if n.oldStage != n.Stage && oldm.CurrentTask != len(oldm.Tasks) && !n.ChangeForced() {
 		e := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
-		e.Errorf("Can not change bootenvs with pending tasks unless forced")
+		e.Errorf("Can not change stages with pending tasks unless forced")
+		return e
+	}
+	// If we have a stage set, don't change bootenv unless force
+	if n.Stage != "" && n.oldStage == n.Stage && n.oldBootEnv != n.BootEnv && !n.ChangeForced() {
+		e := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
+		e.Errorf("Can not change bootenv while in a stage unless forced.")
 		return e
 	}
 	return nil
 }
 
 func (n *Machine) AfterSave() {
-	// Have we changed bootenvs.  Rebuild the task lists
-	if n.oldBootEnv == n.BootEnv || !n.Available {
+	// Have we changed stages.  Rebuild the task lists
+	if n.oldStage == n.Stage || !n.Available {
+		// If we don't have a stage, init structs
+		if n.Stage == "" && n.Tasks == nil {
+			n.Tasks = []string{}
+			n.CurrentTask = 0
+			_, e2 := n.p.Save(n.stores, n)
+			if e2 != nil {
+				n.p.Logger.Printf("Failed to save machine in after Save. %v\n", n)
+			}
+		}
 		return
 	}
 	objs := n.stores
-	profiles := objs("profiles")
-	bootenvs := objs("bootenvs")
-	// We get tasks by aggregating
-	//   1. BootEnv tasks
-	//   2. Profile tasks in order.
-	//   3. Global Profile tasks (if they exist)
+	stages := objs("stages")
 
 	taskList := []string{}
-
-	env := AsBootEnv(bootenvs.Find(n.BootEnv))
-	taskList = append(taskList, env.Tasks...)
-
-	for _, pname := range n.Profiles {
-		prof := AsProfile(profiles.Find(pname))
-		taskList = append(taskList, prof.Tasks...)
-	}
-	gprof := AsProfile(profiles.Find(n.p.GlobalProfileName))
-	if gprof != nil {
-		taskList = append(taskList, gprof.Tasks...)
+	if obj := stages.Find(n.Stage); obj != nil {
+		stage := AsStage(obj)
+		taskList = append(taskList, stage.Tasks...)
 	}
 
 	// Reset the task list, set currentTask to 0
@@ -528,7 +624,7 @@ func (n *Machine) AfterSave() {
 	}
 
 	// Reset this here to keep from looping forever.
-	n.oldBootEnv = n.BootEnv
+	n.oldStage = n.Stage
 
 	_, e2 := n.p.Save(objs, n)
 	if e2 != nil {
@@ -556,11 +652,11 @@ func AsMachines(o []models.Model) []*Machine {
 }
 
 var machineLockMap = map[string][]string{
-	"get":     []string{"machines", "profiles", "params"},
-	"create":  []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
-	"update":  []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
-	"patch":   []string{"bootenvs", "machines", "tasks", "profiles", "templates", "params"},
-	"delete":  []string{"bootenvs", "machines"},
+	"get":     []string{"stages", "machines", "profiles", "params"},
+	"create":  []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
+	"update":  []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
+	"patch":   []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
+	"delete":  []string{"stages", "bootenvs", "machines"},
 	"actions": []string{"machines", "profiles", "params"},
 }
 

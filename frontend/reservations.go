@@ -58,6 +58,10 @@ type ReservationListPathParameter struct {
 	// in: query
 	Limit int `json:"limit"`
 	// in: query
+	Available string
+	// in: query
+	Valid string
+	// in: query
 	Addr string
 	// in: query
 	Token string
@@ -83,6 +87,8 @@ func (f *Frontend) InitReservationApi() {
 	//    Token = string
 	//    Strategy = string
 	//    NextServer = IP Address
+	//    Available = boolean
+	//    Valid = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value

@@ -70,6 +70,10 @@ type PluginListPathParameter struct {
 	// in: query
 	Limit int `json:"limit"`
 	// in: query
+	Available string
+	// in: query
+	Valid string
+	// in: query
 	Name string
 	// in: query
 	Provider string
@@ -89,6 +93,8 @@ func (f *Frontend) InitPluginApi() {
 	// Functional Indexs:
 	//    Name = string
 	//    Provider = string
+	//    Available = boolean
+	//    Valid = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value

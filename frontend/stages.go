@@ -7,47 +7,47 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SubnetResponse returned on a successful GET, PUT, PATCH, or POST of a single subnet
+// StageResponse returned on a successful GET, PUT, PATCH, or POST of a single stage
 // swagger:response
-type SubnetResponse struct {
+type StageResponse struct {
 	// in: body
-	Body *models.Subnet
+	Body *models.Stage
 }
 
-// SubnetsResponse returned on a successful GET of all the subnets
+// StagesResponse returned on a successful GET of all the stages
 // swagger:response
-type SubnetsResponse struct {
+type StagesResponse struct {
 	//in: body
-	Body []*models.Subnet
+	Body []*models.Stage
 }
 
-// SubnetBodyParameter used to inject a Subnet
-// swagger:parameters createSubnet putSubnet
-type SubnetBodyParameter struct {
+// StageBodyParameter used to inject a Stage
+// swagger:parameters createStage putStage
+type StageBodyParameter struct {
 	// in: body
 	// required: true
-	Body *models.Subnet
+	Body *models.Stage
 }
 
-// SubnetPatchBodyParameter used to patch a Subnet
-// swagger:parameters patchSubnet
-type SubnetPatchBodyParameter struct {
+// StagePatchBodyParameter used to patch a Stage
+// swagger:parameters patchStage
+type StagePatchBodyParameter struct {
 	// in: body
 	// required: true
 	Body jsonpatch2.Patch
 }
 
-// SubnetPathParameter used to name a Subnet in the path
-// swagger:parameters putSubnets getSubnet putSubnet patchSubnet deleteSubnet
-type SubnetPathParameter struct {
+// StagePathParameter used to name a Stage in the path
+// swagger:parameters putStages getStage putStage patchStage deleteStage
+type StagePathParameter struct {
 	// in: path
 	// required: true
 	Name string `json:"name"`
 }
 
-// SubnetListPathParameter used to limit lists of Subnet by path options
-// swagger:parameters listSubnets
-type SubnetListPathParameter struct {
+// StageListPathParameter used to limit lists of Stage by path options
+// swagger:parameters listStages
+type StageListPathParameter struct {
 	// in: query
 	Offest int `json:"offset"`
 	// in: query
@@ -57,23 +57,19 @@ type SubnetListPathParameter struct {
 	// in: query
 	Valid string
 	// in: query
-	Strategy string
-	// in: query
-	NextServer string
-	// in: query
-	Subnet string
-	// in: query
 	Name string
 	// in: query
-	Enabled string
+	Reboot string
+	// in: query
+	BootEnv string
 }
 
-func (f *Frontend) InitSubnetApi() {
-	// swagger:route GET /subnets Subnets listSubnets
+func (f *Frontend) InitStageApi() {
+	// swagger:route GET /stages Stages listStages
 	//
-	// Lists Subnets filtered by some parameters.
+	// Lists Stages filtered by some parameters.
 	//
-	// This will show all Subnets by default.
+	// This will show all Stages by default.
 	//
 	// You may specify:
 	//    Offset = integer, 0-based inclusive starting point in filter data.
@@ -81,11 +77,9 @@ func (f *Frontend) InitSubnetApi() {
 	//
 	// Functional Indexs:
 	//    Name = string
-	//    NextServer = IP Address
-	//    Subnet = CIDR Address
-	//    Strategy = string
+	//    Reboot = boolean
+	//    BootEnv = string
 	//    Available = boolean
-	//    Valid = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value
@@ -102,99 +96,99 @@ func (f *Frontend) InitSubnetApi() {
 	//    Name=Lt(fred)&Available=true - returns items with Name less than fred and Available is true
 	//
 	// Responses:
-	//    200: SubnetsResponse
+	//    200: StagesResponse
 	//    401: NoContentResponse
 	//    403: NoContentResponse
 	//    406: ErrorResponse
-	f.ApiGroup.GET("/subnets",
+	f.ApiGroup.GET("/stages",
 		func(c *gin.Context) {
-			f.List(c, &backend.Subnet{})
+			f.List(c, &backend.Stage{})
 		})
 
-	// swagger:route POST /subnets Subnets createSubnet
+	// swagger:route POST /stages Stages createStage
 	//
-	// Create a Subnet
+	// Create a Stage
 	//
-	// Create a Subnet from the provided object
+	// Create a Stage from the provided object
 	//
 	//     Responses:
-	//       201: SubnetResponse
+	//       201: StageResponse
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       422: ErrorResponse
-	f.ApiGroup.POST("/subnets",
+	f.ApiGroup.POST("/stages",
 		func(c *gin.Context) {
-			b := &backend.Subnet{}
+			b := &backend.Stage{}
 			f.Create(c, b)
 		})
-
-	// swagger:route GET /subnets/{name} Subnets getSubnet
+	// swagger:route GET /stages/{name} Stages getStage
 	//
-	// Get a Subnet
+	// Get a Stage
 	//
-	// Get the Subnet specified by {name} or return NotFound.
+	// Get the Stage specified by {name} or return NotFound.
 	//
 	//     Responses:
-	//       200: SubnetResponse
+	//       200: StageResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
-	f.ApiGroup.GET("/subnets/:name",
+	f.ApiGroup.GET("/stages/:name",
 		func(c *gin.Context) {
-			f.Fetch(c, &backend.Subnet{}, c.Param(`name`))
+			f.Fetch(c, &backend.Stage{}, c.Param(`name`))
 		})
 
-	// swagger:route PATCH /subnets/{name} Subnets patchSubnet
+	// swagger:route PATCH /stages/{name} Stages patchStage
 	//
-	// Patch a Subnet
+	// Patch a Stage
 	//
-	// Update a Subnet specified by {name} using a RFC6902 Patch structure
+	// Update a Stage specified by {name} using a RFC6902 Patch structure
 	//
 	//     Responses:
-	//       200: SubnetResponse
+	//       200: StageResponse
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       406: ErrorResponse
 	//       422: ErrorResponse
-	f.ApiGroup.PATCH("/subnets/:name",
+	f.ApiGroup.PATCH("/stages/:name",
 		func(c *gin.Context) {
-			f.Patch(c, &backend.Subnet{}, c.Param(`name`))
+			f.Patch(c, &backend.Stage{}, c.Param(`name`))
 		})
 
-	// swagger:route PUT /subnets/{name} Subnets putSubnet
+	// swagger:route PUT /stages/{name} Stages putStage
 	//
-	// Put a Subnet
+	// Put a Stage
 	//
-	// Update a Subnet specified by {name} using a JSON Subnet
+	// Update a Stage specified by {name} using a JSON Stage
 	//
 	//     Responses:
-	//       200: SubnetResponse
+	//       200: StageResponse
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
-	f.ApiGroup.PUT("/subnets/:name",
+	f.ApiGroup.PUT("/stages/:name",
 		func(c *gin.Context) {
-			f.Update(c, &backend.Subnet{}, c.Param(`name`))
+			f.Update(c, &backend.Stage{}, c.Param(`name`))
 		})
 
-	// swagger:route DELETE /subnets/{name} Subnets deleteSubnet
+	// swagger:route DELETE /stages/{name} Stages deleteStage
 	//
-	// Delete a Subnet
+	// Delete a Stage
 	//
-	// Delete a Subnet specified by {name}
+	// Delete a Stage specified by {name}
 	//
 	//     Responses:
-	//       200: SubnetResponse
+	//       200: StageResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
-	f.ApiGroup.DELETE("/subnets/:name",
+	//       409: ErrorResponse
+	f.ApiGroup.DELETE("/stages/:name",
 		func(c *gin.Context) {
-			f.Remove(c, &backend.Subnet{}, c.Param(`name`))
+			f.Remove(c, &backend.Stage{}, c.Param(`name`))
 		})
 }
