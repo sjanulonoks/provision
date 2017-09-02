@@ -103,7 +103,7 @@ func TestRenderData(t *testing.T) {
 		BootParams: "{{.Param \"cow\"}}",
 	}))
 	func() {
-		d, unlocker := dt.LockEnts("bootenvs", "templates", "machines", "profiles", "params", "tasks")
+		d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks")
 		defer unlocker()
 
 		objs := []crudTest{
@@ -134,7 +134,7 @@ func TestRenderData(t *testing.T) {
 		} else {
 			t.Logf("Created new test machine")
 		}
-		pp := machine.GetParams()
+		pp := machine.GetParams(d, false)
 		pp["foo"] = "bar"
 		machine.SetParams(d, pp)
 	}()
@@ -153,9 +153,9 @@ func TestRenderData(t *testing.T) {
 		t.Logf("BootEnv default without fred rendered properly for test machine")
 	}
 	func() {
-		d, unlocker := dt.LockEnts("bootenvs", "templates", "machines", "profiles", "params", "tasks")
+		d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks")
 		defer unlocker()
-		pp := machine.GetParams()
+		pp := machine.GetParams(d, false)
 		pp["fred"] = "fred = fred"
 		machine.SetParams(d, pp)
 	}()
@@ -172,7 +172,7 @@ func TestRenderData(t *testing.T) {
 		t.Logf("BootEnv default with fred rendered properly for test machine")
 	}
 	func() {
-		d, unlocker := dt.LockEnts("bootenvs", "templates", "machines", "profiles", "params", "tasks")
+		d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks")
 		defer unlocker()
 		machine.BootEnv = "nothing"
 		saved, err := dt.Save(d, machine)
@@ -194,7 +194,7 @@ func TestRenderData(t *testing.T) {
 	}
 	var rd *RenderData
 	func() {
-		d, unlocker := dt.LockEnts("bootenvs", "templates", "machines", "profiles", "params", "tasks", "preferences")
+		d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks", "preferences")
 		defer unlocker()
 		// Test the render functions directly.
 		rd = newRenderData(d, dt, nil, nil)
@@ -306,7 +306,7 @@ func TestRenderData(t *testing.T) {
 	}()
 
 	func() {
-		d, unlocker := dt.LockEnts("bootenvs", "templates", "machines", "profiles", "params", "tasks", "preferences")
+		d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks", "preferences")
 		defer unlocker()
 		// Tests with machine and bootenv (has bad BootParams)
 		rd = newRenderData(d, dt, machine, badBootEnv)

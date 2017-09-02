@@ -123,6 +123,8 @@ type dtSetter interface {
 
 func Fill(t store.KeySaver) {
 	switch obj := t.(type) {
+	case *Stage:
+		obj.Stage = &models.Stage{}
 	case *BootEnv:
 		obj.BootEnv = &models.BootEnv{}
 	case *Job:
@@ -158,6 +160,8 @@ func ModelToBackend(m models.Model) store.KeySaver {
 	switch obj := m.(type) {
 	case store.KeySaver:
 		return obj
+	case *models.Stage:
+		return &Stage{Stage: obj}
 	case *models.BootEnv:
 		return &BootEnv{BootEnv: obj}
 	case *models.Job:
@@ -206,6 +210,16 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 	}
 
 	switch obj := m.(type) {
+	case *models.Stage:
+		var res Stage
+		if ours != nil {
+			res = *ours.(*Stage)
+		} else {
+			res = Stage{}
+		}
+		res.Stage = obj
+		p.setDT(&res)
+		return &res
 	case *models.BootEnv:
 		var res BootEnv
 		if ours != nil {
@@ -380,6 +394,7 @@ func allKeySavers(res *DataTracker) []models.Model {
 		&Task{p: res},
 		&Profile{p: res},
 		&BootEnv{p: res},
+		&Stage{p: res},
 		&Machine{p: res},
 		&Subnet{p: res},
 		&Reservation{p: res},
@@ -603,7 +618,6 @@ func NewDataTracker(backend store.Store,
 		res.Create(d, &models.Profile{
 			Name:   res.GlobalProfileName,
 			Params: map[string]interface{}{},
-			Tasks:  []string{},
 		})
 	}
 	users := d("users")

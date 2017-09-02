@@ -73,8 +73,19 @@ type MachinePatchBodyParameter struct {
 }
 
 // MachinePathParameter used to find a Machine in the path
-// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine getMachineParams postMachineParams getMachineActions
+// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine postMachineParams getMachineActions
 type MachinePathParameter struct {
+	// in: path
+	// required: true
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
+}
+
+// MachineGetParamsPathParameter used to find a Machine in the path
+// swagger:parameters getMachineParams
+type MachineGetParamsPathParameter struct {
+	// in: query
+	Aggregate string `json:"aggregate"`
 	// in: path
 	// required: true
 	// swagger:strfmt uuid
@@ -124,6 +135,10 @@ type MachineListPathParameter struct {
 	// in: query
 	Limit int `json:"limit"`
 	// in: query
+	Available string
+	// in: query
+	Valid string
+	// in: query
 	Uuid string
 	// in: query
 	Name string
@@ -152,6 +167,8 @@ func (f *Frontend) InitMachineApi() {
 	//    BootEnv = string
 	//    Address = IP Address
 	//    Runnable = true/false
+	//    Available = boolean
+	//    Valid = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value
@@ -321,10 +338,20 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			b := &backend.Machine{}
 			var ref models.Model
-			func() {
+
+			aggregate := false
+			if c.Query("aggregate") == "true" {
+				aggregate = true
+			}
+
+			p := func() map[string]interface{} {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("get")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
+				if ref != nil {
+					return backend.AsMachine(ref).GetParams(d, aggregate)
+				}
+				return nil
 			}()
 			if ref == nil {
 				err := &models.Error{
@@ -340,7 +367,6 @@ func (f *Frontend) InitMachineApi() {
 			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
 				return
 			}
-			p := backend.AsMachine(ref).GetParams()
 			c.JSON(http.StatusOK, p)
 		})
 

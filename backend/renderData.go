@@ -63,6 +63,9 @@ func newRenderedTemplate(r *RenderData,
 	} else if r.Machine == nil {
 		prefixes = []string{"bootenvs"}
 		keys = []string{r.target.Key()}
+	} else if r.Stage != nil {
+		prefixes = []string{"machines", "stages"}
+		keys = []string{r.Machine.Key(), r.target.Key()}
 	} else {
 		prefixes = []string{"machines", "bootenvs"}
 		keys = []string{r.Machine.Key(), r.target.Key()}
@@ -71,7 +74,7 @@ func newRenderedTemplate(r *RenderData,
 		path: path,
 		name: tmplKey,
 		write: func(remoteIP net.IP) (*bytes.Reader, error) {
-			objs, unlocker := p.LockEnts("tasks", "machines", "bootenvs", "profiles")
+			objs, unlocker := p.LockEnts("stages", "tasks", "machines", "bootenvs", "profiles")
 			defer unlocker()
 			var rd *RenderData
 			var machine *Machine
@@ -122,6 +125,11 @@ type rTask struct {
 	renderData *RenderData
 }
 
+type rStage struct {
+	*Stage
+	renderData *RenderData
+}
+
 // PathFor expands the partial paths for kernels and initrds into full
 // paths appropriate for specific protocols.
 //
@@ -161,6 +169,7 @@ type RenderData struct {
 	Machine  *rMachine // The Machine that the template is being rendered for.
 	Env      *rBootEnv // The boot environment that provided the template.
 	Task     *rTask
+	Stage    *rStage
 	d        Stores
 	target   renderable
 	p        *DataTracker
@@ -178,6 +187,8 @@ func newRenderData(d Stores, p *DataTracker, m *Machine, r renderable) *RenderDa
 		res.Env = &rBootEnv{BootEnv: obj, renderData: res}
 	case *Task:
 		res.Task = &rTask{Task: obj, renderData: res}
+	case *Stage:
+		res.Stage = &rStage{Stage: obj, renderData: res}
 	}
 	return res
 }

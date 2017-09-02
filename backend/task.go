@@ -128,7 +128,7 @@ type taskHaver interface {
 
 func (t *Task) BeforeDelete() error {
 	e := &models.Error{Code: 409, Type: StillInUseError, Object: t}
-	for _, objPrefix := range []string{"profiles", "machines", "bootenvs"} {
+	for _, objPrefix := range []string{"machines", "stages"} {
 		for _, j := range t.stores(objPrefix).Items() {
 			thing := j.(taskHaver)
 			if thing.HasTask(t.Name) {
@@ -161,7 +161,7 @@ var taskLockMap = map[string][]string{
 	"create": []string{"templates", "tasks"},
 	"update": []string{"templates", "tasks"},
 	"patch":  []string{"templates", "tasks"},
-	"delete": []string{"bootenvs", "tasks", "profiles", "machines"},
+	"delete": []string{"stages", "tasks", "machines"},
 }
 
 func (t *Task) Locks(action string) []string {

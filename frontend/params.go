@@ -68,6 +68,10 @@ type ParamListPathParameter struct {
 	// in: query
 	Limit int `json:"limit"`
 	// in: query
+	Available string
+	// in: query
+	Valid string
+	// in: query
 	Name string
 }
 
@@ -84,6 +88,8 @@ func (f *Frontend) InitParamApi() {
 	//
 	// Functional Indexs:
 	//    Name = string
+	//    Available = boolean
+	//    Valid = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value

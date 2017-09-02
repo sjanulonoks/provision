@@ -44,15 +44,6 @@ func (obj *BootEnv) SaveClean() store.KeySaver {
 	return toBackend(obj.p, nil, &mod)
 }
 
-func (b *BootEnv) HasTask(s string) bool {
-	for _, p := range b.Tasks {
-		if p == s {
-			return true
-		}
-	}
-	return false
-}
-
 func (b *BootEnv) Indexes() map[string]index.Maker {
 	fix := AsBootEnv
 	res := index.MakeBaseIndexes(b)
@@ -206,11 +197,6 @@ func (b *BootEnv) Validate() {
 	b.renderers = renderers{}
 	// First, the stuff that must be correct in order for
 	b.AddError(index.CheckUnique(b, b.stores("bootenvs").Items()))
-	for _, taskName := range b.Tasks {
-		if b.stores("tasks").Find(taskName) == nil {
-			b.Errorf("Task %s does not exist", taskName)
-		}
-	}
 	// If our basic templates do not parse, it is game over for us
 	b.p.tmplMux.Lock()
 	b.tmplMux.Lock()
@@ -334,6 +320,7 @@ func (b *BootEnv) BeforeSave() error {
 func (b *BootEnv) BeforeDelete() error {
 	e := &models.Error{Code: 409, Type: StillInUseError, Object: b}
 	machines := b.stores("machines")
+	stages := b.stores("stages")
 	prefToFind := ""
 	if b.OnlyUnknown {
 		prefToFind = "unknownBootEnv"
@@ -350,6 +337,13 @@ func (b *BootEnv) BeforeDelete() error {
 				continue
 			}
 			e.Errorf("Bootenv %s in use by Machine %s", b.Name, machine.Name)
+		}
+		for _, i := range stages.Items() {
+			stage := AsStage(i)
+			if stage.BootEnv != b.Name {
+				continue
+			}
+			e.Errorf("Bootenv %s in use by Stage %s", b.Name, stage.Name)
 		}
 	}
 	return e.HasError()
@@ -408,7 +402,7 @@ var bootEnvLockMap = map[string][]string{
 	"create": []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
 	"update": []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
 	"patch":  []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
-	"delete": []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
+	"delete": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles"},
 }
 
 func (b *BootEnv) Locks(action string) []string {

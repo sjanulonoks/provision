@@ -30,15 +30,6 @@ func (obj *Profile) SaveClean() store.KeySaver {
 	return toBackend(obj.p, nil, &mod)
 }
 
-func (p *Profile) HasTask(s string) bool {
-	for _, p := range p.Tasks {
-		if p == s {
-			return true
-		}
-	}
-	return false
-}
-
 func (p *Profile) Indexes() map[string]index.Maker {
 	fix := AsProfile
 	res := index.MakeBaseIndexes(p)
@@ -97,7 +88,6 @@ func (p *Profile) New() store.KeySaver {
 		res.ForceChange()
 	}
 	res.Params = map[string]interface{}{}
-	res.Tasks = []string{}
 	res.p = p.p
 	return res
 }
@@ -113,6 +103,13 @@ func (p *Profile) BeforeDelete() error {
 		m := AsMachine(i)
 		if m.HasProfile(p.Name) {
 			e.Errorf("Machine %s is using profile %s", m.UUID(), p.Name)
+		}
+	}
+	stages := p.stores("stages")
+	for _, i := range stages.Items() {
+		s := AsStage(i)
+		if s.HasProfile(p.Name) {
+			e.Errorf("Stage %s is using profile %s", s.Name, p.Name)
 		}
 	}
 	return e.HasError()
@@ -139,11 +136,6 @@ func (p *Profile) Validate() {
 			if err := param.ValidateValue(v); err != nil {
 				p.Errorf("Key '%s': invalid val '%s': %v", k, v, err)
 			}
-		}
-	}
-	for i, taskName := range p.Tasks {
-		if p.stores("tasks").Find(taskName) == nil {
-			p.Errorf("Task %s (at %d) does not exist", taskName, i)
 		}
 	}
 	p.SetAvailable()
@@ -173,7 +165,7 @@ var profileLockMap = map[string][]string{
 	"create": []string{"profiles", "tasks", "params"},
 	"update": []string{"profiles", "tasks", "params"},
 	"patch":  []string{"profiles", "tasks", "params"},
-	"delete": []string{"profiles", "machines"},
+	"delete": []string{"stages", "profiles", "machines"},
 }
 
 func (p *Profile) Locks(action string) []string {

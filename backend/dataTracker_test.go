@@ -72,7 +72,7 @@ func mkDT(bs store.Store) *DataTracker {
 		8091,
 		8092,
 		logger,
-		map[string]string{"defaultBootEnv": "default", "unknownBootEnv": "ignore"},
+		map[string]string{"defaultBootEnv": "local", "unknownBootEnv": "ignore"},
 		NewPublishers(logger))
 	return dt
 }
