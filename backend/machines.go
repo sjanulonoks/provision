@@ -447,12 +447,18 @@ func (n *Machine) setDT(p *DataTracker) {
 }
 
 func (n *Machine) OnCreate() error {
-	bootenvs := n.stores("bootenvs")
+	if n.Stage == "" {
+		n.Stage = n.p.pref("defaultStage")
+	}
 	if n.BootEnv == "" {
 		n.BootEnv = n.p.pref("defaultBootEnv")
 	}
+	bootenvs := n.stores("bootenvs")
+	stages := n.stores("stages")
 	if bootenvs.Find(n.BootEnv) == nil {
 		n.Errorf("Bootenv %s does not exist", n.BootEnv)
+	} else if n.Stage != "" && stages.Find(n.Stage) == nil {
+		n.Errorf("Stage %s does not exist", n.Stage)
 	} else {
 		// All machines start runnable.
 		n.Runnable = true

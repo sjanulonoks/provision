@@ -679,6 +679,7 @@ func (p *DataTracker) pref(name string) string {
 func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 	err := &models.Error{}
 	bootenvs := d("bootenvs")
+	stages := d("stages")
 	benvCheck := func(name, val string) *BootEnv {
 		be := bootenvs.Find(val)
 		if be == nil {
@@ -686,6 +687,17 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			return nil
 		}
 		return AsBootEnv(be)
+	}
+	stageCheck := func(name, val string) bool {
+		if val == "" {
+			return true
+		}
+		stage := stages.Find(val)
+		if stage == nil {
+			err.Errorf("%s: Stage %s does not exist", name, val)
+			return false
+		}
+		return true
 	}
 	intCheck := func(name, val string) bool {
 		_, e := strconv.Atoi(val)
@@ -713,6 +725,10 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 		case "defaultBootEnv":
 			be := benvCheck(name, val)
 			if be != nil && !be.OnlyUnknown {
+				savePref(name, val)
+			}
+		case "defaultStage":
+			if stageCheck(name, val) {
 				savePref(name, val)
 			}
 		case "unknownBootEnv":

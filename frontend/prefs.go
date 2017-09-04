@@ -64,7 +64,7 @@ func (f *Frontend) InitPrefApi() {
 			// Filter unknown preferences here
 			for k := range prefs {
 				switch k {
-				case "defaultBootEnv", "unknownBootEnv":
+				case "defaultBootEnv", "unknownBootEnv", "defaultStage":
 					if !assureAuth(c, f.Logger, "prefs", "post", k) {
 						return
 					}

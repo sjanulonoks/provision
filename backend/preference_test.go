@@ -4,7 +4,7 @@ import "testing"
 
 func TestPreferences(t *testing.T) {
 	dt := mkDT(nil)
-	d, unlocker := dt.LockEnts("preferences", "bootenvs")
+	d, unlocker := dt.LockEnts("preferences", "bootenvs", "stages")
 	defer unlocker()
 	if be, err := dt.Pref("defaultBootEnv"); err != nil {
 		t.Errorf("Expected to get a defaultBootEnv preference, got nothing")
@@ -40,6 +40,12 @@ func TestPreferences(t *testing.T) {
 		t.Logf("Expected error setting prefs: %v", err)
 	} else {
 		t.Errorf("Should have failed setting foo to bar")
+	}
+	prefs["defaultStage"] = "bar"
+	if err := dt.SetPrefs(d, prefs); err != nil {
+		t.Logf("Expected error setting prefs: %v", err)
+	} else {
+		t.Errorf("Should have failed setting defaultStage to bar")
 	}
 	dt.Prefs()
 }
