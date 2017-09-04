@@ -220,8 +220,7 @@ func (r *RenderData) GenerateToken() string {
 			ttl, _ = strconv.Atoi(sttl)
 		}
 		t, _ = NewClaim(r.Machine.Key(), ttl).
-			Add("machines", "patch", r.Machine.Key()).
-			Add("machines", "get", r.Machine.Key()).
+			Add("machines", "*", r.Machine.Key()).
 			Add("jobs", "create", r.Machine.Key()).
 			Add("jobs", "get", r.Machine.Key()).
 			Add("jobs", "patch", r.Machine.Key()).
