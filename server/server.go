@@ -70,6 +70,7 @@ type ProgOpts struct {
 
 	DevUI          string `long:"dev-ui" description:"Root of UI Pages for Development"`
 	DhcpInterfaces string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
+	DefaultStage   string `long:"default-stage" description:"The default stage for the nodes" default:""`
 	DefaultBootEnv string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"local"`
 	UnknownBootEnv string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
 
@@ -154,6 +155,7 @@ func Server(c_opts *ProgOpts) {
 			"debugRenderer":       fmt.Sprintf("%d", c_opts.DebugRenderer),
 			"debugFrontend":       fmt.Sprintf("%d", c_opts.DebugFrontend),
 			"debugPlugins":        fmt.Sprintf("%d", c_opts.DebugPlugins),
+			"defaultStage":        c_opts.DefaultStage,
 			"defaultBootEnv":      c_opts.DefaultBootEnv,
 			"unknownBootEnv":      c_opts.UnknownBootEnv,
 			"knownTokenTimeout":   fmt.Sprintf("%d", c_opts.KnownTokenTimeout),
