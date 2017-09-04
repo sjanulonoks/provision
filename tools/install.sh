@@ -6,11 +6,12 @@ DEFAULT_DRP_VERSION="stable"
 
 usage() {
         echo
-	echo "Usage: $0 [--drp-version=<Version to install>] [--isolated] [--ipaddr=<ip>] <install|remove>"
+	echo "Usage: $0 [--drp-version=<Version to install>] [--nocontent] [--isolated] [--ipaddr=<ip>] <install|remove>"
         echo
         echo "Options:"
         echo "  --debug=[true|false] # Enables debug output"
         echo "  --isolated # Sets up the current directory as a place to the cli and provision"
+        echo "  --nocontent # Don't add content to the system"
         echo "  --ipaddr=<ip> # The IP to use for the system identified IP.  The system will attempt to discover the value"
         echo "                # if not specified"
         echo "  --drp-version=<string>  # Version identifier if downloading.  stable, tip, or specific version label."
@@ -21,6 +22,7 @@ usage() {
 	echo "Defaults are: "
 	echo "  version = tip (instead of v2.9.1003)"
         echo "  isolated = false"
+        echo "  nocontent = false"
         echo "  force = false"
         echo "  debug = false"
         echo
@@ -29,6 +31,7 @@ usage() {
 
 DRP_VERSION=$DEFAULT_DRP_VERSION
 ISOLATED=false
+NO_CONTENT=false
 args=()
 while (( $# > 0 )); do
     arg="$1"
@@ -41,6 +44,9 @@ while (( $# > 0 )); do
             ;;
         --isolated)
             ISOLATED=true
+            ;;
+        --nocontent)
+            NO_CONTENT=true
             ;;
         --*)
             arg_key="${arg_key#--}"
@@ -208,10 +214,12 @@ case $1 in
                  $shasum -c sha256sums || exit 1
              fi
 
-             echo "Installing Version $DRP_VERSION of Digital Rebar Provision Community Content"
-             curl -sfL -o drp-community-content.yaml https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.yaml || echo "Failed to dowload content."
-             curl -sfL -o drp-community-content.sha256 https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.sha256 || echo "Failed to download sha of content."
-             $shasum -c drp-community-content.sha256
+             if [[ $NO_CONTENT == false ]] ; then
+                 echo "Installing Version $DRP_VERSION of Digital Rebar Provision Community Content"
+                 curl -sfL -o drp-community-content.yaml https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.yaml || echo "Failed to dowload content."
+                 curl -sfL -o drp-community-content.sha256 https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.sha256 || echo "Failed to download sha of content."
+                 $shasum -c drp-community-content.sha256
+             fi
 
              if [[ $ISOLATED == false ]] ; then
                  sudo cp "$binpath"/* "$bindest"
@@ -232,8 +240,10 @@ case $1 in
                  fi
 
                  sudo mkdir -p /usr/share/dr-provision
-                 DEFAULT_CONTENT_FILE="/usr/share/dr-provision/default.yaml"
-                 sudo mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
+                 if [[ $NO_CONTENT == false ]] ; then
+                     DEFAULT_CONTENT_FILE="/usr/share/dr-provision/default.yaml"
+                     sudo mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
+                 fi 
              else
                  mkdir -p drp-data
 
@@ -294,8 +304,10 @@ case $1 in
                  fi
                  set -e
                  mkdir -p "`pwd`/drp-data/saas-content"
-                 DEFAULT_CONTENT_FILE="`pwd`/drp-data/saas-content/default.yaml"
-                 mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
+                 if [[ $NO_CONTENT == false ]] ; then
+                     DEFAULT_CONTENT_FILE="`pwd`/drp-data/saas-content/default.yaml"
+                     mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
+                 fi
              fi
 
              echo
