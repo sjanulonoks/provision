@@ -69,7 +69,7 @@ func (f *Frontend) InitPrefApi() {
 						return
 					}
 					continue
-				case "knownTokenTimeout", "unknownTokenTimeout", "debugRenderer", "debugDhcp", "debugBootEnv":
+				case "knownTokenTimeout", "unknownTokenTimeout", "debugRenderer", "debugDhcp", "debugBootEnv", "debugFrontend", "debugPlugins":
 					if !assureAuth(c, f.Logger, "prefs", "post", k) {
 						return
 					}
