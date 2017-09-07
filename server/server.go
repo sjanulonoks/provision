@@ -233,17 +233,40 @@ func Server(c_opts *ProgOpts) {
 	srv := &http.Server{Addr: fmt.Sprintf(":%d", c_opts.ApiPort), Handler: fe.MgmtApi}
 	services = append(services, srv)
 
-	go func() {
-		// Handle SIGINT and SIGTERM.
-		ch := make(chan os.Signal)
-		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-		log.Println(<-ch)
+	// Handle SIGHUP, SIGINT and SIGTERM.
+	ch := make(chan os.Signal)
+	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 
-		// Stop the service gracefully.
-		for _, svc := range services {
-			logger.Println("Shutting down server...")
-			if err := svc.Shutdown(context.Background()); err != nil {
-				logger.Printf("could not shutdown: %v", err)
+	go func() {
+		for {
+			s := <-ch
+			log.Println(s)
+
+			switch s {
+			case syscall.SIGHUP:
+				logger.Println("Reloading data stores...")
+				// Make data store - THIS IS BAD if datastore is memory.
+				dtStore, err := midlayer.DefaultDataStack(c_opts.DataRoot, c_opts.BackEndType,
+					c_opts.LocalContent, c_opts.DefaultContent, c_opts.SaasContentRoot)
+				if err != nil {
+					logger.Printf("Unable to create new DataStack on SIGHUP: %v", err)
+				} else {
+					func() {
+						_, unlocker := dt.LockAll()
+						defer unlocker()
+						dt.ReplaceBackend(dtStore)
+					}()
+					logger.Println("Reload Complete")
+				}
+			case syscall.SIGTERM, syscall.SIGINT:
+				// Stop the service gracefully.
+				for _, svc := range services {
+					logger.Println("Shutting down server...")
+					if err := svc.Shutdown(context.Background()); err != nil {
+						logger.Printf("could not shutdown: %v", err)
+					}
+				}
+				break
 			}
 		}
 	}()
