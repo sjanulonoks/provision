@@ -93,6 +93,20 @@ func buildSummary(st store.Store) *models.ContentSummary {
 	cs.Meta.Version = metaData["Version"]
 	cs.Counts = map[string]int{}
 
+	cs.Meta.Writable = false
+	cs.Meta.Type = "dynamic"
+	cs.Meta.Overwritable = false
+	if cs.Meta.Name == "BackingStore" {
+		cs.Meta.Type = "writable"
+		cs.Meta.Writable = true
+	} else if cs.Meta.Name == "LocalStore" {
+		cs.Meta.Type = "local"
+	} else if cs.Meta.Name == "DefaultStore" {
+		cs.Meta.Type = "default"
+		cs.Meta.Overwritable = true
+	}
+	cs.Warnings = nil
+
 	subs := mst.Subs()
 	for k, sub := range subs {
 		keys, err := sub.Keys()
@@ -136,6 +150,19 @@ func (f *Frontend) buildContent(st store.Store) (*models.Content, *models.Error)
 		content.Meta.Version = val
 	} else {
 		content.Meta.Version = "Unknown"
+	}
+
+	content.Meta.Writable = false
+	content.Meta.Type = "dynamic"
+	content.Meta.Overwritable = false
+	if content.Meta.Name == "BackingStore" {
+		content.Meta.Type = "writable"
+		content.Meta.Writable = true
+	} else if content.Meta.Name == "LocalStore" {
+		content.Meta.Type = "local"
+	} else if content.Meta.Name == "DefaultStore" {
+		content.Meta.Type = "default"
+		content.Meta.Overwritable = true
 	}
 
 	// Walk subs to build content sets
@@ -325,11 +352,16 @@ func (f *Frontend) InitContentApi() {
 					cs := buildSummary(newStore)
 
 					ds := f.dt.Backend.(*midlayer.DataStack)
-					if nbs, err := ds.AddReplaceStore(name, newStore, f.Logger); err != nil {
+					if nbs, hard, soft := ds.AddReplaceStore(name, newStore, f.Logger); hard != nil {
 						midlayer.CleanUpStore(newStore)
-						jsonError(c, err, http.StatusInternalServerError,
+						jsonError(c, hard, http.StatusInternalServerError,
 							fmt.Sprintf("failed to add content: %s: ", name))
 					} else {
+						if soft != nil {
+							if berr, ok := soft.(*models.Error); ok {
+								cs.Warnings = berr.Messages
+							}
+						}
 						f.dt.ReplaceBackend(nbs)
 						c.JSON(http.StatusCreated, cs)
 					}
@@ -391,11 +423,16 @@ func (f *Frontend) InitContentApi() {
 					cs := buildSummary(newStore)
 
 					ds := f.dt.Backend.(*midlayer.DataStack)
-					if nbs, err := ds.AddReplaceStore(name, newStore, f.Logger); err != nil {
+					if nbs, hard, soft := ds.AddReplaceStore(name, newStore, f.Logger); hard != nil {
 						midlayer.CleanUpStore(newStore)
-						jsonError(c, err, http.StatusInternalServerError,
+						jsonError(c, hard, http.StatusInternalServerError,
 							fmt.Sprintf("failed to replace content: %s: ", name))
 					} else {
+						if soft != nil {
+							if berr, ok := soft.(*models.Error); ok {
+								cs.Warnings = berr.Messages
+							}
+						}
 						f.dt.ReplaceBackend(nbs)
 						c.JSON(http.StatusOK, cs)
 					}
@@ -434,14 +471,13 @@ func (f *Frontend) InitContentApi() {
 				}
 
 				ds := f.dt.Backend.(*midlayer.DataStack)
-				if nbs, err := ds.RemoveStore(name, f.Logger); err != nil {
-					jsonError(c, err, http.StatusInternalServerError,
+				if nbs, hard, _ := ds.RemoveStore(name, f.Logger); hard != nil {
+					jsonError(c, hard, http.StatusInternalServerError,
 						fmt.Sprintf("failed to remove content: %s: ", name))
 				} else {
 					f.dt.ReplaceBackend(nbs)
 					c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
 				}
-
 			}()
 		})
 }

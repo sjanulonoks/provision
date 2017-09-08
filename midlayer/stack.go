@@ -55,38 +55,32 @@ func (d *DataStack) Clone() *DataStack {
 	return dtStore
 }
 
-func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, error) {
+func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	delete(dtStore.saasContents, name)
 	if err := dtStore.buildStack(); err != nil {
-		return nil, models.NewError("ValidationError", 422, err.Error())
+		return nil, models.NewError("ValidationError", 422, err.Error()), nil
 	}
 	hard, soft := backend.ValidateDataTrackerStore(dtStore, logger)
-	if hard == nil && soft == nil && oldStore != nil {
+	if hard == nil && oldStore != nil {
 		CleanUpStore(oldStore)
 	}
-	if hard != nil {
-		return dtStore, hard
-	}
-	return dtStore, soft
+	return dtStore, hard, soft
 }
 
-func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *log.Logger) (*DataStack, error) {
+func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *log.Logger) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	dtStore.saasContents[name] = newStore
 	if err := dtStore.buildStack(); err != nil {
-		return nil, models.NewError("ValidationError", 422, err.Error())
+		return nil, models.NewError("ValidationError", 422, err.Error()), nil
 	}
 	hard, soft := backend.ValidateDataTrackerStore(dtStore, logger)
-	if hard == nil && soft == nil && oldStore != nil {
+	if hard == nil && oldStore != nil {
 		CleanUpStore(oldStore)
 	}
-	if hard != nil {
-		return dtStore, hard
-	}
-	return dtStore, soft
+	return dtStore, hard, soft
 }
 
 func (d *DataStack) buildStack() error {
