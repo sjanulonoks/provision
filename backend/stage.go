@@ -156,18 +156,20 @@ func (s *Stage) Validate() {
 			s.Errorf("Profile %s does not exist", profileName)
 		}
 	}
-	if nbFound := s.stores("bootenvs").Find(s.BootEnv); nbFound == nil {
-		s.Errorf("BootEnv %s does not exist", s.BootEnv)
-	} else {
-		env := AsBootEnv(nbFound)
-		if !env.Available {
-			s.Errorf("Stage %s wants BootEnv %s, which is not available", s.Name, s.BootEnv)
+	if s.BootEnv != "" {
+		if nbFound := s.stores("bootenvs").Find(s.BootEnv); nbFound == nil {
+			s.Errorf("BootEnv %s does not exist", s.BootEnv)
 		} else {
-			for _, ti := range env.Templates {
-				for _, si := range s.Templates {
-					if si.Path == ti.Path {
-						s.Errorf("Stage %s Template %s overlaps with BootEnv %s Template %s",
-							s.Name, si.Name, s.BootEnv, ti.Name)
+			env := AsBootEnv(nbFound)
+			if !env.Available {
+				s.Errorf("Stage %s wants BootEnv %s, which is not available", s.Name, s.BootEnv)
+			} else {
+				for _, ti := range env.Templates {
+					for _, si := range s.Templates {
+						if si.Path == ti.Path {
+							s.Errorf("Stage %s Template %s overlaps with BootEnv %s Template %s",
+								s.Name, si.Name, s.BootEnv, ti.Name)
+						}
 					}
 				}
 			}

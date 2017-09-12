@@ -19,7 +19,8 @@ func TestStageCrud(t *testing.T) {
 
 	tests := []crudTest{
 		{"Create Stage with nonexistent Name", dt.Create, &models.Stage{}, false},
-		{"Create Stage with nonexistent BootEnv", dt.Create, &models.Stage{Name: "missingbootenv"}, false},
+		{"Create Stage with no BootEnv", dt.Create, &models.Stage{Name: "nobootenv"}, true},
+		{"Create Stage with nonexistent BootEnv", dt.Create, &models.Stage{Name: "missingbootenv", BootEnv: "missingbootenv"}, false},
 		{"Create Stage with missing Task", dt.Create, &models.Stage{Name: "missingtask", BootEnv: "local", Tasks: []string{"jj"}}, false},
 		{"Create Stage with missing profile", dt.Create, &models.Stage{Name: "missingprofile", BootEnv: "local", Profiles: []string{"jj"}}, false},
 		{"Create Stage with invalid models.TemplateInfo (missing Name)", dt.Create, &models.Stage{Name: "test 3", BootEnv: "local", Templates: []models.TemplateInfo{{Path: "{{ .Env.Name }}", ID: "ok"}}}, false},
@@ -38,8 +39,8 @@ func TestStageCrud(t *testing.T) {
 	// List test.
 	bes := d("stages").Items()
 	if bes != nil {
-		if len(bes) != 2 {
-			t.Errorf("List function should have returned: 6, but got %d\n", len(bes))
+		if len(bes) != 3 {
+			t.Errorf("List function should have returned: 3, but got %d\n", len(bes))
 		}
 	} else {
 		t.Errorf("List function returned nil!!")

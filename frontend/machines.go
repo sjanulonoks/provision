@@ -93,7 +93,7 @@ type MachineGetParamsPathParameter struct {
 }
 
 // MachineActionPathParameter used to find a Machine / Action in the path
-// swagger:parameters postMachineAction getMachineAction
+// swagger:parameters getMachineAction
 type MachineActionPathParameter struct {
 	// in: path
 	// required: true

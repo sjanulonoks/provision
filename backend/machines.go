@@ -519,8 +519,11 @@ func (n *Machine) Validate() {
 					n.Tasks = []string{}
 					n.Errorf("Machine %s wants Stage %s, which is not available", n.UUID(), n.Stage)
 				} else {
-					// BootEnv should still be valid because Stage is valid.
-					n.BootEnv = stage.BootEnv
+					// Only change bootenv if specified
+					if stage.BootEnv != "" {
+						// BootEnv should still be valid because Stage is valid.
+						n.BootEnv = stage.BootEnv
+					}
 
 					// XXX: For sanity, check the path of templates to make sure not overlap
 					// with the bootenv.  This is hard - do this last
@@ -642,6 +645,9 @@ func (n *Machine) AfterDelete() {
 	e := &models.Error{}
 	if b := n.stores("bootenvs").Find(n.BootEnv); b != nil {
 		AsBootEnv(b).Render(n.stores, n, e).deregister(n.p.FS)
+	}
+	if s := n.stores("stages").Find(n.Stage); s != nil {
+		AsStage(s).Render(n.stores, n, e).deregister(n.p.FS)
 	}
 }
 
