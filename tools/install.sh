@@ -45,7 +45,9 @@ while (( $# > 0 )); do
         --*)
             arg_key="${arg_key#--}"
             arg_key="${arg_key//-/_}"
-            arg_key="${arg_key^^}"
+            # "^^" Paremeter Expansion is a bash v4.x feature; Mac by default is bash 3.x
+            #arg_key="${arg_key^^}"
+            arg_key=$(echo $arg_key | tr '[:lower:]' '[:upper:]')
             echo "Overriding $arg_key with $arg_data"
             export $arg_key="$arg_data"
             ;;
