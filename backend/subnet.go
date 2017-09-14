@@ -492,28 +492,30 @@ func (s *Subnet) Validate() {
 		s.Errorf("Strategy must have a value")
 	}
 
-	// Make sure that options have the netmask and broadcast options enabled
+	// Build mask and broadcast for always
+	mask := net.IP([]byte(net.IP(subnet.Mask).To4()))
+	bcastBits := binary.BigEndian.Uint32(subnet.IP) | ^binary.BigEndian.Uint32(mask)
+	buf := make([]byte, 4)
+	binary.BigEndian.PutUint32(buf, bcastBits)
+
+	// Make sure that options have the correct netmask and broadcast options enabled
 	needMask := true
 	needBCast := true
 	for _, opt := range s.Options {
 		if opt.Code == dhcp.OptionBroadcastAddress {
+			opt.Value = net.IP(buf).String()
 			needBCast = false
 		}
 		if opt.Code == dhcp.OptionSubnetMask {
+			opt.Value = mask.String()
 			needMask = false
 		}
 	}
-	if needMask || needBCast {
-		mask := net.IP([]byte(net.IP(subnet.Mask).To4()))
-		if needMask {
-			s.Options = append(s.Options, models.DhcpOption{dhcp.OptionSubnetMask, mask.String()})
-		}
-		if needBCast {
-			bcastBits := binary.BigEndian.Uint32(subnet.IP) | ^binary.BigEndian.Uint32(mask)
-			buf := make([]byte, 4)
-			binary.BigEndian.PutUint32(buf, bcastBits)
-			s.Options = append(s.Options, models.DhcpOption{dhcp.OptionBroadcastAddress, net.IP(buf).String()})
-		}
+	if needMask {
+		s.Options = append(s.Options, &models.DhcpOption{dhcp.OptionSubnetMask, mask.String()})
+	}
+	if needBCast {
+		s.Options = append(s.Options, &models.DhcpOption{dhcp.OptionBroadcastAddress, net.IP(buf).String()})
 	}
 
 	if !s.OnlyReservations {
