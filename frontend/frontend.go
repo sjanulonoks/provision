@@ -87,7 +87,7 @@ func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	return
 }
 
-func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, apiport, provport int, fileRoot, devUI string, authSource AuthSource, pubs *backend.Publishers, drpid string, pc *midlayer.PluginController, noDhcp, noTftp, noProv bool, saasDir string) (me *Frontend) {
+func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, apiport, provport int, fileRoot, devUI, UIUrl string, authSource AuthSource, pubs *backend.Publishers, drpid string, pc *midlayer.PluginController, noDhcp, noTftp, noProv bool, saasDir string) (me *Frontend) {
 	gin.SetMode(gin.ReleaseMode)
 
 	if authSource == nil {
@@ -222,19 +222,17 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, ap
 	mgmtApi.StaticFS("/swagger-ui",
 		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "swagger-ui"})
 
-	// Server UI with flag to run from local files instead of assets
-	if len(devUI) == 0 {
-		mgmtApi.StaticFS("/ui",
-			&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "ui/public"})
-	} else {
+	// Optionally add a local dev-ui
+	if len(devUI) != 0 {
 		logger.Printf("DEV: Running UI from %s\n", devUI)
-		mgmtApi.Static("/ui", devUI)
+		mgmtApi.Static("/dev-ui", devUI)
 	}
 
-	mgmtApi.GET("/ux", func(c *gin.Context) {
+	// UI points to the cloud
+	mgmtApi.GET("/ui", func(c *gin.Context) {
 		incomingUrl := location.Get(c)
 
-		url := fmt.Sprintf("https://rackn.github.io/provision-ux/#/e/%s", incomingUrl.Host)
+		url := fmt.Sprintf("%s/#/e/%s", UIUrl, incomingUrl.Host)
 		c.Redirect(http.StatusMovedPermanently, url)
 	})
 

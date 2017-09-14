@@ -69,6 +69,7 @@ type ProgOpts struct {
 	FileRoot        string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
 
 	DevUI          string `long:"dev-ui" description:"Root of UI Pages for Development"`
+	UIUrl          string `long:"ui-url" description:"URL to redirect to UI" default:"https://rackn.github.io/provision-ux"`
 	DhcpInterfaces string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
 	DefaultStage   string `long:"default-stage" description:"The default stage for the nodes" default:""`
 	DefaultBootEnv string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"local"`
@@ -194,7 +195,7 @@ func Server(c_opts *ProgOpts) {
 
 	fe := frontend.NewFrontend(dt, logger,
 		c_opts.OurAddress, c_opts.ApiPort, c_opts.StaticPort, c_opts.FileRoot,
-		c_opts.DevUI, nil, publishers, c_opts.DrpId, pc,
+		c_opts.DevUI, c_opts.UIUrl, nil, publishers, c_opts.DrpId, pc,
 		c_opts.DisableDHCP, c_opts.DisableTftpServer, c_opts.DisableProvisioner,
 		c_opts.SaasContentRoot)
 	publishers.Add(fe)
