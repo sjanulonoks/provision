@@ -36,6 +36,13 @@ for tool in go-bindata swagger glide; do
     esac
 done
 
+# FIX SWAGGER - this is still why we can't have nice things.
+OLDPWD=`pwd`
+cd ../../go-swagger/go-swagger
+git checkout 0.12.0
+go install github.com/go-swagger/go-swagger/cmd/swagger
+cd $OLDPWD
+
 glide install
 rm -rf client genmodels embedded/assets/swagger.json
 go generate server/assets.go
