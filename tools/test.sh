@@ -22,7 +22,7 @@ for d in $(go list ./... 2>/dev/null | grep -v cmds | grep -v vendor | grep -v g
     rm -f test.bin
     go test -o test.bin -c -race -covermode=atomic -coverpkg=$packages "$d"
     if [ -e test.bin ] ; then
-        (cd .$dir; time "$tdir/test.bin" -test.v -test.coverprofile="$tdir/profile.out")
+        (cd .$dir; time "$tdir/test.bin" -test.coverprofile="$tdir/profile.out")
         rm -f test.bin
     fi
 
