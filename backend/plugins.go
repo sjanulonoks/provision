@@ -30,45 +30,44 @@ func (obj *Plugin) SaveClean() store.KeySaver {
 
 func (n *Plugin) Indexes() map[string]index.Maker {
 	fix := AsPlugin
-	return map[string]index.Maker{
-		"Key": index.MakeKey(),
-		"Name": index.Make(
-			true,
-			"string",
-			func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
-			func(ref models.Model) (gte, gt index.Test) {
-				refName := fix(ref).Name
-				return func(s models.Model) bool {
-						return fix(s).Name >= refName
-					},
-					func(s models.Model) bool {
-						return fix(s).Name > refName
-					}
-			},
-			func(s string) (models.Model, error) {
-				plugin := fix(n.New())
-				plugin.Name = s
-				return plugin, nil
-			}),
-		"Provider": index.Make(
-			false,
-			"string",
-			func(i, j models.Model) bool { return fix(i).Provider < fix(j).Provider },
-			func(ref models.Model) (gte, gt index.Test) {
-				refProvider := fix(ref).Provider
-				return func(s models.Model) bool {
-						return fix(s).Provider >= refProvider
-					},
-					func(s models.Model) bool {
-						return fix(s).Provider > refProvider
-					}
-			},
-			func(s string) (models.Model, error) {
-				plugin := fix(n.New())
-				plugin.Provider = s
-				return plugin, nil
-			}),
-	}
+	res := index.MakeBaseIndexes(n)
+	res["Name"] = index.Make(
+		true,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
+		func(ref models.Model) (gte, gt index.Test) {
+			refName := fix(ref).Name
+			return func(s models.Model) bool {
+					return fix(s).Name >= refName
+				},
+				func(s models.Model) bool {
+					return fix(s).Name > refName
+				}
+		},
+		func(s string) (models.Model, error) {
+			plugin := fix(n.New())
+			plugin.Name = s
+			return plugin, nil
+		})
+	res["Provider"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Provider < fix(j).Provider },
+		func(ref models.Model) (gte, gt index.Test) {
+			refProvider := fix(ref).Provider
+			return func(s models.Model) bool {
+					return fix(s).Provider >= refProvider
+				},
+				func(s models.Model) bool {
+					return fix(s).Provider > refProvider
+				}
+		},
+		func(s string) (models.Model, error) {
+			plugin := fix(n.New())
+			plugin.Provider = s
+			return plugin, nil
+		})
+	return res
 }
 
 func (n *Plugin) Backend() store.Store {

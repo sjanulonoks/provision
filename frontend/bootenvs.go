@@ -57,6 +57,8 @@ type BootEnvListPathParameter struct {
 	// in: query
 	Valid string
 	// in: query
+	ReadOnly string
+	// in: query
 	OnlyUnknown string
 	// in: query
 	Name string
@@ -77,6 +79,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//    Name = string
 	//    Available = boolean
 	//    Valid = boolean
+	//    ReadOnly = boolean
 	//    OnlyUnknown = boolean
 	//
 	// Functions:

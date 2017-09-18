@@ -108,6 +108,8 @@ type JobListPathParameter struct {
 	// in: query
 	Valid string
 	// in: query
+	ReadOnly string
+	// in: query
 	Uuid string
 	// in: query
 	Stage string
@@ -147,6 +149,7 @@ func (f *Frontend) InitJobApi() {
 	//    EndTime = datetime
 	//    Available = boolean
 	//    Valid = boolean
+	//    ReadOnly = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value

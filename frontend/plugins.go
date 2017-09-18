@@ -74,6 +74,8 @@ type PluginListPathParameter struct {
 	// in: query
 	Valid string
 	// in: query
+	ReadOnly string
+	// in: query
 	Name string
 	// in: query
 	Provider string
@@ -95,6 +97,7 @@ func (f *Frontend) InitPluginApi() {
 	//    Provider = string
 	//    Available = boolean
 	//    Valid = boolean
+	//    ReadOnly = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value

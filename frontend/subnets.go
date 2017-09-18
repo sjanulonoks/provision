@@ -57,6 +57,8 @@ type SubnetListPathParameter struct {
 	// in: query
 	Valid string
 	// in: query
+	ReadOnly string
+	// in: query
 	Strategy string
 	// in: query
 	NextServer string
@@ -86,6 +88,7 @@ func (f *Frontend) InitSubnetApi() {
 	//    Strategy = string
 	//    Available = boolean
 	//    Valid = boolean
+	//    ReadOnly = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value
