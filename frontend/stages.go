@@ -57,6 +57,8 @@ type StageListPathParameter struct {
 	// in: query
 	Valid string
 	// in: query
+	ReadOnly string
+	// in: query
 	Name string
 	// in: query
 	Reboot string

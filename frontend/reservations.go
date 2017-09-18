@@ -62,6 +62,8 @@ type ReservationListPathParameter struct {
 	// in: query
 	Valid string
 	// in: query
+	ReadOnly string
+	// in: query
 	Addr string
 	// in: query
 	Token string
@@ -89,6 +91,7 @@ func (f *Frontend) InitReservationApi() {
 	//    NextServer = IP Address
 	//    Available = boolean
 	//    Valid = boolean
+	//    ReadOnly = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value
