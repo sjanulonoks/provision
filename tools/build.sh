@@ -39,6 +39,7 @@ done
 # FIX SWAGGER - this is still why we can't have nice things.
 OLDPWD=`pwd`
 cd ../../go-swagger/go-swagger
+git fetch
 git checkout 0.12.0
 go install github.com/go-swagger/go-swagger/cmd/swagger
 cd $OLDPWD
