@@ -310,13 +310,15 @@ case $1 in
                      DEFAULT_CONTENT_FILE="`pwd`/drp-data/saas-content/default.yaml"
                      mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
                  fi
+
+                 EP="./"
              fi
 
              echo
              echo "# Once dr-provision is started, these commands will install the isos for the community defaults"
-             echo "  drpcli bootenvs uploadiso ce-ubuntu-16.04-install"
-             echo "  drpcli bootenvs uploadiso ce-centos-7.3.1611-install"
-             echo "  drpcli bootenvs uploadiso ce-sledgehammer"
+             echo "  ${EP}drpcli bootenvs uploadiso ce-ubuntu-16.04-install"
+             echo "  ${EP}drpcli bootenvs uploadiso ce-centos-7.3.1611-install"
+             echo "  ${EP}drpcli bootenvs uploadiso ce-sledgehammer"
              echo
 
              ;;
