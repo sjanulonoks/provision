@@ -669,7 +669,7 @@ var machineLockMap = map[string][]string{
 	"update":  []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
 	"patch":   []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
 	"delete":  []string{"stages", "bootenvs", "machines"},
-	"actions": []string{"machines", "profiles", "params"},
+	"actions": []string{"stages", "machines", "profiles", "params"},
 }
 
 func (m *Machine) Locks(action string) []string {
