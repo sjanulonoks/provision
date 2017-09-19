@@ -10,46 +10,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Stat struct {
-	// required: true
-	Name string `json:"name"`
-	// required: true
-	Count int `json:"count"`
-}
-
-// swagger:model
-type Info struct {
-	// required: true
-	Arch string `json:"arch"`
-	// required: true
-	Os string `json:"os"`
-	// required: true
-	Version string `json:"version"`
-	// required: true
-	Id string `json:"id"`
-	// required: true
-	ApiPort int `json:"api_port"`
-	// required: true
-	FilePort int `json:"file_port"`
-	// required: true
-	TftpEnabled bool `json:"tftp_enabled"`
-	// required: true
-	DhcpEnabled bool `json:"dhcp_enabled"`
-	// required: true
-	ProvisionerEnabled bool `json:"prov_enabled"`
-	// required: true
-	Stats []*Stat `json:"stats"`
-}
-
 // InfosResponse returned on a successful GET of an info
 // swagger:response
 type InfoResponse struct {
 	// in: body
-	Body *Info
+	Body *models.Info
 }
 
-func (f *Frontend) GetInfo(drpid string) (*Info, *models.Error) {
-	i := &Info{
+func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
+	i := &models.Info{
 		Arch:               runtime.GOARCH,
 		Os:                 runtime.GOOS,
 		Version:            provision.RS_VERSION,
@@ -59,7 +28,7 @@ func (f *Frontend) GetInfo(drpid string) (*Info, *models.Error) {
 		TftpEnabled:        !f.NoTftp,
 		DhcpEnabled:        !f.NoDhcp,
 		ProvisionerEnabled: !f.NoProv,
-		Stats:              make([]*Stat, 0, 0),
+		Stats:              make([]*models.Stat, 0, 0),
 	}
 
 	res := &models.Error{
@@ -75,13 +44,13 @@ func (f *Frontend) GetInfo(drpid string) (*Info, *models.Error) {
 		if idx, err := index.All(index.Native())(&d("machines").Index); err != nil {
 			res.AddError(err)
 		} else {
-			i.Stats = append(i.Stats, &Stat{"machines.count", idx.Count()})
+			i.Stats = append(i.Stats, &models.Stat{"machines.count", idx.Count()})
 		}
 
 		if idx, err := index.All(index.Native())(&d("subnets").Index); err != nil {
 			res.AddError(err)
 		} else {
-			i.Stats = append(i.Stats, &Stat{"subnets.count", idx.Count()})
+			i.Stats = append(i.Stats, &models.Stat{"subnets.count", idx.Count()})
 		}
 	}()
 

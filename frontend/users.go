@@ -29,18 +29,7 @@ type UsersResponse struct {
 // swagger:response UserTokenResponse
 type UserTokenResponse struct {
 	//in: body
-	Body UserToken
-}
-
-// swagger:model
-type UserToken struct {
-	Token string
-	Info  Info
-}
-
-// swagger:model
-type UserPassword struct {
-	Password string
+	Body models.UserToken
 }
 
 // UserBodyParameter used to inject a User
@@ -64,7 +53,7 @@ type UserPatchBodyParameter struct {
 type UserPutPasswordParameter struct {
 	// in: body
 	// required: true
-	Body UserPassword
+	Body models.UserPassword
 }
 
 // UserPathParameter used to name a User in the path
@@ -249,7 +238,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 				// Error is only if stats are not filled in.  User
 				// Token should work regardless of that.
 				info, _ := f.GetInfo(drpid)
-				c.JSON(http.StatusOK, UserToken{Token: t, Info: *info})
+				c.JSON(http.StatusOK, models.UserToken{Token: t, Info: *info})
 			}
 		})
 
@@ -318,7 +307,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 			if !assureAuth(c, f.Logger, user.Prefix(), "password", user.Key()) {
 				return
 			}
-			var userPassword UserPassword
+			var userPassword models.UserPassword
 			if !assureDecode(c, &userPassword) {
 				return
 			}
