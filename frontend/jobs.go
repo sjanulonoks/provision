@@ -350,6 +350,22 @@ func (f *Frontend) InitJobApi() {
 			f.Fetch(c, &backend.Job{}, c.Param(`uuid`))
 		})
 
+	// swagger:route HEAD /jobs/{name} Jobs
+	//
+	// See if a Job exists
+	//
+	// Return 200 if the Job specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/jobs/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Job{}, c.Param(`name`))
+		})
+
 	// swagger:route PATCH /jobs/{uuid} Jobs patchJob
 	//
 	// Patch a Job

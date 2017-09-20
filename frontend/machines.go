@@ -262,6 +262,22 @@ func (f *Frontend) InitMachineApi() {
 			f.Fetch(c, &backend.Machine{}, c.Param(`uuid`))
 		})
 
+	// swagger:route HEAD /machines/{name} Machines
+	//
+	// See if a Machine exists
+	//
+	// Return 200 if the Machine specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/machines/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Machine{}, c.Param(`name`))
+		})
+
 	// swagger:route PATCH /machines/{uuid} Machines patchMachine
 	//
 	// Patch a Machine

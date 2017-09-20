@@ -140,6 +140,22 @@ func (f *Frontend) InitStageApi() {
 			f.Fetch(c, &backend.Stage{}, c.Param(`name`))
 		})
 
+	// swagger:route HEAD /stages/{name} Stages
+	//
+	// See if a Stage exists
+	//
+	// Return 200 if the Stage specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/stages/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Stage{}, c.Param(`name`))
+		})
+
 	// swagger:route PATCH /stages/{name} Stages patchStage
 	//
 	// Patch a Stage

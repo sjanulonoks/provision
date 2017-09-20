@@ -513,6 +513,41 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	c.JSON(http.StatusOK, arr)
 }
 
+func (f *Frontend) Exists(c *gin.Context, ref store.KeySaver, key string) {
+	prefix := ref.Prefix()
+	var found bool
+	func() {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("get")...)
+		defer unlocker()
+		objs := d(prefix)
+		idxer, ok := ref.(index.Indexer)
+		if ok {
+			for idxName, idx := range idxer.Indexes() {
+				idxKey := strings.TrimPrefix(key, idxName+":")
+				if key == idxKey {
+					continue
+				}
+				if !idx.Unique {
+					break
+				}
+				items, err := index.All(index.Sort(idx))(&objs.Index)
+				if err == nil {
+					found = items.Find(idxKey) != nil
+				}
+				break
+			}
+		}
+		if !found {
+			found = objs.Find(key) == nil
+		}
+	}()
+	if found {
+		c.Status(http.StatusOK)
+	} else {
+		c.Status(http.StatusNotFound)
+	}
+}
+
 func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	prefix := ref.Prefix()
 	var err error

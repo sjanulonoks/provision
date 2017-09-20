@@ -185,6 +185,22 @@ func (f *Frontend) InitPluginApi() {
 			f.Fetch(c, &backend.Plugin{}, c.Param(`name`))
 		})
 
+	// swagger:route HEAD /plugins/{name} Plugins
+	//
+	// See if a Plugin exists
+	//
+	// Return 200 if the Plugin specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/plugins/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Plugin{}, c.Param(`name`))
+		})
+
 	// swagger:route PATCH /plugins/{name} Plugins patchPlugin
 	//
 	// Patch a Plugin

@@ -179,6 +179,22 @@ func (f *Frontend) InitUserApi(drpid string) {
 			f.Fetch(c, &backend.User{}, c.Param(`name`))
 		})
 
+	// swagger:route HEAD /users/{name} Users
+	//
+	// See if a User exists
+	//
+	// Return 200 if the User specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/users/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.User{}, c.Param(`name`))
+		})
+
 	// swagger:route GET /users/{name}/token Users getUserToken
 	//
 	// Get a User Token

@@ -183,6 +183,22 @@ func (f *Frontend) InitTaskApi() {
 			f.Fetch(c, &backend.Task{}, c.Param(`name`))
 		})
 
+	// swagger:route HEAD /tasks/{name} Tasks
+	//
+	// See if a Task exists
+	//
+	// Return 200 if the Task specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/tasks/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Task{}, c.Param(`name`))
+		})
+
 	// swagger:route PATCH /tasks/{name} Tasks patchTask
 	//
 	// Patch a Task

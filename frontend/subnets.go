@@ -148,6 +148,22 @@ func (f *Frontend) InitSubnetApi() {
 			f.Fetch(c, &backend.Subnet{}, c.Param(`name`))
 		})
 
+	// swagger:route HEAD /subnets/{name} Subnets
+	//
+	// See if a Subnet exists
+	//
+	// Return 200 if the Subnet specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/subnets/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Subnet{}, c.Param(`name`))
+		})
+
 	// swagger:route PATCH /subnets/{name} Subnets patchSubnet
 	//
 	// Patch a Subnet

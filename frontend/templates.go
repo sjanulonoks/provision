@@ -136,6 +136,22 @@ func (f *Frontend) InitTemplateApi() {
 			f.Fetch(c, &backend.Template{}, c.Param(`id`))
 		})
 
+	// swagger:route HEAD /templates/{name} Templates
+	//
+	// See if a Template exists
+	//
+	// Return 200 if the Template specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/templates/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Template{}, c.Param(`name`))
+		})
+
 	// swagger:route PATCH /templates/{name} Templates patchTemplate
 	//
 	// Patch a Template

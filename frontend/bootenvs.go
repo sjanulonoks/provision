@@ -139,6 +139,22 @@ func (f *Frontend) InitBootEnvApi() {
 			f.Fetch(c, &backend.BootEnv{}, c.Param(`name`))
 		})
 
+	// swagger:route HEAD /bootenvs/{name} BootEnvs
+	//
+	// See if a BootEnv exists
+	//
+	// Return 200 if the BootEnv specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/bootenvs/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.BootEnv{}, c.Param(`name`))
+		})
+
 	// swagger:route PATCH /bootenvs/{name} BootEnvs patchBootEnv
 	//
 	// Patch a BootEnv

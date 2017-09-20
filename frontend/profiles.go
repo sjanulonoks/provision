@@ -152,6 +152,22 @@ func (f *Frontend) InitProfileApi() {
 			f.Fetch(c, &backend.Profile{}, c.Param(`name`))
 		})
 
+	// swagger:route HEAD /profiles/{name} Profiles
+	//
+	// See if a Profile exists
+	//
+	// Return 200 if the Profile specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/profiles/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Profile{}, c.Param(`name`))
+		})
+
 	// swagger:route PATCH /profiles/{name} Profiles patchProfile
 	//
 	// Patch a Profile

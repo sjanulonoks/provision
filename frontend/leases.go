@@ -158,6 +158,22 @@ func (f *Frontend) InitLeaseApi() {
 			f.Fetch(c, &backend.Lease{}, models.Hexaddr(ip))
 		})
 
+	// swagger:route HEAD /leases/{name} Leases
+	//
+	// See if a Lease exists
+	//
+	// Return 200 if the Lease specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/leases/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Lease{}, c.Param(`name`))
+		})
+
 	// swagger:route PATCH /leases/{address} Leases patchLease
 	//
 	// Patch a Lease
