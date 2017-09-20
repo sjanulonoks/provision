@@ -80,7 +80,7 @@ type JobLogPutBodyParameter struct {
 }
 
 // JobPathParameter used to find a Job in the path
-// swagger:parameters putJobs getJob putJob patchJob deleteJob getJobParams postJobParams getJobActions getJobLog putJobLog
+// swagger:parameters putJobs getJob putJob patchJob deleteJob getJobParams postJobParams getJobActions getJobLog putJobLog headJob
 type JobPathParameter struct {
 	// in: path
 	// required: true
@@ -350,20 +350,20 @@ func (f *Frontend) InitJobApi() {
 			f.Fetch(c, &backend.Job{}, c.Param(`uuid`))
 		})
 
-	// swagger:route HEAD /jobs/{name} Jobs
+	// swagger:route HEAD /jobs/{uuid} Jobs headJob
 	//
 	// See if a Job exists
 	//
-	// Return 200 if the Job specifiec by {name} exists, or return NotFound.
+	// Return 200 if the Job specifiec by {uuid} exists, or return NotFound.
 	//
 	//     Responses:
 	//       200: NoContentResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: NoContentResponse
-	f.ApiGroup.HEAD("/jobs/:name",
+	f.ApiGroup.HEAD("/jobs/:uuid",
 		func(c *gin.Context) {
-			f.Exists(c, &backend.Job{}, c.Param(`name`))
+			f.Exists(c, &backend.Job{}, c.Param(`uuid`))
 		})
 
 	// swagger:route PATCH /jobs/{uuid} Jobs patchJob

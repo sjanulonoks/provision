@@ -45,7 +45,7 @@ type ParamPatchBodyParameter struct {
 }
 
 // ParamPathParameter used to name a Param in the path
-// swagger:parameters putParams getParam putParam patchParam deleteParam getParamParams postParamParams
+// swagger:parameters putParams getParam putParam patchParam deleteParam getParamParams postParamParams headParam
 type ParamPathParameter struct {
 	// in: path
 	// required: true
@@ -150,7 +150,7 @@ func (f *Frontend) InitParamApi() {
 			f.Fetch(c, &backend.Param{}, c.Param(`name`))
 		})
 
-	// swagger:route HEAD /params/{name} Params
+	// swagger:route HEAD /params/{name} Params headParam
 	//
 	// See if a Param exists
 	//

@@ -42,7 +42,7 @@ type ReservationPatchBodyParameter struct {
 }
 
 // ReservationPathParameter used to address a Reservation in the path
-// swagger:parameters putReservations getReservation putReservation patchReservation deleteReservation
+// swagger:parameters putReservations getReservation putReservation patchReservation deleteReservation headReservation
 type ReservationPathParameter struct {
 	// in: path
 	// required: true
@@ -159,20 +159,20 @@ func (f *Frontend) InitReservationApi() {
 			f.Fetch(c, &backend.Reservation{}, models.Hexaddr(ip))
 		})
 
-	// swagger:route HEAD /reservations/{name} Reservations
+	// swagger:route HEAD /reservations/{address} Reservations headReservation
 	//
 	// See if a Reservation exists
 	//
-	// Return 200 if the Reservation specifiec by {name} exists, or return NotFound.
+	// Return 200 if the Reservation specifiec by {address} exists, or return NotFound.
 	//
 	//     Responses:
 	//       200: NoContentResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: NoContentResponse
-	f.ApiGroup.HEAD("/reservations/:name",
+	f.ApiGroup.HEAD("/reservations/:address",
 		func(c *gin.Context) {
-			f.Exists(c, &backend.Reservation{}, c.Param(`name`))
+			f.Exists(c, &backend.Reservation{}, c.Param(`address`))
 		})
 
 	// swagger:route PATCH /reservations/{address} Reservations patchReservation

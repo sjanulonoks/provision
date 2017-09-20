@@ -38,7 +38,7 @@ type StagePatchBodyParameter struct {
 }
 
 // StagePathParameter used to name a Stage in the path
-// swagger:parameters putStages getStage putStage patchStage deleteStage
+// swagger:parameters putStages getStage putStage patchStage deleteStage headStage
 type StagePathParameter struct {
 	// in: path
 	// required: true
@@ -140,7 +140,7 @@ func (f *Frontend) InitStageApi() {
 			f.Fetch(c, &backend.Stage{}, c.Param(`name`))
 		})
 
-	// swagger:route HEAD /stages/{name} Stages
+	// swagger:route HEAD /stages/{name} Stages headStage
 	//
 	// See if a Stage exists
 	//

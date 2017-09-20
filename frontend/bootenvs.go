@@ -38,7 +38,7 @@ type BootEnvPatchBodyParameter struct {
 }
 
 // BootEnvPathParameter used to name a BootEnv in the path
-// swagger:parameters putBootEnvs getBootEnv putBootEnv patchBootEnv deleteBootEnv
+// swagger:parameters putBootEnvs getBootEnv putBootEnv patchBootEnv deleteBootEnv headBootEnv
 type BootEnvPathParameter struct {
 	// in: path
 	// required: true
@@ -139,7 +139,7 @@ func (f *Frontend) InitBootEnvApi() {
 			f.Fetch(c, &backend.BootEnv{}, c.Param(`name`))
 		})
 
-	// swagger:route HEAD /bootenvs/{name} BootEnvs
+	// swagger:route HEAD /bootenvs/{name} BootEnvs headBootEnv
 	//
 	// See if a BootEnv exists
 	//

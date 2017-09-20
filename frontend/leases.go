@@ -42,7 +42,7 @@ type LeasePatchBodyParameter struct {
 }
 
 // LeasePathParameter used to address a Lease in the path
-// swagger:parameters putLeases getLease putLease patchLease deleteLease
+// swagger:parameters putLeases getLease putLease patchLease deleteLease headLease
 type LeasePathParameter struct {
 	// in: path
 	// required: true
@@ -158,20 +158,20 @@ func (f *Frontend) InitLeaseApi() {
 			f.Fetch(c, &backend.Lease{}, models.Hexaddr(ip))
 		})
 
-	// swagger:route HEAD /leases/{name} Leases
+	// swagger:route HEAD /leases/{address} Leases headLease
 	//
 	// See if a Lease exists
 	//
-	// Return 200 if the Lease specifiec by {name} exists, or return NotFound.
+	// Return 200 if the Lease specifiec by {address} exists, or return NotFound.
 	//
 	//     Responses:
 	//       200: NoContentResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: NoContentResponse
-	f.ApiGroup.HEAD("/leases/:name",
+	f.ApiGroup.HEAD("/leases/:address",
 		func(c *gin.Context) {
-			f.Exists(c, &backend.Lease{}, c.Param(`name`))
+			f.Exists(c, &backend.Lease{}, c.Param(`address`))
 		})
 
 	// swagger:route PATCH /leases/{address} Leases patchLease

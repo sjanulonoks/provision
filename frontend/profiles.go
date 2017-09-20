@@ -47,7 +47,7 @@ type ProfilePatchBodyParameter struct {
 }
 
 // ProfilePathParameter used to name a Profile in the path
-// swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile getProfileParams postProfileParams
+// swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile getProfileParams postProfileParams headProfile
 type ProfilePathParameter struct {
 	// in: path
 	// required: true
@@ -152,7 +152,7 @@ func (f *Frontend) InitProfileApi() {
 			f.Fetch(c, &backend.Profile{}, c.Param(`name`))
 		})
 
-	// swagger:route HEAD /profiles/{name} Profiles
+	// swagger:route HEAD /profiles/{name} Profiles headProfile
 	//
 	// See if a Profile exists
 	//
