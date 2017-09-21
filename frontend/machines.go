@@ -73,7 +73,7 @@ type MachinePatchBodyParameter struct {
 }
 
 // MachinePathParameter used to find a Machine in the path
-// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine postMachineParams getMachineActions
+// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine postMachineParams getMachineActions headMachine
 type MachinePathParameter struct {
 	// in: path
 	// required: true
@@ -260,6 +260,22 @@ func (f *Frontend) InitMachineApi() {
 	f.ApiGroup.GET("/machines/:uuid",
 		func(c *gin.Context) {
 			f.Fetch(c, &backend.Machine{}, c.Param(`uuid`))
+		})
+
+	// swagger:route HEAD /machines/{uuid} Machines headMachine
+	//
+	// See if a Machine exists
+	//
+	// Return 200 if the Machine specifiec by {uuid} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/machines/:uuid",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Machine{}, c.Param(`uuid`))
 		})
 
 	// swagger:route PATCH /machines/{uuid} Machines patchMachine

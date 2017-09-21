@@ -57,7 +57,7 @@ type UserPutPasswordParameter struct {
 }
 
 // UserPathParameter used to name a User in the path
-// swagger:parameters getUser putUser patchUser deleteUser getUserToken putUserPassword
+// swagger:parameters getUser putUser patchUser deleteUser getUserToken putUserPassword headUser
 type UserPathParameter struct {
 	// in: path
 	// required: true
@@ -177,6 +177,22 @@ func (f *Frontend) InitUserApi(drpid string) {
 	f.ApiGroup.GET("/users/:name",
 		func(c *gin.Context) {
 			f.Fetch(c, &backend.User{}, c.Param(`name`))
+		})
+
+	// swagger:route HEAD /users/{name} Users headUser
+	//
+	// See if a User exists
+	//
+	// Return 200 if the User specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/users/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.User{}, c.Param(`name`))
 		})
 
 	// swagger:route GET /users/{name}/token Users getUserToken

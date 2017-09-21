@@ -45,7 +45,7 @@ type ParamPatchBodyParameter struct {
 }
 
 // ParamPathParameter used to name a Param in the path
-// swagger:parameters putParams getParam putParam patchParam deleteParam getParamParams postParamParams
+// swagger:parameters putParams getParam putParam patchParam deleteParam getParamParams postParamParams headParam
 type ParamPathParameter struct {
 	// in: path
 	// required: true
@@ -148,6 +148,22 @@ func (f *Frontend) InitParamApi() {
 	f.ApiGroup.GET("/params/:name",
 		func(c *gin.Context) {
 			f.Fetch(c, &backend.Param{}, c.Param(`name`))
+		})
+
+	// swagger:route HEAD /params/{name} Params headParam
+	//
+	// See if a Param exists
+	//
+	// Return 200 if the Param specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/params/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Param{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /params/{name} Params patchParam

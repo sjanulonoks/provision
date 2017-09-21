@@ -47,7 +47,7 @@ type ProfilePatchBodyParameter struct {
 }
 
 // ProfilePathParameter used to name a Profile in the path
-// swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile getProfileParams postProfileParams
+// swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile getProfileParams postProfileParams headProfile
 type ProfilePathParameter struct {
 	// in: path
 	// required: true
@@ -150,6 +150,22 @@ func (f *Frontend) InitProfileApi() {
 	f.ApiGroup.GET("/profiles/:name",
 		func(c *gin.Context) {
 			f.Fetch(c, &backend.Profile{}, c.Param(`name`))
+		})
+
+	// swagger:route HEAD /profiles/{name} Profiles headProfile
+	//
+	// See if a Profile exists
+	//
+	// Return 200 if the Profile specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/profiles/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Profile{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /profiles/{name} Profiles patchProfile

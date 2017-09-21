@@ -38,7 +38,7 @@ type StagePatchBodyParameter struct {
 }
 
 // StagePathParameter used to name a Stage in the path
-// swagger:parameters putStages getStage putStage patchStage deleteStage
+// swagger:parameters putStages getStage putStage patchStage deleteStage headStage
 type StagePathParameter struct {
 	// in: path
 	// required: true
@@ -138,6 +138,22 @@ func (f *Frontend) InitStageApi() {
 	f.ApiGroup.GET("/stages/:name",
 		func(c *gin.Context) {
 			f.Fetch(c, &backend.Stage{}, c.Param(`name`))
+		})
+
+	// swagger:route HEAD /stages/{name} Stages headStage
+	//
+	// See if a Stage exists
+	//
+	// Return 200 if the Stage specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/stages/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Stage{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /stages/{name} Stages patchStage

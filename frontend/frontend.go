@@ -87,78 +87,102 @@ func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	return
 }
 
-func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, apiport, provport int, fileRoot, devUI, UIUrl string, authSource AuthSource, pubs *backend.Publishers, drpid string, pc *midlayer.PluginController, noDhcp, noTftp, noProv bool, saasDir string) (me *Frontend) {
-	gin.SetMode(gin.ReleaseMode)
-
-	if authSource == nil {
-		authSource = NewDefaultAuthSource(dt)
-	}
-
-	userAuth := func() gin.HandlerFunc {
-		return func(c *gin.Context) {
-			authHeader := c.Request.Header.Get("Authorization")
+func (fe *Frontend) userAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.Request.Header.Get("Authorization")
+		if len(authHeader) == 0 {
+			authHeader = c.Query("token")
 			if len(authHeader) == 0 {
-				authHeader = c.Query("token")
-				if len(authHeader) == 0 {
-					logger.Printf("No authentication header or token")
-					c.Header("WWW-Authenticate", "dr-provision")
-					c.AbortWithStatus(http.StatusUnauthorized)
-					return
+				fe.Logger.Printf("No authentication header or token")
+				c.Header("WWW-Authenticate", "dr-provision")
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			} else {
+				if strings.Contains(authHeader, ":") {
+					authHeader = "Basic " + base64.StdEncoding.EncodeToString([]byte(authHeader))
 				} else {
-					if strings.Contains(authHeader, ":") {
-						authHeader = "Basic " + base64.StdEncoding.EncodeToString([]byte(authHeader))
-					} else {
-						authHeader = "Bearer " + authHeader
-					}
+					authHeader = "Bearer " + authHeader
 				}
 			}
-			hdrParts := strings.SplitN(authHeader, " ", 2)
-			if len(hdrParts) != 2 || (hdrParts[0] != "Basic" && hdrParts[0] != "Bearer") {
-				logger.Printf("Bad auth header: %s", authHeader)
+		}
+		hdrParts := strings.SplitN(authHeader, " ", 2)
+		if len(hdrParts) != 2 || (hdrParts[0] != "Basic" && hdrParts[0] != "Bearer") {
+			fe.Logger.Printf("Bad auth header: %s", authHeader)
+			c.Header("WWW-Authenticate", "dr-provision")
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		if hdrParts[0] == "Basic" {
+			hdr, err := base64.StdEncoding.DecodeString(hdrParts[1])
+			if err != nil {
+				fe.Logger.Printf("Malformed basic auth string: %s", hdrParts[1])
 				c.Header("WWW-Authenticate", "dr-provision")
 				c.AbortWithStatus(http.StatusUnauthorized)
 				return
 			}
-			if hdrParts[0] == "Basic" {
-				hdr, err := base64.StdEncoding.DecodeString(hdrParts[1])
-				if err != nil {
-					logger.Printf("Malformed basic auth string: %s", hdrParts[1])
-					c.Header("WWW-Authenticate", "dr-provision")
-					c.AbortWithStatus(http.StatusUnauthorized)
-					return
-				}
-				userpass := bytes.SplitN(hdr, []byte(`:`), 2)
-				if len(userpass) != 2 {
-					logger.Printf("Malformed basic auth string: %s", hdrParts[1])
-					c.Header("WWW-Authenticate", "dr-provision")
-					c.AbortWithStatus(http.StatusUnauthorized)
-					return
-				}
-				user := authSource.GetUser(string(userpass[0]))
-				if user == nil {
-					logger.Printf("No such user: %s", string(userpass[0]))
-					c.AbortWithStatus(http.StatusForbidden)
-					return
-				}
-				if !user.CheckPassword(string(userpass[1])) {
-					c.AbortWithStatus(http.StatusForbidden)
-					return
-				}
-				t := backend.NewClaim(string(userpass[0]), 30).Add("*", "*", "*")
-				c.Set("DRP-CLAIM", t)
-			} else if hdrParts[0] == "Bearer" {
-				t, err := dt.GetToken(string(hdrParts[1]))
-				if err != nil {
-					logger.Printf("No DRP authentication token")
-					c.Header("WWW-Authenticate", "dr-provision")
-					c.AbortWithStatus(http.StatusForbidden)
-					return
-				}
-				c.Set("DRP-CLAIM", t)
+			userpass := bytes.SplitN(hdr, []byte(`:`), 2)
+			if len(userpass) != 2 {
+				fe.Logger.Printf("Malformed basic auth string: %s", hdrParts[1])
+				c.Header("WWW-Authenticate", "dr-provision")
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
 			}
-
-			c.Next()
+			user := fe.authSource.GetUser(string(userpass[0]))
+			if user == nil {
+				fe.Logger.Printf("No such user: %s", string(userpass[0]))
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+			if !user.CheckPassword(string(userpass[1])) {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+			t := backend.NewClaim(string(userpass[0]), 30).Add("*", "*", "*")
+			c.Set("DRP-CLAIM", t)
+		} else if hdrParts[0] == "Bearer" {
+			t, err := fe.dt.GetToken(string(hdrParts[1]))
+			if err != nil {
+				fe.Logger.Printf("No DRP authentication token")
+				c.Header("WWW-Authenticate", "dr-provision")
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+			c.Set("DRP-CLAIM", t)
 		}
+		c.Next()
+	}
+}
+
+func NewFrontend(
+	dt *backend.DataTracker,
+	logger *log.Logger,
+	address string,
+	apiport, provport int,
+	fileRoot, devUI, UIUrl string,
+	authSource AuthSource,
+	pubs *backend.Publishers,
+	drpid string,
+	pc *midlayer.PluginController,
+	noDhcp, noTftp, noProv bool,
+	saasDir string) (me *Frontend) {
+	me = &Frontend{
+		Logger:     logger,
+		FileRoot:   fileRoot,
+		dt:         dt,
+		pubs:       pubs,
+		pc:         pc,
+		ApiPort:    apiport,
+		ProvPort:   provport,
+		NoDhcp:     noDhcp,
+		NoTftp:     noTftp,
+		NoProv:     noProv,
+		SaasDir:    saasDir,
+		authSource: authSource,
+	}
+	gin.SetMode(gin.ReleaseMode)
+
+	if me.authSource == nil {
+		me.authSource = NewDefaultAuthSource(dt)
 	}
 
 	mgmtApi := gin.New()
@@ -172,16 +196,32 @@ func NewFrontend(dt *backend.DataTracker, logger *log.Logger, address string, ap
 		AllowAllOrigins:  true,
 		AllowCredentials: true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"},
-		AllowHeaders:     []string{"Origin", "X-Requested-With", "Content-Type", "Cookie", "Authorization", "WWW-Authenticate", "X-Return-Attributes"},
-		ExposeHeaders:    []string{"Content-Length", "WWW-Authenticate", "Set-Cookie", "Access-Control-Allow-Headers", "Access-Control-Allow-Credentials", "Access-Control-Allow-Origin", "X-Return-Attributes"},
+		AllowHeaders: []string{
+			"Origin",
+			"X-Requested-With",
+			"Content-Type",
+			"Cookie",
+			"Authorization",
+			"WWW-Authenticate",
+			"X-Return-Attributes",
+		},
+		ExposeHeaders: []string{
+			"Content-Length",
+			"WWW-Authenticate",
+			"Set-Cookie",
+			"Access-Control-Allow-Headers",
+			"Access-Control-Allow-Credentials",
+			"Access-Control-Allow-Origin",
+			"X-Return-Attributes",
+		},
 	}))
 
 	mgmtApi.Use(location.Default())
+	me.MgmtApi = mgmtApi
 
 	apiGroup := mgmtApi.Group("/api/v3")
-	apiGroup.Use(userAuth())
-
-	me = &Frontend{Logger: logger, FileRoot: fileRoot, MgmtApi: mgmtApi, ApiGroup: apiGroup, dt: dt, pubs: pubs, pc: pc, ApiPort: apiport, ProvPort: provport, NoDhcp: noDhcp, NoTftp: noTftp, NoProv: noProv, SaasDir: saasDir}
+	apiGroup.Use(me.userAuth())
+	me.ApiGroup = apiGroup
 
 	me.InitIndexApi()
 	me.InitWebSocket()
@@ -471,6 +511,41 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 		}
 	}
 	c.JSON(http.StatusOK, arr)
+}
+
+func (f *Frontend) Exists(c *gin.Context, ref store.KeySaver, key string) {
+	prefix := ref.Prefix()
+	var found bool
+	func() {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("get")...)
+		defer unlocker()
+		objs := d(prefix)
+		idxer, ok := ref.(index.Indexer)
+		if ok {
+			for idxName, idx := range idxer.Indexes() {
+				idxKey := strings.TrimPrefix(key, idxName+":")
+				if key == idxKey {
+					continue
+				}
+				if !idx.Unique {
+					break
+				}
+				items, err := index.All(index.Sort(idx))(&objs.Index)
+				if err == nil {
+					found = items.Find(idxKey) != nil
+				}
+				break
+			}
+		}
+		if !found {
+			found = objs.Find(key) == nil
+		}
+	}()
+	if found {
+		c.Status(http.StatusOK)
+	} else {
+		c.Status(http.StatusNotFound)
+	}
 }
 
 func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {

@@ -38,7 +38,7 @@ type TemplatePatchBodyParameter struct {
 }
 
 // TemplatePathParameter used to name a Template in the path
-// swagger:parameters putTemplates getTemplate putTemplate patchTemplate deleteTemplate
+// swagger:parameters putTemplates getTemplate putTemplate patchTemplate deleteTemplate headTemplate
 type TemplatePathParameter struct {
 	// in: path
 	// required: true
@@ -134,6 +134,22 @@ func (f *Frontend) InitTemplateApi() {
 	f.ApiGroup.GET("/templates/:id",
 		func(c *gin.Context) {
 			f.Fetch(c, &backend.Template{}, c.Param(`id`))
+		})
+
+	// swagger:route HEAD /templates/{name} Templates headTemplate
+	//
+	// See if a Template exists
+	//
+	// Return 200 if the Template specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/templates/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Template{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /templates/{name} Templates patchTemplate

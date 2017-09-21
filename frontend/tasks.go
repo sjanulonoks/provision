@@ -47,7 +47,7 @@ type TaskPatchBodyParameter struct {
 }
 
 // TaskPathParameter used to find a Task in the path
-// swagger:parameters putTasks getTask putTask patchTask deleteTask getTaskParams postTaskParams
+// swagger:parameters putTasks getTask putTask patchTask deleteTask getTaskParams postTaskParams headTask
 type TaskPathParameter struct {
 	// in: path
 	// required: true
@@ -181,6 +181,22 @@ func (f *Frontend) InitTaskApi() {
 	f.ApiGroup.GET("/tasks/:name",
 		func(c *gin.Context) {
 			f.Fetch(c, &backend.Task{}, c.Param(`name`))
+		})
+
+	// swagger:route HEAD /tasks/{name} Tasks headTask
+	//
+	// See if a Task exists
+	//
+	// Return 200 if the Task specifiec by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/tasks/:name",
+		func(c *gin.Context) {
+			f.Exists(c, &backend.Task{}, c.Param(`name`))
 		})
 
 	// swagger:route PATCH /tasks/{name} Tasks patchTask
