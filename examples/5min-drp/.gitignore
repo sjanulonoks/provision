@@ -1,0 +1,10 @@
+.terraform/
+terraform.tfstate
+dr-provision-install/
+private-content/**
+drpcli
+*.bak
+5min-drp-ssh-key*
+packet-ipmi-plugin-create.json
+stagemap-create.json
+!private-content/secrets
