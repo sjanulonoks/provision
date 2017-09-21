@@ -57,7 +57,7 @@ type UserPutPasswordParameter struct {
 }
 
 // UserPathParameter used to name a User in the path
-// swagger:parameters getUser putUser patchUser deleteUser getUserToken putUserPassword
+// swagger:parameters getUser putUser patchUser deleteUser getUserToken putUserPassword headUser
 type UserPathParameter struct {
 	// in: path
 	// required: true
@@ -179,7 +179,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 			f.Fetch(c, &backend.User{}, c.Param(`name`))
 		})
 
-	// swagger:route HEAD /users/{name} Users
+	// swagger:route HEAD /users/{name} Users headUser
 	//
 	// See if a User exists
 	//

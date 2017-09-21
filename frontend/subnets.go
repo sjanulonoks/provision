@@ -38,7 +38,7 @@ type SubnetPatchBodyParameter struct {
 }
 
 // SubnetPathParameter used to name a Subnet in the path
-// swagger:parameters putSubnets getSubnet putSubnet patchSubnet deleteSubnet
+// swagger:parameters putSubnets getSubnet putSubnet patchSubnet deleteSubnet headSubnet
 type SubnetPathParameter struct {
 	// in: path
 	// required: true
@@ -148,7 +148,7 @@ func (f *Frontend) InitSubnetApi() {
 			f.Fetch(c, &backend.Subnet{}, c.Param(`name`))
 		})
 
-	// swagger:route HEAD /subnets/{name} Subnets
+	// swagger:route HEAD /subnets/{name} Subnets headSubnet
 	//
 	// See if a Subnet exists
 	//

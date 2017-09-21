@@ -38,7 +38,7 @@ type TemplatePatchBodyParameter struct {
 }
 
 // TemplatePathParameter used to name a Template in the path
-// swagger:parameters putTemplates getTemplate putTemplate patchTemplate deleteTemplate
+// swagger:parameters putTemplates getTemplate putTemplate patchTemplate deleteTemplate headTemplate
 type TemplatePathParameter struct {
 	// in: path
 	// required: true
@@ -136,7 +136,7 @@ func (f *Frontend) InitTemplateApi() {
 			f.Fetch(c, &backend.Template{}, c.Param(`id`))
 		})
 
-	// swagger:route HEAD /templates/{name} Templates
+	// swagger:route HEAD /templates/{name} Templates headTemplate
 	//
 	// See if a Template exists
 	//

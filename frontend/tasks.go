@@ -47,7 +47,7 @@ type TaskPatchBodyParameter struct {
 }
 
 // TaskPathParameter used to find a Task in the path
-// swagger:parameters putTasks getTask putTask patchTask deleteTask getTaskParams postTaskParams
+// swagger:parameters putTasks getTask putTask patchTask deleteTask getTaskParams postTaskParams headTask
 type TaskPathParameter struct {
 	// in: path
 	// required: true
@@ -183,7 +183,7 @@ func (f *Frontend) InitTaskApi() {
 			f.Fetch(c, &backend.Task{}, c.Param(`name`))
 		})
 
-	// swagger:route HEAD /tasks/{name} Tasks
+	// swagger:route HEAD /tasks/{name} Tasks headTask
 	//
 	// See if a Task exists
 	//
