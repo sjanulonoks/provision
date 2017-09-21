@@ -87,6 +87,157 @@ func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	return
 }
 
+func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
+	getAll, setAll, getOne, setOne func(c *gin.Context)) {
+	return func(c *gin.Context) {
+			id := c.Param(idKey)
+			var ref models.Model
+			aggregate := false
+			if c.Query("aggregate") == "true" {
+				aggregate = true
+			}
+			p := func() map[string]interface{} {
+				d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
+				defer unlocker()
+				ref = d(obj.Prefix()).Find(id)
+				if ref != nil {
+					return ref.(backend.Paramer).GetParams(d, aggregate)
+				}
+				return nil
+			}()
+			if ref == nil {
+				err := &models.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: obj.Prefix(),
+					Key:   id,
+				}
+				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
+				c.JSON(err.Code, err)
+				return
+			}
+			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
+				return
+			}
+			c.JSON(http.StatusOK, p)
+		},
+		func(c *gin.Context) {
+			var val map[string]interface{}
+			if !assureDecode(c, &val) {
+				return
+			}
+			id := c.Param(idKey)
+			var ref models.Model
+			func() {
+				d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
+				defer unlocker()
+				ref = d(obj.Prefix()).Find(id)
+			}()
+			if ref == nil {
+				err := &models.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: obj.Prefix(),
+					Key:   id,
+				}
+				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
+				c.JSON(err.Code, err)
+				return
+			}
+			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
+				return
+			}
+
+			m := ref.(backend.Paramer)
+			var err error
+			func() {
+				d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
+				defer unlocker()
+				err = m.SetParams(d, val)
+			}()
+			if err != nil {
+				be, _ := err.(*models.Error)
+				c.JSON(be.Code, be)
+			} else {
+				c.JSON(http.StatusOK, val)
+			}
+		},
+		func(c *gin.Context) {
+			id := c.Param(idKey)
+			var ref models.Model
+			aggregate := false
+			if c.Query("aggregate") == "true" {
+				aggregate = true
+			}
+			paramKey := c.Param("key")
+			val, _ := func() (interface{}, bool) {
+				d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
+				defer unlocker()
+				ref = d(obj.Prefix()).Find(id)
+				if ref != nil {
+					return ref.(backend.Paramer).GetParam(d, paramKey, aggregate)
+				}
+				return nil, false
+			}()
+			if ref == nil {
+				err := &models.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: obj.Prefix(),
+					Key:   id,
+				}
+				err.Errorf("%s GET Param: %s: Not Found", err.Model, err.Key)
+				c.JSON(err.Code, err)
+				return
+			}
+			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
+				return
+			}
+			c.JSON(http.StatusOK, val)
+		},
+		func(c *gin.Context) {
+			var val interface{}
+			if !assureDecode(c, &val) {
+				return
+			}
+			id := c.Param(idKey)
+			paramKey := c.Param("key")
+			var ref models.Model
+			func() {
+				d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
+				defer unlocker()
+				ref = d(obj.Prefix()).Find(id)
+			}()
+			if ref == nil {
+				err := &models.Error{
+					Code:  http.StatusNotFound,
+					Type:  "API_ERROR",
+					Model: obj.Prefix(),
+					Key:   id,
+				}
+				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
+				c.JSON(err.Code, err)
+				return
+			}
+			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
+				return
+			}
+			m := ref.(backend.Paramer)
+			var err error
+			func() {
+				d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
+				defer unlocker()
+				err = m.SetParam(d, paramKey, val)
+			}()
+			if err != nil {
+				be, _ := err.(*models.Error)
+				c.JSON(be.Code, be)
+			} else {
+				c.JSON(http.StatusOK, val)
+			}
+		}
+}
+
 func (fe *Frontend) userAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.Request.Header.Get("Authorization")

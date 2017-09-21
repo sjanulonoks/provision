@@ -396,16 +396,16 @@ func (n *Machine) SetParams(d Stores, values map[string]interface{}) error {
 	return e.HasError()
 }
 
-func (n *Machine) GetParam(d Stores, key string, searchProfiles bool) (interface{}, bool) {
+func (n *Machine) GetParam(d Stores, key string, aggregate bool) (interface{}, bool) {
 	mm := n.GetParams(d, false)
 	if v, found := mm[key]; found {
 		return v, true
 	}
-	if searchProfiles {
+	if aggregate {
 		// Check profiles for params
 		for _, e := range n.Profiles {
 			if p := n.getProfile(d, e); p != nil {
-				if v, ok := p.GetParam(key, false); ok {
+				if v, ok := p.GetParam(d, key, false); ok {
 					return v, true
 				}
 			}
@@ -415,7 +415,7 @@ func (n *Machine) GetParam(d Stores, key string, searchProfiles bool) (interface
 		if stage != nil {
 			for _, pn := range stage.Profiles {
 				if p := n.getProfile(d, pn); p != nil {
-					if v, ok := p.GetParam(key, false); ok {
+					if v, ok := p.GetParam(d, key, false); ok {
 						return v, true
 					}
 				}
@@ -429,6 +429,14 @@ func (n *Machine) GetParam(d Stores, key string, searchProfiles bool) (interface
 		}
 	}
 	return nil, false
+}
+
+func (n *Machine) SetParam(d Stores, key string, val interface{}) error {
+	n.Profile.Params[key] = val
+	e := &models.Error{Code: 422, Type: ValidationError, Object: n}
+	_, e2 := n.p.Save(d, n)
+	e.AddError(e2)
+	return e.HasError()
 }
 
 func (n *Machine) New() store.KeySaver {

@@ -7,6 +7,14 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
+type Paramer interface {
+	models.Model
+	GetParams(Stores, bool) map[string]interface{}
+	SetParams(Stores, map[string]interface{}) error
+	GetParam(Stores, string, bool) (interface{}, bool)
+	SetParam(Stores, string, interface{}) error
+}
+
 // Param represents metadata about a Parameter or a Preference.
 // Specifically, it contains a description of what the information
 // is for, detailed documentation about the param, and a JSON schema that
