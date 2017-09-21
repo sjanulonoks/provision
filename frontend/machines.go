@@ -45,6 +45,13 @@ type MachineParamsResponse struct {
 	Body map[string]interface{}
 }
 
+// MachineParamResponse return on a successful GET of a single Machine param
+// swagger:response
+type MachineParamResponse struct {
+	// in: body
+	Body interface{}
+}
+
 // MachineActionPostResponse return on a successful POST of action
 // swagger:response
 type MachineActionPostResponse struct {
@@ -81,6 +88,18 @@ type MachinePathParameter struct {
 	Uuid uuid.UUID `json:"uuid"`
 }
 
+// MachineSetPathParameter used to set a single parameter on a single machine
+// swagger:parameters postMachineParam
+type MachinePostParamPathParameter struct {
+	// in: path
+	// required: true
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
+	// in: path
+	//required: true
+	Key string `json:"key"`
+}
+
 // MachineGetParamsPathParameter used to find a Machine in the path
 // swagger:parameters getMachineParams
 type MachineGetParamsPathParameter struct {
@@ -90,6 +109,20 @@ type MachineGetParamsPathParameter struct {
 	// required: true
 	// swagger:strfmt uuid
 	Uuid uuid.UUID `json:"uuid"`
+}
+
+//  MachineGetParamPathParemeter used to get a single Parameter for a single Machine
+// swagger:parameters getMachineParam
+type MachineGetParamPathParemeter struct {
+	// in: query
+	Aggregate string `json:"aggregate"`
+	// in: path
+	// required: true
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
+	// in: path
+	//required: true
+	Key string `json:"key"`
 }
 
 // MachineActionPathParameter used to find a Machine / Action in the path
@@ -125,6 +158,14 @@ type MachineParamsBodyParameter struct {
 	// in: body
 	// required: true
 	Body map[string]interface{}
+}
+
+// MachineParamsBodyParameter used to set Machine Params
+// swagger:parameters postMachineParam
+type MachineParamBodyParameter struct {
+	// in: body
+	// required: true
+	Body interface{}
 }
 
 // MachineListPathParameter used to limit lists of Machine by path options
@@ -341,6 +382,8 @@ func (f *Frontend) InitMachineApi() {
 			f.Remove(c, &backend.Machine{}, c.Param(`uuid`))
 		})
 
+	pGetAll, pSetAll, pGetOne, pSetOne := f.makeParamEndpoints(&backend.Machine{}, "uuid")
+
 	// swagger:route GET /machines/{uuid}/params Machines getMachineParams
 	//
 	// List machine params Machine
@@ -352,42 +395,7 @@ func (f *Frontend) InitMachineApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
-	f.ApiGroup.GET("/machines/:uuid/params",
-		func(c *gin.Context) {
-			uuid := c.Param(`uuid`)
-			b := &backend.Machine{}
-			var ref models.Model
-
-			aggregate := false
-			if c.Query("aggregate") == "true" {
-				aggregate = true
-			}
-
-			p := func() map[string]interface{} {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("get")...)
-				defer unlocker()
-				ref = d("machines").Find(uuid)
-				if ref != nil {
-					return backend.AsMachine(ref).GetParams(d, aggregate)
-				}
-				return nil
-			}()
-			if ref == nil {
-				err := &models.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: "machines",
-					Key:   uuid,
-				}
-				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
-				return
-			}
-			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
-				return
-			}
-			c.JSON(http.StatusOK, p)
-		})
+	f.ApiGroup.GET("/machines/:uuid/params", pGetAll)
 
 	// swagger:route POST /machines/{uuid}/params Machines postMachineParams
 	//
@@ -399,49 +407,32 @@ func (f *Frontend) InitMachineApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
-	f.ApiGroup.POST("/machines/:uuid/params",
-		func(c *gin.Context) {
-			var val map[string]interface{}
-			if !assureDecode(c, &val) {
-				return
-			}
-			uuid := c.Param(`uuid`)
-			b := &backend.Machine{}
-			var ref models.Model
-			func() {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("get")...)
-				defer unlocker()
-				ref = d("machines").Find(uuid)
-			}()
-			if ref == nil {
-				err := &models.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: "machines",
-					Key:   uuid,
-				}
-				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
-				return
-			}
-			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
-				return
-			}
+	f.ApiGroup.POST("/machines/:uuid/params", pSetAll)
 
-			m := backend.AsMachine(ref)
-			var err error
-			func() {
-				d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
-				defer unlocker()
-				err = m.SetParams(d, val)
-			}()
-			if err != nil {
-				be, _ := err.(*models.Error)
-				c.JSON(be.Code, be)
-			} else {
-				c.JSON(http.StatusOK, val)
-			}
-		})
+	// swagger:route GET /machines/{uuid}/params/{key} Machines getMachineParam
+	//
+	// Get a single machine parameter
+	//
+	// Get a single parameter {key} for a Machine specified by {uuid}
+	//
+	//     Responses:
+	//       200: MachineParamResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/machines/:uuid/params/:key", pGetOne)
+
+	// swagger:route POST /machines/{uuid}/params/{key} Machines postMachineParam
+	//
+	// Set as single Parameter {key} for a machine specified by {uuid}
+	//
+	//     Responses:
+	//       200: MachineParamResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/machines/:uuid/params/:key", pSetOne)
 
 	// swagger:route GET /machines/{uuid}/actions Machines getMachineActions
 	//

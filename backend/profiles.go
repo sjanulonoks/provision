@@ -58,7 +58,7 @@ func (p *Profile) Backend() store.Store {
 	return p.p.getBackend(p)
 }
 
-func (p *Profile) GetParams() map[string]interface{} {
+func (p *Profile) GetParams(d Stores, aggregate bool) map[string]interface{} {
 	m := p.Params
 	if m == nil {
 		m = map[string]interface{}{}
@@ -74,12 +74,20 @@ func (p *Profile) SetParams(d Stores, values map[string]interface{}) error {
 	return e.HasError()
 }
 
-func (p *Profile) GetParam(key string, searchProfiles bool) (interface{}, bool) {
-	mm := p.GetParams()
+func (p *Profile) GetParam(d Stores, key string, aggregate bool) (interface{}, bool) {
+	mm := p.GetParams(d, aggregate)
 	if v, found := mm[key]; found {
 		return v, true
 	}
 	return nil, false
+}
+
+func (p *Profile) SetParam(d Stores, key string, val interface{}) error {
+	p.Params[key] = val
+	e := &models.Error{Code: 422, Type: ValidationError, Object: p}
+	_, e2 := p.p.Save(d, p)
+	e.AddError(e2)
+	return e.HasError()
 }
 
 func (p *Profile) New() store.KeySaver {

@@ -1,8 +1,6 @@
 package frontend
 
 import (
-	"net/http"
-
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
@@ -30,6 +28,13 @@ type ProfileParamsResponse struct {
 	Body map[string]interface{}
 }
 
+// ProfileParamResponse return on a successful GET of a single Param for a Profile
+// swagger:response
+type ProfileParamResponse struct {
+	// in: body
+	Body interface{}
+}
+
 // ProfileBodyParameter used to inject a Profile
 // swagger:parameters createProfile putProfile
 type ProfileBodyParameter struct {
@@ -54,9 +59,28 @@ type ProfilePathParameter struct {
 	Name string `json:"name"`
 }
 
+// ProfileParamsPathParameter used to get or set a single Parameter in a Profile
+// swagger:parameters getProfileParam postProfileParam
+type ProfileParamsPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Key string `json:"key"`
+}
+
 // ProfileParamsBodyParameter used to set Profile Params
 // swagger:parameters postProfileParams
 type ProfileParamsBodyParameter struct {
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
+// ProfileParamBodyParameter used to set a single Param on a Profile
+// swagger:parameters postProfileParam
+type ProfileParamBodyParameter struct {
 	// in: body
 	// required: true
 	Body map[string]interface{}
@@ -221,6 +245,8 @@ func (f *Frontend) InitProfileApi() {
 			f.Remove(c, &backend.Profile{}, c.Param(`name`))
 		})
 
+	pGetAll, pSetAll, pGetOne, pSetOne := f.makeParamEndpoints(&backend.Profile{}, "name")
+
 	// swagger:route GET /profiles/{name}/params Profiles getProfileParams
 	//
 	// List profile params Profile
@@ -232,33 +258,7 @@ func (f *Frontend) InitProfileApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
-	f.ApiGroup.GET("/profiles/:name/params",
-		func(c *gin.Context) {
-			name := c.Param(`name`)
-			var res models.Model
-			tp := &backend.Profile{}
-			func() {
-				d, unlocker := f.dt.LockEnts(models.Model(tp).(Lockable).Locks("get")...)
-				defer unlocker()
-				res = d("profiles").Find(name)
-			}()
-			if res == nil {
-				err := &models.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: "profiles",
-					Key:   name,
-				}
-				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
-				return
-			}
-			if !assureAuth(c, f.Logger, res.Prefix(), "get", res.Key()) {
-				return
-			}
-			p := backend.AsProfile(res).GetParams()
-			c.JSON(http.StatusOK, p)
-		})
+	f.ApiGroup.GET("/profiles/:name/params", pGetAll)
 
 	// swagger:route POST /profiles/{name}/params Profiles postProfileParams
 	//
@@ -270,47 +270,30 @@ func (f *Frontend) InitProfileApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
-	f.ApiGroup.POST("/profiles/:name/params",
-		func(c *gin.Context) {
-			var val map[string]interface{}
-			if !assureDecode(c, &val) {
-				return
-			}
-			name := c.Param(`name`)
-			var res models.Model
-			tp := &backend.Profile{}
-			func() {
-				d, unlocker := f.dt.LockEnts(models.Model(tp).(Lockable).Locks("get")...)
-				defer unlocker()
-				res = d("profiles").Find(name)
-			}()
-			if res == nil {
-				err := &models.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: "profiles",
-					Key:   name,
-				}
-				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
-				return
-			}
-			if !assureAuth(c, f.Logger, res.Prefix(), "get", res.Key()) {
-				return
-			}
-			m := backend.AsProfile(res)
-			var err error
-			func() {
-				d, unlocker := f.dt.LockEnts(res.(Lockable).Locks("update")...)
-				defer unlocker()
-				err = m.SetParams(d, val)
-			}()
-			if err != nil {
-				be, _ := err.(*models.Error)
-				c.JSON(be.Code, be)
-			} else {
-				c.JSON(http.StatusOK, val)
-			}
-		})
+	f.ApiGroup.POST("/profiles/:name/params", pSetAll)
 
+	// swagger:route GET /profiles/{name}/params/{key} Profiles getProfileParam
+	//
+	// Get a single profile parameter
+	//
+	// Get a single parameter {key} for a Profile specified by {name}
+	//
+	//     Responses:
+	//       200: ProfileParamResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/profiles/:name/params/:key", pGetOne)
+
+	// swagger:route POST /profiles/{name}/params/{key} Profiles postProfileParam
+	//
+	// Set as single Parameter {key} for a profile specified by {name}
+	//
+	//     Responses:
+	//       200: ProfileParamResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/profiles/:name/params/:key", pSetOne)
 }
