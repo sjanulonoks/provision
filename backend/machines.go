@@ -507,11 +507,13 @@ func (n *Machine) Validate() {
 	if n.Stage != "" {
 		if stages == nil {
 			n.Errorf("Stage %s does not exist", n.Stage)
+			n.SetInvalid() // Force Fatal
 		} else {
 			if nbFound := stages.Find(n.Stage); nbFound == nil {
 				n.CurrentTask = 0
 				n.Tasks = []string{}
 				n.Errorf("Stage %s does not exist", n.Stage)
+				n.SetInvalid() // Force Fatal
 			} else {
 				stage := AsStage(nbFound)
 				if !stage.Available {
@@ -595,7 +597,7 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	// If we have a stage set, don't change bootenv unless force
 	if n.Stage != "" && n.oldStage == n.Stage && n.oldBootEnv != n.BootEnv && !n.ChangeForced() {
 		e := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
-		e.Errorf("Can not change bootenv while in a stage unless forced.")
+		e.Errorf("Can not change bootenv while in a stage unless forced. old: %s new %s", n.oldBootEnv, n.BootEnv)
 		return e
 	}
 	return nil
