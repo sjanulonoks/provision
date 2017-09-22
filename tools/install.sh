@@ -5,34 +5,43 @@ set -e
 DEFAULT_DRP_VERSION="stable"
 
 usage() {
-        echo
-	echo "Usage: $0 [--drp-version=<Version to install>] [--nocontent] [--isolated] [--ipaddr=<ip>] <install|remove>"
-        echo
-        echo "Options:"
-        echo "  --debug=[true|false] # Enables debug output"
-        echo "  --isolated # Sets up the current directory as a place to the cli and provision"
-        echo "  --nocontent # Don't add content to the system"
-        echo "  --ipaddr=<ip> # The IP to use for the system identified IP.  The system will attempt to discover the value"
-        echo "                # if not specified"
-        echo "  --drp-version=<string>  # Version identifier if downloading.  stable, tip, or specific version label."
-        echo "                         # Defaults to $DEFAULT_DRP_VERSION"
-        echo
-        echo "  install    # Sets up an insolated or system enabled install.  Outputs nexts steps"
-        echo "  remove     # Removes the system enabled install.  Requires no other flags"
-	echo "Defaults are: "
-	echo "  version = tip (instead of v2.9.1003)"
-        echo "  isolated = false"
-        echo "  nocontent = false"
-        echo "  force = false"
-        echo "  debug = false"
-        echo
-	exit 1
+cat <<EOFUSAGE
+Usage: $0 [--drp-version=<Version to install>] [--nocontent]
+          [--isolate] [--ipaddr=<ip>] install | remove
+
+Options:
+    --debug=[true|false]    # Enables debug output
+    --force=[true|false]    # Forces an overwrite of local install binaries and content
+    --upgrade=[true|false]  # Turns on 'force' option to overwrite local binaries/content
+    --isolated              # Sets up current directory as install location for drpcli
+                            # and dr-provision
+    --nocontent             # Don't add content to the system
+    --ipaddr=<ip>           # The IP to use for the system identified IP.  The system
+                            # will attepmto to discover the value if not specified
+    --drp-version=<string>  # Version identifier if downloading.  stable, tip, or
+                            # specific version label.  Defaults to: $DEFAULT_DRP_VERSION
+
+    install                 # Sets up an insolated or system 'production' enabled install.
+    remove                  # Removes the system enabled install.  Requires no other flags
+
+Defaults are:
+    version     = tip       (examples: 'tip', 'v2.9.1003' or 'stable')
+    isolated    = false
+    nocontent   = false
+    upgrade     = false
+    force       = false
+    debug       = false
+EOFUSAGE
+
+exit 0
 }
 
 DRP_VERSION=$DEFAULT_DRP_VERSION
 ISOLATED=false
 NO_CONTENT=false
 DBG=false
+UPGRADE=false
+
 args=()
 while (( $# > 0 )); do
     arg="$1"
@@ -48,6 +57,13 @@ while (( $# > 0 )); do
             ;;
         --isolated)
             ISOLATED=true
+            ;;
+        --force)
+            force=true
+            ;;
+        --upgrade)
+            UPGRADE=true
+            force=true
             ;;
         --nocontent)
             NO_CONTENT=true
@@ -201,7 +217,7 @@ case $1 in
                  echo "'dr-provision' service is running, CAN NOT upgrade ... please stop service first"
                  exit 9
              else
-                 echo "'dr-provision' service is not running, beginning install process"
+                 echo "'dr-provision' service is not running, beginning install process ... "
              fi
 
              ensure_packages
@@ -238,6 +254,7 @@ case $1 in
                  if [[ $initfile ]]; then
                      if [[ -r $initfile ]]
                      then
+                         echo "WARNING ... WARNING ... WARNING"
                          echo "initfile ('$initfile') exists already, not overwriting it"
                          echo "please verify 'dr-provision' startup options are correct"
                          echo "for your environment and the new version .. "
@@ -258,6 +275,11 @@ case $1 in
                      sudo mv /var/lib/dr-provision $DIR
                      sudo mkdir -p /var/lib/dr-provision
                      sudo mv $DIR/* /var/lib/dr-provision/digitalrebar
+                 fi
+
+                 if [[ ! -e /var/lib/dr-provision/digitalrebar/tftpboot && -e /var/lib/tftpboot ]] ; then
+                     echo "MOVING /var/lib/tftpboot to /var/lib/dr-provision/tftpboot location ... "
+                     sudo mv /var/lib/tftpboot /var/lib/dr-provision/
                  fi
 
                  sudo mkdir -p /usr/share/dr-provision
