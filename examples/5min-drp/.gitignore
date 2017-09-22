@@ -1,9 +1,13 @@
+.*.swp
+bin/**
+tmp/
 .terraform/
 terraform.tfstate
 dr-provision-install/
 private-content/**
 drpcli
 *.bak
+*.backup
 5min-drp-ssh-key*
 packet-ipmi-plugin-create.json
 stagemap-create.json

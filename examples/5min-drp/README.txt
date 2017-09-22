@@ -18,8 +18,10 @@ README file for 5min-drp
 
 The following are the basic steps 
 
-git clone <something>
-cd 5min-drp
+git clone -n https://github.com/digitalrebar/provision.git --depth=1
+cd provision
+git checkout HEAD examples/5min-drp
+cd examples/5min-drp
 
 # EDIT THE SECRETS FILE !!  You need:
 # 
@@ -30,7 +32,12 @@ cd 5min-drp
 
 # staged demo includes our 'secrets' and RackN private content
 # which we'll copy over here to make things easier
-# cp ../private-content/* private-content/
+cp ../private-content/drp-rack-plugins* ./private-content/
+cp ../private-content/terraform-provider-packet bin/
+# extra content
+cp ../private-content/5min* ./
+cp ../private-content/terraform.tfstate ./
+cp ../private-content/secrets ./private-content
 
 ./control.sh install-terraform    # installs terraform locally
 ./control.sh install-secrets      # installs API and PROJECT secrets for Terraform files
