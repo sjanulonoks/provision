@@ -32,6 +32,7 @@ usage() {
 DRP_VERSION=$DEFAULT_DRP_VERSION
 ISOLATED=false
 NO_CONTENT=false
+DBG=false
 args=()
 while (( $# > 0 )); do
     arg="$1"
@@ -41,6 +42,9 @@ while (( $# > 0 )); do
         --help|-h)
             usage
             exit 0
+            ;;
+        --debug)
+            DBG=true
             ;;
         --isolated)
             ISOLATED=true
@@ -64,12 +68,10 @@ while (( $# > 0 )); do
 done
 set -- "${args[@]}"
 
-if [[ $DEBUG == true ]] ; then
-    set -x
-fi
+[[ $DBG == true ]] && set -x
 
 # Figure out what Linux distro we are running on.
-export OS_TYPE= OS_VER= OS_NAME=
+export OS_TYPE= OS_VER= OS_NAME= OS_FAMILY=
 
 if [[ -f /etc/os-release ]]; then
     . /etc/os-release
@@ -194,6 +196,14 @@ esac
 
 case $1 in
      install)
+             if ( ps -ef | grep -v grep | grep -q dr-provision )
+             then
+                 echo "'dr-provision' service is running, CAN NOT upgrade ... please stop service first"
+                 exit 9
+             else
+                 echo "'dr-provision' service is not running, beginning install process"
+             fi
+
              ensure_packages
              # Are we in a build tree
              if [ -e server ] ; then
@@ -226,7 +236,16 @@ case $1 in
              if [[ $ISOLATED == false ]] ; then
                  sudo cp "$binpath"/* "$bindest"
                  if [[ $initfile ]]; then
-                     sudo cp "$initfile" "$initdest"
+                     if [[ -r $initfile ]]
+                     then
+                         echo "initfile ('$initfile') exists already, not overwriting it"
+                         echo "please verify 'dr-provision' startup options are correct"
+                         echo "for your environment and the new version .. "
+                         echo ""
+                         echo "specifically verify: '--file-root=<tftpboot directory>'"
+                     else
+                         sudo cp "$initfile" "$initdest"
+                     fi
                      echo "# You can start the DigitalRebar Provision service with:"
                      echo "$starter"
                      echo "# You can enable the DigitalRebar Provision service with:"
@@ -235,10 +254,10 @@ case $1 in
 
                  # handle the v3.0.X to v3.1.0 directory structure.
                  if [[ ! -e /var/lib/dr-provision/digitalrebar && -e /var/lib/dr-provision ]] ; then
-                     DIR=$(mktemp)
+                     DIR=$(mktemp -d)
                      sudo mv /var/lib/dr-provision $DIR
                      sudo mkdir -p /var/lib/dr-provision
-                     sudo mv $DIR /var/lib/dr-provision/digitalrebar
+                     sudo mv $DIR/* /var/lib/dr-provision/digitalrebar
                  fi
 
                  sudo mkdir -p /usr/share/dr-provision
