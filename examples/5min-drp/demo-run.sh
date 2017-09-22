@@ -35,13 +35,24 @@ function confirm() {
   fi
 }
 
-#echo "ACTION: Cloning GIT repo contents ... "
-#git clone <something>
-#cd 5min-drp
+###
+#  we assume you've checked out the examples/5min-drp/ directory from the
+#  Digital Rebar Provision repo ... do something like:
+###
+# echo "ACTION: Cloning GIT repo contents ... "
+# git clone -n https://github.com/digitalrebar/provision.git --depth=1
+# cd provision
+# git checkout HEAD examples/5min-drp
+# cd ..
+# mv examples/5min-drp ./
+# cd 5min-drp
 
 #
 #vim private-content/secrets
-# cp ../private-content/* private-content/
+echo "Staging terraform plugins, private content, and secrets ... "
+cp ../private-content/drp-rack-plugins* ./private-content/
+cp ../private-content/terraform-provider-packet bin/
+cp ../private-content/secrets ./private-content
 
 # installs terraform locally
 confirm ./control.sh install-terraform    
@@ -52,9 +63,15 @@ confirm ./control.sh install-secrets
 # removes ssh keys if exists and generates new keys
 confirm ./control.sh ssh-keys             
 
-# create our DRP endpoint instance
-confirm terraform apply                   
-# view our completed plan status
+# apply our SSH keys 
+confirm terraform apply -target=packet_ssh_key.5min-drp
+confirm terraform apply -target=packet_ssh_key.5min-nodes
+
+# build our DRP server
+confirm terraform apply -target=packet_device.5min-drp
+
+# view our completed plan status -- NOTE the "5min-nodes"
+# do NOT get applied until after 5min-drp is finished 
 confirm terraform plan                    
 
 # installs DRP locally for CLI commands
@@ -68,8 +85,6 @@ confirm export DRP=`./control.sh get-drp-id`
 
 # install DRP and basic content as identified by <ID>
 confirm ./control.sh drp-install $DRP     
-# check that DRP is running
-./control.sh ssh $DRP "ps -ef | grep dr-provision"
 
 case $1 in 
   local)
@@ -87,6 +102,10 @@ case $1 in
     confirm ./control.sh remote-content $DRP  
   ;;
 esac
+
+# bring up our DRP target nodes:
+#confirm terraform apply -target=packet_device.5min-nodes
+confirm TF_VAR_node_count=2 terraform apply -target=packet_device.5min-nodes
 
 # helper functions ... not used in demo
 #./control.sh get-address <ID>     # get the IP address of new DRP server identified by <ID>

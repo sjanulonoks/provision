@@ -36,20 +36,23 @@ source ./private-content/secrets || xiterr 1 "unable to source './secrets' file 
 [[ -z "$API_KEY" ]] && xiterr 1 "API_KEY is empty ... bailing - check secrets file"
 [[ -z "$PROJECT_ID" ]] && xiterr 1 "PROJECT_ID is empty ... bailing - check secrets file"
 
-SSH_KEY=${SSH_KEY:-"5min-drp-ssh-key"}
+SSH_DRP_KEY=${SSH_DRP_KEY:-"5min-drp-ssh-key"}
+#SSH_NODES_KEY=${SSH_NODES_KEY:-"5min-nodes-ssh-key"}
 MY_OS=${MY_OS:-"darwin"}
 MY_ARCH=${MY_ARCH:-"amd64"}
 TF_VER=${TF_VER:-"0.10.5"}
 DRP_OS=${DRP_OS:-"linux"}
 DRP_ARCH=${DRP_ARCH:-"amd64"}
 CREDS=${CREDS:-"--username=rocketskates --password=r0cketsk8ts"}
-NODE_OS=${NODE_OS:-"ce-centos-7.3.1611"}  # ce-ubuntu-16.04
+# do not use the CE based bootenvs for the Packet.net 5min demo
+NODE_OS=${NODE_OS:-"centos-7.3.1611-install"}  # ubuntu-16.04-install
 
 CURL="curl -sfSL"
-DRPCLI="./drpcli"
+DRPCLI="drpcli"
 
 # add HOME/bin to path if it's not there already
 [[ ":$PATH:" != *":$HOME/bin:"* ]] && PATH="$HOME/bin:${PATH}"
+[[ ":$PATH:" != *":`pwd`/bin:"* ]] && PATH="`pwd`/bin:${PATH}"
 
 function usage() {
 
@@ -57,20 +60,20 @@ cat <<END_USAGE
 USAGE:  $0 [arguments]
 WHERE: arguments are as follows:
 
-        install-terraform    installs terraform locally
-        install-secrets      installs API and PROJECT secrets for Terraform files
-        ssh-keys             removes ssh keys if exists and generates new keys
-        get-drp-local        installs DRP locally
-        get-drp-content      installs DRP community content locally
-        get-drp-plugins      installs DRP Packet Plugins
-        remote-content <ID>  runs 'get-drp-content' and 'get-drp-plugins' on remote <ID>
-        get-drp-id           get the DRP endpoint server ID
-        get-address <ID>     get the IP address of new DRP server identified by <ID>
-        ssh <ID> [COMMANDS]  ssh to the IP address of DRP server identified by <ID>
-        scp <ID> [FILES]     ssh to the IP address of DRP server identified by <ID>
-        drp-install <ID>     install DRP and basic content as identified by <ID>
-        drp-setup <ID>       perform content and plugins setup on <ID> endpoint
-        cleanup              WARNING WARNING WARNING
+    install-terraform    installs terraform locally
+    install-secrets      installs API and PROJECT secrets for Terraform files
+    ssh-keys             removes ssh keys if exists and generates new keys
+    get-drp-local        installs DRP locally
+    get-drp-content      installs DRP community content locally
+    get-drp-plugins      installs DRP Packet Plugins
+    remote-content <ID>  do 'get-drp-content' and 'get-drp-plugins' on remote <ID>
+    get-drp-id           get the DRP endpoint server ID
+    get-address <ID>     get the IP address of new DRP server identified by <ID>
+    ssh <ID> [COMMANDS]  ssh to the IP address of DRP server identified by <ID>
+    scp <ID> [FILES]     ssh to the IP address of DRP server identified by <ID>
+    drp-install <ID>     install DRP and basic content as identified by <ID>
+    drp-setup <ID>       perform content and plugins setup on <ID> endpoint
+    cleanup              WARNING WARNING WARNING
 
 CLEANUP:  WARNING - cleanup will NUKE things - like your private SSH KEY (and more) !!!!!!!!!
 
@@ -85,7 +88,8 @@ CLEANUP:  WARNING - cleanup will NUKE things - like your private SSH KEY (and mo
           * <ID>  is the ID of the DRP endpoint that is created by terraform 
 
           * you can override built in defaults by setting the following variables:
-               SSH_KEY  MY_OS  MY_ARCH  TF_VER  DRP_OS  DRP_ARCH  CREDS  NODE_OS
+               SSH_DRP_KEY  SSH_NODES_KEY MY_OS    MY_ARCH  TF_VER  DRP_OS  
+               DRP_ARCH     CREDS         NODE_OS
 
 END_USAGE
 } # end usaage()
@@ -171,16 +175,25 @@ function os_info() {
 
 prereqs 
 
+# we're going to stuff some binaries in the local bin/ path
+PATH=`pwd`/bin:$PATH
+
 case $1 in 
   usage|--usage|help|--help|-h)
     usage
     ;;
 
   install-secrets)
-      sed -i.bak                                    \
-        -e "s/insert_api_key_here/$API_KEY/g"       \
-        -e "s/insert_project_id_here/$PROJECT_ID/g" \
+      sed -i.bak                                           \
+        -e "s/insert_api_key_here/$API_KEY/g"              \
+        -e "s/insert_project_id_here/$PROJECT_ID/g"        \
         vars.tf
+      if (( $? ))
+      then
+        xiterr 1 "unable to install secrets to vars.tf"
+      else
+        echo "Secrets installed to vars.tf ..."
+      fi
     ;;
 
   get-drp-local)
@@ -194,24 +207,35 @@ case $1 in
     unzip dr-provision.zip
     cd ..
 
-    ln -s `pwd`/dr-provision-install/bin/${MY_OS}/${MY_ARCH}/drpcli `pwd`/drpcli
-    $DRPCLI version || xiterr 1 "failed to install DRP endpoint in current directory"
+    ln -s `pwd`/dr-provision-install/bin/${MY_OS}/${MY_ARCH}/drpcli `pwd`/bin/drpcli
+    $DRPCLI version || xiterr 1 "failed to install DRP endpoint in bin/ directory"
     ;;
 
   install-terraform)
     # get, and install terraform
-    cd /tmp
-    mkdir -p $HOME/bin
+    mkdir -p bin
+    mkdir -p tmp
+    cd tmp
     wget -O tf.zip https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_${MY_OS}_${MY_ARCH}.zip && unzip tf.zip
-    mv terraform $HOME/bin/ && chmod 755 $HOME/bin/terraform
+    mv terraform ../bin/ && chmod 755 ../bin/terraform
     rm tf.zip
+    cd ..
+    rm -rf tmp
 
-    cd -
+    # since the terraform-provider-packet plugin requires GO to compile - we are pre requiring
+    # you to pre-stage it - we need the latest plugin to support the "always_pxe" option - if you
+    # have GO 1.9.0 or newer - you can get/compile/install it with:
+    #    go get -u github.com/terraform-providers/terraform-provider-packet
+    # copy the plugin out of the generated bin/ directory 
+    
+    TF_PLUG="`pwd`/bin/terraform-provider-packet"
+    [[ ! -r "${TF_PLUG}" ]] && xiterr 4 "Terraform packet plugin not found ('$TF_PLUG')"
+    echo "providers { packet = \"${TF_PLUG}\" }" >> $HOME/.terraformrc
     terraform init
     ;;
 
   get-drp-content)
-    echo "No content being added, exists already ... "
+    echo ""
 #    rm -rf dr-provision-install/drp-community-content.*
 #    mkdir -p dr-provision-install
 #    cd dr-provision-install
@@ -261,8 +285,6 @@ case $1 in
     check_sum sha256sums
 
     cd ../..
-
-    # (drpcli plugins set packet-ipmi parameter packet-api-key API-KEY) 
     ;;
 
   remote-content)
@@ -275,10 +297,17 @@ case $1 in
 
   ssh-keys)
     # remove keys if they exist already 
-    [[ -f "${SSH_KEY}" ]] && rm -f ${SSH_KEY}
-    [[ -f "${SSH_KEY}.pub" ]] && rm -f ${SSH_KEY}.pub
+    [[ -f "${SSH_DRP_KEY}" ]] && rm -f ${SSH_DRP_KEY}
+    [[ -f "${SSH_DRP_KEY}.pub" ]] && rm -f ${SSH_DRP_KEY}.pub
+    ssh-keygen -t rsa -b 4096 -C "5min-DRP-demo" -P "" -f ${SSH_DRP_KEY}
 
-    ssh-keygen -t rsa -b 4096 -C "5min-DRP-demo" -P "" -f ${SSH_KEY}
+#    if [[ "$SSH_DRP_KEY != "$SSH_NODES_KEY ]]
+#    then
+#      [[ -f "${SSH_NODES_KEY}" ]] && rm -f ${SSH_NODES_KEY}
+#      [[ -f "${SSH_NODES_KEY}.pub" ]] && rm -f ${SSH_NODES_KEY}.pub
+#      ssh-keygen -t rsa -b 4096 -C "5min-NODES-demo" -P "" -f ${SSH_NODES_KEY}
+#    fi
+
     ;;
 
   get-drp-id)
@@ -305,9 +334,9 @@ case $1 in
     shift 2
 
     case $CMD in
-      ssh) ssh -x -i ${SSH_KEY} root@`$0 get-address $TARGET` "$*"
+      ssh) ssh -x -i ${SSH_DRP_KEY} root@`$0 get-address $TARGET` "$*"
         ;;
-      scp) scp -i ${SSH_KEY} $* root@`$0 get-address $TARGET`:
+      scp) scp -i ${SSH_DRP_KEY} $* root@`$0 get-address $TARGET`:
         ;;
     esac
     ;;
@@ -319,10 +348,10 @@ case $1 in
     echo "Pushing helper content to remote DRP endpoint ... "
     echo "           ID :: '$2'"
     echo "   IP Address :: '$A'"
-    scp -r -i ${SSH_KEY} -r drp-install.sh terraform.tfstate $0 private-content/ root@${A}:./
+    scp -r -i ${SSH_DRP_KEY} -r drp-install.sh terraform.tfstate $0 private-content/ root@${A}:./
 
     echo "Installing DRP endpoint service on remote host ... "
-    ssh -x -i ${SSH_KEY} root@${A} "chmod 755 drp-install.sh; ./drp-install.sh"
+    ssh -x -i ${SSH_DRP_KEY} root@${A} "chmod 755 drp-install.sh; ./drp-install.sh"
     ;;
 
   drp-setup)
@@ -405,7 +434,7 @@ case $1 in
     }
 EOFPLUGIN
 
-    if ( $DRPCLI $ENDPOINT plugins exists "packet-ipmi" )
+    if ( $DRPCLI $ENDPOINT plugins exists "packet-ipmi" > /dev/null 2>&1 )
     then
       $DRPCLI $ENDPOINT plugins destroy "packet-ipmi"
     fi
@@ -428,16 +457,16 @@ EOFPLUGIN
     }
 EOFSTAGE
 
-    if ( $DRPCLI $ENDPOINT profiles exists global )
+    if ( $DRPCLI $ENDPOINT profiles exists global > /dev/null 2>&1 )
     then
       $DRPCLI $ENDPOINT profiles destroy global
     fi
     $DRPCLI $ENDPOINT profiles create - < private-content/stagemap-create.json
 
     # set our default Stage, Default Boot Enviornment, and our Unknown Boot Environment
-    ( $DRPCLI $ENDPOINT stages exists discover ) || xiterr 9 "default stage ('discover') doesn't exist"
-    ( $DRPCLI $ENDPOINT bootenvs exists sledgehammer ) || xiterr 9 "default BootEnv ('sledgehammer') doesn't exist"
-    ( $DRPCLI $ENDPOINT bootenvs exists discovery ) || xiterr 9 "unknown BootEnv ('discovery') doesn't exist"
+    ( $DRPCLI $ENDPOINT stages exists discover > /dev/null 2>&1 ) || xiterr 9 "default stage ('discover') doesn't exist"
+    ( $DRPCLI $ENDPOINT bootenvs exists sledgehammer > /dev/null 2>&1 ) || xiterr 9 "default BootEnv ('sledgehammer') doesn't exist"
+    ( $DRPCLI $ENDPOINT bootenvs exists discovery > /dev/null 2>&1 ) || xiterr 9 "unknown BootEnv ('discovery') doesn't exist"
 
     $DRPCLI $ENDPOINT prefs set defaultStage discover defaultBootEnv sledgehammer unknownBootEnv discovery
     ;;
@@ -451,6 +480,8 @@ EOFSTAGE
     rm -f 5min-drp-ssh-key.pub
     rm -f drpcli
     rm -rf dr-provision-install
+    rm -rf tmp 
+    rm -rf bin/*
 
     sed -i.bak                                               \
       -e 's/^\(API="\)\(.*\)\("\)/\1insert_api_key_here\3/g'        \

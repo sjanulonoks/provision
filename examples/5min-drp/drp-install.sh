@@ -18,20 +18,29 @@
 #  installs a DRP server  
 ###
 
+PATH=`pwd`/bin:$PATH
+os_type=`uname -s`
+os_arch=`uname -i`
+[[ $os_arch == "x86_64" ]] && os_arch="amd64"
+os_type=${os_type,,}
+os_arch=${os_arch,,}
+
 set -x 
 curl -fsSL https://raw.githubusercontent.com/digitalrebar/provision/tip/tools/install.sh \
   | bash -s -- --isolated install --drp-version=tip
 
-#ln -s ~/bin/linux/amd64/drpcli bin/drpcli
-#ln -s ~/bin/linux/amd64/dr-provision bin/dr-provision
+ln -s `pwd`/bin/${os_type}/${os_arch}/drpcli bin/drpcli
+ln -s `pwd`/bin/${os_type}/${os_arch}/dr-provision bin/dr-provision
 
 cat <<EOFSTART > drp-start.sh
 #!/bin/bash
 
+PATH=`pwd`/bin:$PATH
 set -x
-sudo ./dr-provision --base-root=$HOME/drp-data --local-content="" --default-content="" > $HOME/drp-local.log 2>&1 &
+dr-provision --base-root=$HOME/drp-data --local-content="" --default-content="" > $HOME/drp-local.log 2>&1 &
 set +x
 sleep 2
+echo "Process listing for 'dr-provision':"
 ps -ef | grep -v grep | grep --color=always dr-provision
 
 EOFSTART
@@ -42,17 +51,14 @@ chmod 755 drp-start.sh
 cat <<'EOFISOS' > drp-isos.sh
 #!/bin/bash
 
-BASE=https://raw.githubusercontent.com/digitalrebar/provision-content/master/bootenvs
+ISOS="ce-ubuntu-16.04-install ce-centos-7.3.1611-install ce-sledgehammer"
 
-echo "Installing bootenvs now ... please be patient ... "
-for BOOTENV in ce-centos-7.3.1611.yml ce-discovery.yml ce-sledgehammer.yml ce-ubuntu-16.04.yml
+echo "Downloading and installing bootenvs ISOS now ... please be patient ... "
+for ISO in $ISOS
 do
-        curl -s $BASE/$BOOTENV -o $BOOTENV
-        NAME=`cat $BOOTENV | grep "^Name: " | cut -d '"' -f 2`
-set -x
-        ./drpcli bootenvs create - < $BOOTENV
-        ./drpcli bootenvs uploadiso $NAME
-set +x
+  set -x
+  ./drpcli bootenvs uploadiso $ISO
+  set +x
 done
 
 exit 0
@@ -63,3 +69,4 @@ chmod 755 drp-isos.sh
 
 ./drpcli isos list
 
+exit $?
