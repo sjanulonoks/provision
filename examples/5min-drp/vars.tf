@@ -25,7 +25,8 @@ provider "packet" {
 
 // The Packet data center you would like to deploy into
 variable "packet_facility" {
-  default = "sjc1"
+  //default = "sjc1"
+  default = "nrt1"
 }
 
 // The path to the private key you created
@@ -54,7 +55,8 @@ variable "cluster_name" {
 
 // The number of Packet nodes to have DRP deploy
 variable "node_count" {
-  default = "3"
+  // default = "10"
+  default = "1"
 }
 
 // The Packet DRP provisioned node types to use
@@ -64,12 +66,14 @@ variable "node_type" {
 
 // The path to the private key you created
 variable "nodes_ssh_key_path" {
-  default = "./5min-drp-ssh-key"
+  //default = "./5min-drp-ssh-key"
+  default = "./5min-nodes-ssh-key"
 }
 
 // The path to the public key you created
 variable "nodes_ssh_public_key_path" {
-  default = "./5min-drp-ssh-key.pub"
+  //default = "./5min-drp-ssh-key.pub"
+  default = "./5min-nodes-ssh-key.pub"
 }
  
 
