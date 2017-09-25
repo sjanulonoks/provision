@@ -291,15 +291,18 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 			}
 		}
 
-		if len(plugin.Errors) != len(errors) {
-			plugin.Errors = errors
+		if plugin.PluginErrors == nil {
+			plugin.PluginErrors = []string{}
+		}
+		if len(plugin.PluginErrors) != len(errors) {
+			plugin.PluginErrors = errors
 			pc.dt.Update(d, plugin)
 		}
 		pc.publishers.Publish("plugin", "started", plugin.Name, plugin)
 		pc.dt.Infof("debugPlugins", "Starting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
 	} else {
 		pc.dt.Infof("debugPlugins", "Starting plugin: %s(%s) missing provider\n", plugin.Name, plugin.Provider)
-		if plugin.Errors == nil || len(plugin.Errors) == 0 {
+		if plugin.PluginErrors == nil || len(plugin.PluginErrors) == 0 {
 			plugin.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", plugin.Provider)}
 			pc.dt.Update(d, plugin)
 		}
@@ -431,24 +434,23 @@ func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) 
 	}
 	var copied int64
 	ctype := c.Request.Header.Get(`Content-Type`)
-    switch strings.Split(ctype, "; ")[0] {
-    case `application/octet-stream`:
+	switch strings.Split(ctype, "; ")[0] {
+	case `application/octet-stream`:
 		if c.Request.Body == nil {
 			return nil, models.NewError("API ERROR", http.StatusBadRequest,
-					fmt.Sprintf("upload: Unable to upload %s: missing body", name))
+				fmt.Sprintf("upload: Unable to upload %s: missing body", name))
 		}
-    case `multipart/form-data`:
-        header , err := c.FormFile("file")
-        if err != nil {
-            return nil, models.NewError("API ERROR", http.StatusBadRequest,
-                    fmt.Sprintf("upload: Failed to find multipart file: %v", err))
-        }
-        name = path.Base(header.Filename)
-    default:
-        return nil, models.NewError("API ERROR", http.StatusUnsupportedMediaType,
-                fmt.Sprintf("upload: plugin_provider %s content-type %s is not application/octet-stream or multipart/form-data", name, ctype))
-    }
-
+	case `multipart/form-data`:
+		header, err := c.FormFile("file")
+		if err != nil {
+			return nil, models.NewError("API ERROR", http.StatusBadRequest,
+				fmt.Sprintf("upload: Failed to find multipart file: %v", err))
+		}
+		name = path.Base(header.Filename)
+	default:
+		return nil, models.NewError("API ERROR", http.StatusUnsupportedMediaType,
+			fmt.Sprintf("upload: plugin_provider %s content-type %s is not application/octet-stream or multipart/form-data", name, ctype))
+	}
 
 	ppTmpName := path.Join(pc.pluginDir, fmt.Sprintf(`.%s.part`, path.Base(name)))
 	ppName := path.Join(pc.pluginDir, path.Base(name))
@@ -463,30 +465,30 @@ func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) 
 			fmt.Sprintf("upload: Unable to upload %s: %v", name, err))
 	}
 
-    switch strings.Split(ctype, "; ")[0] {
-    case `application/octet-stream`:
+	switch strings.Split(ctype, "; ")[0] {
+	case `application/octet-stream`:
 		copied, err = io.Copy(tgt, c.Request.Body)
 		if err != nil {
 			os.Remove(ppTmpName)
 			return nil, models.NewError("API ERROR", http.StatusInsufficientStorage,
-					fmt.Sprintf("upload: Failed to upload %s: %v", name, err))
+				fmt.Sprintf("upload: Failed to upload %s: %v", name, err))
 		}
 		if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
 			os.Remove(ppTmpName)
 			return nil, models.NewError("API ERROR", http.StatusBadRequest,
-					fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes received", name, c.Request.ContentLength, copied))
+				fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes received", name, c.Request.ContentLength, copied))
 		}
 	case `multipart/form-data`:
-		header , _ := c.FormFile("file")
-        file, err := header.Open()
-        defer file.Close()
-        copied, err = io.Copy(tgt, file)
-        if err != nil {
+		header, _ := c.FormFile("file")
+		file, err := header.Open()
+		defer file.Close()
+		copied, err = io.Copy(tgt, file)
+		if err != nil {
 			return nil, models.NewError("API ERROR", http.StatusBadRequest,
-					fmt.Sprintf("upload: iso %s could not save", header.Filename))
-        }
-        file.Close()
-    }
+				fmt.Sprintf("upload: iso %s could not save", header.Filename))
+		}
+		file.Close()
+	}
 	tgt.Close()
 
 	os.Remove(ppName)
