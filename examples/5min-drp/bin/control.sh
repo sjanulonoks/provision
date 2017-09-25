@@ -376,10 +376,10 @@ echo "ADDR:  $ADDR"
     echo "Pushing helper content to remote DRP endpoint ... "
     echo "           ID :: '$2'"
     echo "   IP Address :: '$A'"
-    scp -r -i ${SSH_DRP_KEY} -r drp-install.sh terraform.tfstate $0 private-content/ root@${A}:./
+    scp -r -i ${SSH_DRP_KEY} -r bin/drp-install.sh terraform.tfstate $0 private-content/ root@${A}:./
 
     echo "Installing DRP endpoint service on remote host ... "
-    ssh -x -i ${SSH_DRP_KEY} root@${A} "chmod 755 drp-install.sh; VER_DRP=${VER_DRP} ./drp-install.sh"
+    ssh -x -i ${SSH_DRP_KEY} root@${A} "chmod 755 bin/drp-install.sh; VER_DRP=${VER_DRP} ./bin/drp-install.sh"
     ;;
 
   drp-setup)
