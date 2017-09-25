@@ -1,5 +1,9 @@
 .*.swp
-bin/**
+bin/terraform
+bin/drpcli
+bin/dr-provision
+bin/terraform-provider-packet
+bin/yq
 tmp/
 .terraform/
 terraform.tfstate
