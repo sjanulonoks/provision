@@ -300,6 +300,19 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 	return nil, fmt.Errorf("No such machine parameter %s", key)
 }
 
+func (r *RenderData) CallTemplate(name string, data interface{}) (ret interface{}, err error) {
+	buf := bytes.NewBuffer([]byte{})
+	tmpl := r.target.templates().Lookup(name)
+	if tmpl == nil {
+		return nil, fmt.Errorf("Missing template: %s", name)
+	}
+	err = tmpl.Execute(buf, data)
+	if err == nil {
+		ret = buf.String()
+	}
+	return
+}
+
 func (r *RenderData) makeRenderers(e models.ErrorAdder) renderers {
 	toRender, requiredParams := r.target.renderInfo()
 	for _, param := range requiredParams {
