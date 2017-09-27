@@ -31,7 +31,7 @@ for f in ipxe.efi ipxe.pxe jq bootx64.efi lpxelinux.0 esxi.0 wimboot; do
             curl -sfgL https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 -o jq
             chmod 755 jq;;
         bootx64.efi)
-            curl -sfgL http://downloads.sourceforge.net/project/elilo/elilo/elilo-3.16/elilo-3.16-all.tar.gz -o elilo.tar.gz
+            curl -sfgL https://rackn-sledgehammer.s3.amazonaws.com/provisioner/elilo-3.16-all.tar.gz -o elilo.tar.gz
             tar xzf elilo.tar.gz ./elilo-3.16-x86_64.efi
             tar xzf elilo.tar.gz ./elilo-3.16-ia32.efi
             tar xzf elilo.tar.gz ./elilo-3.16-ia64.efi
@@ -40,7 +40,7 @@ for f in ipxe.efi ipxe.pxe jq bootx64.efi lpxelinux.0 esxi.0 wimboot; do
             mv elilo-3.16-x86_64.efi bootx64.efi
             rm elilo.tar.gz;;
         lpxelinux.0)
-            curl -sfgL https://s3.amazonaws.com/opencrowbar/provisioner/syslinux-6.03.tar.xz -o syslinux-6.03.tar.xz
+            curl -sfgL https://rackn-sledgehammer.s3.amazonaws.com/provisioner/syslinux-6.03.tar.xz -o syslinux-6.03.tar.xz
             for s in syslinux-6.03/bios/com32/elflink/ldlinux/ldlinux.c32 \
                          syslinux-6.03/bios/core/lpxelinux.0 \
                          syslinux-6.03/bios/com32/modules/pxechn.c32 \
@@ -50,7 +50,7 @@ for f in ipxe.efi ipxe.pxe jq bootx64.efi lpxelinux.0 esxi.0 wimboot; do
             done
             rm -rf syslinux-6.03.tar.xz syslinux-6.03;;
         esxi.0)
-            curl -sfgL https://s3.amazonaws.com/opencrowbar/provisioner/syslinux-3.86.tar.xz -o syslinux-3.86.tar.xz
+            curl -sfgL https://rackn-sledgehammer.s3.amazonaws.com/provisioner/syslinux-3.86.tar.xz -o syslinux-3.86.tar.xz
             tar xOJf syslinux-3.86.tar.xz syslinux-3.86/core/pxelinux.0 > esxi.0.tmp
             mv esxi.0.tmp esxi.0
             rm -rf syslinux-3.86.tar.xz syslinux-3.86;;
