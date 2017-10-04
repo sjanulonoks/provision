@@ -25,8 +25,9 @@ provider "packet" {
 
 // The Packet data center you would like to deploy into
 variable "packet_facility" {
-  //default = "sjc1"
-  default = "nrt1"
+  //default = "sjc1"  // Sunnyvale, CA USA
+  //default = "nrt1"  // Tokyo, JP
+  default = "ewr1"  // Parsipany, NJ USA
 }
 
 // The path to the private key you created

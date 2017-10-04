@@ -31,6 +31,15 @@
 ###
 function xiterr() { [[ $1 =~ ^[0-9]+$ ]] && { local _xit=$1; shift; } || local _xit=255; echo "FATAL: $*"; exit $_xit; }
 
+###
+#  set global XIT value if we receive an error exit code (anything 
+#  besides a Zero)
+###
+function xit() { local _x=$1; (( $_x )) && (( XIT += _x )); }
+
+[[ -f ./bin/color.sh ]] && source ./bin/color.sh
+( type -t cprintf > /dev/null 2>&1 ) || function cprintf() { printf "%s" "$*"; }
+
 # get our API_KEY and PROJECT_ID secrets
 source ./private-content/secrets || xiterr 1 "unable to source './secrets' file "
 [[ -z "$API_KEY" ]] && xiterr 1 "API_KEY is empty ... bailing - check secrets file"
@@ -43,7 +52,6 @@ SSH_DRP_KEY=${SSH_DRP_KEY:-"5min-drp-ssh-key"}
 SSH_NODES_KEY=${SSH_NODES_KEY:-"5min-nodes-ssh-key"}
 MY_OS=${MY_OS:-"darwin"}
 MY_ARCH=${MY_ARCH:-"amd64"}
-TF_VER=${TF_VER:-"0.10.5"}
 DRP_OS=${DRP_OS:-"linux"}
 DRP_ARCH=${DRP_ARCH:-"amd64"}
 CREDS=${CREDS:-"--username=rocketskates --password=r0cketsk8ts"}
@@ -52,6 +60,7 @@ NODE_OS=${NODE_OS:-"centos-7.3.1611-install"}  # ubuntu-16.04-install
 
 CURL="curl -sfSL"
 DRPCLI="drpcli"
+XIT=0
 
 # add HOME/bin to path if it's not there already
 [[ ":$PATH:" != *":$HOME/bin:"* ]] && PATH="$HOME/bin:${PATH}"
@@ -71,10 +80,10 @@ WHERE: arguments are as follows:
     set-drp-endpoint <ID>  sets the drp-nodes.tf endpoint information 
                            for Terraform
     get-drp-local          installs DRP locally
-    get-drp-content        installs DRP community content locally
+    get-drp-cc             installs DRP *community* content 
     get-drp-plugins        installs DRP Packet Plugins
     drp-install <ID>       install DRP and basic content as identified by <ID>
-    remote-content <ID>    do 'get-drp-content' and 'get-drp-plugins' on remote <ID>
+    remote-content <ID>    do 'get-drp-cc' and 'get-drp-plugins' on remote <ID>
     drp-setup <ID>         perform content and plugins setup on <ID> endpoint
 
     get-drp-id             get the DRP endpoint server ID
@@ -86,22 +95,52 @@ WHERE: arguments are as follows:
 
 CLEANUP:  WARNING - cleanup will NUKE things - like private SSH KEY (and more)  !!!
 
-  NOTES:  * 'get-drp-content' and 'get-drp-plugins' run on the local control host
+  NOTES:  * 'get-drp-cc' and 'get-drp-plugins' run on the local control host
             'remote-content' runs the content pull FROM the <ID> endpoint
             ONLY run 'get-drp-*' _OR_ 'remote-content' - NOT both
 
           * get-drp-id gets the ID of the DRP endpoint server - suggest adding
-            to your environment varialbes like:
+            to your environment variables like:
                #  export DRP=\`$0 get-drp-id\`
 
           * <ID> is the ID of the DRP endpoint that is created by terraform 
 
           * you can override built in defaults by setting the following variables:
-             SSH_DRP_KEY  SSH_NODES_KEY  MY_OS    MY_ARCH  TF_VER       DRP_OS  
-             DRP_ARCH     CREDS          NODE_OS  VER_DRP  VER_CONTENT  VER_PLUGINS
+             SSH_DRP_KEY  SSH_NODES_KEY  MY_OS    MY_ARCH      DRP_OS      DRP_ARCH
+             CREDS        NODE_OS        VER_DRP  VER_CONTENT  VER_PLUGINS
 
 END_USAGE
 } # end usaage()
+
+# ssh function
+#   ARGv1 shouuld be terraform ID of target
+#   remains args are commands to execute on remote side
+#   global var SSH_DRP_KEY must be set to private key
+function my_ssh() {
+  [[ -z "$1" ]] && xiterr 1 "Need DRP endpoint ID as argument 1"
+  local _target=`$0 get-address $1`
+  shift 1
+
+  [[ ! -r "$SSH_DRP_KEY" ]] && xiterr 1 "ssh key file ('$SSH_DRP_KEY') not readable"
+  ssh -x -i ${SSH_DRP_KEY} root@$_target "$*" 
+  xit $?
+}
+
+# copy files to remote target
+#   ARGv1 shouuld be terraform ID of target
+#   remains args are files to SCP
+#   global var SSH_DRP_KEY must be set to private key
+#
+# TODO:  should switch to using rsync 
+function my_copy() {
+  [[ -z "$1" ]] && xiterr 1 "Need DRP endpoint ID as argument 1"
+  local _target=`$0 get-address $1`
+  shift 1
+
+  [[ ! -r "$SSH_DRP_KEY" ]] && xiterr 1 "ssh key file ('$SSH_DRP_KEY') not readable"
+  scp -i ${SSH_DRP_KEY} $* root@$_target: 
+  xit $?
+}
 
 ###
 #  accept as ARGv1 a sha256 check sum file to test
@@ -113,10 +152,12 @@ function check_sum() {
   local _platform=`uname -s`
 
   case $_platform in
-    Darwin) shasum -a 256 -c $_sum ;;
-    Linux)  sha256sum -c $_sum ;;
+    Darwin) shasum -a 256 -c $_sum; xit $? ;;
+    Linux)  sha256sum -c $_sum; xit $? ;;
     *) xiterr 2 "unsupported platform type '$_platform'"
   esac
+
+  (( $XIT )) && xiterr 9 "checksum failed for '$_sum'"
 }
 
 function prereqs() {
@@ -132,12 +173,13 @@ function prereqs() {
 	os_info
 
 	case $_OS_FAMILY in
-		rhel)   sudo yum -y install $_pkgs ;;
-		debian) sudo apt -y install $_pkgs ;;
+		rhel)   sudo yum -y install $_pkgs; xit $? ;;
+		debian) sudo apt -y install $_pkgs; xit $? ;;
     darwin) ;;
     *)  xiterr 4 "unsupported _OS_FAMILY ('$_OS_FAMILY') in prereqs()" ;;
 	esac
 
+  (( $XIT )) && xiterr 1 "prerequisites failed ('$_pkgs')"
 }
 
 # set our global _OS_* variables for re-use
@@ -209,13 +251,16 @@ case $1 in
     rm -rf dr-provision-install
     mkdir dr-provision-install
     cd dr-provision-install
+    set -x
     $CURL https://github.com/digitalrebar/provision/releases/download/${VER_DRP}/dr-provision.zip -o dr-provision.zip
     $CURL https://github.com/digitalrebar/provision/releases/download/${VER_DRP}/dr-provision.sha256 -o dr-provision.sha256
-    check_sum dr-provision.sha256
+    set +x
+    check_sum dr-provision.sha256 
 
     unzip dr-provision.zip
     cd ..
 
+    [[ -f "`pwd`/bin/drpcli" ]] && rm -f `pwd`\/bin/drpcli
     ln -s `pwd`/dr-provision-install/bin/${MY_OS}/${MY_ARCH}/drpcli `pwd`/bin/drpcli
     $DRPCLI version || xiterr 1 "failed to install DRP endpoint in bin/ directory"
     ;;
@@ -225,6 +270,19 @@ case $1 in
     mkdir -p bin
     mkdir -p tmp
     cd tmp
+    # make a reasonable attempt at getting the latest version of Terraform
+    TF_VER=`curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_version'`
+    # see:  https://github.com/hashicorp/terraform/issues/9803
+    # thank you Apple for providing a hobbled version of 'sort' that doesn't contain "-V" 
+    # (version sorting) capabilities
+    #`curl -s https://releases.hashicorp.com/terraform/   \
+    #  | grep terraform_                                         \
+    #  | egrep -v "rc|beta"                                      \
+    #  | egrep "_[1-9]\.[0-9].*|0\.[1-9][0-9]\."                 \
+    #  | sed 's/\(^.*>\)\(terraform_.*\..*\..*\)\(<\/.*$\)/\2/g' \
+    #  | sort -n                                                 \
+    #  | tail -1                                                 \
+    #  | sed 's/terraform_//g'`
     wget -O tf.zip https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_${MY_OS}_${MY_ARCH}.zip && unzip tf.zip
     mv terraform ../bin/ && chmod 755 ../bin/terraform
     rm tf.zip
@@ -245,20 +303,21 @@ case $1 in
       cp $HOME/.terraformrc $HOME/.terraformrc.5min-backup
     fi
     echo "providers { packet = \"${TF_PLUG}\" }" >> $HOME/.terraformrc
-    terraform init
+    terraform init || xiterr 1 "terraform init failed"
     ;;
 
   set-drp-endpoint)
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
-echo "ADDR:  $ADDR"
     ( sed -i.bak 's+\(^chain http://\)\(.*\)\(/default.ipxe.*$\)+\1'${ADDR}':8091\3+g' drp-nodes.tf ) \
       && echo "DRP endpoint set in 'drp-nodes.tf' successfully: " \
-      || exiterr 1 "DRP endpoint set FAILED for 'drp-nodes.tf'"
-    grep "^chain " drp-nodes.tf
+      || xiterr 1 "DRP endpoint set FAILED for 'drp-nodes.tf'"
+    _chain=`cprintf $cyan $(grep "^chain " drp-nodes.tf)`
+    echo "  ipxe -->  $_chain"
+    xit $?
     ;;
 
-  get-drp-content)
+  get-drp-cc)
     # community content is installed via install.sh of DRP - unless "--nocontent" is specified
     echo ""
     rm -rf dr-provision-install/drp-community-content.*
@@ -279,6 +338,8 @@ echo "ADDR:  $ADDR"
 
     ;;
 
+  # get-drp-plugins relies on private-content for the RackN specific conent 
+  # this is VERY different from the get-drp-cc (Community Content)
   get-drp-plugins)
     [[ ! -r private-content/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip ]] && xiterr 1 "missing private-content plugins"
 
@@ -318,9 +379,23 @@ echo "ADDR:  $ADDR"
 
     # drp-community-content is  installed by default (unless '--nocontent' specified)
     # do not attempt to install it again
-    # $0 ssh $2 "hostname; $0 get-drp-content $2; $0 get-drp-plugins $2; bash -x $0 drp-setup $2"
-    $0 ssh $2 "hostname; $0 get-drp-plugins $2; bash -x $0 drp-setup $2"
+    # $0 ssh $2 "hostname; $0 get-drp-cc $2; $0 get-drp-plugins $2; bash -x $0 drp-setup $2"
+    CMD="hostname; ./bin/control.sh get-drp-plugins $2; bash -x ./bin/control.sh drp-setup $2"
+    my_ssh $2 "$CMD"
+    xit $?
+    ;;
 
+  ssh|scp|copy)
+    [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
+    _cmd=$1
+    shift 1
+
+    case $_cmd in
+      ssh) my_ssh $*
+        ;;
+      copy|scp) my_copy $*
+        ;;
+    esac
     ;;
 
   ssh-keys)
@@ -328,18 +403,21 @@ echo "ADDR:  $ADDR"
     [[ -f "${SSH_DRP_KEY}" ]] && rm -f ${SSH_DRP_KEY}
     [[ -f "${SSH_DRP_KEY}.pub" ]] && rm -f ${SSH_DRP_KEY}.pub
     ssh-keygen -t rsa -b 4096 -C "5min-drp-ssh-key" -P "" -f ${SSH_DRP_KEY}
+    xit $?
 
     if [[ "$SSH_DRP_KEY != "$SSH_NODES_KEY ]]
     then
       [[ -f "${SSH_NODES_KEY}" ]] && rm -f ${SSH_NODES_KEY}
       [[ -f "${SSH_NODES_KEY}.pub" ]] && rm -f ${SSH_NODES_KEY}.pub
       ssh-keygen -t rsa -b 4096 -C "5min-nodes-ssh-key" -P "" -f ${SSH_NODES_KEY}
+      xit $?
     fi
 
     ;;
 
   get-drp-id)
     terraform plan | grep packet_device.5min-drp | awk ' { print $NF } ' | sed 's/)//'
+    xit $?
     ;;
 
   get-address)
@@ -348,25 +426,12 @@ echo "ADDR:  $ADDR"
     [[ ! -r terraform.tfstate ]] && xiterr 3 "terraform.tfstate not readable, did you run 'terraform apply'?"
     cat terraform.tfstate \
       | jq -r '.modules[].resources."packet_device.5min-drp".primary.attributes."network.0.address"'
+    xit $?
 #    $CURL -X GET --header "Accept: application/json" \
 #      --header "X-Auth-Token: ${API_KEY}"              \
 #      "https://api.packet.net/devices/${2}"            \
 #      | jq -rcM '.ip_addresses[0].address'
 
-    ;;
-
-  ssh|scp)
-    CMD=$1
-    [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
-    TARGET=$2
-    shift 2
-
-    case $CMD in
-      ssh) ssh -x -i ${SSH_DRP_KEY} root@`$0 get-address $TARGET` "$*"
-        ;;
-      scp) scp -i ${SSH_DRP_KEY} $* root@`$0 get-address $TARGET`:
-        ;;
-    esac
     ;;
 
   drp-install)
@@ -376,12 +441,27 @@ echo "ADDR:  $ADDR"
     echo "Pushing helper content to remote DRP endpoint ... "
     echo "           ID :: '$2'"
     echo "   IP Address :: '$A'"
-    scp -r -i ${SSH_DRP_KEY} -r bin/drp-install.sh terraform.tfstate $0 private-content/ root@${A}:./
+    my_ssh $2 "mkdir -p bin"
+    my_copy $2 -r bin/drp-install.sh terraform.tfstate $0 private-content/ 
 
     echo "Installing DRP endpoint service on remote host ... "
-    ssh -x -i ${SSH_DRP_KEY} root@${A} "chmod 755 bin/drp-install.sh; VER_DRP=${VER_DRP} ./bin/drp-install.sh"
+    my_ssh $2 "mv *.sh bin/; chmod 755 bin/*.sh; VER_DRP=${VER_DRP} ./bin/drp-install.sh"
     ;;
 
+  # horri-bad hack to fix bug w/ stages not eval as valid
+  # intended to be run on remote DRP endpoint
+  fix-stages-bug)
+
+    URL="https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/packet"
+    CONTENT="dr-provision-install/content-packet.json"
+    CONTENT_NAME=`cat $CONTENT | jq -r '.meta.Name'`
+    set -x
+    $DRPCLI $ENDPOINT contents destroy "$CONTENT_NAME"
+    $DRPCLI $ENDPOINT contents create - < $CONTENT
+    set +x
+    ;;
+  # sets up the RackN specific content packs on a DRP endpoint - VERY different
+  # from CC (community content)
   drp-setup)
     _ext=""
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
@@ -491,8 +571,14 @@ EOFSTAGE
     fi
     $DRPCLI $ENDPOINT profiles create - < private-content/stagemap-create.json
 
-    # grab our sledgehammer ... 
-    $DRPCLI $ENDPOINT bootenvs uploadiso sledgehammer
+    # upload our isos
+    UPLOADS="sledgehammer $NODE_OS"
+    for UPLOAD in $UPLOADS
+    do
+    $DRPCLI $ENDPOINT bootenvs exists $UPLOAD \
+      && $DRPCLI $ENDPOINT bootenvs uploadiso $UPLOAD \
+      || echo "bootenv '$UPLOAD' doesn't exist, not uploading ISO"
+    done
 
     # verify we have our stages/bootenvs available before setting the defaults for them
     ( $DRPCLI $ENDPOINT stages exists discover > /dev/null 2>&1 ) || xiterr 9 "default stage ('discover') doesn't exist"
@@ -549,7 +635,7 @@ EOFSTAGE
   extra-cleanup)
     echo "performing extra cleanup tasks .... "
     set -x
-    rm -rf *bak terraform.tfstate* $HOME/.terraformrc ./terraform 
+    rm -rf *bak terraform.tfstate* $HOME/.terraformrc ./.terraform 
     rm -rf dr-provision-install
     set +x
     ;;
@@ -560,4 +646,4 @@ EOFSTAGE
     ;;
 esac
 
-exit 0
+exit $XIT
