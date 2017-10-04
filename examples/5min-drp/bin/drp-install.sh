@@ -28,9 +28,11 @@ os_arch=`uname -i`
 os_type=${os_type,,}
 os_arch=${os_arch,,}
 
+# do not install content - let our outside orchestration handle that for us
+# as we may want CC (community content) or RackN  specific content
 set -x
 curl -fsSL https://raw.githubusercontent.com/digitalrebar/provision/${VER_DRP}/tools/install.sh \
-  | bash -s -- --isolated install --drp-version=${VER_DRP}
+  | bash -s -- install --drp-version=${VER_DRP} --isolated --nocontent
 set +x
 
 ln -s `pwd`/bin/${os_type}/${os_arch}/drpcli bin/drpcli

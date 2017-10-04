@@ -13,6 +13,7 @@ drpcli
 *.bak
 *.backup
 5min-drp-ssh-key*
+5min-node-ssh-key*
 packet-ipmi-plugin-create.json
 stagemap-create.json
 !private-content/secrets
