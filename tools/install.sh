@@ -252,7 +252,7 @@ case $1 in
              if [[ $ISOLATED == false ]] ; then
                  sudo cp "$binpath"/* "$bindest"
                  if [[ $initfile ]]; then
-                     if [[ -r $initfile ]]
+                     if [[ -r $initdest ]]
                      then
                          echo "WARNING ... WARNING ... WARNING"
                          echo "initfile ('$initfile') exists already, not overwriting it"
@@ -286,7 +286,7 @@ case $1 in
                  if [[ $NO_CONTENT == false ]] ; then
                      DEFAULT_CONTENT_FILE="/usr/share/dr-provision/default.yaml"
                      sudo mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
-                 fi 
+                 fi
              else
                  mkdir -p drp-data
 
