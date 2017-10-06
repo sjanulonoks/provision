@@ -12,6 +12,8 @@ func TestUserCrud(t *testing.T) {
 	defer unlocker()
 	tests := []crudTest{
 		{"Create empty user", dt.Create, &models.User{}, false},
+		{"Create with bad user /", dt.Create, &models.User{Name: "greg/asdg"}, false},
+		{"Create with bad user \\", dt.Create, &models.User{Name: "greg\\agsd"}, false},
 		{"Create new user with name", dt.Create, &models.User{Name: "Test User"}, true},
 		{"Create Duplicate User", dt.Create, &models.User{Name: "Test User"}, false},
 		{"Delete User", dt.Remove, &models.User{Name: "Test User"}, true},

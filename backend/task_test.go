@@ -18,6 +18,8 @@ func TestTaskCrud(t *testing.T) {
 	tests := []crudTest{
 		{"Create Task with nonexistent Name", dt.Create, &models.Task{}, false},
 		{"Create Task with no templates", dt.Create, &models.Task{Name: "test 1"}, true},
+		{"Create Task with bad name /", dt.Create, &models.Task{Name: "test/1"}, false},
+		{"Create Task with bad name \\", dt.Create, &models.Task{Name: "test\\1"}, false},
 		{"Create Task with invalid models.TemplateInfo (missing Name)", dt.Create, &models.Task{Name: "test 3", Templates: []models.TemplateInfo{{Path: "{{ .Env.Name }}", ID: "ok"}}}, false},
 		{"Create Task with invalid models.TemplateInfo (missing ID)", dt.Create, &models.Task{Name: "test 3", Templates: []models.TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}"}}}, false},
 		{"Create Task with invalid models.TemplateInfo (invalid ID)", dt.Create, &models.Task{Name: "test 3", Templates: []models.TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}", ID: "okp"}}}, false},

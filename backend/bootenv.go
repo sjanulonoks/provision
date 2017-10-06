@@ -197,6 +197,9 @@ func (b *BootEnv) Validate() {
 	b.renderers = renderers{}
 	// First, the stuff that must be correct in order for
 	b.AddError(index.CheckUnique(b, b.stores("bootenvs").Items()))
+	if strings.Contains(b.Name, "/") || strings.Contains(b.Name, "\\") {
+		b.Errorf("Name must not contain a '/' or '\\'")
+	}
 	// If our basic templates do not parse, it is game over for us
 	b.p.tmplMux.Lock()
 	b.tmplMux.Lock()

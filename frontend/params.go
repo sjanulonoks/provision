@@ -1,6 +1,8 @@
 package frontend
 
 import (
+	"strings"
+
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
@@ -145,9 +147,10 @@ func (f *Frontend) InitParamApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
-	f.ApiGroup.GET("/params/:name",
+	f.ApiGroup.GET("/params/*name",
 		func(c *gin.Context) {
-			f.Fetch(c, &backend.Param{}, c.Param(`name`))
+			name := strings.TrimLeft(c.Param(`name`), `/`)
+			f.Fetch(c, &backend.Param{}, name)
 		})
 
 	// swagger:route HEAD /params/{name} Params headParam
@@ -161,9 +164,10 @@ func (f *Frontend) InitParamApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: NoContentResponse
-	f.ApiGroup.HEAD("/params/:name",
+	f.ApiGroup.HEAD("/params/*name",
 		func(c *gin.Context) {
-			f.Exists(c, &backend.Param{}, c.Param(`name`))
+			name := strings.TrimLeft(c.Param(`name`), `/`)
+			f.Exists(c, &backend.Param{}, name)
 		})
 
 	// swagger:route PATCH /params/{name} Params patchParam
@@ -180,9 +184,10 @@ func (f *Frontend) InitParamApi() {
 	//       404: ErrorResponse
 	//       406: ErrorResponse
 	//       422: ErrorResponse
-	f.ApiGroup.PATCH("/params/:name",
+	f.ApiGroup.PATCH("/params/*name",
 		func(c *gin.Context) {
-			f.Patch(c, &backend.Param{}, c.Param(`name`))
+			name := strings.TrimLeft(c.Param(`name`), `/`)
+			f.Patch(c, &backend.Param{}, name)
 		})
 
 	// swagger:route PUT /params/{name} Params putParam
@@ -198,9 +203,10 @@ func (f *Frontend) InitParamApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       422: ErrorResponse
-	f.ApiGroup.PUT("/params/:name",
+	f.ApiGroup.PUT("/params/*name",
 		func(c *gin.Context) {
-			f.Update(c, &backend.Param{}, c.Param(`name`))
+			name := strings.TrimLeft(c.Param(`name`), `/`)
+			f.Update(c, &backend.Param{}, name)
 		})
 
 	// swagger:route DELETE /params/{name} Params deleteParam
@@ -214,10 +220,9 @@ func (f *Frontend) InitParamApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
-	f.ApiGroup.DELETE("/params/:name",
+	f.ApiGroup.DELETE("/params/*name",
 		func(c *gin.Context) {
-			f.Remove(c, &backend.Param{}, c.Param(`name`))
-
+			name := strings.TrimLeft(c.Param(`name`), `/`)
+			f.Remove(c, &backend.Param{}, name)
 		})
-
 }

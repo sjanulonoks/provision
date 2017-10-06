@@ -20,6 +20,8 @@ func TestBootEnvCrud(t *testing.T) {
 	tests := []crudTest{
 		{"Create Bootenv with nonexistent Name", dt.Create, &models.BootEnv{}, false},
 		{"Create Bootenv with no templates", dt.Create, &models.BootEnv{Name: "test 1"}, true},
+		{"Create Bootenv with invalid Name /", dt.Create, &models.BootEnv{Name: "test/greg"}, false},
+		{"Create Bootenv with invalid Name \\", dt.Create, &models.BootEnv{Name: "test\\greg"}, false},
 		{"Create Bootenv with invalid BootParams tmpl", dt.Create, &models.BootEnv{Name: "test 2", BootParams: "{{ }"}, false},
 		{"Create Bootenv with valid BootParams tmpl", dt.Create, &models.BootEnv{Name: "test 2", BootParams: "{{ .Env.Name }}"}, true},
 		{"Create Bootenv with invalid models.TemplateInfo (missing Name)", dt.Create, &models.BootEnv{Name: "test 3", Templates: []models.TemplateInfo{{Path: "{{ .Env.Name }}", ID: "ok"}}}, false},

@@ -20,6 +20,8 @@ func TestStageCrud(t *testing.T) {
 	tests := []crudTest{
 		{"Create Stage with nonexistent Name", dt.Create, &models.Stage{}, false},
 		{"Create Stage with no BootEnv", dt.Create, &models.Stage{Name: "nobootenv"}, true},
+		{"Create Stage with bad name /", dt.Create, &models.Stage{Name: "no/bootenv"}, false},
+		{"Create Stage with bad name \\", dt.Create, &models.Stage{Name: "no\\bootenv"}, false},
 		{"Create Stage with nonexistent BootEnv", dt.Create, &models.Stage{Name: "missingbootenv", BootEnv: "missingbootenv"}, false},
 		{"Create Stage with missing Task", dt.Create, &models.Stage{Name: "missingtask", BootEnv: "local", Tasks: []string{"jj"}}, false},
 		{"Create Stage with missing profile", dt.Create, &models.Stage{Name: "missingprofile", BootEnv: "local", Profiles: []string{"jj"}}, false},

@@ -481,6 +481,9 @@ func (n *Machine) Validate() {
 	if n.Name == "" {
 		n.Errorf("Machine %s must have a name", n.Uuid)
 	}
+	if strings.Contains(n.Name, "/") || strings.Contains(n.Name, "\\") {
+		n.Errorf("Name must not contain a '/' or '\\'")
+	}
 	validateMaybeZeroIP4(n, n.Address)
 	n.AddError(index.CheckUnique(n, n.stores("machines").Items()))
 	n.SetValid()
