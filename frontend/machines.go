@@ -420,7 +420,7 @@ func (f *Frontend) InitMachineApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
-	f.ApiGroup.GET("/machines/:uuid/params/:key", pGetOne)
+	f.ApiGroup.GET("/machines/:uuid/params/*key", pGetOne)
 
 	// swagger:route POST /machines/{uuid}/params/{key} Machines postMachineParam
 	//
@@ -432,7 +432,7 @@ func (f *Frontend) InitMachineApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
-	f.ApiGroup.POST("/machines/:uuid/params/:key", pSetOne)
+	f.ApiGroup.POST("/machines/:uuid/params/*key", pSetOne)
 
 	// swagger:route GET /machines/{uuid}/actions Machines getMachineActions
 	//

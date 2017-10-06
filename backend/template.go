@@ -3,6 +3,7 @@ package backend
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"text/template"
 
 	"github.com/digitalrebar/provision/backend/index"
@@ -106,6 +107,9 @@ func (t *Template) Validate() {
 	if t.ID == "" {
 		t.Errorf("Template must have an ID")
 		return
+	}
+	if strings.Contains(t.ID, "/") || strings.Contains(t.ID, "\\") {
+		t.Errorf("ID must not contain a '/' or '\\'")
 	}
 	var err error
 	t.p.tmplMux.Lock()

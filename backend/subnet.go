@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/digitalrebar/provision/backend/index"
@@ -481,6 +482,9 @@ func AsSubnets(o []models.Model) []*Subnet {
 }
 
 func (s *Subnet) Validate() {
+	if strings.Contains(s.Name, "/") || strings.Contains(s.Name, "\\") {
+		s.Errorf("Name must not contain a '/' or '\\'")
+	}
 	_, subnet, err := net.ParseCIDR(s.Subnet.Subnet)
 	if err != nil {
 		s.Errorf("Invalid subnet %s: %v", s.Subnet.Subnet, err)

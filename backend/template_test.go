@@ -12,6 +12,8 @@ func TestTemplateCrud(t *testing.T) {
 	defer unlocker()
 	tests := []crudTest{
 		{"Create Template with No ID", dt.Create, &models.Template{}, false},
+		{"Create Template with Bad / ID", dt.Create, &models.Template{ID: "test/greg"}, false},
+		{"Create Template with Bad \\ ID", dt.Create, &models.Template{ID: "test\\greg"}, false},
 		{"Create Valid Empty Template", dt.Create, &models.Template{ID: "test1"}, true},
 		{"Create Valid Nonempty Template", dt.Create, &models.Template{ID: "test2", Contents: "{{ .Foo }}"}, true},
 		{"Create Duplicate Template", dt.Create, &models.Template{ID: "test1"}, false},

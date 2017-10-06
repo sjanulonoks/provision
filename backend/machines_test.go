@@ -56,6 +56,8 @@ func TestMachineCrud(t *testing.T) {
 		{"Create known-good Bootenv", dt.Create, &models.BootEnv{Name: "default", Templates: []models.TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "default"}}}, true},
 		{"Create known-unavailable Bootenv", dt.Create, &models.BootEnv{Name: "unavailable"}, true},
 		{"Create empty machine", dt.Create, &models.Machine{}, false},
+		{"Create machine with bad Name /", dt.Create, &models.Machine{Name: "greg/greg"}, false},
+		{"Create machine with bad Name \\", dt.Create, &models.Machine{Name: "greg\\greg"}, false},
 		{"Create unnamed machine", dt.Create, &models.Machine{Uuid: okUUID}, false},
 		{"Create named machine", dt.Create, &models.Machine{Uuid: okUUID, Name: "default.fqdn"}, true},
 		{"Create new machine with same UUID", dt.Create, &models.Machine{Uuid: okUUID, Name: "other.fqdn"}, false},

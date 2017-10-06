@@ -170,6 +170,7 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 				aggregate = true
 			}
 			paramKey := c.Param("key")
+			paramKey = strings.TrimLeft(paramKey, `/`)
 			val, _ := func() (interface{}, bool) {
 				d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
 				defer unlocker()
@@ -202,6 +203,7 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 			}
 			id := c.Param(idKey)
 			paramKey := c.Param("key")
+			paramKey = strings.TrimLeft(paramKey, `/`)
 			var ref models.Model
 			func() {
 				d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)

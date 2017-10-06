@@ -283,7 +283,7 @@ func (f *Frontend) InitProfileApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
-	f.ApiGroup.GET("/profiles/:name/params/:key", pGetOne)
+	f.ApiGroup.GET("/profiles/:name/params/*key", pGetOne)
 
 	// swagger:route POST /profiles/{name}/params/{key} Profiles postProfileParam
 	//
@@ -295,5 +295,5 @@ func (f *Frontend) InitProfileApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
-	f.ApiGroup.POST("/profiles/:name/params/:key", pSetOne)
+	f.ApiGroup.POST("/profiles/:name/params/*key", pSetOne)
 }

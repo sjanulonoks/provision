@@ -13,6 +13,8 @@ func TestSubnetCrud(t *testing.T) {
 	defer unlocker()
 	createTests := []crudTest{
 		{"Create empty Subnet", dt.Create, &models.Subnet{}, false},
+		{"Create with bad name /", dt.Create, &models.Subnet{Name: "greg/24"}, false},
+		{"Create with bad name \\", dt.Create, &models.Subnet{Name: "greg\\24"}, false},
 		{"Create valid Subnet", dt.Create, &models.Subnet{Name: "test", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true},
 		{"Create duplicate Subnet", dt.Create, &models.Subnet{Name: "test", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, false},
 		{"Create invalid Subnet(bad Subnet)", dt.Create, &models.Subnet{Name: "test2", Subnet: "127.0.0.0", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, false},

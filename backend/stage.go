@@ -2,6 +2,7 @@ package backend
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"text/template"
 
@@ -143,6 +144,9 @@ func (s *Stage) genRoot(commonRoot *template.Template, e models.ErrorAdder) *tem
 }
 
 func (s *Stage) Validate() {
+	if strings.Contains(s.Name, "/") || strings.Contains(s.Name, "\\") {
+		s.Errorf("Name must not contain a '/' or '\\'")
+	}
 	s.renderers = renderers{}
 	// First, the stuff that must be correct in order for
 	s.AddError(index.CheckUnique(s, s.stores("stages").Items()))
