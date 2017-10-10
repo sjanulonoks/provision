@@ -600,7 +600,7 @@ func NewDataTracker(backend store.Store,
 	}
 
 	// Create minimal content.
-	d, unlocker := res.LockEnts("bootenvs", "preferences", "users", "machines", "profiles", "params")
+	d, unlocker := res.LockEnts("stages", "bootenvs", "preferences", "users", "machines", "profiles", "params")
 	defer unlocker()
 	if d("bootenvs").Find("ignore") == nil {
 		res.Create(d, ignoreBoot)

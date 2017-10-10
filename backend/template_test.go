@@ -8,7 +8,7 @@ import (
 
 func TestTemplateCrud(t *testing.T) {
 	dt := mkDT(nil)
-	d, unlocker := dt.LockEnts("templates", "bootenvs", "tasks", "machines")
+	d, unlocker := dt.LockEnts("stages", "templates", "bootenvs", "tasks", "machines")
 	defer unlocker()
 	tests := []crudTest{
 		{"Create Template with No ID", dt.Create, &models.Template{}, false},

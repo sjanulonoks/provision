@@ -212,8 +212,7 @@ esac
 
 case $1 in
      install)
-             if ( ps -ef | grep -v grep | grep -q dr-provision )
-             then
+             if pgrep dr-provision; then
                  echo "'dr-provision' service is running, CAN NOT upgrade ... please stop service first"
                  exit 9
              else
@@ -252,7 +251,7 @@ case $1 in
              if [[ $ISOLATED == false ]] ; then
                  sudo cp "$binpath"/* "$bindest"
                  if [[ $initfile ]]; then
-                     if [[ -r $initfile ]]
+                     if [[ -r $initdest ]]
                      then
                          echo "WARNING ... WARNING ... WARNING"
                          echo "initfile ('$initfile') exists already, not overwriting it"
@@ -286,7 +285,7 @@ case $1 in
                  if [[ $NO_CONTENT == false ]] ; then
                      DEFAULT_CONTENT_FILE="/usr/share/dr-provision/default.yaml"
                      sudo mv drp-community-content.yaml $DEFAULT_CONTENT_FILE
-                 fi 
+                 fi
              else
                  mkdir -p drp-data
 

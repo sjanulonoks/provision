@@ -289,6 +289,16 @@ func (b *BootEnv) Validate() {
 		}
 	}
 	b.SetAvailable()
+	stages := b.stores("stages")
+	if stages != nil {
+		for _, i := range stages.Items() {
+			stage := AsStage(i)
+			if stage.BootEnv != b.Name {
+				continue
+			}
+			stage.Validate()
+		}
+	}
 }
 
 func (b *BootEnv) OnLoad() error {
@@ -402,9 +412,9 @@ func (b *BootEnv) AfterSave() {
 
 var bootEnvLockMap = map[string][]string{
 	"get":    []string{"bootenvs"},
-	"create": []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
-	"update": []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
-	"patch":  []string{"bootenvs", "machines", "tasks", "templates", "profiles"},
+	"create": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles"},
+	"update": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles"},
+	"patch":  []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles"},
 	"delete": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles"},
 }
 
