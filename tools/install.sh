@@ -212,8 +212,7 @@ esac
 
 case $1 in
      install)
-             if ( ps -ef | grep -v grep | grep -q dr-provision )
-             then
+             if pgrep dr-provision; then
                  echo "'dr-provision' service is running, CAN NOT upgrade ... please stop service first"
                  exit 9
              else
