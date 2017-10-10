@@ -8,7 +8,7 @@ import (
 
 func TestTaskCrud(t *testing.T) {
 	dt := mkDT(nil)
-	d, unlocker := dt.LockEnts("templates", "tasks", "bootenvs")
+	d, unlocker := dt.LockEnts("stages", "templates", "tasks", "bootenvs")
 	defer unlocker()
 	tmpl := &models.Template{ID: "ok", Contents: "{{ .Env.Name }}"}
 	if ok, err := dt.Create(d, tmpl); !ok {

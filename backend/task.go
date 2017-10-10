@@ -106,6 +106,22 @@ func (t *Task) Validate() {
 		t.rootTemplate = root
 		t.SetAvailable()
 	}
+	stages := t.stores("stages")
+	if stages != nil {
+		for _, i := range stages.Items() {
+			stage := AsStage(i)
+			if stage.Tasks == nil || len(stage.Tasks) == 0 {
+				continue
+			}
+			for _, taskName := range stage.Tasks {
+				if taskName != t.Name {
+					continue
+				}
+				stage.Validate()
+				break
+			}
+		}
+	}
 	return
 }
 
@@ -162,9 +178,9 @@ func (t *Task) Render(d Stores, m *Machine, e *models.Error) renderers {
 
 var taskLockMap = map[string][]string{
 	"get":    []string{"templates", "tasks"},
-	"create": []string{"templates", "tasks"},
-	"update": []string{"templates", "tasks"},
-	"patch":  []string{"templates", "tasks"},
+	"create": []string{"stages", "templates", "tasks"},
+	"update": []string{"stages", "templates", "tasks"},
+	"patch":  []string{"stages", "templates", "tasks"},
 	"delete": []string{"stages", "tasks", "machines"},
 }
 

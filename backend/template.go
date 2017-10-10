@@ -79,10 +79,11 @@ func (t *Template) parse(root *template.Template) error {
 }
 
 type tmplUpdater struct {
-	root                *template.Template
-	tasks               []*Task
-	bootenvs            []*BootEnv
-	taskTmpls, envTmpls []*template.Template
+	root                            *template.Template
+	tasks                           []*Task
+	bootenvs                        []*BootEnv
+	stages                          []*Stage
+	taskTmpls, envTmpls, stageTmpls []*template.Template
 }
 
 func (t *Template) checkSubs(root *template.Template, e models.ErrorAdder) {
@@ -93,13 +94,20 @@ func (t *Template) checkSubs(root *template.Template, e models.ErrorAdder) {
 	if foo := t.stores("bootenvs"); foo != nil {
 		t.toUpdate.bootenvs = AsBootEnvs(foo.Items())
 	}
+	if foo := t.stores("stages"); foo != nil {
+		t.toUpdate.stages = AsStages(foo.Items())
+	}
 	t.toUpdate.taskTmpls = make([]*template.Template, len(t.toUpdate.tasks))
 	t.toUpdate.envTmpls = make([]*template.Template, len(t.toUpdate.bootenvs))
+	t.toUpdate.stageTmpls = make([]*template.Template, len(t.toUpdate.stages))
 	for i, task := range t.toUpdate.tasks {
 		t.toUpdate.taskTmpls[i] = task.genRoot(root, e)
 	}
 	for i, bootenv := range t.toUpdate.bootenvs {
 		t.toUpdate.envTmpls[i] = bootenv.genRoot(root, e)
+	}
+	for i, stage := range t.toUpdate.stages {
+		t.toUpdate.stageTmpls[i] = stage.genRoot(root, e)
 	}
 }
 
@@ -209,10 +217,10 @@ func AsTemplates(o []models.Model) []*Template {
 
 var templateLockMap = map[string][]string{
 	"get":    []string{"templates"},
-	"create": []string{"templates", "bootenvs", "machines", "tasks"},
-	"update": []string{"templates", "bootenvs", "machines", "tasks"},
-	"patch":  []string{"templates", "bootenvs", "machines", "tasks"},
-	"delete": []string{"templates", "bootenvs", "machines", "tasks"},
+	"create": []string{"stages", "templates", "bootenvs", "machines", "tasks"},
+	"update": []string{"stages", "templates", "bootenvs", "machines", "tasks"},
+	"patch":  []string{"stages", "templates", "bootenvs", "machines", "tasks"},
+	"delete": []string{"stages", "templates", "bootenvs", "machines", "tasks"},
 }
 
 func (t *Template) Locks(action string) []string {
