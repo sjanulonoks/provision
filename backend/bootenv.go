@@ -296,7 +296,11 @@ func (b *BootEnv) Validate() {
 			if stage.BootEnv != b.Name {
 				continue
 			}
-			stage.Validate()
+			func() {
+				stage.stores = b.stores
+				defer func() { stage.stores = nil }()
+				stage.Validate()
+			}()
 		}
 	}
 }
