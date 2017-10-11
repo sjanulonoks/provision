@@ -126,6 +126,28 @@ func (j *Job) Indexes() map[string]index.Maker {
 			job.Uuid = id
 			return job, nil
 		})
+	res["Previous"] = index.Make(
+		false,
+		"UUID string",
+		func(i, j models.Model) bool { return fix(i).Previous.String() < fix(j).Previous.String() },
+		func(ref models.Model) (gte, gt index.Test) {
+			refUuid := fix(ref).Previous.String()
+			return func(s models.Model) bool {
+					return fix(s).Previous.String() >= refUuid
+				},
+				func(s models.Model) bool {
+					return fix(s).Previous.String() > refUuid
+				}
+		},
+		func(s string) (models.Model, error) {
+			id := uuid.Parse(s)
+			if id == nil {
+				return nil, fmt.Errorf("Invalid UUID: %s", s)
+			}
+			job := fix(j.New())
+			job.Previous = id
+			return job, nil
+		})
 	res["Stage"] = index.Make(
 		false,
 		"string",
@@ -296,10 +318,8 @@ func (j *Job) OnLoad() error {
 		return j.p.objs[ref]
 	}
 	defer func() { j.stores = nil }()
+	j.SetValid()
 	j.Validate()
-	if !j.Validated {
-		return j.HasError()
-	}
 	return nil
 }
 
@@ -373,7 +393,9 @@ func (j *Job) Validate() {
 
 	j.SetValid()
 	j.SetAvailable()
-	if j.Available && j.oldState != j.State && j.State == "running" {
+	if !j.Available {
+		j.State = "failed"
+	} else if j.oldState != j.State && j.State == "running" {
 		j.StartTime = time.Now()
 	}
 }
@@ -388,10 +410,24 @@ func (j *Job) BeforeSave() error {
 
 func (j *Job) BeforeDelete() error {
 	e := &models.Error{Code: 422, Type: ValidationError, Object: j}
-
-	if j.State != "finished" && j.State != "failed" {
-		e.Errorf("Jobs %s is not in a deletable state: %v", j.UUID(), j.State)
+	if j.State == "finished" || j.State == "failed" {
+		return nil
 	}
+	machines := j.stores("machines")
+	if machines == nil || machines.Find(j.Machine.String()) == nil {
+		// Machine has vanished.  We can delete this job
+		return nil
+	}
+	jobs := j.stores("jobs")
+	// Test to see if there is a job that follows this one.  If there is, we can delete this one.
+	if jobs != nil {
+		prevMaker := j.Indexes()["Previous"]
+		prevIdx, err := index.Sort(prevMaker)(&jobs.Index)
+		if err != nil || prevIdx.Find(j.Uuid.String()) != nil {
+			return nil
+		}
+	}
+	e.Errorf("Jobs %s is not in a deletable state: %v", j.UUID(), j.State)
 
 	return e.HasError()
 }
@@ -472,7 +508,7 @@ var jobLockMap = map[string][]string{
 	"create":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
 	"update":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
 	"patch":   []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
-	"delete":  []string{"jobs"},
+	"delete":  []string{"machines", "jobs"},
 	"actions": []string{"stages", "jobs", "machines", "tasks", "profiles"},
 }
 
