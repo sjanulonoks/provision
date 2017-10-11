@@ -465,7 +465,7 @@ func (n *Machine) OnCreate() error {
 	stages := n.stores("stages")
 	if bootenvs.Find(n.BootEnv) == nil {
 		n.Errorf("Bootenv %s does not exist", n.BootEnv)
-	} else if n.Stage != "" && stages.Find(n.Stage) == nil {
+	} else if stages.Find(n.Stage) == nil {
 		n.Errorf("Stage %s does not exist", n.Stage)
 	} else {
 		// All machines start runnable.
@@ -514,39 +514,36 @@ func (n *Machine) Validate() {
 			n.Errorf("Task %s (at %d) does not exist", taskName, i)
 		}
 	}
-
-	if n.Stage != "" {
-		if stages == nil {
+	if stages == nil {
+		n.Errorf("Stage %s does not exist", n.Stage)
+		n.SetInvalid() // Force Fatal
+	} else {
+		if nbFound := stages.Find(n.Stage); nbFound == nil {
+			n.CurrentTask = 0
+			n.Tasks = []string{}
 			n.Errorf("Stage %s does not exist", n.Stage)
 			n.SetInvalid() // Force Fatal
 		} else {
-			if nbFound := stages.Find(n.Stage); nbFound == nil {
+			stage := AsStage(nbFound)
+			if !stage.Available {
 				n.CurrentTask = 0
 				n.Tasks = []string{}
-				n.Errorf("Stage %s does not exist", n.Stage)
-				n.SetInvalid() // Force Fatal
+				n.Errorf("Machine %s wants Stage %s, which is not available", n.UUID(), n.Stage)
 			} else {
-				stage := AsStage(nbFound)
-				if !stage.Available {
-					n.CurrentTask = 0
-					n.Tasks = []string{}
-					n.Errorf("Machine %s wants Stage %s, which is not available", n.UUID(), n.Stage)
-				} else {
-					// Only change bootenv if specified
-					if stage.BootEnv != "" {
-						// BootEnv should still be valid because Stage is valid.
-						n.BootEnv = stage.BootEnv
-					}
-
-					// XXX: For sanity, check the path of templates to make sure not overlap
-					// with the bootenv.  This is hard - do this last
-
-					if obFound := stages.Find(n.oldStage); obFound != nil {
-						oldStage := AsStage(obFound)
-						oldStage.Render(objs, n, n).deregister(n.p.FS)
-					}
-					stage.Render(objs, n, n).register(n.p.FS)
+				// Only change bootenv if specified
+				if stage.BootEnv != "" {
+					// BootEnv should still be valid because Stage is valid.
+					n.BootEnv = stage.BootEnv
 				}
+
+				// XXX: For sanity, check the path of templates to make sure not overlap
+				// with the bootenv.  This is hard - do this last
+
+				if obFound := stages.Find(n.oldStage); obFound != nil {
+					oldStage := AsStage(obFound)
+					oldStage.Render(objs, n, n).deregister(n.p.FS)
+				}
+				stage.Render(objs, n, n).register(n.p.FS)
 			}
 		}
 	}
@@ -589,6 +586,9 @@ func (n *Machine) OnLoad() error {
 	n.stores = func(ref string) *Store {
 		return n.p.objs[ref]
 	}
+	if n.Stage == "" {
+		n.Stage = "none"
+	}
 	defer func() { n.stores = nil }()
 	return n.BeforeSave()
 }
@@ -606,7 +606,10 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 		return e
 	}
 	// If we have a stage set, don't change bootenv unless force
-	if n.Stage != "" && n.oldStage == n.Stage && n.oldBootEnv != n.BootEnv && !n.ChangeForced() {
+	if n.Stage == "" {
+		n.Stage = "none"
+	}
+	if n.Stage != "none" && n.oldStage == n.Stage && n.oldBootEnv != n.BootEnv && !n.ChangeForced() {
 		e := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
 		e.Errorf("Can not change bootenv while in a stage unless forced. old: %s new %s", n.oldBootEnv, n.BootEnv)
 		return e

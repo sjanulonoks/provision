@@ -21,6 +21,8 @@ type DataStack struct {
 	localContent   store.Store
 	saasContents   map[string]store.Store
 	defaultContent store.Store
+	pluginContents map[string]store.Store
+	basicContent   store.Store
 }
 
 func CleanUpStore(st store.Store) error {
@@ -41,46 +43,63 @@ func CleanUpStore(st store.Store) error {
 }
 
 func (d *DataStack) Clone() *DataStack {
-	dtStore := &DataStack{store.StackedStore{}, nil, nil, make(map[string]store.Store), nil}
+	dtStore := &DataStack{
+		StackedStore:   store.StackedStore{},
+		writeContent:   d.writeContent,
+		localContent:   d.localContent,
+		basicContent:   d.basicContent,
+		defaultContent: d.defaultContent,
+		saasContents:   map[string]store.Store{},
+		pluginContents: map[string]store.Store{},
+	}
 	dtStore.Open(store.DefaultCodec)
-
-	dtStore.writeContent = d.writeContent
-	dtStore.localContent = d.localContent
-	dtStore.defaultContent = d.defaultContent
-	dtStore.saasContents = make(map[string]store.Store)
 	for k, s := range d.saasContents {
 		dtStore.saasContents[k] = s
+	}
+	for k, s := range d.pluginContents {
+		dtStore.pluginContents[k] = s
 	}
 
 	return dtStore
 }
 
-func (d *DataStack) RemoveStore(name string, logger *log.Logger) (*DataStack, error, error) {
+func (d *DataStack) rebuild(oldStore store.Store, logger *log.Logger) (*DataStack, error, error) {
+	if err := d.buildStack(); err != nil {
+		return nil, models.NewError("ValidationError", 422, err.Error()), nil
+	}
+	hard, soft := backend.ValidateDataTrackerStore(d, logger)
+	if hard == nil && oldStore != nil {
+		CleanUpStore(oldStore)
+	}
+	return d, hard, soft
+}
+
+func (d *DataStack) RemoveSAAS(name string, logger *log.Logger) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	delete(dtStore.saasContents, name)
-	if err := dtStore.buildStack(); err != nil {
-		return nil, models.NewError("ValidationError", 422, err.Error()), nil
-	}
-	hard, soft := backend.ValidateDataTrackerStore(dtStore, logger)
-	if hard == nil && oldStore != nil {
-		CleanUpStore(oldStore)
-	}
-	return dtStore, hard, soft
+	return dtStore.rebuild(oldStore, logger)
 }
 
-func (d *DataStack) AddReplaceStore(name string, newStore store.Store, logger *log.Logger) (*DataStack, error, error) {
+func (d *DataStack) AddReplaceSAAS(name string, newStore store.Store, logger *log.Logger) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	dtStore.saasContents[name] = newStore
-	if err := dtStore.buildStack(); err != nil {
-		return nil, models.NewError("ValidationError", 422, err.Error()), nil
-	}
-	hard, soft := backend.ValidateDataTrackerStore(dtStore, logger)
-	if hard == nil && oldStore != nil {
-		CleanUpStore(oldStore)
-	}
-	return dtStore, hard, soft
+	return dtStore.rebuild(oldStore, logger)
+}
+
+func (d *DataStack) RemovePlugin(name string, logger *log.Logger) (*DataStack, error, error) {
+	dtStore := d.Clone()
+	oldStore, _ := dtStore.pluginContents[name]
+	delete(dtStore.pluginContents, name)
+	return dtStore.rebuild(oldStore, logger)
+}
+
+func (d *DataStack) AddReplacePlugin(name string, newStore store.Store, logger *log.Logger) (*DataStack, error, error) {
+	dtStore := d.Clone()
+	oldStore, _ := dtStore.pluginContents[name]
+	dtStore.pluginContents[name] = newStore
+	return dtStore.rebuild(oldStore, logger)
 }
 
 func (d *DataStack) buildStack() error {
@@ -94,11 +113,9 @@ func (d *DataStack) buildStack() error {
 	}
 
 	// Sort Names
-	saas := make([]string, len(d.saasContents))
-	i := 0
+	saas := make([]string, 0, len(d.saasContents))
 	for k, _ := range d.saasContents {
-		saas[i] = k
-		i++
+		saas = append(saas, k)
 	}
 	sort.Strings(saas)
 
@@ -114,12 +131,29 @@ func (d *DataStack) buildStack() error {
 		}
 	}
 
+	plugins := make([]string, 0, len(d.pluginContents))
+	for k, _ := range d.pluginContents {
+		plugins = append(plugins, k)
+	}
+	sort.Strings(plugins)
+
+	for _, k := range plugins {
+		if err := d.Push(d.pluginContents[k], true, false); err != nil {
+			return err
+		}
+	}
+	d.Push(d.basicContent, false, false)
 	return nil
 }
 
 func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasDir string) (*DataStack, error) {
-	dtStore := &DataStack{store.StackedStore{}, nil, nil, make(map[string]store.Store), nil}
+	dtStore := &DataStack{
+		StackedStore:   store.StackedStore{},
+		saasContents:   map[string]store.Store{},
+		pluginContents: map[string]store.Store{},
+	}
 	dtStore.Open(store.DefaultCodec)
+	dtStore.basicContent = backend.BasicContent()
 
 	var backendStore store.Store
 	if u, err := url.Parse(backendType); err == nil && u.Scheme != "" {
@@ -196,7 +230,5 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 			}
 		}
 	}
-
-	err = dtStore.buildStack()
-	return dtStore, err
+	return dtStore, dtStore.buildStack()
 }
