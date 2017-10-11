@@ -117,7 +117,11 @@ func (t *Task) Validate() {
 				if taskName != t.Name {
 					continue
 				}
-				stage.Validate()
+				func() {
+					stage.stores = t.stores
+					defer func() { stage.stores = nil }()
+					stage.Validate()
+				}()
 				break
 			}
 		}
