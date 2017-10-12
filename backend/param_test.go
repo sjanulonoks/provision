@@ -12,7 +12,7 @@ func TestParamsCrud(t *testing.T) {
 	defer unlocker()
 	tests := []crudTest{
 		{"Create empty profile", dt.Create, &models.Param{}, false},
-		{"Create new profile with name", dt.Create, &models.Param{Name: "Test Param"}, false},
+		{"Create new profile with name", dt.Create, &models.Param{Name: "Test Param 0"}, true},
 		{"Create new profile with name and schema", dt.Create, &models.Param{
 			Name:   "Test Param",
 			Schema: map[string]interface{}{},
