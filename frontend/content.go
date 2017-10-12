@@ -352,7 +352,7 @@ func (f *Frontend) InitContentApi() {
 					cs := buildSummary(newStore)
 
 					ds := f.dt.Backend.(*midlayer.DataStack)
-					if nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger); hard != nil {
+					if nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger, nil); hard != nil {
 						midlayer.CleanUpStore(newStore)
 						jsonError(c, hard, http.StatusInternalServerError,
 							fmt.Sprintf("failed to add content: %s: ", name))
@@ -423,7 +423,7 @@ func (f *Frontend) InitContentApi() {
 					cs := buildSummary(newStore)
 
 					ds := f.dt.Backend.(*midlayer.DataStack)
-					if nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger); hard != nil {
+					if nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger, nil); hard != nil {
 						midlayer.CleanUpStore(newStore)
 						jsonError(c, hard, http.StatusInternalServerError,
 							fmt.Sprintf("failed to replace content: %s: ", name))

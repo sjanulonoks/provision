@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"sort"
 
 	"github.com/digitalrebar/provision/backend"
@@ -63,6 +64,16 @@ func (d *DataStack) Clone() *DataStack {
 	return dtStore
 }
 
+// FixerUpper takes a the datastack and a store.Store that is to be
+// added to the passed stack.  FixerUpper is responsible for making
+// sure that it can integrate the new store into the stack, making
+// whatever changes are needed to the current datastack to make
+// inclusion possible.  It must take care to scan and detect if it
+// will not be able to maek changes, because any changes it has to
+// make to items in the data stack will be live and not possible to
+// undo after FixerUpper returns.
+type FixerUpper func(*DataStack, store.Store) error
+
 func (d *DataStack) rebuild(oldStore store.Store, logger *log.Logger) (*DataStack, error, error) {
 	if err := d.buildStack(); err != nil {
 		return nil, models.NewError("ValidationError", 422, err.Error()), nil
@@ -81,8 +92,17 @@ func (d *DataStack) RemoveSAAS(name string, logger *log.Logger) (*DataStack, err
 	return dtStore.rebuild(oldStore, logger)
 }
 
-func (d *DataStack) AddReplaceSAAS(name string, newStore store.Store, logger *log.Logger) (*DataStack, error, error) {
+func (d *DataStack) AddReplaceSAAS(
+	name string,
+	newStore store.Store,
+	logger *log.Logger,
+	fixup FixerUpper) (*DataStack, error, error) {
 	dtStore := d.Clone()
+	if fixup != nil {
+		if err := fixup(dtStore, newStore); err != nil {
+			return nil, err, nil
+		}
+	}
 	oldStore, _ := dtStore.saasContents[name]
 	dtStore.saasContents[name] = newStore
 	return dtStore.rebuild(oldStore, logger)
@@ -95,11 +115,54 @@ func (d *DataStack) RemovePlugin(name string, logger *log.Logger) (*DataStack, e
 	return dtStore.rebuild(oldStore, logger)
 }
 
-func (d *DataStack) AddReplacePlugin(name string, newStore store.Store, logger *log.Logger) (*DataStack, error, error) {
+func (d *DataStack) AddReplacePlugin(
+	name string,
+	newStore store.Store,
+	logger *log.Logger,
+	fixup FixerUpper) (*DataStack, error, error) {
 	dtStore := d.Clone()
+	if fixup != nil {
+		if err := fixup(dtStore, newStore); err != nil {
+			return nil, err, nil
+		}
+	}
 	oldStore, _ := dtStore.pluginContents[name]
 	dtStore.pluginContents[name] = newStore
 	return dtStore.rebuild(oldStore, logger)
+}
+
+func fixBasic(d *DataStack, l store.Store) error {
+	toRemove := [][]string{}
+	layer0 := d.Layers()[0]
+	lSubs := l.Subs()
+	dSubs := layer0.Subs()
+	for k, v := range lSubs {
+		dSub := dSubs[k]
+		if dSub == nil {
+			continue
+		}
+		lKeys, _ := v.Keys()
+		for _, key := range lKeys {
+			var dItem interface{}
+			var lItem interface{}
+			if err := dSub.Load(key, &dItem); err != nil {
+				continue
+			}
+			if err := v.Load(key, &lItem); err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(dItem, lItem) {
+				return fmt.Errorf("fixBasic: cannot replace %s:%s: item in writable store not equal to static version\n%v\n%v",
+					k, key, dItem, lItem)
+			}
+			log.Printf("fixBasic: Replacing writable %s:%s with immutable one", k, key)
+			toRemove = append(toRemove, []string{k, key})
+		}
+	}
+	for _, item := range toRemove {
+		dSubs[item[0]].Remove(item[1])
+	}
+	return nil
 }
 
 func (d *DataStack) buildStack() error {
@@ -142,7 +205,12 @@ func (d *DataStack) buildStack() error {
 			return err
 		}
 	}
-	d.Push(d.basicContent, false, false)
+	if err := d.Push(d.basicContent, false, false); err != nil {
+		if err = fixBasic(d, d.basicContent); err == nil {
+			return d.Push(d.basicContent, false, false)
+		}
+		return err
+	}
 	return nil
 }
 

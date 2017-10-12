@@ -626,7 +626,6 @@ func NewDataTracker(backend store.Store,
 
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)
-		log.Printf("runningPref: %s: %s", pref.Name, pref.Val)
 		res.runningPrefs[pref.Name] = pref.Val
 	}
 
