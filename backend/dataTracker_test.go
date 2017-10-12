@@ -60,11 +60,14 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 }
 
 func mkDT(bs store.Store) *DataTracker {
+	s, _ := store.Open("stack:///")
 	if bs == nil {
-		bs = BasicContent()
+		bs, _ = store.Open("memory:///")
 	}
+	s.(*store.StackedStore).Push(bs, false, true)
+	s.(*store.StackedStore).Push(BasicContent(), false, false)
 	logger := log.New(os.Stdout, "dt", 0)
-	dt := NewDataTracker(bs,
+	dt := NewDataTracker(s,
 		tmpDir,
 		tmpDir,
 		"127.0.0.1",

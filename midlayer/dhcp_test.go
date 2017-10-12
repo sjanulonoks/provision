@@ -51,13 +51,16 @@ func TestMain(m *testing.M) {
 		log.Printf("Creating temp dir for file root failed: %v", err)
 		os.Exit(1)
 	}
+	s, _ := store.Open("stack:///")
 	bs := &store.Directory{Path: tmpDir}
 	if err := bs.Open(nil); err != nil {
 		log.Printf("Could not create directory: %v", err)
 		os.Exit(1)
 	}
+	s.(*store.StackedStore).Push(bs, false, true)
+	s.(*store.StackedStore).Push(backend.BasicContent(), false, false)
 	logger := log.New(os.Stdout, "dt", 0)
-	dataTracker = backend.NewDataTracker(bs,
+	dataTracker = backend.NewDataTracker(s,
 		tmpDir,
 		tmpDir,
 		"127.0.0.1",
