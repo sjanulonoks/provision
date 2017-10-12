@@ -19,73 +19,94 @@ import (
 	"github.com/digitalrebar/store"
 )
 
-var (
-	ignoreBoot = &models.BootEnv{
-		Name:        `ignore`,
-		Description: "The boot environment you should use to have unknown machines boot off their local hard drive",
-		OS: models.OsInfo{
-			Name: `ignore`,
-		},
-		OnlyUnknown: true,
-		Templates: []models.TemplateInfo{
-			{
-				Name: "pxelinux",
-				Path: `pxelinux.cfg/default`,
-				Contents: `DEFAULT local
+func BasicContent() store.Store {
+	var (
+		ignoreBoot = &models.BootEnv{
+			Name:        `ignore`,
+			Description: "The boot environment you should use to have unknown machines boot off their local hard drive",
+			OS: models.OsInfo{
+				Name: `ignore`,
+			},
+			OnlyUnknown: true,
+			Templates: []models.TemplateInfo{
+				{
+					Name: "pxelinux",
+					Path: `pxelinux.cfg/default`,
+					Contents: `DEFAULT local
 PROMPT 0
 TIMEOUT 10
 LABEL local
 localboot 0
 `,
-			},
-			{
-				Name:     `elilo`,
-				Path:     `elilo.conf`,
-				Contents: `exit`,
-			},
-			{
-				Name: `ipxe`,
-				Path: `default.ipxe`,
-				Contents: `#!ipxe
+				},
+				{
+					Name:     `elilo`,
+					Path:     `elilo.conf`,
+					Contents: `exit`,
+				},
+				{
+					Name: `ipxe`,
+					Path: `default.ipxe`,
+					Contents: `#!ipxe
 chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 `,
+				},
 			},
-		},
-	}
+		}
 
-	localBoot = &models.BootEnv{
-		Name:        "local",
-		Description: "The boot environment you should use to have known machines boot off their local hard drive",
-		OS: models.OsInfo{
-			Name: "local",
-		},
-		OnlyUnknown: false,
-		Templates: []models.TemplateInfo{
-			{
-				Name: "pxelinux",
-				Path: "pxelinux.cfg/{{.Machine.HexAddress}}",
-				Contents: `DEFAULT local
+		localBoot = &models.BootEnv{
+			Name:        "local",
+			Description: "The boot environment you should use to have known machines boot off their local hard drive",
+			OS: models.OsInfo{
+				Name: "local",
+			},
+			OnlyUnknown: false,
+			Templates: []models.TemplateInfo{
+				{
+					Name: "pxelinux",
+					Path: "pxelinux.cfg/{{.Machine.HexAddress}}",
+					Contents: `DEFAULT local
 PROMPT 0
 TIMEOUT 10
 LABEL local
 localboot 0
 `,
-			},
-			{
-				Name:     "elilo",
-				Path:     "{{.Machine.HexAddress}}.conf",
-				Contents: "exit",
-			},
-			{
-				Name: "ipxe",
-				Path: "{{.Machine.Address}}.ipxe",
-				Contents: `#!ipxe
+				},
+				{
+					Name:     "elilo",
+					Path:     "{{.Machine.HexAddress}}.conf",
+					Contents: "exit",
+				},
+				{
+					Name: "ipxe",
+					Path: "{{.Machine.Address}}.ipxe",
+					Contents: `#!ipxe
 exit
 `,
+				},
 			},
-		},
-	}
-)
+		}
+		noneStage = &models.Stage{
+			Name: "none",
+		}
+	)
+	res, _ := store.Open("memory:///")
+	bootEnvs, _ := res.MakeSub("bootenvs")
+	stages, _ := res.MakeSub("stages")
+	localBoot.ClearValidation()
+	ignoreBoot.ClearValidation()
+	noneStage.ClearValidation()
+	bootEnvs.Save("local", localBoot)
+	bootEnvs.Save("ignore", ignoreBoot)
+	stages.Save("none", noneStage)
+	res.(*store.Memory).SetMetaData(map[string]string{
+		"Name":        "BasicStore",
+		"Description": "Default objects that must be present",
+		"Version":     "Unversioned",
+		"Type":        "default",
+	})
+	return res
+}
 
 type followUpSaver interface {
 	followUpSave()
@@ -602,12 +623,6 @@ func NewDataTracker(backend store.Store,
 	// Create minimal content.
 	d, unlocker := res.LockEnts("stages", "bootenvs", "preferences", "users", "machines", "profiles", "params")
 	defer unlocker()
-	if d("bootenvs").Find("ignore") == nil {
-		res.Create(d, ignoreBoot)
-	}
-	if d("bootenvs").Find("local") == nil {
-		res.Create(d, localBoot)
-	}
 
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)
@@ -689,9 +704,6 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 		return AsBootEnv(be)
 	}
 	stageCheck := func(name, val string) bool {
-		if val == "" {
-			return true
-		}
 		stage := stages.Find(val)
 		if stage == nil {
 			err.Errorf("%s: Stage %s does not exist", name, val)
