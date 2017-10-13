@@ -81,8 +81,6 @@ if [[ "$USER" == "shane" ]]
 then
   echo "<<SHANE>> Staging terraform plugins, private content, and secrets ... "
   set -x
-  cp $HOME/private-content/drp-rack-plugins* ./private-content/
-  cp $HOME/private-content/terraform-provider-packet bin/
   cp $HOME/private-content/secrets ./private-content
   set +x
 fi
