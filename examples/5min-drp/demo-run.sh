@@ -56,7 +56,7 @@ function confirm() {
   else
     echo "$_sep"
     echo ""
-    $*
+    eval $*
     _err=$?
 
     (( $_err )) && echo "$_failed" || echo "$_success"
@@ -82,6 +82,8 @@ then
   echo "<<SHANE>> Staging terraform plugins, private content, and secrets ... "
   set -x
   cp $HOME/private-content/secrets ./private-content
+  go get -u github.com/terraform-providers/terraform-provider-packet
+  cp $HOME/go/bin/terraform-provider-packet private-content/
   set +x
 fi
 
@@ -118,11 +120,11 @@ confirm export DRP=`control.sh get-drp-id`
 # get our DRP Endpoint IP Address to manipulate our SSH Host Keys
 confirm export ADDR=`control.sh get-address $DRP`
 
-# remove any existing host keys
+# remove any existing host keys that might conflict
 confirm ssh-keygen -R $ADDR
 
-# install the newly built DRP Endpoint host key
-confirm "ssh-keyscan -H $ADDR >> $HOME/.ssh/known_hosts 2> /dev/null"
+# scan our newly built host for host keys and inject to known_hosts
+confirm "ssh-keyscan -H $ADDR >> $HOME/.ssh/known_hosts"
 
 # install DRP and basic content as identified by <ID>
 confirm control.sh drp-install $DRP     
@@ -141,14 +143,14 @@ case $1 in
     echo "Installing content from DRP endpoint ('$DRP') (pull from endpoint)..."
     # runs 'get-drp-cc', 'get-drp-plugins', and 'drp-setup' on remote <ID>
     echo ""
-    cprintf $bold "   SSH to remote DRP, stop, restart in foreground ... ? "
-    cprintf $bold "   Maybe launch UI to show empty content too ... ? "
+    cprintf $bold "   SSH to remote DRP, stop, restart in foreground ... ? \n"
+    cprintf $bold "   Maybe launch UI to show empty content too ... ? \n"
     cprintf $bold "   https://rackn.github.io/provision-ux/#/e/${ADDR}:8092/system "
     echo ""
     confirm control.sh remote-content $DRP  
     echo ""
     cprintf $cyan "NOTICE:"
-    echo "         Errors may be 'normal' - ISOs, Kernel, and InitRDs are "
+    echo "  Errors may be 'normal' - ISOs, Kernel, and InitRDs are "
     echo "         normal as the content has not yet been pused to the DRP"
     echo "         endpoint.  Other errors should be investigated."
     echo ""
