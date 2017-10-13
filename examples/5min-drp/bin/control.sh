@@ -481,7 +481,7 @@ case $1 in
   fix-stages-bug)
 
     URL="https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/packet${RACKN_AUTH}"
-    CONTENT="dr-provision-install/content-packet.json"
+    CONTENT="dr-provision-install/drp-content-packet.json"
     CONTENT_NAME=`cat $CONTENT | jq -r '.meta.Name'`
     set -x
     $DRPCLI $ENDPOINT contents destroy "$CONTENT_NAME"
