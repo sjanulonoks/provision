@@ -1,3 +1,4 @@
+!bin
 .*.swp
 bin/terraform
 bin/drpcli

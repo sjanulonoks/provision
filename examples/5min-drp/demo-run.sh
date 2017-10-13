@@ -124,7 +124,7 @@ confirm export ADDR=`control.sh get-address $DRP`
 confirm ssh-keygen -R $ADDR
 
 # install the newly built DRP Endpoint host key
-confirm ssh-keyscan -H $ADDR >> $HOME/.ssh/known_hosts 2> /dev/null
+confirm "ssh-keyscan -H $ADDR >> $HOME/.ssh/known_hosts 2> /dev/null"
 
 # install DRP and basic content as identified by <ID>
 confirm control.sh drp-install $DRP     

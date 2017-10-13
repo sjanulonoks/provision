@@ -16,38 +16,30 @@
 README file for 5min-drp
 
 
-IMPORTANT REQUIREMENTS
-----------------------
+OVERVIEW AND IMPORTANT REQUIREMENTS
+-----------------------------------
+
 You will need to perform the following requirements in preparation to
-using this demo 5min-drp process:
+using this demo 5min-drp process - details on these steps is provided
+further down in this README:
+
+  * get the 5min-drp code from the github repo
 
   * have a packet.net account, and your API KEY, and PROJECT ID
 
-  * download the RackN registered content pack and stage it in the
-    "private-content" directory, along with the sha256sum file
+  * get your RackN USERNAME for registered content download authorization
 
   * download the 'terraform-provider-packet' plugin for terraform
     and stage it in the 'private-content' directory
 
-     + install Go Lang 1.9.0 or newer from:
-       https://golang.org/dl/
-     + build the provider:
-       go get -u github.com/terraform-providers/terraform-provider-packet
-     + copy the provider to the 'private-content' directory
-       cp $HOME/go/bin/terraform-provider-packet private-content/
-
-  * download RackN "drp-rack-plugin", which is available at:
-    https://github.com/rackn/provision-plugins/releases/download/${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.sha256
-    https://github.com/rackn/provision-plugins/releases/download/${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip
-
 
 WARNING
 -------
-Because Terraform has some ... oddities - we must write a $HOME/.terraformrc
-file to be able to use the Beta version of the 'terraform-provider-packet'. 
 
-We
-will make a backup copy of your existing .terraformrc file - and we will 
+Because Terraform has some ... oddities - we must write a $HOME/.terraformrc
+file to be able to use the 'terraform-provider-packet' plugin. 
+
+We will make a backup copy of your existing .terraformrc file - and we will 
 restore it at the end of the demo when you run the "control.sh cleanup" 
 function.  
 
@@ -59,7 +51,8 @@ GIT CLONE
 ---------
 
 The following steps will clone this content from the digitalrebar/provision 
-github repo:
+github repo (we assume you will run this from $HOME/5min-drp - adjust yourself
+accordingly if you want to put it somewhere else):
 
     git clone -n https://github.com/digitalrebar/provision.git --depth=1
     cd provision
@@ -73,24 +66,79 @@ github repo:
 SECRETS INFORMATION
 -------------------
 
-# EDIT THE SECRETS FILE !!  You need:
-# 
-#   API_KEY     packet.net key for access to your Packet Project
-#   PROJECT_ID  packet.net project to create DRP and Nodes in 
+EDIT THE SECRETS FILE !!  Located in private-content/secrets.  You need:
+
+  API       packet.net key for access to your Packet Project
+  PROJECT   packet.net project to create DRP and Nodes in 
+  USERNAME  your RackN username ID 
+
+    # modify the API, PROJECT, and USERNAME  variables
 
     vim private-content/secrets
 
+  API and PROJECT are from packet.net and you should find them in your
+  Packet portal management
 
-PRIVATE CONTENT
----------------
+  USERNAME is from the RackN Portal - to find your USERNAME, log in 
+  to the portal, and navigate to:
 
-Make sure you have the RackN registered user content in the 'private-contents'
-directory, as follows:
+    Hamburger Menu (3 horizontal lines in upper left)
+    User Profile
+    Unique User Identifier
 
-    ls -l private-content/
-    -rw-r--r--@ 1      99  Sep 20 11:51  drp-rack-plugins-linux-amd64.sha256
-    -rw-r--r--@ 1 9127420  Sep 20 11:51  drp-rack-plugins-linux-amd64.zip
-    -rw-r--r--  1     577  Sep 20 11:12  secrets
+  Direct URL:  https://rackn.github.io/provision-ux/#/user/ 
+
+  It will be a big ugly UUID like string like:  ad9914b7-60bd-49d9-81d0-95e532e7ce1c
+
+
+  NOTE: Please do not modify the following in the 'secrets' file:
+        API_KEY, PROJECT_ID, and RACKN_USERNAME 
+
+
+GET TERRAFORM-PROVIDER-PACKET PLUGIN
+------------------------------------
+
+  * you must install Go Lang as all terraform providers must be
+    built from scratch:
+     + install Go Lang 1.9.0 or newer according to the docs; from:
+       https://golang.org/dl/
+ 
+  * build the provider
+     + build the provider:
+       go get -u github.com/terraform-providers/terraform-provider-packet
+     + by default this will put the compiled provider in:
+         $HOME/go/bin/
+     + copy the provider to the 'private-content' directory
+       cp $HOME/go/bin/terraform-provider-packet private-content/
+
+
+RACKN PLUGIN CONTENT
+--------------------
+
+Download the RackN plugins content and stage it in the private-contents directory.
+
+  * to get the drp-rack-plugins - do the following:
+
+      export VER_PLUGINS="tip"
+      export DRP_OS="linux"
+      export DRP_ARCH="amd64"
+      export BASE=https://github.com/rackn/provision-plugins/releases/download"
+      ${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.sha256
+      https://github.com/rackn/provision-plugins/releases/download/${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.sha256
+      https://github.com/rackn/provision-plugins/releases/download/${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip
+
+
+FINAL CHECK BEFORE RUNNING
+--------------------------
+
+  * Make sure you have the RackN registered user content in the 'private-contents'
+    directory, as follows (file sizes/etc may vary):
+
+      ls -l private-content/
+      -rw-r--r--   1 shane  staff       781 Oct 12 18:45 secrets
+      -rwxr-xr-x   1 shane  staff  22550724 Oct 12 18:48 terraform-provider-packet
+
+  * make sure you've modified the 'secrets' file appropriately 
 
 
 RUN DEMO-RUN.SH SCRIPT
@@ -146,6 +194,9 @@ NOTES:
           endpoint has no direct internet connection). 
 
           To force "proxy" pushing content - call the run-demo.sh
-          script with the "local" argument as ARGv2
+          script with the "local" argument as ARGv2.  Note that
+          this options _should_ work but is not very well 
+          tested (hint: there are probably some minor bugs)
+
 
 

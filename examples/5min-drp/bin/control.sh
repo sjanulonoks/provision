@@ -42,8 +42,18 @@ function xit() { local _x=$1; (( $_x )) && (( XIT += _x )); }
 
 # get our API_KEY and PROJECT_ID secrets
 source ./private-content/secrets || xiterr 1 "unable to source './secrets' file "
-[[ -z "$API_KEY" ]] && xiterr 1 "API_KEY is empty ... bailing - check secrets file"
-[[ -z "$PROJECT_ID" ]] && xiterr 1 "PROJECT_ID is empty ... bailing - check secrets file"
+[[ -z "$API_KEY"        || "$API_KEY"        == "insert_api_key_here" ]]         \
+  && xiterr 1 "API_KEY is empty or unset ... bailing - check secrets file"
+[[ -z "$PROJECT_ID"     || "$PROJECT_ID"     == "insert_project_id_here" ]]      \
+  && xiterr 1 "PROJECT_ID is empty or unset ... bailing - check secrets file"
+[[ -z "$RACKN_USERNAME" || "$RACKN_USERNAME" == "insert_rackn_username_here" ]]  \
+  && xiterr 1 "RACKN_USERNAME is empty or unset ... bailing - check secrets file"
+
+RACKN_AUTH="?username=${RACKN_USENAME}"
+
+API="insert_api_key_here"
+PROJECT="insert_project_id_here"
+USERNAME="insert_rackn_username_here"
 
 VER_DRP=${VER_DRP:-"stable"}
 VER_CONTENT=${VER_CONTENT:-"stable"}
@@ -290,10 +300,14 @@ case $1 in
     rm -rf tmp
 
     # since the terraform-provider-packet plugin requires GO to compile - we are pre requiring
-    # you to pre-stage it - we need the latest plugin to support the "always_pxe" option - if you
+    # you to pre-stage it in the private-content directory.  If you 
     # have GO 1.9.0 or newer - you can get/compile/install it with:
     #    go get -u github.com/terraform-providers/terraform-provider-packet
-    # copy the plugin out of the generated bin/ directory 
+    # copy the plugin out of the generated $HOME/go/bin/ (usually) directory to 
+    # the private-content/ directory
+
+    PRIV_TPP="private-content/terraform-provider-packet"
+    [[ -f "$PRIV_TPP" ]] && cp "$PRIV_TPP" bin/
     
     TF_PLUG="`pwd`/bin/terraform-provider-packet"
     [[ ! -r "${TF_PLUG}" ]] && xiterr 4 "Terraform packet plugin not found ('$TF_PLUG')"
@@ -341,7 +355,7 @@ case $1 in
   # get-drp-plugins relies on private-content for the RackN specific conent 
   # this is VERY different from the get-drp-cc (Community Content)
   get-drp-plugins)
-    [[ ! -r private-content/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip ]] && xiterr 1 "missing private-content plugins"
+#    [[ ! -r private-content/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip ]] && xiterr 1 "missing private-content plugins"
 
     rm -rf dr-provision-install/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.*
     mkdir -p dr-provision-install
@@ -349,9 +363,21 @@ case $1 in
 
     # packet helper content
     $CURL \
-      https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/packet \
+      https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/packet${RACKN_AUTH} \
       -o drp-content-packet.json
     ls -l drp-content-packet.json
+
+     $CURL \
+       https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/plugins/packet-ipmi${RACKN_AUTH} \
+       -o drp-plugin-packet-ipmi.json
+    ls -l drp-plugin-packet-ipmi.json
+
+    # get our packet-ipmi provider plugin location 
+    PACKET_URL="https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/plugins/packet-ipmi${RACKN_AUTH}"
+    PART=`$CURL $PACKET_URL | jq ".$DRP_ARCH.$DRP_OS"`
+    BASE=`$CURL $PACKET_URL | jq '.base'`
+    # download the plugin
+    $CURL $BASE/$PART -o drp-plugin-packet-ipmi
 
 # currently these plugins are closed to community - so you MUST obtain this
 # with authenticated gitlab account, and copy to the private-content directory
@@ -361,14 +387,16 @@ case $1 in
 #    $CURL  \
 #      https://github.com/rackn/provision-plugins/releases/download/${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip \
 #      -o drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip
-    cp ../private-content/drp-rack-plugins* ./
-    check_sum drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.sha256
 
-		rm -rf plugins
-    mkdir -p plugins
-		cd plugins
-		unzip ../drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip
-    check_sum sha256sums
+# moved to CURL grab of the plugin with authenticated username
+#    cp ../private-content/drp-rack-plugins* ./
+#    check_sum drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.sha256
+
+#		rm -rf plugins
+#    mkdir -p plugins
+#		cd plugins
+#		unzip ../drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip
+#    check_sum sha256sums
 
     cd ../..
     ;;
@@ -452,7 +480,7 @@ case $1 in
   # intended to be run on remote DRP endpoint
   fix-stages-bug)
 
-    URL="https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/packet"
+    URL="https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/packet${RACKN_AUTH}"
     CONTENT="dr-provision-install/content-packet.json"
     CONTENT_NAME=`cat $CONTENT | jq -r '.meta.Name'`
     set -x
@@ -471,9 +499,9 @@ case $1 in
 
     # get content
     URLS="
-    https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/os-linux
-    https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/os-discovery
-    https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/packet
+    https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/os-linux${RACKN_AUTH}
+    https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/os-discovery${RACKN_AUTH}
+    https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/packet${RACKN_AUTH}
     "
     for URL in $URLS
     do
@@ -508,10 +536,10 @@ case $1 in
       set +x
     done  
 
-    # install paccket-ipmi plugin
-    for PLUGIN in dr-provision-install/plugins/packet-ipmi
+    # install packet-ipmi plugin
+    for PLUGIN in dr-provision-install/drp-plugin-*
     do
-      PLUG_NAME=`basename $PLUGIN`
+      PLUG_NAME=`basename $PLUGIN | sed 's/^drp-plugin-//'`
 
       if ( $DRPCLI $ENDPOINT plugin_providers exists $PLUG_NAME > /dev/null 2>&1 )
       then
@@ -525,18 +553,18 @@ case $1 in
       set +x
     done
 
-    if ( $DRPCLI $ENDPOINT plugins exists packet-ipmi > /dev/null 2>&1 )
-    then
-      set -x
-      $DRPCLI $ENDPOINT plugins destroy packet-ipmi
-      set +x
-    fi
+#    if ( $DRPCLI $ENDPOINT plugins exists packet-ipmi > /dev/null 2>&1 )
+#    then
+#      set -x
+#      $DRPCLI $ENDPOINT plugins destroy packet-ipmi
+#      set +x
+#    fi
 
     cat <<EOFPLUGIN > private-content/packet-ipmi-plugin-create.json
     {
       "Available": true,
       "Name": "packet-ipmi",
-      "Description": "5min Packet IPMI API Key",
+      "Description": "Packet IPMI API Key",
       "Provider": "packet-ipmi",
       "Params": { "packet/api-key": "$API_KEY" }
     }
@@ -609,9 +637,10 @@ EOFSTAGE
     rm -rf tmp 
     rm -rf bin/terraform bin/drpcli bin/dr-provision bin/terraform-provider-packet bin/yq
 
-    sed -i.bak                                                      \
-      -e 's/^\(API="\)\(.*\)\("\)/\1insert_api_key_here\3/g'        \
-      -e 's/^\(PROJECT="\)\(.*\)\("\)/\1insert_project_id_here\3/g' \
+    sed -i.bak                                                           \
+      -e 's/^\(API="\)\(.*\)\("\)/\1insert_api_key_here\3/g'             \
+      -e 's/^\(PROJECT="\)\(.*\)\("\)/\1insert_project_id_here\3/g'      \
+      -e 's/^\(USERNAME="\)\(.*\)\("\)/\1insert_rackn_username_here\3/g' \
       private-content/secrets
     sed -i.bak                                                                \
       -e 's/\(^.*packet_api_key.*"\)\(.*\)\(".*$\)/\1insert_api_key_here\3/g' \
@@ -635,7 +664,7 @@ EOFSTAGE
   extra-cleanup)
     echo "performing extra cleanup tasks .... "
     set -x
-    rm -rf *bak terraform.tfstate* $HOME/.terraformrc ./.terraform 
+    rm -rf *bak private-content/*bak terraform.tfstate* $HOME/.terraformrc ./.terraform 
     rm -rf dr-provision-install
     set +x
     ;;
