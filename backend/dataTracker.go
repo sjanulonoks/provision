@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"text/template"
 
@@ -527,11 +528,36 @@ func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 				soft.AddError(v.HasError())
 			}
 		}
+		if prefix == "tasks" {
+			stack, ok := bk.(*store.StackedStore)
+			if ok {
+				subStore := stack.Subs()[prefix]
+				if subStore != nil {
+					sub := stack.Subs()[prefix].(*store.StackedStore)
+					for i := range res {
+						obj := AsTask(res[i])
+						key := obj.Key()
+						meta := sub.MetaFor(key)
+						if flagStr, ok := meta["feature-flags"]; ok && len(flagStr) > 0 {
+							obj.MergeFeatures(strings.Split(flagStr, ","))
+						}
+						if obj.HasFeature("original-exit-codes") {
+							obj.RemoveFeature("sane-exit-codes")
+						}
+						if !obj.HasFeature("sane-exit-codes") {
+							obj.AddFeature("original-exit-codes")
+						}
+						res[i] = obj
+					}
+				}
+			}
+		}
+
 		p.objs[prefix].Index = *index.Create(res)
 
-		if obj.Prefix() == "templates" {
+		if prefix == "templates" {
 			buf := &bytes.Buffer{}
-			for _, thing := range p.objs["templates"].Items() {
+			for _, thing := range p.objs[prefix].Items() {
 				tmpl := AsTemplate(thing)
 				fmt.Fprintf(buf, `{{define "%s"}}%s{{end}}`, tmpl.ID, tmpl.Contents)
 			}

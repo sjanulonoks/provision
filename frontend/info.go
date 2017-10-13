@@ -29,6 +29,7 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 		DhcpEnabled:        !f.NoDhcp,
 		ProvisionerEnabled: !f.NoProv,
 		Stats:              make([]*models.Stat, 0, 0),
+		Features:           []string{"api-v3"},
 	}
 
 	res := &models.Error{
