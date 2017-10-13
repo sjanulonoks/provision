@@ -174,6 +174,7 @@ function prereqs() {
   local _pkgs
   local _yq="https://gist.githubusercontent.com/earonesty/1d7cb531bb8fff8c228b7710126bcc33/raw/e250f65764c448fe4073a746c4da639d857c9e6c/yq"
   # test for our prerequisites here and add them to _pkgs parameter if missing
+  # if a Mac OS X - chuck an error
   mkdir -p $HOME/bin
   ( which unzip > /dev/null 2>&1 ) || _pkgs="unzip $_pkgs"
   ( which jq > /dev/null 2>&1 ) || _pkgs="jq $_pkgs"
@@ -185,7 +186,7 @@ function prereqs() {
 	case $_OS_FAMILY in
 		rhel)   sudo yum -y install $_pkgs; xit $? ;;
 		debian) sudo apt -y install $_pkgs; xit $? ;;
-    darwin) ;;
+    darwin) xiterr 4 "install required pkgs ($_pkgs) on Mac OS X first (eg 'brew install jq')";;
     *)  xiterr 4 "unsupported _OS_FAMILY ('$_OS_FAMILY') in prereqs()" ;;
 	esac
 
@@ -276,6 +277,8 @@ case $1 in
     ;;
 
   install-terraform)
+    [[ ! -r private-content/terraform-provider-packet ]] \
+      && xiterr 9 "required private-content/terraform-provider-packet doesn't exist"
     # get, and install terraform
     mkdir -p bin
     mkdir -p tmp
@@ -293,9 +296,9 @@ case $1 in
     #  | sort -n                                                 \
     #  | tail -1                                                 \
     #  | sed 's/terraform_//g'`
-    wget -O tf.zip https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_${MY_OS}_${MY_ARCH}.zip && unzip tf.zip
+    curl -s -o tf.zip https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_${MY_OS}_${MY_ARCH}.zip 
+    unzip tf.zip || xiterr 1 "failed to unzip downloaded Terraform zip file"
     mv terraform ../bin/ && chmod 755 ../bin/terraform
-    rm tf.zip
     cd ..
     rm -rf tmp
 
@@ -374,10 +377,10 @@ case $1 in
 
     # get our packet-ipmi provider plugin location 
     PACKET_URL="https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/plugins/packet-ipmi${RACKN_AUTH}"
-    PART=`$CURL $PACKET_URL | jq ".$DRP_ARCH.$DRP_OS"`
-    BASE=`$CURL $PACKET_URL | jq '.base'`
-    # download the plugin
-    $CURL $BASE/$PART -o drp-plugin-packet-ipmi
+    PART=`$CURL $PACKET_URL | jq -r ".$DRP_ARCH.$DRP_OS"`
+    BASE=`$CURL $PACKET_URL | jq -r '.base'`
+    # download the plugin - AWS cares about extra slashes ... blech 
+    curl -s ${BASE}${PART} -o drp-plugin-packet-ipmi
 
 # currently these plugins are closed to community - so you MUST obtain this
 # with authenticated gitlab account, and copy to the private-content directory
@@ -498,14 +501,15 @@ case $1 in
     ENDPOINT="--endpoint=https://$ADDR:8092 $CREDS"
 
     # get content
+    # content/packet is separate out to drp-content-packet in get-plugins (json and plugin both)
+    # https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/packet${RACKN_AUTH}
     URLS="
     https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/os-linux${RACKN_AUTH}
     https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/os-discovery${RACKN_AUTH}
-    https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/packet${RACKN_AUTH}
     "
     for URL in $URLS
     do
-      CONTENT_NAME="content-`basename $URL`.json"
+      CONTENT_NAME="content-`basename $URL | sed 's/\?.*$//'`.json"
       set -x
       $CURL $URL -o dr-provision-install/$CONTENT_NAME
       set +x
@@ -537,7 +541,7 @@ case $1 in
     done  
 
     # install packet-ipmi plugin
-    for PLUGIN in dr-provision-install/drp-plugin-*
+    for PLUGIN in `ls -1 dr-provision-install/drp-plugin-* | grep -v "json$"`
     do
       PLUG_NAME=`basename $PLUGIN | sed 's/^drp-plugin-//'`
 
@@ -604,7 +608,7 @@ EOFSTAGE
     for UPLOAD in $UPLOADS
     do
     $DRPCLI $ENDPOINT bootenvs exists $UPLOAD \
-      && $DRPCLI $ENDPOINT bootenvs uploadiso $UPLOAD \
+      && { set -x; $DRPCLI $ENDPOINT bootenvs uploadiso $UPLOAD; set +x; } \
       || echo "bootenv '$UPLOAD' doesn't exist, not uploading ISO"
     done
 
