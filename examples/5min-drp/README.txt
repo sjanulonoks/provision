@@ -98,6 +98,8 @@ EDIT THE SECRETS FILE !!  Located in private-content/secrets.  You need:
 GET TERRAFORM-PROVIDER-PACKET PLUGIN
 ------------------------------------
 
+Sadly ... you must do it this way ... 
+
   * you must install Go Lang as all terraform providers must be
     built from scratch:
      + install Go Lang 1.9.0 or newer according to the docs; from:
@@ -111,21 +113,6 @@ GET TERRAFORM-PROVIDER-PACKET PLUGIN
      + copy the provider to the 'private-content' directory
        cp $HOME/go/bin/terraform-provider-packet private-content/
 
-
-RACKN PLUGIN CONTENT
---------------------
-
-Download the RackN plugins content and stage it in the private-contents directory.
-
-  * to get the drp-rack-plugins - do the following:
-
-      export VER_PLUGINS="tip"
-      export DRP_OS="linux"
-      export DRP_ARCH="amd64"
-      export BASE=https://github.com/rackn/provision-plugins/releases/download"
-      ${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.sha256
-      https://github.com/rackn/provision-plugins/releases/download/${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.sha256
-      https://github.com/rackn/provision-plugins/releases/download/${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip
 
 
 FINAL CHECK BEFORE RUNNING
@@ -152,6 +139,7 @@ process.  Simply start this script.
 If you re-run the script and want to skip steps that have run previously, simply 
 answer "no" to the "ACTION" input. 
 
+
 WHAT HAPPENS?
 -------------
 
@@ -167,6 +155,7 @@ WHAT HAPPENS?
 10. set the DRP endpoint IP address to terraform 'drp-nodes.tf'
 11. kick over "N" number of nodes to provision against the new
     DRP endpoint 
+
 
 CLEANUP:
 --------
@@ -197,6 +186,41 @@ NOTES:
           script with the "local" argument as ARGv2.  Note that
           this options _should_ work but is not very well 
           tested (hint: there are probably some minor bugs)
+
+
+ADVANCED USAGE OPTIONS
+----------------------
+
+"demo-run.sh" just drives the "bin/control.sh" script to make it easy and prettier.
+You can run the full demo without any Confirmation prompts, set CONFIRM variable to
+"no":
+
+  CONFIRM=no ./demo-run.sh
+
+The entire demo will run through without (hopefully...) any interactions. 
+
+
+You can manually drive some things with the "bin/control.sh" script - simply run
+it with the "--usage" or "--help" flags, it'll print out usage statement. 
+
+
+"bin/control.sh cleanup" has an 8 second safety timer in it.  If you know what you're
+doing - you can simply call it with "bin/control.sh cleanup force" - and it'll skip 
+the safety timer. 
+
+
+You can get your DRP Endpoint provioned IP address with the "bin/control.sh" script
+(AFTER it has been successfully provisioned, of course):
+
+  DRPID=`bin/control.sh get-drp-id`
+  DRPIP=`bin/control.sh get-address $DRPID`
+
+
+You can SSH directly to the DRP Endpoint using the injected SSH keys:
+
+  ssh -x -i ./5min-drp-ssh-key root@$DRPIP 
+  OR
+  bin/control.sh ssh $DRPID
 
 
 
