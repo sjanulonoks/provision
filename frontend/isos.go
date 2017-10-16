@@ -82,7 +82,7 @@ func (f *Frontend) InitIsoApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/isos",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "isos", "list", "") {
+			if !f.assureAuth(c, "isos", "list", "") {
 				return
 			}
 			ents, err := ioutil.ReadDir(path.Join(f.FileRoot, "isos"))
@@ -117,7 +117,7 @@ func (f *Frontend) InitIsoApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/isos/:name",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "isos", "get", c.Param(`name`)) {
+			if !f.assureAuth(c, "isos", "get", c.Param(`name`)) {
 				return
 			}
 			isoName := path.Join(f.FileRoot, `isos`, path.Base(c.Param(`name`)))
@@ -146,7 +146,7 @@ func (f *Frontend) InitIsoApi() {
 	//       507: ErrorResponse
 	f.ApiGroup.POST("/isos/:name",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "isos", "post", c.Param(`name`)) {
+			if !f.assureAuth(c, "isos", "post", c.Param(`name`)) {
 				return
 			}
 			uploadIso(c, f.FileRoot, c.Param(`name`), f.dt)
@@ -165,7 +165,7 @@ func (f *Frontend) InitIsoApi() {
 	f.ApiGroup.DELETE("/isos/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
-			if !assureAuth(c, f.Logger, "isos", "delete", name) {
+			if !f.assureAuth(c, "isos", "delete", name) {
 				return
 			}
 			isoName := path.Join(f.FileRoot, `isos`, path.Base(name))
@@ -202,40 +202,40 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 	var copied int64
 
 	ctype := c.Request.Header.Get(`Content-Type`)
-    switch strings.Split(ctype, "; ")[0] {
-    case `application/octet-stream`:
+	switch strings.Split(ctype, "; ")[0] {
+	case `application/octet-stream`:
 		if c.Request.Body == nil {
 			c.JSON(http.StatusBadRequest,
 				models.NewError("API ERROR", http.StatusBadRequest,
 					fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
 			return
 		}
-    case `multipart/form-data`:
-        header , err := c.FormFile("file")
-        if err != nil {
-            c.JSON(http.StatusBadRequest,
-                models.NewError("API ERROR", http.StatusBadRequest,
-                    fmt.Sprintf("upload: Failed to find multipart file: %v", err)))
-            return
-        }
-        name = path.Base(header.Filename)
-    default:
-        c.JSON(http.StatusUnsupportedMediaType,
-            models.NewError("API ERROR", http.StatusUnsupportedMediaType,
-                fmt.Sprintf("upload: iso %s content-type %s is not application/octet-stream or multipart/form-data", name, ctype)))
-        return
-    }
+	case `multipart/form-data`:
+		header, err := c.FormFile("file")
+		if err != nil {
+			c.JSON(http.StatusBadRequest,
+				models.NewError("API ERROR", http.StatusBadRequest,
+					fmt.Sprintf("upload: Failed to find multipart file: %v", err)))
+			return
+		}
+		name = path.Base(header.Filename)
+	default:
+		c.JSON(http.StatusUnsupportedMediaType,
+			models.NewError("API ERROR", http.StatusUnsupportedMediaType,
+				fmt.Sprintf("upload: iso %s content-type %s is not application/octet-stream or multipart/form-data", name, ctype)))
+		return
+	}
 
-    isoTmpName := path.Join(fileRoot, `isos`, fmt.Sprintf(`.%s.part`, path.Base(name)))
-    isoName := path.Join(fileRoot, `isos`, path.Base(name))
+	isoTmpName := path.Join(fileRoot, `isos`, fmt.Sprintf(`.%s.part`, path.Base(name)))
+	isoName := path.Join(fileRoot, `isos`, path.Base(name))
 
-    out, err := os.Create(isoTmpName)
+	out, err := os.Create(isoTmpName)
 	if err != nil {
 		c.JSON(http.StatusConflict,
 			models.NewError("API ERROR", http.StatusConflict, fmt.Sprintf("upload: iso %s already uploading", name)))
 		return
 	}
-    defer out.Close()
+	defer out.Close()
 
 	if err != nil {
 		c.JSON(http.StatusConflict,
@@ -243,38 +243,38 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 		return
 	}
 
-    switch strings.Split(ctype, "; ")[0] {
-    case `application/octet-stream`:
+	switch strings.Split(ctype, "; ")[0] {
+	case `application/octet-stream`:
 		copied, err = io.Copy(out, c.Request.Body)
-        if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
-            os.Remove(isoTmpName)
-            c.JSON(http.StatusBadRequest,
-                models.NewError("API ERROR", http.StatusBadRequest,
-                    fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes received", name, c.Request.ContentLength, copied)))
-            return
-        }
-        if err != nil {
-            os.Remove(isoTmpName)
-            c.JSON(http.StatusInsufficientStorage,
-                models.NewError("API ERROR",
-                    http.StatusInsufficientStorage, fmt.Sprintf("upload: Failed to upload %s: %v", name, err)))
-            return
-        }
-    case `multipart/form-data`:
-        header , _ := c.FormFile("file")
-        file, err := header.Open()
-        defer file.Close()
-        copied, err = io.Copy(out, file)
-        if err != nil {
-            c.JSON(http.StatusConflict,
-                models.NewError("API ERROR", http.StatusBadRequest, fmt.Sprintf("upload: iso %s could not save", header.Filename)))
-            return
-        }
-        file.Close()
-    }
+		if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
+			os.Remove(isoTmpName)
+			c.JSON(http.StatusBadRequest,
+				models.NewError("API ERROR", http.StatusBadRequest,
+					fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes received", name, c.Request.ContentLength, copied)))
+			return
+		}
+		if err != nil {
+			os.Remove(isoTmpName)
+			c.JSON(http.StatusInsufficientStorage,
+				models.NewError("API ERROR",
+					http.StatusInsufficientStorage, fmt.Sprintf("upload: Failed to upload %s: %v", name, err)))
+			return
+		}
+	case `multipart/form-data`:
+		header, _ := c.FormFile("file")
+		file, err := header.Open()
+		defer file.Close()
+		copied, err = io.Copy(out, file)
+		if err != nil {
+			c.JSON(http.StatusConflict,
+				models.NewError("API ERROR", http.StatusBadRequest, fmt.Sprintf("upload: iso %s could not save", header.Filename)))
+			return
+		}
+		file.Close()
+	}
 
-    os.Remove(isoName)
-    os.Rename(isoTmpName, isoName)
+	os.Remove(isoName)
+	os.Rename(isoTmpName, isoName)
 	go reloadBootenvsForIso(dt, name)
 	c.JSON(http.StatusCreated, &IsoInfo{Path: name, Size: copied})
 }

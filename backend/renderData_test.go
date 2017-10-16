@@ -268,6 +268,9 @@ func TestRenderData(t *testing.T) {
 		} else if e.Error() != "Missing bootenv" {
 			t.Errorf("BootParams with no ENV should have generated an error: %s, but got %s\n", "Missing bootenv", e.Error())
 		}
+
+		grantorSecret, _ := dt.Pref("systemGrantorSecret")
+
 		s = rd.GenerateToken()
 		claim, e := dt.GetToken(s)
 		if e != nil {
@@ -281,6 +284,18 @@ func TestRenderData(t *testing.T) {
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 600 {
 			t.Errorf("Unknown token timeout should be 600, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "", "") {
+			t.Errorf("Secrets validate to validate correctly: %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "empty", "empty") {
+			t.Errorf("Secrets validate to validate correctly: %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", "") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret)
 		}
 		e = dt.SetPrefs(d, map[string]string{"unknownTokenTimeout": "50"})
 		if e != nil {
@@ -302,6 +317,22 @@ func TestRenderData(t *testing.T) {
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 50 {
 			t.Errorf("Unknown token timeout should be 50, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "", "") {
+			t.Errorf("Secrets validate to validate correctly: %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "empty", "empty") {
+			t.Errorf("Secrets validate to validate correctly: %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", "") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret)
+		}
+		s = rd.GenerateInfiniteToken()
+		if s != "" {
+			t.Errorf("Infinite Token should not be allowed for non-machine templates\n")
 		}
 	}()
 
@@ -387,6 +418,10 @@ func TestRenderData(t *testing.T) {
 		} else if e.Error() != errString {
 			t.Errorf("BootParams with no ENV should have generated an error: %s, but got %s\n", errString, e.Error())
 		}
+
+		machineSecret := machine.Secret
+		grantorSecret, _ := dt.Pref("systemGrantorSecret")
+
 		s = rd.GenerateToken()
 		claim, e := dt.GetToken(s)
 		if e != nil {
@@ -409,6 +444,31 @@ func TestRenderData(t *testing.T) {
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 3600 {
 			t.Errorf("Known token timeout should be 3600, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "", machineSecret) {
+			t.Errorf("Secrets validate to validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "empty", machineSecret) {
+			t.Errorf("Secrets validate to validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", machineSecret) {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret, "", machineSecret+"1") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret+"1", claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", machineSecret+"1") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
+				machineSecret+"1", claim.GrantorClaims.MachineSecret)
 		}
 		e = dt.SetPrefs(d, map[string]string{"knownTokenTimeout": "50"})
 		if e != nil {
@@ -436,6 +496,80 @@ func TestRenderData(t *testing.T) {
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 50 {
 			t.Errorf("Known token timeout should be 50, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "", machineSecret) {
+			t.Errorf("Secrets validate to validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "empty", machineSecret) {
+			t.Errorf("Secrets validate to validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", machineSecret) {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret, "", machineSecret+"1") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret+"1", claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", machineSecret+"1") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
+				machineSecret+"1", claim.GrantorClaims.MachineSecret)
+		}
+
+		s = rd.GenerateInfiniteToken()
+		claim, e = dt.GetToken(s)
+		if e != nil {
+			t.Errorf("GetToken should return a good claim. %v\n", e)
+		}
+		if claim.Match("machines", "post", "anything") {
+			t.Errorf("Known token should NOT match: machines/post/*\n")
+		}
+		if claim.Match("machines", "get", "anything") {
+			t.Errorf("Known token should NOT match: machines/get/*\n")
+		}
+		if claim.Match("machines", "patch", "anything") {
+			t.Errorf("Known token should NOT match: machines/patch/*\n")
+		}
+		if !claim.Match("machines", "get", machine.Key()) {
+			t.Errorf("Known token should match: machines/get/%s\n", machine.Key())
+		}
+		if !claim.Match("machines", "patch", machine.Key()) {
+			t.Errorf("Known token should match: machines/patch/%s\n", machine.Key())
+		}
+		if claim.ExpiresAt-claim.IssuedAt >= 100000 {
+			t.Errorf("Known token timeout should > 100000, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "", machineSecret) {
+			t.Errorf("Secrets validate to validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "empty", machineSecret) {
+			t.Errorf("Secrets validate to validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", machineSecret) {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret, "", machineSecret+"1") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret+"1", claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", machineSecret+"1") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
+				machineSecret+"1", claim.GrantorClaims.MachineSecret)
 		}
 	}()
 

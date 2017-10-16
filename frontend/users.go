@@ -210,20 +210,26 @@ func (f *Frontend) InitUserApi(drpid string) {
 	f.ApiGroup.GET("/users/:name/token",
 		func(c *gin.Context) {
 			ref := &backend.User{}
-			var user models.Model
+			var uobj models.Model
+			var gobj models.Model
 			func() {
 				d, unlocker := f.dt.LockEnts(ref.Locks("get")...)
 				defer unlocker()
-				user = d("users").Find(c.Param("name"))
+				uobj = d("users").Find(c.Param("name"))
+				gobj = d("users").Find(f.getAuthUser(c))
 			}()
-			if user == nil {
+			if uobj == nil {
 				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
 				c.JSON(http.StatusNotFound, models.NewError("API_ERROR", http.StatusNotFound, s))
 				return
 			}
-			if !assureAuth(c, f.Logger, user.Prefix(), "token", user.Key()) {
+			if !f.assureAuth(c, uobj.Prefix(), "token", uobj.Key()) {
 				return
 			}
+
+			user := backend.AsUser(uobj)
+			grantor := backend.AsUser(gobj)
+
 			sttl, _ := c.GetQuery("ttl")
 			ttl := 3600
 			if sttl != "" {
@@ -243,7 +249,11 @@ func (f *Frontend) InitUserApi(drpid string) {
 				specific = "*"
 			}
 
-			if t, err := f.dt.NewToken(c.Param(`name`), ttl, scope, action, specific); err != nil {
+			claims := backend.NewClaim(c.Param(`name`), grantor.Name, ttl).
+				Add(scope, action, specific).
+				AddSecrets(grantor.Secret, user.Secret, "")
+
+			if t, err := f.dt.SealClaims(claims); err != nil {
 				ne, ok := err.(*models.Error)
 				if ok {
 					c.JSON(ne.Code, ne)
@@ -310,6 +320,13 @@ func (f *Frontend) InitUserApi(drpid string) {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name/password",
 		func(c *gin.Context) {
+			if !f.assureAuth(c, "users", "password", c.Param("name")) {
+				return
+			}
+			var userPassword models.UserPassword
+			if !assureDecode(c, &userPassword) {
+				return
+			}
 			ref := &backend.User{}
 			d, unlocker := f.dt.LockEnts(ref.Locks("update")...)
 			defer unlocker()
@@ -320,13 +337,6 @@ func (f *Frontend) InitUserApi(drpid string) {
 				return
 			}
 			user := backend.AsUser(obj)
-			if !assureAuth(c, f.Logger, user.Prefix(), "password", user.Key()) {
-				return
-			}
-			var userPassword models.UserPassword
-			if !assureDecode(c, &userPassword) {
-				return
-			}
 			if err := user.ChangePassword(d, userPassword.Password); err != nil {
 				be, ok := err.(*models.Error)
 				if ok {

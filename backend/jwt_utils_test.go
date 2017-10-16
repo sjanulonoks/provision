@@ -34,7 +34,7 @@ func TestJWTUtils(t *testing.T) {
 	}
 
 	jwtManager = NewJwtManager([]byte(randString(32)))
-	s, e := NewClaim("fred", 30).Add("*", "a", "m").Seal(jwtManager)
+	s, e := NewClaim("fred", "fred", 30).Add("*", "a", "m").Seal(jwtManager)
 	if e != nil {
 		t.Errorf("Failed to sign token: %v\n", e)
 	}
@@ -50,7 +50,7 @@ func TestJWTUtils(t *testing.T) {
 		}
 	}
 
-	s, e = NewClaim("fred", 1).Add("*", "m", "a").Seal(jwtManager)
+	s, e = NewClaim("fred", "fred", 1).Add("*", "m", "a").Seal(jwtManager)
 	if e != nil {
 		t.Errorf("Failed to sign token: %v\n", e)
 	}

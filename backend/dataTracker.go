@@ -734,6 +734,7 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 	}
 	for name, val := range prefs {
 		switch name {
+		case "systemGrantorSecret": // Do nothing
 		case "defaultBootEnv":
 			be := benvCheck(name, val)
 			if be != nil && !be.OnlyUnknown {
@@ -757,7 +758,6 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			if intCheck(name, val) {
 				savePref(name, val)
 			}
-			continue
 		default:
 			err.Errorf("Unknown preference %s", name)
 		}
@@ -976,10 +976,6 @@ func (p *DataTracker) Backup() ([]byte, error) {
 func (p *DataTracker) ReplaceBackend(st store.Store) (hard, soft error) {
 	p.Backend = st
 	return p.rebuildCache()
-}
-
-func (p *DataTracker) NewToken(id string, ttl int, scope, action, specific string) (string, error) {
-	return NewClaim(id, ttl).Add(scope, action, specific).Seal(p.tokenManager)
 }
 
 func (p *DataTracker) Printf(f string, args ...interface{}) {

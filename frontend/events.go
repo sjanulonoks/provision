@@ -29,7 +29,7 @@ func (f *Frontend) InitEventApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/events",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "events", "post", "*") {
+			if !f.assureAuth(c, "events", "post", "*") {
 				return
 			}
 			event := models.Event{}

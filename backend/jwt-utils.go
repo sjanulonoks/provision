@@ -143,10 +143,43 @@ func (c *Claim) Match(scope, action, specific string) bool {
 		(c.Specific == specific || c.Specific == "*")
 }
 
+//
+// Grantor Claims allow for the token to be validated against
+// the granting user, the current user, and the machine.
+// Each of those object can have a secret that if changed
+// on the user object will invalid the token.
+//
+// This allows for mass revocation at a machine, grantor,
+// or user level.
+//
+type GrantorClaims struct {
+	GrantorId     string `json:"grantor_id"`
+	GrantorSecret string `json:"grantor_secret"`
+	UserId        string `json:"user_id"`
+	UserSecret    string `json:"user_secret"`
+	MachineUuid   string `json:"machine_uuid"`
+	MachineSecret string `json:"machine_secret"`
+}
+
+// If present, we should validate them.
+func (gc *GrantorClaims) Validate(grantor, user, machine string) bool {
+	if gc.GrantorSecret != "" && grantor != "" && grantor != gc.GrantorSecret {
+		return false
+	}
+	if gc.UserSecret != "" && user != "" && user != gc.UserSecret {
+		return false
+	}
+	if gc.MachineSecret != "" && machine != "" && machine != gc.MachineSecret {
+		return false
+	}
+	return true
+}
+
 // DrpCustomClaims is a JWT token that contains a list of all the
 // things this token allows access to.
 type DrpCustomClaims struct {
-	DrpClaims []Claim `json:"drp_claims"`
+	DrpClaims     []Claim       `json:"drp_claims"`
+	GrantorClaims GrantorClaims `json:"grantor_claims"`
 	jwt.StandardClaims
 }
 
@@ -160,16 +193,55 @@ func (d *DrpCustomClaims) Match(scope, action, specific string) bool {
 	return false
 }
 
+func (d *DrpCustomClaims) HasGrantorId() bool {
+	return d.GrantorClaims.GrantorId != ""
+}
+func (d *DrpCustomClaims) GrantorId() string {
+	return d.GrantorClaims.GrantorId
+}
+func (d *DrpCustomClaims) HasUserId() bool {
+	return d.GrantorClaims.UserId != ""
+}
+func (d *DrpCustomClaims) UserId() string {
+	return d.GrantorClaims.UserId
+}
+func (d *DrpCustomClaims) HasMachineUuid() bool {
+	return d.GrantorClaims.MachineUuid != ""
+}
+func (d *DrpCustomClaims) MachineUuid() string {
+	return d.GrantorClaims.MachineUuid
+}
+
+func (d *DrpCustomClaims) ValidateSecrets(grantor, user, machine string) bool {
+	return d.GrantorClaims.Validate(grantor, user, machine)
+}
+
 // NewClaim creates a new, unsigned Token that doesn't allow access to anything.
 // You must call Seal() to turn this into a signed JWT token.
-func NewClaim(user string, ttl int) *DrpCustomClaims {
+func NewClaim(user, grantor string, ttl int) *DrpCustomClaims {
 	d := time.Duration(ttl) * time.Second
 	res := &DrpCustomClaims{DrpClaims: []Claim{}}
 	res.IssuedAt = time.Now().Unix()
 	res.ExpiresAt = time.Now().Add(d).Unix()
 	res.Issuer = "digitalrebar provision"
 	res.Id = user
+	res.GrantorClaims.UserId = user
+	res.GrantorClaims.GrantorId = grantor
 	return res
+}
+
+// Set the specific secrets
+func (d *DrpCustomClaims) AddMachine(uuid string) *DrpCustomClaims {
+	d.GrantorClaims.MachineUuid = uuid
+	return d
+}
+
+// Set the specific secrets
+func (d *DrpCustomClaims) AddSecrets(user, grantor, machine string) *DrpCustomClaims {
+	d.GrantorClaims.UserSecret = user
+	d.GrantorClaims.GrantorSecret = grantor
+	d.GrantorClaims.MachineSecret = machine
+	return d
 }
 
 // Add adds a discrete Claim to our custom Token class.

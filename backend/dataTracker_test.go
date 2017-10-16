@@ -75,7 +75,7 @@ func mkDT(bs store.Store) *DataTracker {
 		8091,
 		8092,
 		logger,
-		map[string]string{"defaultStage": "none", "defaultBootEnv": "local", "unknownBootEnv": "ignore"},
+		map[string]string{"systemGrantorSecret": "itisfred", "defaultStage": "none", "defaultBootEnv": "local", "unknownBootEnv": "ignore"},
 		NewPublishers(logger))
 	return dt
 }

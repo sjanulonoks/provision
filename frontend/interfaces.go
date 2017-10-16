@@ -43,7 +43,7 @@ func (f *Frontend) InitInterfaceApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/interfaces",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "interfaces", "list", "") {
+			if !f.assureAuth(c, "interfaces", "list", "") {
 				return
 			}
 			intfs, err := f.dt.GetInterfaces()
@@ -73,7 +73,7 @@ func (f *Frontend) InitInterfaceApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/interfaces/:name",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "interfaces", "get", c.Param(`name`)) {
+			if !f.assureAuth(c, "interfaces", "get", c.Param(`name`)) {
 				return
 			}
 			intfs, err := f.dt.GetInterfaces()

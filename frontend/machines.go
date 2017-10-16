@@ -447,7 +447,7 @@ func (f *Frontend) InitMachineApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/machines/:uuid/actions",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "machines", "actions", c.Param(`uuid`)) {
+			if !f.assureAuth(c, "machines", "actions", c.Param(`uuid`)) {
 				return
 			}
 			uuid := c.Param(`uuid`)
@@ -499,7 +499,7 @@ func (f *Frontend) InitMachineApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/machines/:uuid/actions/:name",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "machines", c.Param(`name`), c.Param(`uuid`)) {
+			if !f.assureAuth(c, "machines", c.Param(`name`), c.Param(`uuid`)) {
 				return
 			}
 			uuid := c.Param(`uuid`)
@@ -560,6 +560,10 @@ func (f *Frontend) InitMachineApi() {
 
 			ma := &models.MachineAction{Command: name, Params: val}
 
+			if !f.assureAuth(c, "machines", name, uuid) {
+				return
+			}
+
 			b := &backend.Machine{}
 			var ref models.Model
 			bad := func() bool {
@@ -575,9 +579,6 @@ func (f *Frontend) InitMachineApi() {
 					}
 					err.Errorf("%s Call Action: machine %s: Not Found", err.Model, err.Key)
 					c.JSON(err.Code, err)
-					return true
-				}
-				if !assureAuth(c, f.Logger, ref.Prefix(), name, ref.Key()) {
 					return true
 				}
 
