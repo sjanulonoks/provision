@@ -465,6 +465,9 @@ func (n *Machine) OnCreate() error {
 	}
 	bootenvs := n.stores("bootenvs")
 	stages := n.stores("stages")
+	if n.Tasks == nil {
+		n.Tasks = []string{}
+	}
 	if bootenvs.Find(n.BootEnv) == nil {
 		n.Errorf("Bootenv %s does not exist", n.BootEnv)
 	} else if stages.Find(n.Stage) == nil {
