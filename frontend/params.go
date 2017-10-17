@@ -220,6 +220,7 @@ func (f *Frontend) InitParamApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/params/*name",
 		func(c *gin.Context) {
 			name := strings.TrimLeft(c.Param(`name`), `/`)

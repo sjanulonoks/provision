@@ -377,6 +377,7 @@ func (f *Frontend) InitMachineApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/machines/:uuid",
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Machine{}, c.Param(`uuid`))

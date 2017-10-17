@@ -247,6 +247,7 @@ func (f *Frontend) InitTaskApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/tasks/:name",
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Task{}, c.Param(`name`))
