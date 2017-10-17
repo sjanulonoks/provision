@@ -238,6 +238,7 @@ func (f *Frontend) InitReservationApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/reservations/:address",
 		func(c *gin.Context) {
 			addr := net.ParseIP(c.Param(`address`))

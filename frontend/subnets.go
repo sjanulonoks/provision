@@ -212,6 +212,7 @@ func (f *Frontend) InitSubnetApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/subnets/:name",
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Subnet{}, c.Param(`name`))

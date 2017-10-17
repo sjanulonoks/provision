@@ -162,6 +162,7 @@ func (f *Frontend) InitIsoApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/isos/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)

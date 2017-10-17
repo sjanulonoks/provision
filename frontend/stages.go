@@ -205,6 +205,7 @@ func (f *Frontend) InitStageApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/stages/:name",
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Stage{}, c.Param(`name`))

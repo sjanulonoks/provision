@@ -269,6 +269,7 @@ func (f *Frontend) InitFileApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/files/*path",
 		func(c *gin.Context) {
 			if !f.assureAuth(c, "files", "delete", c.Param(`path`)) {

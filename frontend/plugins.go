@@ -249,6 +249,7 @@ func (f *Frontend) InitPluginApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/plugins/:name",
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Plugin{}, c.Param(`name`))

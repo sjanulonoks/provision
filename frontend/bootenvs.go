@@ -204,6 +204,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/bootenvs/:name",
 		func(c *gin.Context) {
 			f.Remove(c, &backend.BootEnv{}, c.Param(`name`))

@@ -138,6 +138,7 @@ func (f *Frontend) InitPluginProviderApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/plugin_providers/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
