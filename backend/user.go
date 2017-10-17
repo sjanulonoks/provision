@@ -117,7 +117,11 @@ func (u *User) OnLoad() error {
 		return u.p.objs[ref]
 	}
 	defer func() { u.stores = nil }()
-	return u.BeforeSave()
+	err := u.BeforeSave()
+	if err == nil {
+		err = u.stores("users").backingStore.Save(u.Key(), u)
+	}
+	return err
 }
 
 var userLockMap = map[string][]string{

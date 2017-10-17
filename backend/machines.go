@@ -603,7 +603,12 @@ func (n *Machine) OnLoad() error {
 		n.oldStage = "none"
 	}
 	defer func() { n.stores = nil }()
-	return n.BeforeSave()
+
+	err := n.BeforeSave()
+	if err == nil {
+		err = n.stores("machines").backingStore.Save(n.Key(), n)
+	}
+	return err
 }
 
 func (n *Machine) OnChange(oldThing store.KeySaver) error {
