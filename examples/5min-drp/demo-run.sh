@@ -82,8 +82,9 @@ then
   echo "<<SHANE>> Staging terraform plugins, private content, and secrets ... "
   set -x
   cp $HOME/private-content/secrets ./private-content
-  go get -u github.com/terraform-providers/terraform-provider-packet
-  cp $HOME/go/bin/terraform-provider-packet private-content/
+#  not needed - 'terraform init' now gets good version
+#  go get -u github.com/terraform-providers/terraform-provider-packet
+#  cp $HOME/go/bin/terraform-provider-packet private-content/
   set +x
 fi
 

@@ -24,23 +24,9 @@
 #            if key names exist alread - they'll create successfully, but
 #            the duplicate key names can lead to operator confusion and
 #            possibly error
-#          * 'install-terraform' should check for latest release version,
-#            then check existing PATH for it, and avoid downloading if we
-#            already have it installed 
 ###
 
-###
-#  exit with error code and FATAL message
-#  example:  xiterr 1 "error message"
-###
-function xiterr() { [[ $1 =~ ^[0-9]+$ ]] && { local _xit=$1; shift; } || local _xit=255; echo "FATAL: $*"; exit $_xit; }
-
-###
-#  set global XIT value if we receive an error exit code (anything 
-#  besides a Zero)
-###
-function xit() { local _x=$1; (( $_x )) && (( XIT += _x )); }
-
+[[ -f ./bin/functions.sh ]] && source ./bin/functions.sh || exit 99
 [[ -f ./bin/color.sh ]] && source ./bin/color.sh
 ( type -t cprintf > /dev/null 2>&1 ) || function cprintf() { printf "%s" "$*"; }
 
@@ -158,24 +144,6 @@ function my_copy() {
   xit $?
 }
 
-###
-#  accept as ARGv1 a sha256 check sum file to test
-###
-function check_sum() {
-  local _sum=$1
-  [[ -z "$_sum" ]] && xiterr 1 "no check sum file passed to check_sum()"
-  [[ ! -r "$_sum" ]] && xiterr 1 "unable to read check sum file '$_sum'"
-  local _platform=`uname -s`
-
-  case $_platform in
-    Darwin) shasum -a 256 -c $_sum; xit $? ;;
-    Linux)  sha256sum -c $_sum; xit $? ;;
-    *) xiterr 2 "unsupported platform type '$_platform'"
-  esac
-
-  (( $XIT )) && xiterr 9 "checksum failed for '$_sum'"
-}
-
 function prereqs() {
   local _pkgs
   local _yq="https://gist.githubusercontent.com/earonesty/1d7cb531bb8fff8c228b7710126bcc33/raw/e250f65764c448fe4073a746c4da639d857c9e6c/yq"
@@ -198,48 +166,6 @@ function prereqs() {
 
   (( $XIT )) && xiterr 1 "prerequisites failed ('$_pkgs')"
 }
-
-# set our global _OS_* variables for re-use
-function os_info() {
-	# Figure out what Linux distro we are running on.
-	# set these globally for use outside of the script
-	export _OS_TYPE= _OS_VER= _OS_NAME= _OS_FAMITLY=
-
-	if [[ -f /etc/os-release ]]; then
-    source /etc/os-release
-    _OS_TYPE=${ID,,}
-    _OS_VER=${VERSION_ID,,}
-	elif [[ -f /etc/lsb-release ]]; then
-    source /etc/lsb-release
-    _OS_VER=${DISTRIB_RELEASE,,}
-    _OS_TYPE=${DISTRIB_ID,,}
-	elif [[ -f /etc/centos-release || -f /etc/fedora-release || -f /etc/redhat-release ]]; then
-    for rel in centos-release fedora-release redhat-release; do
-        [[ -f /etc/$rel ]] || continue
-        _OS_TYPE=${rel%%-*}
-        _OS_VER="$(egrep -o '[0-9.]+' "/etc/$rel")"
-        break
-    done
-
-    if [[ ! $_OS_TYPE ]]; then
-        echo "Cannot determine Linux version we are running on!"
-        exit 1
-    fi
-	elif [[ -f /etc/debian_version ]]; then
-    _OS_TYPE=debian
-    _OS_VER=$(cat /etc/debian_version)
-	elif [[ $(uname -s) == Darwin ]] ; then
-    _OS_TYPE=darwin
-    _OS_VER=$(sw_vers | grep ProductVersion | awk '{ print $2 }')
-	fi
-	_OS_NAME="$_OS_TYPE-$_OS_VER"
-
-	case $_OS_TYPE in
-    centos|redhat|fedora) _OS_FAMILY="rhel";;
-    debian|ubuntu) _OS_FAMILY="debian";;
-    *) _OS_FAMILY=$_OS_TYPE;;
-	esac
-} # end os_family()
 
 prereqs 
 
@@ -283,49 +209,32 @@ case $1 in
     ;;
 
   install-terraform)
-    [[ ! -r private-content/terraform-provider-packet ]] \
-      && xiterr 9 "required private-content/terraform-provider-packet doesn't exist"
-    # get, and install terraform
     mkdir -p bin
-    mkdir -p tmp
-    cd tmp
+
     # make a reasonable attempt at getting the latest version of Terraform
     TF_VER=`curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_version'`
-    # see:  https://github.com/hashicorp/terraform/issues/9803
-    # thank you Apple for providing a hobbled version of 'sort' that doesn't contain "-V" 
-    # (version sorting) capabilities
-    #`curl -s https://releases.hashicorp.com/terraform/   \
-    #  | grep terraform_                                         \
-    #  | egrep -v "rc|beta"                                      \
-    #  | egrep "_[1-9]\.[0-9].*|0\.[1-9][0-9]\."                 \
-    #  | sed 's/\(^.*>\)\(terraform_.*\..*\..*\)\(<\/.*$\)/\2/g' \
-    #  | sort -n                                                 \
-    #  | tail -1                                                 \
-    #  | sed 's/terraform_//g'`
-    curl -s -o tf.zip https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_${MY_OS}_${MY_ARCH}.zip 
-    unzip tf.zip || xiterr 1 "failed to unzip downloaded Terraform zip file"
-    mv terraform ../bin/ && chmod 755 ../bin/terraform
-    cd ..
-    rm -rf tmp
+    GET_TF_CMD="curl -s -o tf.zip https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_${MY_OS}_${MY_ARCH}.zip "
+    # if locally installed all ready - get current version 
+    TF_INSTALL_VER=`( which -s terraform ) && terraform version | head -1 | cut -d "v" -f 2`
 
-    # since the terraform-provider-packet plugin requires GO to compile - we are pre requiring
-    # you to pre-stage it in the private-content directory.  If you 
-    # have GO 1.9.0 or newer - you can get/compile/install it with:
-    #    go get -u github.com/terraform-providers/terraform-provider-packet
-    # copy the plugin out of the generated $HOME/go/bin/ (usually) directory to 
-    # the private-content/ directory
+    ( `compver $TF_VER '>' $TF_INSTALL_VER` ) && UPGRADE=1 || UPGRADE=0
+    [[ -z "$TF_INSTALL_VER" ]] && INSTALL=1 || INSTALL=0 
 
-    PRIV_TPP="private-content/terraform-provider-packet"
-    [[ -f "$PRIV_TPP" ]] && cp "$PRIV_TPP" bin/
-    
-    TF_PLUG="`pwd`/bin/terraform-provider-packet"
-    [[ ! -r "${TF_PLUG}" ]] && xiterr 4 "Terraform packet plugin not found ('$TF_PLUG')"
-    if [[ -f $HOME/.terraformrc ]] 
+    if (( $UPGRADE || $INSTALL ))
     then
-      echo "Backing up $HOME/.terraformrc to $HOME/.terraformrc.5min-backup"
-      cp $HOME/.terraformrc $HOME/.terraformrc.5min-backup
+      mkdir -p tmp_tf
+      cd tmp_tf
+      echo "Installing local version of terrform binary to ./bin/ directory"
+      $GET_TF_CMD
+      unzip tf.zip || xiterr 1 "failed to unzip downloaded Terraform zip file"
+      mv terraform ../bin/ && chmod 755 ../bin/terraform
+      cd ..
+      rm -rf tmp_tf
+    else
+      echo "Terraform binary found ('`which terraform`'), and is current (ver '$TF_VER')."
+      echo "NOT downloading a new version; Using this binary for terraform functions."
     fi
-    echo "providers { packet = \"${TF_PLUG}\" }" >> $HOME/.terraformrc
+
     terraform init || xiterr 1 "terraform init failed"
     ;;
 

@@ -29,26 +29,11 @@ further down in this README:
 
   * get your RackN USERNAME for registered content download authorization
 
-  * download the 'terraform-provider-packet' plugin for terraform
-    and stage it in the 'private-content' directory
-
   * [optional] make changes to the terraform "vars.tf" parameters
 
-WARNING
--------
 
-Because Terraform has some ... oddities - we must write a $HOME/.terraformrc
-file to be able to use the 'terraform-provider-packet' plugin. 
-
-We will make a backup copy of your existing .terraformrc file - and we will 
-restore it at the end of the demo when you run the "control.sh cleanup" 
-function.  
-
-IF YOU DO NOT run the 'cleanup' function - you will need to manually restore 
-your terraform configuration file. (backup is:  $HOME/.terraform.5min-backup )
-
-IF YOU DESTROY machines in Packet.net portal - we will not know about that
-action, and you will have to clean up manually ... 
+NOTE: The terraform-provider-plugin has been updated in the public repo,
+      it's no longer necessary to get/build it manually and pre-stage it.
 
 
 GIT CLONE
@@ -99,37 +84,14 @@ EDIT THE SECRETS FILE !!  Located in private-content/secrets.  You need:
         API_KEY, PROJECT_ID, and RACKN_USERNAME 
 
 
-GET TERRAFORM-PROVIDER-PACKET PLUGIN
-------------------------------------
-
-Sadly ... you must do it this way ... 
-
-  * you must install Go Lang as all terraform providers should be
-    built from scratch:
-     + install Go Lang 1.9.0 or newer according to the docs; from:
-         https://golang.org/dl/
- 
-  * build the provider
-     + build the provider:
-         go get -u github.com/terraform-providers/terraform-provider-packet
-     + by default this will put the compiled provider in:
-         $HOME/go/bin/
-     + copy the provider to the 'private-content' directory
-         cp $HOME/go/bin/terraform-provider-packet private-content/
-
-
-
 FINAL CHECK BEFORE RUNNING
 --------------------------
 
-  * Make sure you have the RackN registered user content in the 'private-contents'
-    directory, as follows (file sizes/etc may vary):
-
-      ls -l private-content/
-      -rw-r--r--   1 shane  staff       781 Oct 12 18:45 secrets
-      -rwxr-xr-x   1 shane  staff  22550724 Oct 12 18:48 terraform-provider-packet
-
   * make sure you've modified the 'secrets' file appropriately 
+    (inject API, PROJECT, and USERNAME)
+
+  * make sure you've modified the 'vars.tf' file to suit your use
+    (change 'cluster_name', 'machines_count', etc....)
 
 
 [optional] MODIFY THE TERRAFOMR "vars.tf" FILE
@@ -147,6 +109,7 @@ FINAL CHECK BEFORE RUNNING
   * specify the number of Machines to provision 
 
   * change the packet.net facility to provsion the cluster in 
+
 
 RUN DEMO-RUN.SH SCRIPT
 ----------------------
@@ -172,7 +135,7 @@ WHAT HAPPENS?
     (on centos-7, configurable, see vars.tf)
 7.  install DRP locally in ./bin for 'drpcli' control
 8.  install DRP on the remote endpoint 
-9.  configure content and services on DRP   [SEE NOTE: CONTENT]
+9.  configure content and services on DRP  [SEE NOTE: CONTENT]
 10. set the DRP endpoint IP address to terraform 'drp-machines.tf'
 11. kick over "N" number of machines to provision against the new
     DRP endpoint 
@@ -229,7 +192,7 @@ what you're doing - you can simply call it with "bin/control.sh cleanup
 force" - and it'll skip the safety timer. 
 
 
-You can get your DRP Endpoint provioned IP address with the "bin/control.sh" 
+You can get your DRP Endpoint provisioned IP address with the "bin/control.sh" 
 script (AFTER it has been successfully provisioned, of course):
 
   DRP_ID=`bin/control.sh get-drp-id`
@@ -243,7 +206,8 @@ You can SSH directly to the DRP Endpoint using the injected SSH keys:
   bin/control.sh ssh $DRP_ID
 
 
-You should be able to SSH to the Machines directly as well, using the following:
+You should be able to SSH to the Machines directly as well, using the following
+(after they've been provsioned and installed, of course):
 
   terraform plan    # to get the various machines IP addresses
                     # or get from packet.net
@@ -251,4 +215,10 @@ You should be able to SSH to the Machines directly as well, using the following:
   ssh -x -i ./machines-ssh-key root@<MACHINE_IP>
                   
 
+IF you need a custom version of the terraform-provider-packet plugin, you can 
+specify it in your ~/.terraformrc file like so:
 
+  providers { packet = "$HOME/.terraform.d/terraform-provider-packet" }
+
+Prior to running "terraform init" (which occurs during the "terraform-install"
+stage in this Demo.
