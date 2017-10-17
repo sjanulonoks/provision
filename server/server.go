@@ -84,7 +84,8 @@ type ProgOpts struct {
 	TlsCertFile   string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
 	DrpId         string `long:"drp-id" description:"The id of this Digital Rebar Provision instance" default:""`
 
-	SystemGrantorSecret string `long:"system-grantor-secret" description:"Auth Token secret to allow revocation of all Machine tokens" default:"initial-secret"`
+	BaseTokenSecret     string `long:"base-token-secret" description:"Auth Token secret to allow revocation of all tokens" default:""`
+	SystemGrantorSecret string `long:"system-grantor-secret" description:"Auth Token secret to allow revocation of all Machine tokens" default:""`
 }
 
 func mkdir(d string, logger *log.Logger) {
@@ -161,9 +162,10 @@ func Server(c_opts *ProgOpts) {
 			"defaultStage":        c_opts.DefaultStage,
 			"defaultBootEnv":      c_opts.DefaultBootEnv,
 			"unknownBootEnv":      c_opts.UnknownBootEnv,
-			"systemGrantorSecret": c_opts.SystemGrantorSecret,
 			"knownTokenTimeout":   fmt.Sprintf("%d", c_opts.KnownTokenTimeout),
 			"unknownTokenTimeout": fmt.Sprintf("%d", c_opts.UnknownTokenTimeout),
+			"baseTokenSecret":     c_opts.BaseTokenSecret,
+			"systemGrantorSecret": c_opts.SystemGrantorSecret,
 		},
 		publishers)
 

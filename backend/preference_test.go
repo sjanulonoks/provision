@@ -47,5 +47,11 @@ func TestPreferences(t *testing.T) {
 	} else {
 		t.Errorf("Should have failed setting defaultStage to bar")
 	}
+	prefs["baseTokenSecret"] = "lessbytes"
+	if err := dt.SetPrefs(d, prefs); err != nil {
+		t.Logf("Expected error setting prefs: %v", err)
+	} else {
+		t.Errorf("Should have failed setting baseTokenSecret to lessbytes")
+	}
 	dt.Prefs()
 }
