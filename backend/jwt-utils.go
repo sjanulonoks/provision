@@ -54,6 +54,10 @@ func NewJwtManager(key []byte, configs ...JwtConfig) *JwtManager {
 	return m
 }
 
+func (m *JwtManager) updateKey(newkey []byte) {
+	m.key = newkey
+}
+
 func (m *JwtManager) setDefaults() {
 	if m.method == nil {
 		m.method = jwt.SigningMethodHS256

@@ -64,11 +64,17 @@ func (f *Frontend) InitPrefApi() {
 			// Filter unknown preferences here
 			for k := range prefs {
 				switch k {
+				case "baseTokenSecret":
+					if !f.assureAuth(c, "prefs", "post", k) {
+						return
+					}
+					if len(prefs[k]) != 32 {
+						err.Errorf("Preference %s: Must be 32 bytes long", k)
+					}
 				case "defaultBootEnv", "unknownBootEnv", "defaultStage", "systemGrantorSecret":
 					if !f.assureAuth(c, "prefs", "post", k) {
 						return
 					}
-					continue
 				case "knownTokenTimeout", "unknownTokenTimeout", "debugRenderer", "debugDhcp", "debugBootEnv", "debugFrontend", "debugPlugins":
 					if !f.assureAuth(c, "prefs", "post", k) {
 						return
@@ -76,7 +82,6 @@ func (f *Frontend) InitPrefApi() {
 					if _, e := strconv.Atoi(prefs[k]); e != nil {
 						err.Errorf("Preference %s: %v", k, e)
 					}
-					continue
 				default:
 					err.Errorf("Unknown Preference %s", k)
 				}

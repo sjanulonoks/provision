@@ -585,10 +585,10 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, so
 		Logger:            logger,
 		defaultPrefs:      map[string]string{},
 		runningPrefs:      map[string]string{},
+		tokenManager:      NewJwtManager([]byte{}, JwtConfig{Method: jwt.SigningMethodHS256}),
 		prefMux:           &sync.Mutex{},
 		allMux:            &sync.RWMutex{},
 		FS:                NewFS(".", logger),
-		tokenManager:      NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
 		tmplMux:           &sync.Mutex{},
 		GlobalProfileName: "global",
 		thunks:            make([]func(), 0),
@@ -619,10 +619,10 @@ func NewDataTracker(backend store.Store,
 		Logger:            logger,
 		defaultPrefs:      defaultPrefs,
 		runningPrefs:      map[string]string{},
+		tokenManager:      NewJwtManager([]byte{}, JwtConfig{Method: jwt.SigningMethodHS256}),
 		prefMux:           &sync.Mutex{},
 		allMux:            &sync.RWMutex{},
 		FS:                NewFS(fileRoot, logger),
-		tokenManager:      NewJwtManager([]byte(randString(32)), JwtConfig{Method: jwt.SigningMethodHS256}),
 		tmplMux:           &sync.Mutex{},
 		GlobalProfileName: "global",
 		thunks:            make([]func(), 0),
@@ -650,10 +650,25 @@ func NewDataTracker(backend store.Store,
 	d, unlocker := res.LockEnts("stages", "bootenvs", "preferences", "users", "machines", "profiles", "params")
 	defer unlocker()
 
+	// Load the prefs - overriding defaults.
 	for _, prefIsh := range d("preferences").Items() {
 		pref := AsPref(prefIsh)
 		res.runningPrefs[pref.Name] = pref.Val
 	}
+
+	// Set systemGrantorSecret and baseTokenSecret if unset and save it to backing store.
+	prefs := res.Prefs()
+	savePrefs := false
+	for _, pref := range []string{"systemGrantorSecret", "baseTokenSecret"} {
+		if val, ok := prefs[pref]; !ok || val == "" {
+			prefs[pref] = randString(32)
+			savePrefs = true
+		}
+	}
+	if savePrefs {
+		res.SetPrefs(d, prefs)
+	}
+	res.tokenManager.updateKey([]byte(res.pref("baseTokenSecret")))
 
 	if d("profiles").Find(res.GlobalProfileName) == nil {
 		res.Create(d, &models.Profile{
@@ -721,6 +736,13 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 	err := &models.Error{}
 	bootenvs := d("bootenvs")
 	stages := d("stages")
+	lenCheck := func(name, val string) bool {
+		if len(val) != 32 {
+			err.Errorf("%s: Must be a string of length 32: %s", name, val)
+			return false
+		}
+		return true
+	}
 	benvCheck := func(name, val string) *BootEnv {
 		be := bootenvs.Find(val)
 		if be == nil {
@@ -760,7 +782,12 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 	}
 	for name, val := range prefs {
 		switch name {
-		case "systemGrantorSecret": // Do nothing
+		case "systemGrantorSecret":
+			savePref(name, val)
+		case "baseTokenSecret":
+			if lenCheck(name, val) && savePref(name, val) {
+				p.tokenManager.updateKey([]byte(val))
+			}
 		case "defaultBootEnv":
 			be := benvCheck(name, val)
 			if be != nil && !be.OnlyUnknown {
