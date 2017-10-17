@@ -286,7 +286,7 @@ func (f *Frontend) InitPluginApi() {
 				c.JSON(err.Code, err)
 				return
 			}
-			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
+			if !f.assureAuth(c, ref.Prefix(), "get", ref.Key()) {
 				return
 			}
 			p := backend.AsPlugin(ref).GetParams()
@@ -328,7 +328,7 @@ func (f *Frontend) InitPluginApi() {
 				c.JSON(err.Code, err)
 				return
 			}
-			if !assureAuth(c, f.Logger, ref.Prefix(), "get", ref.Key()) {
+			if !f.assureAuth(c, ref.Prefix(), "get", ref.Key()) {
 				return
 			}
 

@@ -204,7 +204,7 @@ func (f *Frontend) InitJobApi() {
 				c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, "Create request must have Machine field"))
 				return
 			}
-			if !assureAuth(c, f.Logger, "jobs", "create", b.AuthKey()) {
+			if !f.assureAuth(c, "jobs", "create", b.AuthKey()) {
 				return
 			}
 			if b.Uuid == nil || len(b.Uuid) == 0 {
@@ -451,12 +451,13 @@ func (f *Frontend) InitJobApi() {
 				}
 				j = backend.AsJob(jo)
 
-				if !assureAuth(c, f.Logger, "jobs", "actions", j.AuthKey()) {
-					return true
-				}
 				return false
 			}()
 			if bad {
+				return
+			}
+
+			if !f.assureAuth(c, "jobs", "actions", j.AuthKey()) {
 				return
 			}
 
@@ -507,12 +508,13 @@ func (f *Frontend) InitJobApi() {
 				}
 				j = backend.AsJob(jo)
 
-				if !assureAuth(c, f.Logger, "jobs", "log", j.AuthKey()) {
-					return true
-				}
 				return false
 			}()
 			if bad {
+				return
+			}
+
+			if !f.assureAuth(c, "jobs", "log", j.AuthKey()) {
 				return
 			}
 
@@ -566,12 +568,13 @@ func (f *Frontend) InitJobApi() {
 				}
 				j = backend.AsJob(jo)
 
-				if !assureAuth(c, f.Logger, "jobs", "log", j.AuthKey()) {
-					return true
-				}
 				return false
 			}()
 			if bad {
+				return
+			}
+
+			if !f.assureAuth(c, "jobs", "log", j.AuthKey()) {
 				return
 			}
 

@@ -102,6 +102,9 @@ func (u *User) Validate() {
 }
 
 func (u *User) BeforeSave() error {
+	if u.Secret == "" {
+		u.Secret = randString(16)
+	}
 	u.Validate()
 	if !u.Useable() {
 		return u.MakeError(422, ValidationError, u)

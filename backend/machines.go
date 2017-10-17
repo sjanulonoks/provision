@@ -572,6 +572,10 @@ func (n *Machine) Validate() {
 }
 
 func (n *Machine) BeforeSave() error {
+	// Always make sure we have a secret
+	if n.Secret == "" {
+		n.Secret = randString(16)
+	}
 	n.Validate()
 	if !n.Useable() {
 		return n.MakeError(422, ValidationError, n)

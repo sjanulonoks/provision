@@ -86,7 +86,7 @@ func (f *Frontend) InitFileApi() {
 			if pathPart == "" {
 				pathPart = "/"
 			}
-			if !assureAuth(c, f.Logger, "files", "list", pathPart) {
+			if !f.assureAuth(c, "files", "list", pathPart) {
 				return
 			}
 			ents, err := ioutil.ReadDir(path.Join(f.FileRoot, "files", path.Clean(pathPart)))
@@ -124,7 +124,7 @@ func (f *Frontend) InitFileApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/files/*path",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "files", "get", c.Param(`path`)) {
+			if !f.assureAuth(c, "files", "get", c.Param(`path`)) {
 				return
 			}
 			fileName := path.Join(f.FileRoot, `files`, path.Clean(c.Param(`path`)))
@@ -157,21 +157,21 @@ func (f *Frontend) InitFileApi() {
 	f.ApiGroup.POST("/files/*path",
 		func(c *gin.Context) {
 			name := c.Param(`path`)
-			if !assureAuth(c, f.Logger, "files", "post", name) {
+			if !f.assureAuth(c, "files", "post", name) {
 				return
 			}
 			var copied int64
 			ctype := c.Request.Header.Get(`Content-Type`)
-		    switch strings.Split(ctype, "; ")[0] {
-		    case `application/octet-stream`:
+			switch strings.Split(ctype, "; ")[0] {
+			case `application/octet-stream`:
 				if c.Request.Body == nil {
 					c.JSON(http.StatusBadRequest,
 						models.NewError("API ERROR", http.StatusBadRequest,
 							fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
 					return
 				}
-		    case `multipart/form-data`:
-		        header, err := c.FormFile("file")
+			case `multipart/form-data`:
+				header, err := c.FormFile("file")
 				if err != nil {
 					c.JSON(http.StatusBadRequest,
 						models.NewError("API ERROR", http.StatusBadRequest,
@@ -179,7 +179,7 @@ func (f *Frontend) InitFileApi() {
 					return
 				}
 				name = path.Base(header.Filename)
-		    default:
+			default:
 				c.JSON(http.StatusUnsupportedMediaType,
 					models.NewError("API ERROR", http.StatusUnsupportedMediaType,
 						fmt.Sprintf("upload: file %s must have content-type application/octet-stream", name)))
@@ -218,7 +218,7 @@ func (f *Frontend) InitFileApi() {
 				return
 			}
 
-		    switch strings.Split(ctype, "; ")[0] {
+			switch strings.Split(ctype, "; ")[0] {
 			case `application/octet-stream`:
 				copied, err = io.Copy(tgt, c.Request.Body)
 				if err != nil {
@@ -250,8 +250,8 @@ func (f *Frontend) InitFileApi() {
 					return
 				}
 				file.Close()
-		    }
-		    tgt.Close()
+			}
+			tgt.Close()
 
 			os.Remove(fileName)
 			os.Rename(fileTmpName, fileName)
@@ -271,7 +271,7 @@ func (f *Frontend) InitFileApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.DELETE("/files/*path",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "files", "delete", c.Param(`path`)) {
+			if !f.assureAuth(c, "files", "delete", c.Param(`path`)) {
 				return
 			}
 			fileName := path.Join(f.FileRoot, `files`, path.Clean(c.Param(`path`)))

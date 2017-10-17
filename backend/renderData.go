@@ -207,19 +207,29 @@ func (r *RenderData) ApiURL() string {
 
 func (r *RenderData) GenerateToken() string {
 	var t string
+
+	grantor := "system"
+	grantorSecret := ""
+	if ss := r.p.pref("systemGrantorSecret"); ss != "" {
+		grantorSecret = ss
+	}
+
 	if r.Machine == nil {
 		ttl := 600
 		if sttl := r.p.pref("unknownTokenTimeout"); sttl != "" {
 			ttl, _ = strconv.Atoi(sttl)
 		}
-		t, _ = NewClaim("general", ttl).Add("machines", "post", "*").
-			Add("machines", "get", "*").Seal(r.p.tokenManager)
+		t, _ = NewClaim("general", grantor, ttl).
+			Add("machines", "post", "*").
+			Add("machines", "get", "*").
+			AddSecrets("", grantorSecret, "").
+			Seal(r.p.tokenManager)
 	} else {
 		ttl := 3600
 		if sttl := r.p.pref("knownTokenTimeout"); sttl != "" {
 			ttl, _ = strconv.Atoi(sttl)
 		}
-		t, _ = NewClaim(r.Machine.Key(), ttl).
+		t, _ = NewClaim(r.Machine.Key(), grantor, ttl).
 			Add("machines", "*", r.Machine.Key()).
 			Add("stages", "get", "*").
 			Add("jobs", "create", r.Machine.Key()).
@@ -229,6 +239,38 @@ func (r *RenderData) GenerateToken() string {
 			Add("jobs", "log", r.Machine.Key()).
 			Add("events", "post", "*").
 			Add("reservations", "create", "*").
+			AddMachine(r.Machine.Key()).
+			AddSecrets("", grantorSecret, r.Machine.Secret).
+			Seal(r.p.tokenManager)
+	}
+	return t
+}
+
+func (r *RenderData) GenerateInfiniteToken() string {
+	var t string
+	if r.Machine == nil {
+		// Don't allow infinite tokens.
+		return ""
+	} else {
+		grantor := "system"
+		grantorSecret := ""
+		if ss := r.p.pref("systemGrantorSecret"); ss != "" {
+			grantorSecret = ss
+		}
+
+		ttl := 2 ^ 31 - 1
+		t, _ = NewClaim(r.Machine.Key(), grantor, ttl).
+			Add("machines", "*", r.Machine.Key()).
+			Add("stages", "get", "*").
+			Add("jobs", "create", r.Machine.Key()).
+			Add("jobs", "get", r.Machine.Key()).
+			Add("jobs", "patch", r.Machine.Key()).
+			Add("jobs", "actions", r.Machine.Key()).
+			Add("jobs", "log", r.Machine.Key()).
+			Add("events", "post", "*").
+			Add("reservations", "create", "*").
+			AddMachine(r.Machine.Key()).
+			AddSecrets("", grantorSecret, r.Machine.Secret).
 			Seal(r.p.tokenManager)
 	}
 	return t

@@ -238,7 +238,7 @@ func (f *Frontend) InitContentApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/contents",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "contents", "list", "") {
+			if !f.assureAuth(c, "contents", "list", "") {
 				return
 			}
 
@@ -283,7 +283,7 @@ func (f *Frontend) InitContentApi() {
 	f.ApiGroup.GET("/contents/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
-			if !assureAuth(c, f.Logger, "contents", "get", name) {
+			if !f.assureAuth(c, "contents", "get", name) {
 				return
 			}
 
@@ -324,7 +324,7 @@ func (f *Frontend) InitContentApi() {
 	//       507: ErrorResponse
 	f.ApiGroup.POST("/contents",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "contents", "create", "*") {
+			if !f.assureAuth(c, "contents", "create", "*") {
 				return
 			}
 			content := &models.Content{}
@@ -387,7 +387,7 @@ func (f *Frontend) InitContentApi() {
 	//       507: ErrorResponse
 	f.ApiGroup.PUT("/contents/:name",
 		func(c *gin.Context) {
-			if !assureAuth(c, f.Logger, "contents", "update", "*") {
+			if !f.assureAuth(c, "contents", "update", "*") {
 				return
 			}
 			content := &models.Content{}
@@ -454,7 +454,7 @@ func (f *Frontend) InitContentApi() {
 	f.ApiGroup.DELETE("/contents/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
-			if !assureAuth(c, f.Logger, "contents", "delete", name) {
+			if !f.assureAuth(c, "contents", "delete", name) {
 				return
 			}
 
