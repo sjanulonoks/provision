@@ -97,15 +97,15 @@ confirm control.sh install-secrets
 confirm control.sh ssh-keys             
 
 # apply our SSH keys 
-confirm terraform apply -target=packet_ssh_key.5min-drp-ssh-key
-confirm terraform apply -target=packet_ssh_key.5min-nodes-ssh-key
+confirm terraform apply -target=packet_ssh_key.drp-ssh-key
+confirm terraform apply -target=packet_ssh_key.machines-ssh-key
 
 # build our DRP server
-confirm terraform apply -target=packet_device.5min-drp
+confirm terraform apply -target=packet_device.drp-endpoint
 
 
-# view our completed plan status -- NOTE the "5min-nodes"
-# do NOT get applied until after 5min-drp is finished 
+# view our completed plan status -- NOTE the "machines"
+# do NOT get applied until after 'drp' endpoint is finished 
 confirm terraform plan                    
 
 # installs DRP locally for CLI commands
@@ -151,22 +151,22 @@ case $1 in
     echo ""
     cprintf $cyan "NOTICE:"
     echo "  Errors may be 'normal' - ISOs, Kernel, and InitRDs are "
-    echo "         normal as the content has not yet been pused to the DRP"
+    echo "         normal as the content has not yet been pushed to the DRP"
     echo "         endpoint.  Other errors should be investigated."
     echo ""
   ;;
 esac
 
-# inject our DRP endpoint address in to the drp-nodes.tf terraform file
+# inject our DRP endpoint address in to the drp-machines.tf terraform file
 confirm control.sh set-drp-endpoint $DRP
 
 # bug in Stages causes stage "discover" to be marked bad, only way to 
 # get it to re-eval as good is to force delete content, and re-add which
 # triggers refresh of stage checks
-confirm control.sh ssh $DRP "bin/control.sh fix-stages-bug $DRP"
+confirm control.sh ssh $DRP \"bin/control.sh fix-stages-bug $DRP\"
 
-# bring up our DRP target nodes:
-confirm terraform apply -target=packet_device.5min-nodes
+# bring up our DRP target machines:
+confirm terraform apply -target=packet_device.drp-machines
 
 # helper functions ... not used in demo
 #control.sh get-address <ID>     # get the IP address of new DRP server identified by <ID>
