@@ -24,10 +24,6 @@ func randString(n int) string {
 	return base64[:n]
 }
 
-func RandString(n int) string {
-	return randString(n)
-}
-
 // Config configures a Manager.
 type JwtConfig struct {
 	// digital signing method, defaults to jwt.SigningMethodHS256 (SHA256)
