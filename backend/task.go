@@ -139,6 +139,9 @@ func (t *Task) OnLoad() error {
 
 func (t *Task) BeforeSave() error {
 	t.Validate()
+	if !t.HasFeature("sane-exit-codes") {
+		t.AddFeature("original-exit-codes")
+	}
 	if !t.Useable() {
 		return t.MakeError(422, ValidationError, t)
 	}

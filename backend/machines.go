@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/digitalrebar/provision/backend/index"
@@ -457,12 +458,16 @@ func (n *Machine) setDT(p *DataTracker) {
 func (n *Machine) OnCreate() error {
 	if n.Stage == "" {
 		n.Stage = n.p.pref("defaultStage")
+		n.oldStage = "none"
 	}
 	if n.BootEnv == "" {
 		n.BootEnv = n.p.pref("defaultBootEnv")
 	}
 	bootenvs := n.stores("bootenvs")
 	stages := n.stores("stages")
+	if n.Tasks == nil {
+		n.Tasks = []string{}
+	}
 	if bootenvs.Find(n.BootEnv) == nil {
 		n.Errorf("Bootenv %s does not exist", n.BootEnv)
 	} else if stages.Find(n.Stage) == nil {
@@ -470,6 +475,9 @@ func (n *Machine) OnCreate() error {
 	} else {
 		// All machines start runnable.
 		n.Runnable = true
+	}
+	if n.Tasks != nil && len(n.Tasks) > 0 {
+		n.CurrentTask = -1
 	}
 	return n.MakeError(422, ValidationError, n)
 }
@@ -592,6 +600,7 @@ func (n *Machine) OnLoad() error {
 	}
 	if n.Stage == "" {
 		n.Stage = "none"
+		n.oldStage = "none"
 	}
 	defer func() { n.stores = nil }()
 	return n.BeforeSave()
@@ -604,17 +613,24 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 
 	// If we are changing stages and we aren't done running tasks,
 	// Fail unless the users marks a force
-	if n.oldStage != n.Stage && oldm.CurrentTask != len(oldm.Tasks) && !n.ChangeForced() {
-		e := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
-		e.Errorf("Can not change stages with pending tasks unless forced")
-		return e
-	}
 	// If we have a stage set, don't change bootenv unless force
 	if n.Stage == "" {
 		n.Stage = "none"
 	}
+	e := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
+	if n.oldStage != n.Stage && oldm.CurrentTask != len(oldm.Tasks) && !n.ChangeForced() {
+		e.Errorf("Can not change stages with pending tasks unless forced")
+		return e
+	}
+	if oldm.Tasks != nil && len(oldm.Tasks) != 0 && n.Stage == oldm.Stage {
+		if n.Tasks == nil || len(n.Tasks) < len(oldm.Tasks) {
+			e.Errorf("Cannot remove tasks from machines without changing stage")
+		}
+		if !reflect.DeepEqual(n.Tasks[:len(oldm.Tasks)], oldm.Tasks) {
+			e.Errorf("Can only append tasks to the task list on a machine.")
+		}
+	}
 	if n.Stage != "none" && n.oldStage == n.Stage && n.oldBootEnv != n.BootEnv && !n.ChangeForced() {
-		e := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
 		e.Errorf("Can not change bootenv while in a stage unless forced. old: %s new %s", n.oldBootEnv, n.BootEnv)
 		return e
 	}
@@ -627,7 +643,7 @@ func (n *Machine) AfterSave() {
 		// If we don't have a stage, init structs
 		if n.Stage == "" && n.Tasks == nil {
 			n.Tasks = []string{}
-			n.CurrentTask = 0
+			n.CurrentTask = -1
 			_, e2 := n.p.Save(n.stores, n)
 			if e2 != nil {
 				n.p.Logger.Printf("Failed to save machine in after Save. %v\n", n)
