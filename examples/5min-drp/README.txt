@@ -32,6 +32,7 @@ further down in this README:
   * download the 'terraform-provider-packet' plugin for terraform
     and stage it in the 'private-content' directory
 
+  * [optional] make changes to the terraform "vars.tf" parameters
 
 WARNING
 -------
@@ -45,6 +46,9 @@ function.
 
 IF YOU DO NOT run the 'cleanup' function - you will need to manually restore 
 your terraform configuration file. (backup is:  $HOME/.terraform.5min-backup )
+
+IF YOU DESTROY machines in Packet.net portal - we will not know about that
+action, and you will have to clean up manually ... 
 
 
 GIT CLONE
@@ -100,18 +104,18 @@ GET TERRAFORM-PROVIDER-PACKET PLUGIN
 
 Sadly ... you must do it this way ... 
 
-  * you must install Go Lang as all terraform providers must be
+  * you must install Go Lang as all terraform providers should be
     built from scratch:
      + install Go Lang 1.9.0 or newer according to the docs; from:
-       https://golang.org/dl/
+         https://golang.org/dl/
  
   * build the provider
      + build the provider:
-       go get -u github.com/terraform-providers/terraform-provider-packet
+         go get -u github.com/terraform-providers/terraform-provider-packet
      + by default this will put the compiled provider in:
          $HOME/go/bin/
      + copy the provider to the 'private-content' directory
-       cp $HOME/go/bin/terraform-provider-packet private-content/
+         cp $HOME/go/bin/terraform-provider-packet private-content/
 
 
 
@@ -128,6 +132,22 @@ FINAL CHECK BEFORE RUNNING
   * make sure you've modified the 'secrets' file appropriately 
 
 
+[optional] MODIFY THE TERRAFOMR "vars.tf" FILE
+----------------------------------------------
+
+  * you may optionally make changes to the "vars.tf" file - specifically, you can 
+    set the "cluster_name" to something other than "5min" - if you instantiate
+    multiple DRP/Machines clusters, then the names will collide in the packet.net
+    portal.  Changing the "cluster_name" will help in identifying which resources
+    belong to which cluster. 
+
+  * you can modify which Operating System the DRP endpoint is running on - the only
+    two supported/tested are Centos 7 and Ubuntu 16.04
+
+  * specify the number of Machines to provision 
+
+  * change the packet.net facility to provsion the cluster in 
+
 RUN DEMO-RUN.SH SCRIPT
 ----------------------
 
@@ -143,17 +163,18 @@ answer "no" to the "ACTION" input.
 WHAT HAPPENS?
 -------------
 
-1.  set PATH to include 5min-drp/bin
-2.  install terraform locally in your 5min-drp/bin directory
+1.  set PATH to include the ./bin directory for DRP and terraform/etc.
+2.  install terraform locally in your ./bin directory
 3.  install the secrets to the terraform vars.tf file
 4.  create SSH keys for DRP endpoint and nodes
 5.  inject the SSH keys in to packet.net Project
-6.  build the DRP Endpoint server in packet.net (on centos-7)
-7.  install DRP locally in 5min-drp/bin for 'drpcli' control
-8.  install DRP on the remote endpoint  
-9.  configure content and services on DPR   [NOTE: CONTENT]
-10. set the DRP endpoint IP address to terraform 'drp-nodes.tf'
-11. kick over "N" number of nodes to provision against the new
+6.  build the DRP Endpoint server in packet.net 
+    (on centos-7, configurable, see vars.tf)
+7.  install DRP locally in ./bin for 'drpcli' control
+8.  install DRP on the remote endpoint 
+9.  configure content and services on DRP   [SEE NOTE: CONTENT]
+10. set the DRP endpoint IP address to terraform 'drp-machines.tf'
+11. kick over "N" number of machines to provision against the new
     DRP endpoint 
 
 
@@ -162,7 +183,6 @@ CLEANUP:
 
 You can cleanup/reset the 5min-drp/ directory back to "factory
 defaults" with the following:
-
 
   bin/terraform destroy --force
   bin/control.sh cleanup        # restores ~/.terraformrc backup
@@ -191,36 +211,44 @@ NOTES:
 ADVANCED USAGE OPTIONS
 ----------------------
 
-"demo-run.sh" just drives the "bin/control.sh" script to make it easy and prettier.
-You can run the full demo without any Confirmation prompts, set CONFIRM variable to
-"no":
+"demo-run.sh" just drives the "bin/control.sh" script to make it easy 
+and prettier.  You can run the full demo without any Confirmation prompts, 
+set CONFIRM variable to "no":
 
   CONFIRM=no ./demo-run.sh
 
 The entire demo will run through without (hopefully...) any interactions. 
 
 
-You can manually drive some things with the "bin/control.sh" script - simply run
-it with the "--usage" or "--help" flags, it'll print out usage statement. 
+You can manually drive some things with the "bin/control.sh" script - simply
+run it with the "--usage" or "--help" flags, it'll print out usage statement. 
 
 
-"bin/control.sh cleanup" has an 8 second safety timer in it.  If you know what you're
-doing - you can simply call it with "bin/control.sh cleanup force" - and it'll skip 
-the safety timer. 
+"bin/control.sh cleanup" has an 8 second safety timer in it.  If you know 
+what you're doing - you can simply call it with "bin/control.sh cleanup 
+force" - and it'll skip the safety timer. 
 
 
-You can get your DRP Endpoint provioned IP address with the "bin/control.sh" script
-(AFTER it has been successfully provisioned, of course):
+You can get your DRP Endpoint provioned IP address with the "bin/control.sh" 
+script (AFTER it has been successfully provisioned, of course):
 
-  DRPID=`bin/control.sh get-drp-id`
-  DRPIP=`bin/control.sh get-address $DRPID`
+  DRP_ID=`bin/control.sh get-drp-id`
+  DRP_IP=`bin/control.sh get-address $DRP_ID`
 
 
 You can SSH directly to the DRP Endpoint using the injected SSH keys:
 
-  ssh -x -i ./5min-drp-ssh-key root@$DRPIP 
+  ssh -x -i ./drp-ssh-key root@$DRP_IP 
   OR
-  bin/control.sh ssh $DRPID
+  bin/control.sh ssh $DRP_ID
 
+
+You should be able to SSH to the Machines directly as well, using the following:
+
+  terraform plan    # to get the various machines IP addresses
+                    # or get from packet.net
+
+  ssh -x -i ./machines-ssh-key root@<MACHINE_IP>
+                  
 
 

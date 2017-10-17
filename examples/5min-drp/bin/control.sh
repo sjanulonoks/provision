@@ -20,9 +20,13 @@
 #
 #  usage:   $0 --help
 #
-#   TODO:  * need to use correct URLs for getting content from official
-#            repo locations
-#          * fix private content get so that we don't have to pre-stage it
+#   TODO:  * 'ssh-keys' check to packet.net via their api to determine
+#            if key names exist alread - they'll create successfully, but
+#            the duplicate key names can lead to operator confusion and
+#            possibly error
+#          * 'install-terraform' should check for latest release version,
+#            then check existing PATH for it, and avoid downloading if we
+#            already have it installed 
 ###
 
 ###
@@ -55,18 +59,20 @@ API="insert_api_key_here"
 PROJECT="insert_project_id_here"
 USERNAME="insert_rackn_username_here"
 
+CN=`grep 'variable "cluster_name' vars.tf | cut -d '"' -f4`
+CLUSTER_NAME=${CN:-"5min"}
 VER_DRP=${VER_DRP:-"stable"}
 VER_CONTENT=${VER_CONTENT:-"stable"}
 VER_PLUGINS=${VER_PLUGINS:-"tip"}
-SSH_DRP_KEY=${SSH_DRP_KEY:-"5min-drp-ssh-key"}
-SSH_NODES_KEY=${SSH_NODES_KEY:-"5min-nodes-ssh-key"}
+SSH_DRP_KEY=${SSH_DRP_KEY:-"${CLUSTER_NAME}-drp-ssh-key"}
+SSH_MACHINES_KEY=${SSH_MACHINES_KEY:-"${CLUSTER_NAME}-machines-ssh-key"}
 MY_OS=${MY_OS:-"darwin"}
 MY_ARCH=${MY_ARCH:-"amd64"}
 DRP_OS=${DRP_OS:-"linux"}
 DRP_ARCH=${DRP_ARCH:-"amd64"}
 CREDS=${CREDS:-"--username=rocketskates --password=r0cketsk8ts"}
 # do not use the CE based bootenvs for the Packet.net 5min demo
-NODE_OS=${NODE_OS:-"centos-7.3.1611-install"}  # ubuntu-16.04-install
+MACHINES_OS=${MACHINES_OS:-"centos-7.3.1611-install"}  # ubuntu-16.04-install
 
 CURL="curl -sfSL"
 DRPCLI="drpcli"
@@ -87,7 +93,7 @@ WHERE: arguments are as follows:
     install-terraform      installs terraform locally
     install-secrets        installs API and PROJECT secrets for Terraform files
     ssh-keys               generates new ssh keys, REMOVES existing keys first
-    set-drp-endpoint <ID>  sets the drp-nodes.tf endpoint information 
+    set-drp-endpoint <ID>  sets the drp-machines.tf endpoint information 
                            for Terraform
     get-drp-local          installs DRP locally
     get-drp-cc             installs DRP *community* content 
@@ -116,8 +122,8 @@ CLEANUP:  WARNING - cleanup will NUKE things - like private SSH KEY (and more)  
           * <ID> is the ID of the DRP endpoint that is created by terraform 
 
           * you can override built in defaults by setting the following variables:
-             SSH_DRP_KEY  SSH_NODES_KEY  MY_OS    MY_ARCH      DRP_OS      DRP_ARCH
-             CREDS        NODE_OS        VER_DRP  VER_CONTENT  VER_PLUGINS
+             SSH_DRP_KEY  SSH_MACHINES_KEY  MY_OS    MY_ARCH      DRP_OS      DRP_ARCH
+             CREDS        MACHINES_OS       VER_DRP  VER_CONTENT  VER_PLUGINS
 
 END_USAGE
 } # end usaage()
@@ -326,10 +332,10 @@ case $1 in
   set-drp-endpoint)
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
-    ( sed -i.bak 's+\(^chain http://\)\(.*\)\(/default.ipxe.*$\)+\1'${ADDR}':8091\3+g' drp-nodes.tf ) \
-      && echo "DRP endpoint set in 'drp-nodes.tf' successfully: " \
-      || xiterr 1 "DRP endpoint set FAILED for 'drp-nodes.tf'"
-    _chain=`cprintf $cyan $(grep "^chain " drp-nodes.tf)`
+    ( sed -i.bak 's+\(^chain http://\)\(.*\)\(/default.ipxe.*$\)+\1'${ADDR}':8091\3+g' drp-machines.tf ) \
+      && echo "DRP endpoint set in 'drp-machines.tf' successfully: " \
+      || xiterr 1 "DRP endpoint set FAILED for 'drp-machines.tf'"
+    _chain=`cprintf $cyan $(grep "^chain " drp-machines.tf)`
     echo "  ipxe -->  $_chain"
     xit $?
     ;;
@@ -430,24 +436,26 @@ case $1 in
     ;;
 
   ssh-keys)
+    # TODO:  add a remote check to packet.net to see if a key with requested
+    #        name exists yet.  it'll work, but it can lead to confusion... 
+
     # remove keys if they exist already 
     [[ -f "${SSH_DRP_KEY}" ]] && rm -f ${SSH_DRP_KEY}
     [[ -f "${SSH_DRP_KEY}.pub" ]] && rm -f ${SSH_DRP_KEY}.pub
-    ssh-keygen -t rsa -b 4096 -C "5min-drp-ssh-key" -P "" -f ${SSH_DRP_KEY}
+    ssh-keygen -t rsa -b 4096 -C "${CLUSTER_NAME}-drp-ssh-key" -P "" -f ${SSH_DRP_KEY}
     xit $?
 
-    if [[ "$SSH_DRP_KEY != "$SSH_NODES_KEY ]]
+    if [[ "$SSH_DRP_KEY != "$SSH_MACHINES_KEY ]]
     then
-      [[ -f "${SSH_NODES_KEY}" ]] && rm -f ${SSH_NODES_KEY}
-      [[ -f "${SSH_NODES_KEY}.pub" ]] && rm -f ${SSH_NODES_KEY}.pub
-      ssh-keygen -t rsa -b 4096 -C "5min-nodes-ssh-key" -P "" -f ${SSH_NODES_KEY}
+      [[ -f "${SSH_MACHINES_KEY}" ]] && rm -f ${SSH_MACHINES_KEY}
+      [[ -f "${SSH_MACHINES_KEY}.pub" ]] && rm -f ${SSH_MACHINES_KEY}.pub
+      ssh-keygen -t rsa -b 4096 -C "${CLUSTER_NAME}-machines-ssh-key" -P "" -f ${SSH_MACHINES_KEY}
       xit $?
     fi
-
     ;;
 
   get-drp-id)
-    terraform plan | grep packet_device.5min-drp | awk ' { print $NF } ' | sed 's/)//'
+    terraform plan | grep packet_device.drp-endpoint: | awk ' { print $NF } ' | sed 's/)//'
     xit $?
     ;;
 
@@ -456,7 +464,7 @@ case $1 in
 
     [[ ! -r terraform.tfstate ]] && xiterr 3 "terraform.tfstate not readable, did you run 'terraform apply'?"
     cat terraform.tfstate \
-      | jq -r '.modules[].resources."packet_device.5min-drp".primary.attributes."network.0.address"'
+      | jq -r '.modules[].resources."packet_device.drp-endpoint".primary.attributes."network.0.address"'
     xit $?
 #    $CURL -X GET --header "Accept: application/json" \
 #      --header "X-Auth-Token: ${API_KEY}"              \
@@ -473,7 +481,7 @@ case $1 in
     echo "           ID :: '$2'"
     echo "   IP Address :: '$A'"
     my_ssh $2 "mkdir -p bin"
-    my_copy $2 -r bin/drp-install.sh terraform.tfstate $0 private-content/ 
+    my_copy $2 -r bin/drp-install.sh *.tf terraform.tfstate $0 private-content/ 
 
     echo "Installing DRP endpoint service on remote host ... "
     my_ssh $2 "mv *.sh bin/; chmod 755 bin/*.sh; VER_DRP=${VER_DRP} ./bin/drp-install.sh"
@@ -541,7 +549,7 @@ case $1 in
     done  
 
     # install packet-ipmi plugin
-    for PLUGIN in `ls -1 dr-provision-install/drp-plugin-* | grep -v "json$"`
+    for PLUGIN in `ls -1 dr-provision-install/drp-plugin-* | egrep -e "yaml$|json$"`
     do
       PLUG_NAME=`basename $PLUGIN | sed 's/^drp-plugin-//'`
 
@@ -580,18 +588,18 @@ EOFPLUGIN
     fi
     $DRPCLI $ENDPOINT plugins create - < private-content/packet-ipmi-plugin-create.json
     # set up the packet stage map 
-    # create stagemap JSON (NODE_OS:  ubuntu-16.04-install)
+    # create stagemap JSON (MACHINES_OS:  ubuntu-16.04-install)
 	  cat <<EOFSTAGE > private-content/stagemap-create.json
     {
       "Available": true,
-      "Description": "5min-packet-map",
+      "Description": "packet-map",
       "Name": "global",
       "Params": {
           "change-stage/map": {
             "discover": "packet-discover:Success",
-            "packet-discover": "${NODE_OS}:Reboot",
+            "packet-discover": "${MACHINES_OS}:Reboot",
             "packet-ssh-keys": "complete-nowait:Success",
-            "${NODE_OS}": "packet-ssh-keys:Success"
+            "${MACHINES_OS}": "packet-ssh-keys:Success"
         }
       }
     }
@@ -604,7 +612,7 @@ EOFSTAGE
     $DRPCLI $ENDPOINT profiles create - < private-content/stagemap-create.json
 
     # upload our isos
-    UPLOADS="sledgehammer $NODE_OS"
+    UPLOADS="sledgehammer $MACHINES_OS"
     for UPLOAD in $UPLOADS
     do
     $DRPCLI $ENDPOINT bootenvs exists $UPLOAD \
@@ -636,7 +644,7 @@ EOFSTAGE
 
     set -x
     rm -f ${SSH_DRP_KEY} ${SSH_DRP_KEY}.pub
-    rm -f ${SSH_NODES_KEY} ${SSH_NODES_KEY}.pub
+    rm -f ${SSH_MACHINES_KEY} ${SSH_MACHINES_KEY}.pub
     rm -f drpcli dr-provision-install
     rm -rf tmp 
     rm -rf bin/terraform bin/drpcli bin/dr-provision bin/terraform-provider-packet bin/yq
@@ -653,7 +661,7 @@ EOFSTAGE
 
     sed -i.bak                                                                          \
       's+\(^chain http://\)\(.*\)\(/default.ipxe\)+\1drp_endpoint_address_and_port\3+g' \
-      drp-nodes.tf
+      drp-machines.tf
 
     find private-content/ -type f | grep -v "/secrets$" | xargs rm -rf 
     set +x
