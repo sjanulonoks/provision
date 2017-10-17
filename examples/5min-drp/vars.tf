@@ -18,6 +18,7 @@ variable "packet_project_id" { default = "insert_project_id_here" }
 //
 
 provider "packet" {
+       version = "~> 1.0"
     auth_token = "${var.packet_api_key}"
 }
 
