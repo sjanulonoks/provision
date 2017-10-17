@@ -30,7 +30,7 @@ provider "packet" {
 //          combined to create unique hostnames.
 //
 // maintain single line for cluster_name for automated use
-variable "cluster_name" { default = "5min" }
+variable "cluster_name" { default = "demo" }
 
 // set your Packet billing cycle 
 variable "billing_cycle" {
@@ -61,6 +61,7 @@ variable "drp_ssh_public_key_path" {
 // the Digital Rebar Provisioning server Operating System
 variable "drp_os" {
   default = "centos_7"
+//  default = "ubuntu_16_04"
 }
 
 // The Packet DRP endpoint type to use
@@ -87,6 +88,8 @@ variable "machines_type" {
 // NOTE ON the Digital Rebar Provisioning server Operating System
 // Provisioned OS is defined by the DRP endpoint itself - and not
 // provisioned by the Terraform/Packet provider/plugins.  
+variable "machines_os" { default = "centos_7" }
+//variable "machines_os" { default = "ubuntu_16_04" }
 
 // The path to the private key you created
 variable "machines_ssh_key_path" {

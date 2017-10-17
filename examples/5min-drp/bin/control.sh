@@ -26,18 +26,24 @@
 #            possibly error
 ###
 
-[[ -f ./bin/functions.sh ]] && source ./bin/functions.sh || exit 99
-[[ -f ./bin/color.sh ]] && source ./bin/color.sh
-( type -t cprintf > /dev/null 2>&1 ) || function cprintf() { printf "%s" "$*"; }
+XIT=${XIT:-"0"}
+# BASH_SOURCE[0] works with both executed script, and 'source'd script
+FUNCS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/functions.sh"
+( type -t functions > /dev/null 2>&1 ) \
+  || { [[ -f "${FUNCS}" ]] && source ${FUNCS} || exit 99; }
 
 # get our API_KEY and PROJECT_ID secrets
 source ./private-content/secrets || xiterr 1 "unable to source './secrets' file "
-[[ -z "$API_KEY"        || "$API_KEY"        == "insert_api_key_here" ]]         \
-  && xiterr 1 "API_KEY is empty or unset ... bailing - check secrets file"
-[[ -z "$PROJECT_ID"     || "$PROJECT_ID"     == "insert_project_id_here" ]]      \
-  && xiterr 1 "PROJECT_ID is empty or unset ... bailing - check secrets file"
-[[ -z "$RACKN_USERNAME" || "$RACKN_USERNAME" == "insert_rackn_username_here" ]]  \
-  && xiterr 1 "RACKN_USERNAME is empty or unset ... bailing - check secrets file"
+
+if [[ "$1" != "extra-cleanup" ]]
+then
+  [[ -z "$API_KEY"        || "$API_KEY"        == "insert_api_key_here" ]]         \
+    && xiterr 1 "API_KEY is empty or unset ... check 'secrets' file"
+  [[ -z "$PROJECT_ID"     || "$PROJECT_ID"     == "insert_project_id_here" ]]      \
+    && xiterr 1 "PROJECT_ID is empty or unset ... check 'secrets' file"
+  [[ -z "$RACKN_USERNAME" || "$RACKN_USERNAME" == "insert_rackn_username_here" ]]  \
+    && xiterr 1 "RACKN_USERNAME is empty or unset ... check 'secrets' file"
+fi
 
 RACKN_AUTH="?username=${RACKN_USENAME}"
 
@@ -46,7 +52,8 @@ PROJECT="insert_project_id_here"
 USERNAME="insert_rackn_username_here"
 
 CN=`grep 'variable "cluster_name' vars.tf | cut -d '"' -f4`
-CLUSTER_NAME=${CN:-"5min"}
+# if set in vars.tf, get our cluster_name
+CLUSTER_NAME=${CN:-"demo"}
 VER_DRP=${VER_DRP:-"stable"}
 VER_CONTENT=${VER_CONTENT:-"stable"}
 VER_PLUGINS=${VER_PLUGINS:-"tip"}
@@ -57,12 +64,21 @@ MY_ARCH=${MY_ARCH:-"amd64"}
 DRP_OS=${DRP_OS:-"linux"}
 DRP_ARCH=${DRP_ARCH:-"amd64"}
 CREDS=${CREDS:-"--username=rocketskates --password=r0cketsk8ts"}
-# do not use the CE based bootenvs for the Packet.net 5min demo
+
+_machines=`grep '^variable "machines_os' vars.tf | cut -d '"' -f 4`
+case $_machines in
+  centos_7)     MACHINES_OS=${MACHINES_OS:-"centos-7.3.1611-install"}
+    ;;
+  ubuntu_16_04) MACHINES_OS=${MACHINES_OS:-"ubuntu-16.04-install"}
+    ;;
+  *) echo "Unsupproted MACHINES_OS specified.  You're results will be unpredictable"
+    ;;
+esac
+# do not use the CE based bootenvs for the Packet.net demo
 MACHINES_OS=${MACHINES_OS:-"centos-7.3.1611-install"}  # ubuntu-16.04-install
 
 CURL="curl -sfSL"
 DRPCLI="drpcli"
-XIT=0
 
 # add HOME/bin to path if it's not there already
 [[ ":$PATH:" != *":$HOME/bin:"* ]] && PATH="$HOME/bin:${PATH}"
@@ -390,12 +406,14 @@ case $1 in
     echo "           ID :: '$2'"
     echo "   IP Address :: '$A'"
     my_ssh $2 "mkdir -p bin"
-    my_copy $2 -r bin/drp-install.sh *.tf terraform.tfstate $0 private-content/ 
+    my_copy $2 -r bin/drp-install.sh *.tf terraform.tfstate $0 bin/functions.sh private-content/ 
 
     echo "Installing DRP endpoint service on remote host ... "
     my_ssh $2 "mv *.sh bin/; chmod 755 bin/*.sh; VER_DRP=${VER_DRP} ./bin/drp-install.sh"
     ;;
 
+  # NOTE:  Shouldn't need this - simply send -HUP signal to dr-provision
+  #        demo-run.sh now SSHs to DRP Endpoint and sends kill -HUP signal
   # horri-bad hack to fix bug w/ stages not eval as valid
   # intended to be run on remote DRP endpoint
   fix-stages-bug)
@@ -575,7 +593,7 @@ EOFSTAGE
     find private-content/ -type f | grep -v "/secrets$" | xargs rm -rf 
     set +x
 
-    [[ -f $HOME/.terraformrc.5min-backup ]] && mv $HOME/.terraformrc.5min-backup $HOME/.terraformrc
+    ssh-keygen -R $ADDR
 
     echo "No terraform actions taken - please nuke resources via terraform ... "
     echo "       Suggest:  terraform destroy --force"
@@ -585,7 +603,7 @@ EOFSTAGE
   extra-cleanup)
     echo "performing extra cleanup tasks .... "
     set -x
-    rm -rf *bak private-content/*bak terraform.tfstate* $HOME/.terraformrc ./.terraform 
+    rm -rf *bak private-content/*bak terraform.tfstate* ./.terraform
     rm -rf dr-provision-install
     set +x
     ;;
