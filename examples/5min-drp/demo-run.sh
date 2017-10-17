@@ -161,10 +161,10 @@ esac
 # inject our DRP endpoint address in to the drp-machines.tf terraform file
 confirm control.sh set-drp-endpoint $DRP
 
-# bug in Stages causes stage "discover" to be marked bad, only way to 
-# get it to re-eval as good is to force delete content, and re-add which
-# triggers refresh of stage checks
-confirm control.sh ssh $DRP \"bin/control.sh fix-stages-bug $DRP\"
+# bug in Stages causes stage "discover" to be marked bad
+# the simplest fix is to HUP the dr-provision service
+confirm echo "Restart DRP Endpoint to fix stages bug ?" \
+  && control.sh ssh $DRP 'kill -HUP `pidof dr-provision`'
 
 # bring up our DRP target machines:
 confirm terraform apply -target=packet_device.drp-machines
