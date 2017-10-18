@@ -104,6 +104,9 @@ func (u *User) Validate() {
 func (u *User) BeforeSave() error {
 	if u.Secret == "" {
 		u.Secret = randString(16)
+		if err := u.stores("users").backingStore.Save(u.Key(), u); err != nil {
+			return err
+		}
 	}
 	u.Validate()
 	if !u.Useable() {
@@ -117,11 +120,7 @@ func (u *User) OnLoad() error {
 		return u.p.objs[ref]
 	}
 	defer func() { u.stores = nil }()
-	err := u.BeforeSave()
-	if err == nil {
-		err = u.stores("users").backingStore.Save(u.Key(), u)
-	}
-	return err
+	return u.BeforeSave()
 }
 
 var userLockMap = map[string][]string{
