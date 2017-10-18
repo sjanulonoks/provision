@@ -104,9 +104,6 @@ func (u *User) Validate() {
 func (u *User) BeforeSave() error {
 	if u.Secret == "" {
 		u.Secret = randString(16)
-		if err := u.stores("users").backingStore.Save(u.Key(), u); err != nil {
-			return err
-		}
 	}
 	u.Validate()
 	if !u.Useable() {
@@ -120,7 +117,20 @@ func (u *User) OnLoad() error {
 		return u.p.objs[ref]
 	}
 	defer func() { u.stores = nil }()
-	return u.BeforeSave()
+
+	// This mustSave part is just to keep us from resaving all the users on startup.
+	mustSave := false
+	if u.Secret == "" {
+		mustSave = true
+	}
+	err := u.BeforeSave()
+	if err == nil && mustSave {
+		v := u.SaveValidation()
+		u.ClearValidation()
+		err = u.stores("machines").backingStore.Save(u.Key(), u)
+		u.RestoreValidation(v)
+	}
+	return err
 }
 
 var userLockMap = map[string][]string{

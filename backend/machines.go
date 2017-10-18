@@ -583,9 +583,6 @@ func (n *Machine) BeforeSave() error {
 	// Always make sure we have a secret
 	if n.Secret == "" {
 		n.Secret = randString(16)
-		if err := n.stores("machines").backingStore.Save(n.Key(), n); err != nil {
-			return err
-		}
 	}
 	n.Validate()
 	if !n.Useable() {
@@ -606,7 +603,21 @@ func (n *Machine) OnLoad() error {
 		n.oldStage = "none"
 	}
 	defer func() { n.stores = nil }()
-	return n.BeforeSave()
+
+	// This mustSave part is just to keep us from resaving all the machines on startup.
+	mustSave := false
+	if n.Secret == "" {
+		mustSave = true
+	}
+
+	err := n.BeforeSave()
+	if err == nil && mustSave {
+		v := n.SaveValidation()
+		n.ClearValidation()
+		err = n.stores("machines").backingStore.Save(n.Key(), n)
+		n.RestoreValidation(v)
+	}
+	return err
 }
 
 func (n *Machine) OnChange(oldThing store.KeySaver) error {
