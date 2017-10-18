@@ -201,7 +201,7 @@ func (f *Frontend) InitJobApi() {
 				return
 			}
 			if b.Machine == nil {
-				c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, "Create request must have Machine field"))
+				c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, "Create request must have Machine field"))
 				return
 			}
 			if !f.assureAuth(c, "jobs", "create", b.AuthKey()) {
@@ -319,7 +319,7 @@ func (f *Frontend) InitJobApi() {
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
 				}
 			} else if code == http.StatusNoContent {
 				c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
@@ -468,7 +468,7 @@ func (f *Frontend) InitJobApi() {
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
 				}
 			}
 			c.JSON(http.StatusOK, actions)

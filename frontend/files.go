@@ -35,17 +35,11 @@ type FileResponse struct {
 	Body string
 }
 
-// swagger:model
-type FileInfo struct {
-	Path string
-	Size int64
-}
-
 // FileInfoResponse returned on a successful upload of a file
 // swagger:response
 type FileInfoResponse struct {
 	// in: body
-	Body *FileInfo
+	Body *models.BlobInfo
 }
 
 // swagger:parameters listFiles
@@ -128,6 +122,17 @@ func (f *Frontend) InitFileApi() {
 				return
 			}
 			fileName := path.Join(f.FileRoot, `files`, path.Clean(c.Param(`path`)))
+			if st, err := os.Stat(fileName); err != nil || !st.Mode().IsRegular() {
+				res := &models.Error{
+					Code:  http.StatusNotFound,
+					Key:   c.Param(`path`),
+					Model: "files",
+					Type:  c.Request.Method,
+				}
+				res.Errorf("Not a regular file")
+				c.JSON(res.Code, res)
+				return
+			}
 			c.Writer.Header().Set("Content-Type", "application/octet-stream")
 			c.File(fileName)
 		})
@@ -156,6 +161,11 @@ func (f *Frontend) InitFileApi() {
 	//       507: ErrorResponse
 	f.ApiGroup.POST("/files/*path",
 		func(c *gin.Context) {
+			err := &models.Error{
+				Model: "files",
+				Key:   c.Param(`path`),
+				Type:  c.Request.Method,
+			}
 			name := c.Param(`path`)
 			if !f.assureAuth(c, "files", "post", name) {
 				return
@@ -165,88 +175,99 @@ func (f *Frontend) InitFileApi() {
 			switch strings.Split(ctype, "; ")[0] {
 			case `application/octet-stream`:
 				if c.Request.Body == nil {
-					c.JSON(http.StatusBadRequest,
-						models.NewError("API ERROR", http.StatusBadRequest,
-							fmt.Sprintf("upload: Unable to upload %s: missing body", name)))
+					err.Code = http.StatusBadRequest
+					err.Errorf("Missing upload body")
+					c.JSON(err.Code, err)
 					return
 				}
 			case `multipart/form-data`:
-				header, err := c.FormFile("file")
-				if err != nil {
-					c.JSON(http.StatusBadRequest,
-						models.NewError("API ERROR", http.StatusBadRequest,
-							fmt.Sprintf("upload: Failed to find multipart file: %v", err)))
+				header, headErr := c.FormFile("file")
+				if headErr != nil {
+					err.Code = http.StatusBadRequest
+					err.AddError(headErr)
+					err.Errorf("Cannot find multipart file")
+					c.JSON(err.Code, err)
 					return
 				}
 				name = path.Base(header.Filename)
 			default:
-				c.JSON(http.StatusUnsupportedMediaType,
-					models.NewError("API ERROR", http.StatusUnsupportedMediaType,
-						fmt.Sprintf("upload: file %s must have content-type application/octet-stream", name)))
+				err.Code = http.StatusBadRequest
+				err.Errorf("Want content-type application/octet-stream, not %s", ctype)
+				c.JSON(err.Code, err)
 				return
 			}
 			if strings.HasSuffix(name, "/") {
-				c.JSON(http.StatusForbidden,
-					models.NewError("API ERROR", http.StatusForbidden,
-						fmt.Sprintf("upload: Cannot upload a directory")))
+				err.Code = http.StatusForbidden
+				err.Errorf("Cannot upload a directory")
+				c.JSON(err.Code, err)
 				return
 			}
 
 			fileTmpName := path.Join(f.FileRoot, `files`, fmt.Sprintf(`.%s.part`, path.Clean(name)))
 			fileName := path.Join(f.FileRoot, `files`, path.Clean(name))
 
-			if err := os.MkdirAll(path.Dir(fileName), 0755); err != nil {
-				c.JSON(http.StatusConflict,
-					models.NewError("API ERROR", http.StatusConflict,
-						fmt.Sprintf("upload: unable to create directory %s", path.Clean(path.Dir(name)))))
+			if mkdirErr := os.MkdirAll(path.Dir(fileName), 0755); mkdirErr != nil {
+				err.Code = http.StatusConflict
+				err.Errorf("Cannot create directory %s", name)
+				c.JSON(err.Code, err)
 				return
 			}
-			if _, err := os.Open(fileTmpName); err == nil {
+			if _, openErr := os.Open(fileTmpName); openErr == nil {
 				os.Remove(fileName)
-				c.JSON(http.StatusConflict,
-					models.NewError("API ERROR", http.StatusConflict,
-						fmt.Sprintf("upload: file %s already uploading", name)))
+				err.Code = http.StatusConflict
+				err.Errorf("File already uploading")
+				err.AddError(openErr)
+				c.JSON(err.Code, err)
 				return
 			}
-			tgt, err := os.Create(fileTmpName)
+			tgt, openErr := os.Create(fileTmpName)
 			defer tgt.Close()
-			if err != nil {
+			if openErr != nil {
 				os.Remove(fileName)
-				c.JSON(http.StatusConflict,
-					models.NewError("API ERROR", http.StatusConflict,
-						fmt.Sprintf("upload: Unable to upload %s: %v", name, err)))
+				err.Code = http.StatusConflict
+				err.Errorf("Unable to upload")
+				err.AddError(openErr)
+				c.JSON(err.Code, err)
 				return
 			}
-
+			var copyErr error
 			switch strings.Split(ctype, "; ")[0] {
 			case `application/octet-stream`:
-				copied, err = io.Copy(tgt, c.Request.Body)
-				if err != nil {
+				copied, copyErr = io.Copy(tgt, c.Request.Body)
+				if copyErr != nil {
 					os.Remove(fileName)
 					os.Remove(fileTmpName)
-					c.JSON(http.StatusInsufficientStorage,
-						models.NewError("API ERROR", http.StatusInsufficientStorage,
-							fmt.Sprintf("upload: Failed to upload %s: %v", name, err)))
+					err.Code = http.StatusInsufficientStorage
+					err.AddError(copyErr)
+					c.JSON(err.Code, err)
 					return
 				}
 
 				if c.Request.ContentLength > 0 && copied != c.Request.ContentLength {
 					os.Remove(fileName)
 					os.Remove(fileTmpName)
-					c.JSON(http.StatusBadRequest,
-						models.NewError("API ERROR", http.StatusBadRequest,
-							fmt.Sprintf("upload: Failed to upload entire file %s: %d bytes expected, %d bytes recieved", name, c.Request.ContentLength, copied)))
+					err.Code = http.StatusBadRequest
+					err.Errorf("%d bytes expected, but only %d bytes recieved",
+						c.Request.ContentLength,
+						copied)
+					c.JSON(err.Code, err)
 					return
 				}
 			case `multipart/form-data`:
 				header, _ := c.FormFile("file")
-				file, err := header.Open()
+				file, headerErr := header.Open()
+				if headerErr != nil {
+					err.Code = http.StatusBadRequest
+					err.AddError(headerErr)
+					c.JSON(err.Code, err)
+					return
+				}
 				defer file.Close()
-				copied, err = io.Copy(tgt, file)
-				if err != nil {
-					c.JSON(http.StatusBadRequest,
-						models.NewError("API ERROR", http.StatusBadRequest,
-							fmt.Sprintf("upload: file %s could not save", header.Filename)))
+				copied, copyErr = io.Copy(tgt, file)
+				if copyErr != nil {
+					err.Code = http.StatusBadRequest
+					err.AddError(copyErr)
+					c.JSON(err.Code, err)
 					return
 				}
 				file.Close()
@@ -255,7 +276,7 @@ func (f *Frontend) InitFileApi() {
 
 			os.Remove(fileName)
 			os.Rename(fileTmpName, fileName)
-			c.JSON(http.StatusCreated, &FileInfo{Path: name, Size: copied})
+			c.JSON(http.StatusCreated, &models.BlobInfo{Path: name, Size: copied})
 		})
 
 	// swagger:route DELETE /files/{path} Files deleteFile
@@ -272,20 +293,26 @@ func (f *Frontend) InitFileApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/files/*path",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "files", "delete", c.Param(`path`)) {
+			name := c.Param(`path`)
+			err := &models.Error{
+				Model: "files",
+				Key:   name,
+				Type:  c.Request.Method,
+			}
+			if !f.assureAuth(c, "files", "delete", name) {
 				return
 			}
-			fileName := path.Join(f.FileRoot, `files`, path.Clean(c.Param(`path`)))
-			if fileName == path.Join(f.FileRoot, `files`) {
-				c.JSON(http.StatusForbidden,
-					models.NewError("API ERROR", http.StatusForbidden,
-						fmt.Sprintf("delete: Not allowed to remove files dir")))
+			fileName := path.Join(f.FileRoot, `files`, name)
+			if !strings.HasPrefix(fileName, path.Join(f.FileRoot, `files`)) {
+				err.Code = http.StatusForbidden
+				err.Errorf("Cannot delete")
+				c.JSON(err.Code, err)
 				return
 			}
-			if err := os.Remove(fileName); err != nil {
-				c.JSON(http.StatusNotFound,
-					models.NewError("API ERROR", http.StatusNotFound,
-						fmt.Sprintf("delete: unable to delete %s", c.Param(`path`))))
+			if rmErr := os.Remove(fileName); rmErr != nil {
+				err.Code = http.StatusNotFound
+				err.Errorf("Unable to delete")
+				c.JSON(err.Code, err)
 				return
 			}
 			c.Data(http.StatusNoContent, gin.MIMEJSON, nil)

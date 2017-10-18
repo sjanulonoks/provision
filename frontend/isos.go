@@ -42,17 +42,11 @@ type IsoResponse struct {
 	Body interface{}
 }
 
-// swagger:model
-type IsoInfo struct {
-	Path string `json:"path"`
-	Size int64  `json:"size"`
-}
-
 // IsoInfoResponse returned on a successful upload of an iso
 // swagger:response
 type IsoInfoResponse struct {
 	// in: body
-	Body *IsoInfo
+	Body *models.BlobInfo
 }
 
 // swagger:parameters uploadIso getIso deleteIso
@@ -120,8 +114,19 @@ func (f *Frontend) InitIsoApi() {
 			if !f.assureAuth(c, "isos", "get", c.Param(`name`)) {
 				return
 			}
-			isoName := path.Join(f.FileRoot, `isos`, path.Base(c.Param(`name`)))
-			c.File(isoName)
+			fileName := path.Join(f.FileRoot, `isos`, path.Clean(c.Param(`name`)))
+			if st, err := os.Stat(fileName); err != nil || !st.Mode().IsRegular() {
+				res := &models.Error{
+					Code:  http.StatusNotFound,
+					Key:   c.Param(`name`),
+					Model: "isos",
+					Type:  c.Request.Method,
+				}
+				res.Errorf("Not a regular file")
+				c.JSON(res.Code, res)
+				return
+			}
+			c.File(fileName)
 		})
 	// swagger:route POST /isos/{path} Isos uploadIso
 	//
@@ -171,8 +176,13 @@ func (f *Frontend) InitIsoApi() {
 			}
 			isoName := path.Join(f.FileRoot, `isos`, path.Base(name))
 			if err := os.Remove(isoName); err != nil {
-				c.JSON(http.StatusNotFound,
-					models.NewError("API ERROR", http.StatusNotFound, fmt.Sprintf("delete: unable to delete %s", name)))
+				res := &models.Error{
+					Code:  http.StatusNotFound,
+					Model: "isos",
+					Key:   name,
+				}
+				res.Errorf("no such iso")
+				c.JSON(res.Code, res)
 				return
 			}
 			c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
@@ -197,7 +207,7 @@ func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
 func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 	if err := os.MkdirAll(path.Join(fileRoot, `isos`), 0755); err != nil {
 		c.JSON(http.StatusConflict,
-			models.NewError("API_ERROR", http.StatusConflict, fmt.Sprintf("upload: unable to create isos directory")))
+			models.NewError(c.Request.Method, http.StatusConflict, fmt.Sprintf("upload: unable to create isos directory")))
 		return
 	}
 	var copied int64
@@ -277,5 +287,5 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 	os.Remove(isoName)
 	os.Rename(isoTmpName, isoName)
 	go reloadBootenvsForIso(dt, name)
-	c.JSON(http.StatusCreated, &IsoInfo{Path: name, Size: copied})
+	c.JSON(http.StatusCreated, &models.BlobInfo{Path: name, Size: copied})
 }

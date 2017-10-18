@@ -92,6 +92,7 @@ func buildSummary(st store.Store) *models.ContentSummary {
 	cs.Meta.Source = metaData["Source"]
 	cs.Meta.Description = metaData["Description"]
 	cs.Meta.Version = metaData["Version"]
+	cs.Meta.Meta = map[string]string{}
 	cs.Counts = map[string]int{}
 
 	cs.Meta.Writable = false
@@ -110,7 +111,7 @@ func buildSummary(st store.Store) *models.ContentSummary {
 		cs.Meta.Type = "default"
 		cs.Meta.Overwritable = true
 	}
-	cs.Warnings = nil
+	cs.Warnings = []string{}
 
 	subs := mst.Subs()
 	for k, sub := range subs {
@@ -301,9 +302,14 @@ func (f *Frontend) InitContentApi() {
 				defer unlocker()
 
 				if cst := f.findContent(name); cst == nil {
-					c.JSON(http.StatusNotFound,
-						models.NewError("API_ERROR", http.StatusNotFound,
-							fmt.Sprintf("content get: not found: %s", name)))
+					res := &models.Error{
+						Model: "contents",
+						Key:   name,
+						Type:  c.Request.Method,
+						Code:  http.StatusNotFound,
+					}
+					res.Errorf("No such content store")
+					c.JSON(http.StatusNotFound, res)
 				} else {
 					content, err := f.buildContent(cst)
 					if err != nil {
@@ -347,9 +353,14 @@ func (f *Frontend) InitContentApi() {
 				defer unlocker()
 
 				if cst := f.findContent(name); cst != nil {
-					c.JSON(http.StatusConflict,
-						models.NewError("API_ERROR", http.StatusConflict,
-							fmt.Sprintf("content post: already exists: %s", name)))
+					res := &models.Error{
+						Model: "contents",
+						Key:   name,
+						Type:  c.Request.Method,
+						Code:  http.StatusConflict,
+					}
+					res.Errorf("Content %s already exists", name)
+					c.JSON(http.StatusConflict, res)
 					return
 				}
 
@@ -406,9 +417,14 @@ func (f *Frontend) InitContentApi() {
 
 			name := c.Param(`name`)
 			if name != content.Meta.Name {
-				c.JSON(http.StatusBadRequest,
-					models.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("Name must match: %s != %s\n", content.Meta.Name, c.Param(`name`))))
+				res := &models.Error{
+					Model: "contents",
+					Key:   name,
+					Type:  c.Request.Method,
+					Code:  http.StatusBadRequest,
+				}
+				res.Errorf("Cannot change name from %s to %s", name, content.Meta.Name)
+				c.JSON(http.StatusBadRequest, res)
 				return
 
 			}
@@ -418,15 +434,27 @@ func (f *Frontend) InitContentApi() {
 				defer unlocker()
 
 				if cst := f.findContent(name); cst == nil {
-					c.JSON(http.StatusNotFound,
-						models.NewError("API_ERROR", http.StatusNotFound,
-							fmt.Sprintf("content put: not found: %s", name)))
+					res := &models.Error{
+						Model: "contents",
+						Key:   name,
+						Type:  c.Request.Method,
+						Code:  http.StatusNotFound,
+					}
+					res.Errorf("Cannot find %s", name)
+					c.JSON(http.StatusNotFound, res)
 					return
 				}
 
 				if newStore, err := f.buildNewStore(content); err != nil {
-					jsonError(c, err, http.StatusInternalServerError,
-						fmt.Sprintf("failed to build content: %s: ", name))
+					res := &models.Error{
+						Model: "contents",
+						Key:   name,
+						Type:  c.Request.Method,
+						Code:  http.StatusInternalServerError,
+					}
+					res.Errorf("Failed to build content")
+					res.AddError(err)
+					c.JSON(res.Code, res)
 					return
 				} else {
 					cs := buildSummary(newStore)
@@ -434,8 +462,16 @@ func (f *Frontend) InitContentApi() {
 					ds := f.dt.Backend.(*midlayer.DataStack)
 					if nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger, nil); hard != nil {
 						midlayer.CleanUpStore(newStore)
-						jsonError(c, hard, http.StatusInternalServerError,
-							fmt.Sprintf("failed to replace content: %s: ", name))
+						res := &models.Error{
+							Model: "contents",
+							Key:   name,
+							Type:  c.Request.Method,
+							Code:  http.StatusInternalServerError,
+						}
+						res.AddError(hard)
+						res.AddError(soft)
+						c.JSON(res.Code, res)
+						return
 					} else {
 						if soft != nil {
 							if berr, ok := soft.(*models.Error); ok {
@@ -473,9 +509,14 @@ func (f *Frontend) InitContentApi() {
 
 				cst := f.findContent(name)
 				if cst == nil {
-					c.JSON(http.StatusNotFound,
-						models.NewError("API_ERROR", http.StatusNotFound,
-							fmt.Sprintf("content get: not found: %s", name)))
+					res := &models.Error{
+						Model:    "contents",
+						Key:      name,
+						Type:     c.Request.Method,
+						Messages: []string{"No such content store"},
+						Code:     404,
+					}
+					c.JSON(http.StatusNotFound, res)
 					return
 				}
 

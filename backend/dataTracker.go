@@ -866,15 +866,29 @@ func (p *DataTracker) setDT(s models.Model) {
 }
 
 func (p *DataTracker) Create(d Stores, obj models.Model) (saved bool, err error) {
+	if ms, ok := obj.(models.Filler); ok {
+		ms.Fill()
+	}
 	ref := toBackend(p, d, obj)
 	prefix := ref.Prefix()
 	key := ref.Key()
 	backend := d(prefix).backingStore
 	if key == "" {
-		return false, fmt.Errorf("dataTracker create %s: Empty key not allowed", prefix)
+		return false, &models.Error{
+			Type:     "CREATE",
+			Model:    prefix,
+			Messages: []string{"Empty key not allowed"},
+			Code:     http.StatusBadRequest,
+		}
 	}
 	if d(prefix).Find(key) != nil {
-		return false, fmt.Errorf("dataTracker create %s: %s already exists", prefix, key)
+		return false, &models.Error{
+			Type:     "CREATE",
+			Model:    prefix,
+			Key:      key,
+			Messages: []string{"already exists"},
+			Code:     http.StatusConflict,
+		}
 	}
 	ref.(validator).setStores(d)
 	checker, checkOK := ref.(models.Validator)
@@ -899,13 +913,13 @@ func (p *DataTracker) Remove(d Stores, obj models.Model) (removed bool, err erro
 	backend := d(prefix).backingStore
 	item := d(prefix).Find(key)
 	if item == nil {
-		err := &models.Error{
-			Code:  http.StatusNotFound,
-			Key:   key,
-			Model: prefix,
+		return false, &models.Error{
+			Type:     "DELETE",
+			Code:     http.StatusNotFound,
+			Key:      key,
+			Model:    prefix,
+			Messages: []string{"Not Found"},
 		}
-		err.Errorf("%s: DELETE %s: Not Found", err.Model, err.Key)
-		return false, err
 	}
 	item.(validator).setStores(d)
 	removed, err = store.Remove(backend, item.(store.KeySaver))
@@ -922,13 +936,13 @@ func (p *DataTracker) Patch(d Stores, obj models.Model, key string, patch jsonpa
 	backend := d(prefix).backingStore
 	target := d(prefix).Find(key)
 	if target == nil {
-		err := &models.Error{
-			Code:  http.StatusNotFound,
-			Key:   key,
-			Model: prefix,
+		return nil, &models.Error{
+			Type:     "PATCH",
+			Code:     http.StatusNotFound,
+			Key:      key,
+			Model:    prefix,
+			Messages: []string{"Not Found"},
 		}
-		err.Errorf("%s: PATCH %s: Not Found", err.Model, err.Key)
-		return nil, err
 	}
 	buf, fatalErr := json.Marshal(target)
 	if fatalErr != nil {
@@ -947,7 +961,17 @@ func (p *DataTracker) Patch(d Stores, obj models.Model, key string, patch jsonpa
 	}
 	toSave := ref.New()
 	if err := json.Unmarshal(resBuf, &toSave); err != nil {
-		return nil, err
+		retErr := &models.Error{
+			Code:  http.StatusInternalServerError,
+			Key:   key,
+			Model: ref.Prefix(),
+			Type:  "JsonPatchError",
+		}
+		retErr.AddError(err)
+		return nil, retErr
+	}
+	if ms, ok := toSave.(models.Filler); ok {
+		ms.Fill()
 	}
 	p.setDT(toSave)
 	toSave.(validator).setStores(d)
@@ -971,17 +995,20 @@ func (p *DataTracker) Update(d Stores, obj models.Model) (saved bool, err error)
 	key := ref.Key()
 	backend := d(prefix).backingStore
 	if target := d(prefix).Find(key); target == nil {
-		err := &models.Error{
-			Code:  http.StatusNotFound,
-			Key:   key,
-			Model: prefix,
+		return false, &models.Error{
+			Type:     "PUT",
+			Code:     http.StatusNotFound,
+			Key:      key,
+			Model:    prefix,
+			Messages: []string{"Not Found"},
 		}
-		err.Errorf("%s: PUT %s: Not Found", err.Model, err.Key)
-		return false, err
 	}
 
 	p.setDT(ref)
 	ref.(validator).setStores(d)
+	if ms, ok := ref.(models.Filler); ok {
+		ms.Fill()
+	}
 	checker, checkOK := ref.(models.Validator)
 	if checkOK {
 		checker.ClearValidation()
@@ -1000,6 +1027,9 @@ func (p *DataTracker) Save(d Stores, obj models.Model) (saved bool, err error) {
 	prefix := ref.Prefix()
 	backend := d(prefix).backingStore
 	ref.(validator).setStores(d)
+	if ms, ok := ref.(models.Filler); ok {
+		ms.Fill()
+	}
 	checker, checkOK := ref.(models.Validator)
 	if checkOK {
 		checker.ClearValidation()

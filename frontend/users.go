@@ -157,6 +157,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/users",
 		func(c *gin.Context) {
@@ -221,7 +222,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 			}()
 			if uobj == nil {
 				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
-				c.JSON(http.StatusNotFound, models.NewError("API_ERROR", http.StatusNotFound, s))
+				c.JSON(http.StatusNotFound, models.NewError(c.Request.Method, http.StatusNotFound, s))
 				return
 			}
 			if !f.assureAuth(c, uobj.Prefix(), "token", uobj.Key()) {
@@ -259,7 +260,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 				if ok {
 					c.JSON(ne.Code, ne)
 				} else {
-					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
 				}
 			} else {
 				// Error is only if stats are not filled in.  User
@@ -282,6 +283,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       406: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/users/:name",
 		func(c *gin.Context) {
@@ -300,6 +302,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name",
 		func(c *gin.Context) {
@@ -318,6 +321,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name/password",
 		func(c *gin.Context) {
@@ -334,7 +338,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 			obj := d("users").Find(c.Param("name"))
 			if obj == nil {
 				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
-				c.JSON(http.StatusNotFound, models.NewError("API_ERROR", http.StatusNotFound, s))
+				c.JSON(http.StatusNotFound, models.NewError(c.Request.Method, http.StatusNotFound, s))
 				return
 			}
 			user := backend.AsUser(obj)
@@ -343,7 +347,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
 				}
 			} else {
 				c.JSON(http.StatusOK, user.Sanitize())

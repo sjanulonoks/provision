@@ -79,8 +79,32 @@ type MachinePatchBodyParameter struct {
 	Body jsonpatch2.Patch
 }
 
+// MachinePatchBodyParameter used to patch a Machine
+// swagger:parameters patchMachineParams
+type MachinePatchParamsParameter struct {
+	// in: body
+	// required: true
+	Body jsonpatch2.Patch
+}
+
+//MachinePostParamParameter used to POST a machine parameter
+//swagger:parameters postMachineParam
+type MachinePostParamParameter struct {
+	// in: body
+	// required: true
+	Body interface{}
+}
+
+//MachinePostParamsParameter used to POST machine parameters
+//swagger:parameters postMachineParams
+type MachinePostParamsParameter struct {
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 // MachinePathParameter used to find a Machine in the path
-// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine postMachineParams getMachineActions headMachine
+// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine getMachineActions headMachine patchMachineParams postMachineParams
 type MachinePathParameter struct {
 	// in: path
 	// required: true
@@ -88,9 +112,9 @@ type MachinePathParameter struct {
 	Uuid uuid.UUID `json:"uuid"`
 }
 
-// MachineSetPathParameter used to set a single parameter on a single machine
+// MachinePostParamPathParemeter used to get a single Parameter for a single Machine
 // swagger:parameters postMachineParam
-type MachinePostParamPathParameter struct {
+type MachinePostParamPathParemeter struct {
 	// in: path
 	// required: true
 	// swagger:strfmt uuid
@@ -150,22 +174,6 @@ type MachineActionBodyParameter struct {
 	// in: body
 	// required: true
 	Body map[string]interface{}
-}
-
-// MachineParamsBodyParameter used to set Machine Params
-// swagger:parameters postMachineParams
-type MachineParamsBodyParameter struct {
-	// in: body
-	// required: true
-	Body map[string]interface{}
-}
-
-// MachineParamsBodyParameter used to set Machine Params
-// swagger:parameters postMachineParam
-type MachineParamBodyParameter struct {
-	// in: body
-	// required: true
-	Body interface{}
 }
 
 // MachineListPathParameter used to limit lists of Machine by path options
@@ -249,6 +257,7 @@ func (f *Frontend) InitMachineApi() {
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/machines",
 		func(c *gin.Context) {
@@ -274,7 +283,7 @@ func (f *Frontend) InitMachineApi() {
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
 				}
 			} else {
 				s, ok := models.Model(b).(Sanitizable)
@@ -332,6 +341,7 @@ func (f *Frontend) InitMachineApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       406: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/machines/:uuid",
 		func(c *gin.Context) {
@@ -355,6 +365,7 @@ func (f *Frontend) InitMachineApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/machines/:uuid",
 		func(c *gin.Context) {
@@ -383,7 +394,7 @@ func (f *Frontend) InitMachineApi() {
 			f.Remove(c, &backend.Machine{}, c.Param(`uuid`))
 		})
 
-	pGetAll, pSetAll, pGetOne, pSetOne := f.makeParamEndpoints(&backend.Machine{}, "uuid")
+	pGetAll, pGetOne, pPatch, pSetThem, pSetOne := f.makeParamEndpoints(&backend.Machine{}, "uuid")
 
 	// swagger:route GET /machines/{uuid}/params Machines getMachineParams
 	//
@@ -398,18 +409,6 @@ func (f *Frontend) InitMachineApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/machines/:uuid/params", pGetAll)
 
-	// swagger:route POST /machines/{uuid}/params Machines postMachineParams
-	//
-	// Set/Replace all the Parameters for a machine specified by {uuid}
-	//
-	//     Responses:
-	//       200: MachineParamsResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
-	//       404: ErrorResponse
-	//       409: ErrorResponse
-	f.ApiGroup.POST("/machines/:uuid/params", pSetAll)
-
 	// swagger:route GET /machines/{uuid}/params/{key} Machines getMachineParam
 	//
 	// Get a single machine parameter
@@ -422,6 +421,30 @@ func (f *Frontend) InitMachineApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/machines/:uuid/params/*key", pGetOne)
+
+	// swagger:route PATCH /machines/{uuid}/params Machines patchMachineParams
+	//
+	// Update params for Machine {uuid} with the passed-in patch
+	//
+	//     Responses:
+	//       200: MachineParamsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.PATCH("/machines/:uuid/params", pPatch)
+
+	// swagger:route POST /machines/{uuid}/params Machines postMachineParams
+	//
+	// Sets parameters for a machine specified by {uuid}
+	//
+	//     Responses:
+	//       200: MachineParamsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/machines/:uuid/params", pSetThem)
 
 	// swagger:route POST /machines/{uuid}/params/{key} Machines postMachineParam
 	//
@@ -462,7 +485,7 @@ func (f *Frontend) InitMachineApi() {
 				if ref == nil {
 					err := &models.Error{
 						Code:  http.StatusNotFound,
-						Type:  "API_ERROR",
+						Type:  c.Request.Method,
 						Model: "machines",
 						Key:   uuid,
 					}
@@ -514,7 +537,7 @@ func (f *Frontend) InitMachineApi() {
 				if ref == nil {
 					err := &models.Error{
 						Code:  http.StatusNotFound,
-						Type:  "API_ERROR",
+						Type:  c.Request.Method,
 						Model: "machines",
 						Key:   uuid,
 					}
@@ -574,7 +597,7 @@ func (f *Frontend) InitMachineApi() {
 				if ref == nil {
 					err := &models.Error{
 						Code:  http.StatusNotFound,
-						Type:  "API_ERROR",
+						Type:  c.Request.Method,
 						Model: "machines",
 						Key:   uuid,
 					}

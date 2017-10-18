@@ -44,7 +44,7 @@ type ProfileBodyParameter struct {
 }
 
 // ProfilePatchBodyParameter used to patch a Profile
-// swagger:parameters patchProfile
+// swagger:parameters patchProfile patchProfileParams
 type ProfilePatchBodyParameter struct {
 	// in: body
 	// required: true
@@ -52,7 +52,7 @@ type ProfilePatchBodyParameter struct {
 }
 
 // ProfilePathParameter used to name a Profile in the path
-// swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile getProfileParams postProfileParams headProfile
+// swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile getProfileParams patchProfileParams headProfile postProfileParams
 type ProfilePathParameter struct {
 	// in: path
 	// required: true
@@ -78,12 +78,12 @@ type ProfileParamsBodyParameter struct {
 	Body map[string]interface{}
 }
 
-// ProfileParamBodyParameter used to set a single Param on a Profile
+// ProfileParamBodyParameter used to set Profile Param
 // swagger:parameters postProfileParam
 type ProfileParamBodyParameter struct {
 	// in: body
 	// required: true
-	Body map[string]interface{}
+	Body interface{}
 }
 
 // ProfileListPathParameter used to limit lists of Profile by path options
@@ -246,7 +246,7 @@ func (f *Frontend) InitProfileApi() {
 			f.Remove(c, &backend.Profile{}, c.Param(`name`))
 		})
 
-	pGetAll, pSetAll, pGetOne, pSetOne := f.makeParamEndpoints(&backend.Profile{}, "name")
+	pGetAll, pGetOne, pPatch, pSetThem, pSetOne := f.makeParamEndpoints(&backend.Profile{}, "name")
 
 	// swagger:route GET /profiles/{name}/params Profiles getProfileParams
 	//
@@ -261,18 +261,6 @@ func (f *Frontend) InitProfileApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/profiles/:name/params", pGetAll)
 
-	// swagger:route POST /profiles/{name}/params Profiles postProfileParams
-	//
-	// Set/Replace all the Parameters for a profile specified by {name}
-	//
-	//     Responses:
-	//       200: ProfileParamsResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
-	//       404: ErrorResponse
-	//       409: ErrorResponse
-	f.ApiGroup.POST("/profiles/:name/params", pSetAll)
-
 	// swagger:route GET /profiles/{name}/params/{key} Profiles getProfileParam
 	//
 	// Get a single profile parameter
@@ -285,6 +273,30 @@ func (f *Frontend) InitProfileApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/profiles/:name/params/*key", pGetOne)
+
+	// swagger:route PATCH /profiles/{name}/params Profiles patchProfileParams
+	//
+	// Update params for Profile {name} with the passed-in patch
+	//
+	//     Responses:
+	//       200: ProfileParamsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.PATCH("/profiles/:name/params", pPatch)
+
+	// swagger:route POST /profiles/{name}/params Profiles postProfileParams
+	//
+	// Sets parameters for a profile specified by {name}
+	//
+	//     Responses:
+	//       200: ProfileParamsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/profiles/:name/params", pSetThem)
 
 	// swagger:route POST /profiles/{name}/params/{key} Profiles postProfileParam
 	//

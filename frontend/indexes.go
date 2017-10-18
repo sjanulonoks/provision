@@ -101,7 +101,7 @@ func (f *Frontend) InitIndexApi() {
 			m, err := models.New(c.Param("prefix"))
 			if err != nil {
 				c.JSON(http.StatusNotFound,
-					models.NewError("API_ERROR", http.StatusNotFound,
+					models.NewError(c.Request.Method, http.StatusNotFound,
 						fmt.Sprintf("index get: not found: %s", c.Param("prefix"))))
 				return
 			}
@@ -109,7 +109,7 @@ func (f *Frontend) InitIndexApi() {
 			idxer, ok := bm.(Indexer)
 			if !ok {
 				c.JSON(http.StatusNotFound,
-					models.NewError("API_ERROR", http.StatusNotFound,
+					models.NewError(c.Request.Method, http.StatusNotFound,
 						fmt.Sprintf("index get: not found: %s", c.Param("prefix"))))
 				return
 			}
@@ -140,7 +140,7 @@ func (f *Frontend) InitIndexApi() {
 			m, err := models.New(prefix)
 			if err != nil {
 				c.JSON(http.StatusNotFound,
-					models.NewError("API_ERROR", http.StatusNotFound,
+					models.NewError(c.Request.Method, http.StatusNotFound,
 						fmt.Sprintf("index get: not found: %s/%s", prefix, paramName)))
 				return
 			}
@@ -148,7 +148,7 @@ func (f *Frontend) InitIndexApi() {
 			idxer, ok := bm.(Indexer)
 			if !ok {
 				c.JSON(http.StatusNotFound,
-					models.NewError("API_ERROR", http.StatusNotFound,
+					models.NewError(c.Request.Method, http.StatusNotFound,
 						fmt.Sprintf("index get: not found: %s/%s", prefix, paramName)))
 				return
 			}
@@ -159,7 +159,7 @@ func (f *Frontend) InitIndexApi() {
 			dpm, ok := bm.(dynParameter)
 			if !ok {
 				c.JSON(http.StatusNotFound,
-					models.NewError("API_ERROR", http.StatusNotFound,
+					models.NewError(c.Request.Method, http.StatusNotFound,
 						fmt.Sprintf("index get: not found: %s/%s", prefix, paramName)))
 				return
 			}
@@ -169,7 +169,7 @@ func (f *Frontend) InitIndexApi() {
 			dynIndex, err := dpm.ParameterMaker(d, paramName)
 			if err != nil {
 				c.JSON(http.StatusNotFound,
-					models.NewError("API_ERROR", http.StatusNotFound,
+					models.NewError(c.Request.Method, http.StatusNotFound,
 						fmt.Sprintf("index get: not found: %s/%s", prefix, paramName)))
 				return
 			}
