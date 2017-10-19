@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/digitalrebar/provision/models"
 )
@@ -215,9 +216,10 @@ func (r *RenderData) GenerateToken() string {
 	}
 
 	if r.Machine == nil {
-		ttl := 600
+		ttl := time.Minute * 10
 		if sttl := r.p.pref("unknownTokenTimeout"); sttl != "" {
-			ttl, _ = strconv.Atoi(sttl)
+			mttl, _ := strconv.Atoi(sttl)
+			ttl = time.Second * time.Duration(mttl)
 		}
 		t, _ = NewClaim("general", grantor, ttl).
 			Add("machines", "post", "*").
@@ -225,9 +227,10 @@ func (r *RenderData) GenerateToken() string {
 			AddSecrets("", grantorSecret, "").
 			Seal(r.p.tokenManager)
 	} else {
-		ttl := 3600
+		ttl := time.Hour
 		if sttl := r.p.pref("knownTokenTimeout"); sttl != "" {
-			ttl, _ = strconv.Atoi(sttl)
+			mttl, _ := strconv.Atoi(sttl)
+			ttl = time.Second * time.Duration(mttl)
 		}
 		t, _ = NewClaim(r.Machine.Key(), grantor, ttl).
 			Add("machines", "*", r.Machine.Key()).
@@ -249,34 +252,33 @@ func (r *RenderData) GenerateToken() string {
 }
 
 func (r *RenderData) GenerateInfiniteToken() string {
-	var t string
 	if r.Machine == nil {
 		// Don't allow infinite tokens.
 		return ""
-	} else {
-		grantor := "system"
-		grantorSecret := ""
-		if ss := r.p.pref("systemGrantorSecret"); ss != "" {
-			grantorSecret = ss
-		}
-
-		ttl := 2 ^ 31 - 1
-		t, _ = NewClaim(r.Machine.Key(), grantor, ttl).
-			Add("machines", "*", r.Machine.Key()).
-			Add("stages", "get", "*").
-			Add("jobs", "create", r.Machine.Key()).
-			Add("jobs", "get", r.Machine.Key()).
-			Add("jobs", "patch", r.Machine.Key()).
-			Add("jobs", "actions", r.Machine.Key()).
-			Add("jobs", "log", r.Machine.Key()).
-			Add("tasks", "get", "*").
-			Add("info", "get", "*").
-			Add("events", "post", "*").
-			Add("reservations", "create", "*").
-			AddMachine(r.Machine.Key()).
-			AddSecrets("", grantorSecret, r.Machine.Secret).
-			Seal(r.p.tokenManager)
 	}
+
+	grantor := "system"
+	grantorSecret := ""
+	if ss := r.p.pref("systemGrantorSecret"); ss != "" {
+		grantorSecret = ss
+	}
+
+	ttl := time.Hour * 24 * 7 * 52 * 3
+	t, _ := NewClaim(r.Machine.Key(), grantor, ttl).
+		Add("machines", "*", r.Machine.Key()).
+		Add("stages", "get", "*").
+		Add("jobs", "create", r.Machine.Key()).
+		Add("jobs", "get", r.Machine.Key()).
+		Add("jobs", "patch", r.Machine.Key()).
+		Add("jobs", "actions", r.Machine.Key()).
+		Add("jobs", "log", r.Machine.Key()).
+		Add("tasks", "get", "*").
+		Add("info", "get", "*").
+		Add("events", "post", "*").
+		Add("reservations", "create", "*").
+		AddMachine(r.Machine.Key()).
+		AddSecrets("", grantorSecret, r.Machine.Secret).
+		Seal(r.p.tokenManager)
 	return t
 }
 

@@ -44,24 +44,24 @@ git checkout 0.12.0
 go install github.com/go-swagger/go-swagger/cmd/swagger
 cd $OLDPWD
 
-glide install
-rm -rf client genmodels embedded/assets/swagger.json
-go generate server/assets.go
-
-# Update cli docs if needed. - does change date.
-go build -o drpcli-docs cmds/drpcli-docs/drpcli-docs.go
-
 . tools/version.sh
 
 echo "Version = $Prepart$MajorV.$MinorV.$PatchV$Extra-$GITHASH"
 
-VERFLAGS="-X github.com/digitalrebar/provision.RS_MAJOR_VERSION=$MajorV \
+export VERFLAGS="-X github.com/digitalrebar/provision.RS_MAJOR_VERSION=$MajorV \
           -X github.com/digitalrebar/provision.RS_MINOR_VERSION=$MinorV \
           -X github.com/digitalrebar/provision.RS_PATCH_VERSION=$PatchV \
           -X github.com/digitalrebar/provision.RS_EXTRA=$Extra \
           -X github.com/digitalrebar/provision.RS_PREPART=$Prepart \
           -X github.com/digitalrebar/provision.BuildStamp=`date -u '+%Y-%m-%d_%I:%M:%S%p'` \
           -X github.com/digitalrebar/provision.GitHash=$GITHASH"
+
+glide install
+rm -rf client genmodels embedded/assets/swagger.json
+go generate server/assets.go
+
+# Update cli docs if needed. - does change date.
+go build -o drpcli-docs cmds/drpcli-docs/drpcli-docs.go
 
 arches=("amd64")
 oses=("linux" "darwin" "windows")
