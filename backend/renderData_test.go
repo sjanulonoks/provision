@@ -543,7 +543,7 @@ func TestRenderData(t *testing.T) {
 		if !claim.Match("machines", "patch", machine.Key()) {
 			t.Errorf("Known token should match: machines/patch/%s\n", machine.Key())
 		}
-		if claim.ExpiresAt-claim.IssuedAt >= 100000 {
+		if claim.ExpiresAt-claim.IssuedAt <= 100000 {
 			t.Errorf("Known token timeout should > 100000, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
 		}
 		if !claim.ValidateSecrets(grantorSecret, "", machineSecret) {
