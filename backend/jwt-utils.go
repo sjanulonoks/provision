@@ -222,11 +222,10 @@ func (d *DrpCustomClaims) ValidateSecrets(grantor, user, machine string) bool {
 
 // NewClaim creates a new, unsigned Token that doesn't allow access to anything.
 // You must call Seal() to turn this into a signed JWT token.
-func NewClaim(user, grantor string, ttl int) *DrpCustomClaims {
-	d := time.Duration(ttl) * time.Second
+func NewClaim(user, grantor string, ttl time.Duration) *DrpCustomClaims {
 	res := &DrpCustomClaims{DrpClaims: []Claim{}}
 	res.IssuedAt = time.Now().Unix()
-	res.ExpiresAt = time.Now().Add(d).Unix()
+	res.ExpiresAt = time.Now().Add(ttl).Unix()
 	res.Issuer = "digitalrebar provision"
 	res.Id = user
 	res.GrantorClaims.UserId = user
