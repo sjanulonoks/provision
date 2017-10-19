@@ -97,16 +97,16 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 		return c.Query("aggregate") == "true"
 	}
 	pFetch := func(obj backend.Paramer, id string, aggregate bool) (
-		models.Model,
+		bool,
 		map[string]interface{},
 	) {
 		d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
 		defer unlocker()
 		ref := d(obj.Prefix()).Find(id)
 		if ref != nil {
-			return ref, ref.(backend.Paramer).GetParams(d, aggregate)
+			return true, ref.(backend.Paramer).GetParams(d, aggregate)
 		}
-		return nil, nil
+		return false, nil
 	}
 	pSet := func(c *gin.Context,
 		key, line string,
@@ -137,8 +137,8 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 		}
 		return res, nil
 	}
-	item404 := func(c *gin.Context, ref models.Model, key, line string) bool {
-		if ref == nil {
+	item404 := func(c *gin.Context, found bool, key, line string) bool {
+		if !found {
 			err := &models.Error{
 				Code:  http.StatusNotFound,
 				Type:  c.Request.Method,
@@ -147,17 +147,16 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 			}
 			err.Errorf("Not Found")
 			c.JSON(err.Code, err)
-			return true
 		}
-		return false
+		return !found
 	}
 	return func(c *gin.Context) {
 			id := c.Param(idKey)
 			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
 			}
-			ref, params := pFetch(obj, id, aggregator(c))
-			if item404(c, ref, id, "Params") {
+			found, params := pFetch(obj, id, aggregator(c))
+			if item404(c, found, id, "Params") {
 				return
 			}
 			c.JSON(http.StatusOK, params)
@@ -167,8 +166,8 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
 			}
-			ref, params := pFetch(obj, id, aggregator(c))
-			if item404(c, ref, id, "Param") {
+			found, params := pFetch(obj, id, aggregator(c))
+			if item404(c, found, id, "Param") {
 				return
 			}
 			c.JSON(http.StatusOK, params[trimmer(c.Param("key"))])
@@ -725,7 +724,7 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	}
 	res := &models.Error{
 		Code:  http.StatusNotAcceptable,
-		Type:  "API_ERROR",
+		Type:  c.Request.Method,
 		Model: ref.Prefix(),
 	}
 	var err error

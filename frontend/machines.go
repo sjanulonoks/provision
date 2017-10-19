@@ -477,8 +477,7 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			b := &backend.Machine{}
 			var ref models.Model
-			list := make([]*models.AvailableAction, 0, 0)
-			bad := func() bool {
+			actions, err := func() ([]models.AvailableAction, *models.Error) {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
@@ -489,23 +488,23 @@ func (f *Frontend) InitMachineApi() {
 						Model: "machines",
 						Key:   uuid,
 					}
-					err.Errorf("%s Actions Get: %s: Not Found", err.Model, err.Key)
-					c.JSON(err.Code, err)
-					return true
+					err.Errorf("Not Found")
+					return nil, err
 				}
-
+				list := make([]models.AvailableAction, 0, 0)
 				m := backend.AsMachine(ref)
 				for _, aa := range f.pc.MachineActions.List() {
 					if _, err := validateMachineAction(f, d, aa.Command, m, make(map[string]interface{}, 0)); err == nil {
-						list = append(list, aa)
+						list = append(list, *aa)
 					}
 				}
-				return false
+				return list, nil
 			}()
-			if bad {
-				return
+			if err != nil {
+				c.JSON(err.Code, err)
+			} else {
+				c.JSON(http.StatusOK, actions)
 			}
-			c.JSON(http.StatusOK, list)
 		})
 
 	// swagger:route GET /machines/{uuid}/actions/{name} Machines getMachineAction
@@ -528,10 +527,10 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			b := &backend.Machine{}
 			var ref models.Model
-			var aa *models.AvailableAction
-			bad := func() bool {
+			action, err := func() (models.AvailableAction, *models.Error) {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
+				res := models.AvailableAction{}
 				ref = d("machines").Find(uuid)
 				if ref == nil {
 					err := &models.Error{
@@ -540,25 +539,17 @@ func (f *Frontend) InitMachineApi() {
 						Model: "machines",
 						Key:   uuid,
 					}
-					err.Errorf("%s Action Get: %s: Not Found", err.Model, err.Key)
-					c.JSON(err.Code, err)
-					return true
+					err.Errorf("Action Get: '%s': Not Found", c.Param(`name`))
+					return res, err
 				}
 				m := backend.AsMachine(ref)
-				var err *models.Error
-				aa, err = validateMachineAction(f, d, c.Param(`name`), m, make(map[string]interface{}, 0))
-				if err != nil {
-					c.JSON(err.Code, err)
-					return true
-				}
-				return false
+				return validateMachineAction(f, d, c.Param(`name`), m, make(map[string]interface{}, 0))
 			}()
-
-			if bad {
-				return
+			if err != nil {
+				c.JSON(err.Code, err)
+			} else {
+				c.JSON(http.StatusOK, action)
 			}
-
-			c.JSON(http.StatusOK, aa)
 		})
 
 	// swagger:route POST /machines/{uuid}/actions/{name} Machines postMachineAction
@@ -581,56 +572,50 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			name := c.Param(`name`)
 
-			ma := &models.MachineAction{Command: name, Params: val}
-
 			if !f.assureAuth(c, "machines", name, uuid) {
 				return
 			}
 
 			b := &backend.Machine{}
 			var ref models.Model
-			bad := func() bool {
+			ma, err := func() (*models.MachineAction, *models.Error) {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 				if ref == nil {
 					err := &models.Error{
 						Code:  http.StatusNotFound,
-						Type:  c.Request.Method,
+						Type:  "INVOKE",
 						Model: "machines",
 						Key:   uuid,
 					}
-					err.Errorf("%s Call Action: machine %s: Not Found", err.Model, err.Key)
-					c.JSON(err.Code, err)
-					return true
+					err.Errorf("Not Found")
+					return nil, err
 				}
-
+				res := &models.MachineAction{Command: name, Params: val}
 				m := backend.AsMachine(ref)
 
-				ma.Name = m.Name
-				ma.Uuid = m.Uuid
-				ma.Address = m.Address
-				ma.BootEnv = m.BootEnv
-
-				var err *models.Error
-				_, err = validateMachineAction(f, d, name, m, val)
-				if err != nil {
-					c.JSON(err.Code, err)
-					return true
+				res.Name = m.Name
+				res.Uuid = m.Uuid
+				res.Address = m.Address
+				res.BootEnv = m.BootEnv
+				if _, err := validateMachineAction(f, d, name, m, val); err != nil {
+					err.Type = "INVOKE"
+					return nil, err
 				}
-				return false
+				return res, nil
 			}()
-
-			if bad {
+			if err != nil {
+				c.JSON(err.Code, err)
 				return
 			}
 
 			f.pubs.Publish("machines", name, uuid, ma)
-			err := f.pc.MachineActions.Run(ma)
-			if err != nil {
-				be, ok := err.(*models.Error)
+			runErr := f.pc.MachineActions.Run(ma)
+			if runErr != nil {
+				be, ok := runErr.(*models.Error)
 				if !ok {
-					c.JSON(409, err)
+					c.JSON(409, runErr)
 				} else {
 					c.JSON(be.Code, be)
 				}
@@ -641,18 +626,20 @@ func (f *Frontend) InitMachineApi() {
 
 }
 
-func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backend.Machine, val map[string]interface{}) (*models.AvailableAction, *models.Error) {
+func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backend.Machine, val map[string]interface{}) (models.AvailableAction, *models.Error) {
+	aa := models.AvailableAction{}
 	err := &models.Error{
 		Code:  http.StatusBadRequest,
-		Type:  "API_ERROR",
+		Type:  "GET",
 		Model: "machines",
-		Key:   m.Uuid.String(),
+		Key:   m.Key(),
 	}
 
-	aa, ok := f.pc.MachineActions.Get(name)
-	if !ok {
-		err.Errorf("%s Call Action: action %s: Not Found", err.Model, name)
-		return nil, err
+	if raa, ok := f.pc.MachineActions.Get(name); !ok {
+		err.Errorf("Action %s: Not Found", name)
+		return aa, err
+	} else {
+		aa = *raa
 	}
 
 	for _, param := range aa.RequiredParams {
@@ -675,14 +662,14 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 			}
 		}
 		if obj == nil {
-			err.Errorf("%s Call Action: machine %s: Missing Parameter %s", err.Model, err.Key, param)
+			err.Errorf("Action %s Missing Parameter %s", name, param)
 		} else {
 			pobj := d("params").Find(param)
 			if pobj != nil {
 				rp := backend.AsParam(pobj)
 
 				if ev := rp.ValidateValue(obj); ev != nil {
-					err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
+					err.Errorf("Action %s: Invalid Parameter: %s: %s", name, param, ev.Error())
 				}
 			}
 		}
@@ -712,12 +699,11 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 				rp := backend.AsParam(pobj)
 
 				if ev := rp.ValidateValue(obj); ev != nil {
-					err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
+					err.Errorf("Action %s: Invalid Parameter: %s: %s", name, param, ev.Error())
 				}
 			}
 		}
 	}
-
 	if err.HasError() == nil {
 		return aa, nil
 	}

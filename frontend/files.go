@@ -208,7 +208,7 @@ func (f *Frontend) InitFileApi() {
 
 			if mkdirErr := os.MkdirAll(path.Dir(fileName), 0755); mkdirErr != nil {
 				err.Code = http.StatusConflict
-				err.Errorf("Cannot create directory %s", name)
+				err.Errorf("Cannot create directory %s", path.Dir(name))
 				c.JSON(err.Code, err)
 				return
 			}
