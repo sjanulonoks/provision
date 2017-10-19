@@ -89,6 +89,11 @@ exit
 		}
 		noneStage = &models.Stage{
 			Name: "none",
+			MetaData: models.MetaData{Meta: map[string]string{
+				"icon":  "circle thin",
+				"color": "green",
+				"title": "Digital Rebar Provision",
+			}},
 		}
 	)
 	res, _ := store.Open("memory:///")
@@ -674,6 +679,11 @@ func NewDataTracker(backend store.Store,
 		res.Create(d, &models.Profile{
 			Name:   res.GlobalProfileName,
 			Params: map[string]interface{}{},
+			MetaData: models.MetaData{Meta: map[string]string{
+				"icon":  "world",
+				"color": "blue",
+				"title": "Digital Rebar Provision",
+			}},
 		})
 	}
 	users := d("users")
