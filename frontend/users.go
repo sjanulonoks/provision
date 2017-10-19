@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
@@ -231,10 +232,10 @@ func (f *Frontend) InitUserApi(drpid string) {
 			grantor := backend.AsUser(gobj)
 
 			sttl, _ := c.GetQuery("ttl")
-			ttl := 3600
+			ttl := time.Hour
 			if sttl != "" {
 				ttl64, _ := strconv.ParseInt(sttl, 10, 64)
-				ttl = int(ttl64)
+				ttl = time.Second * time.Duration(ttl64)
 			}
 			scope, _ := c.GetQuery("scope")
 			if scope == "" {
