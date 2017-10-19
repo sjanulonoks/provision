@@ -318,6 +318,7 @@ func (j *Job) OnLoad() error {
 		return j.p.objs[ref]
 	}
 	defer func() { j.stores = nil }()
+	j.oldState = j.State
 	j.SetValid()
 	j.Validate()
 	return nil
