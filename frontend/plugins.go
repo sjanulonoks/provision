@@ -171,12 +171,18 @@ func (f *Frontend) InitPluginApi() {
 			if !assureDecode(c, b) {
 				return
 			}
-			var res models.Model
 			var err error
-			func() {
+			res, err := func() (models.Model, error) {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("create")...)
 				defer unlocker()
-				_, err = f.dt.Create(d, b)
+				if _, err := f.dt.Create(d, b); err != nil {
+					return nil, err
+				}
+				s, ok := models.Model(b).(Sanitizable)
+				if ok {
+					return s.Sanitize(), nil
+				}
+				return models.Clone(b), nil
 			}()
 			if err != nil {
 				be, ok := err.(*models.Error)
@@ -186,12 +192,6 @@ func (f *Frontend) InitPluginApi() {
 					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				s, ok := models.Model(b).(Sanitizable)
-				if ok {
-					res = s.Sanitize()
-				} else {
-					res = b
-				}
 				c.JSON(http.StatusCreated, res)
 			}
 		})

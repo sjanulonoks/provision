@@ -505,7 +505,6 @@ func (f *Frontend) InitMachineApi() {
 			if bad {
 				return
 			}
-
 			c.JSON(http.StatusOK, list)
 		})
 
