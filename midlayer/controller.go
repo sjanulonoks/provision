@@ -416,7 +416,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 
 			content := &models.Content{}
 
-			content.Meta.Name = pp.Name
+			content.Meta.Name = fmt.Sprintf("plugin-provider-%s", pp.Name)
 			content.Meta.Version = pp.Version
 			content.Meta.Description = fmt.Sprintf("Content layer for %s plugin provider", pp.Name)
 			content.Meta.Source = "FromPluginProvider"
@@ -512,7 +512,8 @@ func (pc *PluginController) removePluginProvider(provider string) {
 			_, unlocker := pc.dt.LockAll()
 			defer unlocker()
 			ds := pc.dt.Backend.(*DataStack)
-			if nbs, hard, _ := ds.RemovePlugin(name, pc.dt.Logger); hard != nil {
+			cName := fmt.Sprintf("plugin-provider-%s", name)
+			if nbs, hard, _ := ds.RemovePlugin(cName, pc.dt.Logger); hard != nil {
 				pc.dt.Infof("debugPlugins", "Skipping removal of plugin content layer %s because of bad store errors: %v\n", name, hard)
 			} else {
 				pc.dt.ReplaceBackend(nbs)
