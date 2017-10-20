@@ -154,6 +154,7 @@ func (f *Frontend) InitProfileApi() {
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/profiles",
 		func(c *gin.Context) {
@@ -205,6 +206,7 @@ func (f *Frontend) InitProfileApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       406: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/profiles/:name",
 		func(c *gin.Context) {
@@ -240,6 +242,7 @@ func (f *Frontend) InitProfileApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/profiles/:name",
 		func(c *gin.Context) {

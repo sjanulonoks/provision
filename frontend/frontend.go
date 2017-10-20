@@ -713,7 +713,13 @@ func jsonError(c *gin.Context, err error, code int, base string) {
 	if ne, ok := err.(*models.Error); ok {
 		c.JSON(ne.Code, ne)
 	} else {
-		c.JSON(code, models.NewError("API_ERROR", code, fmt.Sprintf(base+"%v", err.Error())))
+		res := &models.Error{
+			Type:  c.Request.Method,
+			Code:  code,
+			Model: base,
+		}
+		res.AddError(err)
+		c.JSON(res.Code, res)
 	}
 }
 

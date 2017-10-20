@@ -957,18 +957,20 @@ func (p *DataTracker) Patch(d Stores, obj models.Model, key string, patch jsonpa
 			Code:  http.StatusNotAcceptable,
 			Key:   key,
 			Model: ref.Prefix(),
-			Type:  "JsonPatchError",
+			Type:  "PATCH",
 		}
 		err.Errorf("Patch error at line %d: %v", loc, patchErr)
+		buf, _ := json.Marshal(patch[loc])
+		err.Errorf("Patch line: %v", string(buf))
 		return nil, err
 	}
 	toSave := ref.New()
 	if err := json.Unmarshal(resBuf, &toSave); err != nil {
 		retErr := &models.Error{
-			Code:  http.StatusInternalServerError,
+			Code:  http.StatusConflict,
 			Key:   key,
 			Model: ref.Prefix(),
-			Type:  "JsonPatchError",
+			Type:  "PATCH",
 		}
 		retErr.AddError(err)
 		return nil, retErr

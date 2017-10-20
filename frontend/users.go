@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -212,26 +211,32 @@ func (f *Frontend) InitUserApi(drpid string) {
 	f.ApiGroup.GET("/users/:name/token",
 		func(c *gin.Context) {
 			ref := &backend.User{}
-			var uobj models.Model
-			var gobj models.Model
-			func() {
+			userName, grantorName, userSecret, grantorSecret, err := func() (string, string, string, string, *models.Error) {
+				err := &models.Error{
+					Type:  c.Request.Method,
+					Code:  http.StatusNotFound,
+					Model: "users",
+					Key:   c.Param("name"),
+				}
 				d, unlocker := f.dt.LockEnts(ref.Locks("get")...)
 				defer unlocker()
-				uobj = d("users").Find(c.Param("name"))
-				gobj = d("users").Find(f.getAuthUser(c))
+				u := d("users").Find(c.Param("name"))
+				g := d("users").Find(f.getAuthUser(c))
+				if u == nil || g == nil {
+					err.Errorf("Not Found")
+					return "", "", "", "", err
+				}
+				uobj := backend.AsUser(u)
+				gobj := backend.AsUser(g)
+				return uobj.Name, gobj.Name, uobj.Secret, gobj.Secret, nil
 			}()
-			if uobj == nil {
-				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
-				c.JSON(http.StatusNotFound, models.NewError(c.Request.Method, http.StatusNotFound, s))
+			if err != nil {
+				c.JSON(err.Code, err)
 				return
 			}
-			if !f.assureAuth(c, uobj.Prefix(), "token", uobj.Key()) {
+			if !f.assureAuth(c, "users", "token", userName) {
 				return
 			}
-
-			user := backend.AsUser(uobj)
-			grantor := backend.AsUser(gobj)
-
 			sttl, _ := c.GetQuery("ttl")
 			ttl := time.Hour
 			if sttl != "" {
@@ -251,9 +256,9 @@ func (f *Frontend) InitUserApi(drpid string) {
 				specific = "*"
 			}
 
-			claims := backend.NewClaim(c.Param(`name`), grantor.Name, ttl).
+			claims := backend.NewClaim(c.Param(`name`), grantorName, ttl).
 				Add(scope, action, specific).
-				AddSecrets(grantor.Secret, user.Secret, "")
+				AddSecrets(grantorSecret, userSecret, "")
 
 			if t, err := f.dt.SealClaims(claims); err != nil {
 				ne, ok := err.(*models.Error)
@@ -332,23 +337,32 @@ func (f *Frontend) InitUserApi(drpid string) {
 			if !assureDecode(c, &userPassword) {
 				return
 			}
-			ref := &backend.User{}
-			d, unlocker := f.dt.LockEnts(ref.Locks("update")...)
-			defer unlocker()
-			obj := d("users").Find(c.Param("name"))
-			if obj == nil {
-				s := fmt.Sprintf("%s GET: %s: Not Found", "User", c.Param(`name`))
-				c.JSON(http.StatusNotFound, models.NewError(c.Request.Method, http.StatusNotFound, s))
-				return
-			}
-			user := backend.AsUser(obj)
-			if err := user.ChangePassword(d, userPassword.Password); err != nil {
-				be, ok := err.(*models.Error)
-				if ok {
-					c.JSON(be.Code, be)
-				} else {
-					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
+			user, err := func() (*models.User, *models.Error) {
+				res := &models.Error{
+					Type:  c.Request.Method,
+					Model: "users",
+					Key:   c.Param(`name`),
+					Code:  http.StatusNotFound,
 				}
+				ref := &backend.User{}
+				d, unlocker := f.dt.LockEnts(ref.Locks("update")...)
+				defer unlocker()
+				obj := d("users").Find(c.Param("name"))
+				if obj == nil {
+					res.Errorf("Not Found")
+					return nil, res
+				}
+				user := backend.AsUser(obj)
+				if err := user.ChangePassword(d, userPassword.Password); err != nil {
+					res.Code = http.StatusBadRequest
+					res.AddError(err)
+					return nil, res
+				}
+				ret := models.Clone(user.User)
+				return ret.(*models.User), nil
+			}()
+			if err != nil {
+				c.JSON(err.Code, err)
 			} else {
 				c.JSON(http.StatusOK, user.Sanitize())
 			}

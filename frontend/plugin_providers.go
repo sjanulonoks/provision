@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/digitalrebar/provision/models"
@@ -88,9 +87,14 @@ func (f *Frontend) InitPluginProviderApi() {
 			if pp != nil {
 				c.JSON(http.StatusOK, pp)
 			} else {
-				c.JSON(http.StatusNotFound,
-					models.NewError("API_ERROR", http.StatusNotFound,
-						fmt.Sprintf("plugin provider get: not found: %s", c.Param(`name`))))
+				res := &models.Error{
+					Code:  http.StatusNotFound,
+					Type:  c.Request.Method,
+					Model: "plugin_providers",
+					Key:   c.Param(`name`),
+				}
+				res.Errorf("Not Found")
+				c.JSON(res.Code, res)
 			}
 
 		})
@@ -146,8 +150,14 @@ func (f *Frontend) InitPluginProviderApi() {
 				return
 			}
 			if err := f.pc.RemovePlugin(name); err != nil {
-				c.JSON(http.StatusNotFound,
-					models.NewError("API ERROR", http.StatusNotFound, fmt.Sprintf("delete: unable to delete %s", name)))
+				res := &models.Error{
+					Code:  http.StatusNotFound,
+					Type:  c.Request.Method,
+					Model: "plugin_providers",
+					Key:   c.Param(`name`),
+				}
+				res.Errorf("Not Found")
+				c.JSON(res.Code, res)
 				return
 			}
 			c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
