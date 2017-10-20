@@ -394,7 +394,8 @@ func forceParamRemoval(d *DataStack, l store.Store) error {
 		}
 	}
 	for _, item := range toRemove {
-		dSubs[item[0]].Remove(item[1])
+		dSub := d.Subs()[item[0]]
+		dSub.Remove(item[1])
 	}
 	return nil
 }
