@@ -3,6 +3,7 @@ package frontend
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/digitalrebar/provision/midlayer"
 	"github.com/digitalrebar/provision/models"
@@ -101,6 +102,10 @@ func buildSummary(st store.Store) *models.ContentSummary {
 		cs.Meta.Writable = true
 	} else if cs.Meta.Name == "LocalStore" {
 		cs.Meta.Type = "local"
+	} else if cs.Meta.Name == "BasicStore" {
+		cs.Meta.Type = "basic"
+	} else if strings.HasPrefix(cs.Meta.Name, "plugin-provider-") {
+		cs.Meta.Type = "plugin"
 	} else if cs.Meta.Name == "DefaultStore" {
 		cs.Meta.Type = "default"
 		cs.Meta.Overwritable = true
@@ -160,6 +165,10 @@ func (f *Frontend) buildContent(st store.Store) (*models.Content, *models.Error)
 		content.Meta.Writable = true
 	} else if content.Meta.Name == "LocalStore" {
 		content.Meta.Type = "local"
+	} else if content.Meta.Name == "BasicStore" {
+		content.Meta.Type = "basic"
+	} else if strings.HasPrefix(content.Meta.Name, "plugin-provider-") {
+		content.Meta.Type = "plugin"
 	} else if content.Meta.Name == "DefaultStore" {
 		content.Meta.Type = "default"
 		content.Meta.Overwritable = true
