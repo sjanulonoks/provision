@@ -1,7 +1,6 @@
 package midlayer
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,6 +17,7 @@ import (
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
+	"github.com/digitalrebar/store"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
 )
@@ -334,6 +334,72 @@ func (pc *PluginController) restartPlugin(d backend.Stores, plugin *backend.Plug
 	pc.dt.Infof("debugPlugins", "Restarting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
 }
 
+func (pc *PluginController) buildNewStore(content *models.Content) (newStore store.Store, err error) {
+	filename := fmt.Sprintf("memory:///")
+
+	newStore, err = store.Open(filename)
+	if err != nil {
+		return
+	}
+
+	if md, ok := newStore.(store.MetaSaver); ok {
+		data := map[string]string{
+			"Name":        content.Meta.Name,
+			"Source":      content.Meta.Source,
+			"Description": content.Meta.Description,
+			"Version":     content.Meta.Version,
+		}
+		md.SetMetaData(data)
+	}
+
+	for prefix, objs := range content.Sections {
+		var sub store.Store
+		sub, err = newStore.MakeSub(prefix)
+		if err != nil {
+			return
+		}
+
+		for k, obj := range objs {
+			err = sub.Save(k, obj)
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	return
+}
+
+func forceParamRemoval(d *DataStack, l store.Store) error {
+	toRemove := [][]string{}
+	layer0 := d.Layers()[0]
+	lSubs := l.Subs()
+	dSubs := layer0.Subs()
+	for k, v := range lSubs {
+		dSub := dSubs[k]
+		if dSub == nil {
+			continue
+		}
+		lKeys, _ := v.Keys()
+		for _, key := range lKeys {
+			var dItem interface{}
+			var lItem interface{}
+			if err := dSub.Load(key, &dItem); err != nil {
+				continue
+			}
+			if err := v.Load(key, &lItem); err != nil {
+				return err
+			}
+			toRemove = append(toRemove, []string{k, key})
+		}
+	}
+	for _, item := range toRemove {
+		dSub := d.Subs()[item[0]]
+		dSub.Remove(item[1])
+	}
+	return nil
+}
+
 // Try to add to available - Must lock before calling
 func (pc *PluginController) importPluginProvider(provider string) error {
 	pc.dt.Infof("debugPlugins", "Importing plugin provider: %s\n", provider)
@@ -347,6 +413,18 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 			pc.dt.Infof("debugPlugins", "Skipping %s because of bad json: %s\n%s\n", provider, err, out)
 		} else {
 			skip := false
+
+			content := &models.Content{}
+
+			cName := fmt.Sprintf("plugin-provider-%s", pp.Name)
+			content.Meta.Name = cName
+			content.Meta.Version = pp.Version
+			content.Meta.Description = fmt.Sprintf("Content layer for %s plugin provider", pp.Name)
+			content.Meta.Source = "FromPluginProvider"
+			content.Meta.MetaData.Meta = pp.MetaData.Meta
+			content.Sections = models.Sections{}
+			content.Sections["params"] = models.Section{}
+
 			for _, p := range pp.Parameters {
 				p.ClearValidation()
 				p.AddError(p.ValidateSchema())
@@ -354,29 +432,35 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 					pc.dt.Infof("debugPlugins", "Skipping %s because of bad required scheme: %s %s\n", pp.Name, p.Name, err)
 					skip = true
 				} else {
-					// Attempt create if it doesn't exist already.
-					ref := &backend.Param{}
-					d, unlocker := pc.dt.LockEnts(ref.Locks("create")...)
-					ref2 := d(ref.Prefix()).Find(p.Name)
-					if ref2 == nil {
-						if _, err := pc.dt.Create(d, p); err != nil {
-							pc.dt.Infof("debugPlugins", "Skipping %s because parameter could not be created: %s %s\n", pp.Name, p.Name, err)
-							skip = true
-						}
-					} else {
-						j1str, _ := json.Marshal(p.Schema)
-						j2str, _ := json.Marshal(ref2.(*backend.Param).Schema)
-						if bytes.Compare(j1str, j2str) != 0 {
-							p.Errorf("%s schema in plugin doesn't match existing parameter", p.Name)
-						}
-					}
-					unlocker()
+					content.Sections["params"][p.Name] = p
 				}
 				p.SetValid()
 				p.SetAvailable()
 			}
 
 			if !skip {
+				if ns, err := pc.buildNewStore(content); err != nil {
+					pc.dt.Infof("debugPlugins", "Skipping %s because of bad store: %v\n", pp.Name, err)
+					return err
+				} else {
+					err := func() error {
+						_, unlocker := pc.dt.LockAll()
+						defer unlocker()
+						// Add replace the plugin content
+						ds := pc.dt.Backend.(*DataStack)
+						if nbs, hard, _ := ds.AddReplacePlugin(cName, ns, pc.dt.Logger, forceParamRemoval); hard != nil {
+							pc.dt.Infof("debugPlugins", "Skipping %s because of bad store errors: %v\n", pp.Name, hard)
+							return hard
+						} else {
+							pc.dt.ReplaceBackend(nbs)
+						}
+						return nil
+					}()
+					if err != nil {
+						return err
+					}
+				}
+
 				if _, ok := pc.AvailableProviders[pp.Name]; !ok {
 					pc.dt.Infof("debugPlugins", "Adding plugin provider: %s\n", pp.Name)
 					pc.AvailableProviders[pp.Name] = &pp
@@ -423,6 +507,19 @@ func (pc *PluginController) removePluginProvider(provider string) {
 
 		pc.dt.Infof("debugPlugins", "Removing plugin provider: %s\n", name)
 		pc.publishers.Publish("plugin_provider", "delete", name, pc.AvailableProviders[name])
+
+		// Remove the plugin content
+		func() {
+			_, unlocker := pc.dt.LockAll()
+			defer unlocker()
+			ds := pc.dt.Backend.(*DataStack)
+			cName := fmt.Sprintf("plugin-provider-%s", name)
+			if nbs, hard, _ := ds.RemovePlugin(cName, pc.dt.Logger); hard != nil {
+				pc.dt.Infof("debugPlugins", "Skipping removal of plugin content layer %s because of bad store errors: %v\n", name, hard)
+			} else {
+				pc.dt.ReplaceBackend(nbs)
+			}
+		}()
 		delete(pc.AvailableProviders, name)
 	}
 }
