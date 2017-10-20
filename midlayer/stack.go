@@ -74,8 +74,8 @@ func (d *DataStack) Clone() *DataStack {
 // undo after FixerUpper returns.
 type FixerUpper func(*DataStack, store.Store) error
 
-func (d *DataStack) rebuild(oldStore store.Store, logger *log.Logger) (*DataStack, error, error) {
-	if err := d.buildStack(); err != nil {
+func (d *DataStack) rebuild(oldStore store.Store, logger *log.Logger, fixup FixerUpper, newStore store.Store) (*DataStack, error, error) {
+	if err := d.buildStack(fixup, newStore); err != nil {
 		return nil, models.NewError("ValidationError", 422, err.Error()), nil
 	}
 	hard, soft := backend.ValidateDataTrackerStore(d, logger)
@@ -89,7 +89,7 @@ func (d *DataStack) RemoveSAAS(name string, logger *log.Logger) (*DataStack, err
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	delete(dtStore.saasContents, name)
-	return dtStore.rebuild(oldStore, logger)
+	return dtStore.rebuild(oldStore, logger, nil, nil)
 }
 
 func (d *DataStack) AddReplaceSAAS(
@@ -98,21 +98,16 @@ func (d *DataStack) AddReplaceSAAS(
 	logger *log.Logger,
 	fixup FixerUpper) (*DataStack, error, error) {
 	dtStore := d.Clone()
-	if fixup != nil {
-		if err := fixup(dtStore, newStore); err != nil {
-			return nil, err, nil
-		}
-	}
 	oldStore, _ := dtStore.saasContents[name]
 	dtStore.saasContents[name] = newStore
-	return dtStore.rebuild(oldStore, logger)
+	return dtStore.rebuild(oldStore, logger, fixup, newStore)
 }
 
 func (d *DataStack) RemovePlugin(name string, logger *log.Logger) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.pluginContents[name]
 	delete(dtStore.pluginContents, name)
-	return dtStore.rebuild(oldStore, logger)
+	return dtStore.rebuild(oldStore, logger, nil, nil)
 }
 
 func (d *DataStack) AddReplacePlugin(
@@ -121,14 +116,9 @@ func (d *DataStack) AddReplacePlugin(
 	logger *log.Logger,
 	fixup FixerUpper) (*DataStack, error, error) {
 	dtStore := d.Clone()
-	if fixup != nil {
-		if err := fixup(dtStore, newStore); err != nil {
-			return nil, err, nil
-		}
-	}
 	oldStore, _ := dtStore.pluginContents[name]
 	dtStore.pluginContents[name] = newStore
-	return dtStore.rebuild(oldStore, logger)
+	return dtStore.rebuild(oldStore, logger, fixup, newStore)
 }
 
 func fixBasic(d *DataStack, l store.Store) error {
@@ -165,12 +155,24 @@ func fixBasic(d *DataStack, l store.Store) error {
 	return nil
 }
 
-func (d *DataStack) buildStack() error {
+func (d *DataStack) buildStack(fixup FixerUpper, newStore store.Store) error {
+	wrapperFixup := func(ns store.Store, f1, f2 bool) error {
+		if fixup != nil && newStore == ns {
+			if err := fixup(d, ns); err != nil {
+				return err
+			}
+		}
+		if err := d.Push(ns, f1, f2); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	if err := d.Push(d.writeContent, false, true); err != nil {
 		return err
 	}
 	if d.localContent != nil {
-		if err := d.Push(d.localContent, false, false); err != nil {
+		if err := wrapperFixup(d.localContent, false, false); err != nil {
 			return err
 		}
 	}
@@ -183,13 +185,13 @@ func (d *DataStack) buildStack() error {
 	sort.Strings(saas)
 
 	for _, k := range saas {
-		if err := d.Push(d.saasContents[k], true, false); err != nil {
+		if err := wrapperFixup(d.saasContents[k], true, false); err != nil {
 			return err
 		}
 	}
 
 	if d.defaultContent != nil {
-		if err := d.Push(d.defaultContent, false, false); err != nil {
+		if err := wrapperFixup(d.defaultContent, false, false); err != nil {
 			return err
 		}
 	}
@@ -201,7 +203,7 @@ func (d *DataStack) buildStack() error {
 	sort.Strings(plugins)
 
 	for _, k := range plugins {
-		if err := d.Push(d.pluginContents[k], true, false); err != nil {
+		if err := wrapperFixup(d.pluginContents[k], true, false); err != nil {
 			return err
 		}
 	}
@@ -298,5 +300,5 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 			}
 		}
 	}
-	return dtStore, dtStore.buildStack()
+	return dtStore, dtStore.buildStack(nil, nil)
 }
