@@ -441,12 +441,21 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 					pc.dt.Infof("debugPlugins", "Skipping %s because of bad store: %v\n", pp.Name, err)
 					return err
 				} else {
-					// Add replace the plugin content
-					ds := pc.dt.Backend.(*DataStack)
-					if nbs, hard, _ := ds.AddReplacePlugin(pp.Name, ns, pc.dt.Logger, forceParamRemoval); hard != nil {
-						pc.dt.Infof("debugPlugins", "Skipping %s because of bad store errors: %v\n", pp.Name, hard)
-					} else {
-						pc.dt.ReplaceBackend(nbs)
+					err := func() error {
+						_, unlocker := pc.dt.LockAll()
+						defer unlocker()
+						// Add replace the plugin content
+						ds := pc.dt.Backend.(*DataStack)
+						if nbs, hard, _ := ds.AddReplacePlugin(pp.Name, ns, pc.dt.Logger, forceParamRemoval); hard != nil {
+							pc.dt.Infof("debugPlugins", "Skipping %s because of bad store errors: %v\n", pp.Name, hard)
+							return hard
+						} else {
+							pc.dt.ReplaceBackend(nbs)
+						}
+						return nil
+					}()
+					if err != nil {
+						return err
 					}
 				}
 
@@ -498,12 +507,16 @@ func (pc *PluginController) removePluginProvider(provider string) {
 		pc.publishers.Publish("plugin_provider", "delete", name, pc.AvailableProviders[name])
 
 		// Remove the plugin content
-		ds := pc.dt.Backend.(*DataStack)
-		if nbs, hard, _ := ds.RemovePlugin(name, pc.dt.Logger); hard != nil {
-			pc.dt.Infof("debugPlugins", "Skipping removal of plugin content layer %s because of bad store errors: %v\n", name, hard)
-		} else {
-			pc.dt.ReplaceBackend(nbs)
-		}
+		func() {
+			_, unlocker := pc.dt.LockAll()
+			defer unlocker()
+			ds := pc.dt.Backend.(*DataStack)
+			if nbs, hard, _ := ds.RemovePlugin(name, pc.dt.Logger); hard != nil {
+				pc.dt.Infof("debugPlugins", "Skipping removal of plugin content layer %s because of bad store errors: %v\n", name, hard)
+			} else {
+				pc.dt.ReplaceBackend(nbs)
+			}
+		}()
 		delete(pc.AvailableProviders, name)
 	}
 }
