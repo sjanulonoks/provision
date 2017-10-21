@@ -86,14 +86,13 @@ func buildSummary(st store.Store) *models.ContentSummary {
 		return nil
 	}
 	cs := &models.ContentSummary{}
+	cs.Fill()
 	metaData := mst.MetaData()
 
 	cs.Meta.Name = metaData["Name"]
 	cs.Meta.Source = metaData["Source"]
 	cs.Meta.Description = metaData["Description"]
 	cs.Meta.Version = metaData["Version"]
-	cs.Meta.Meta = map[string]string{}
-	cs.Counts = map[string]int{}
 
 	cs.Meta.Writable = false
 	cs.Meta.Type = "dynamic"
@@ -111,8 +110,6 @@ func buildSummary(st store.Store) *models.ContentSummary {
 		cs.Meta.Type = "default"
 		cs.Meta.Overwritable = true
 	}
-	cs.Warnings = []string{}
-
 	subs := mst.Subs()
 	for k, sub := range subs {
 		keys, err := sub.Keys()

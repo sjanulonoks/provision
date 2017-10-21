@@ -437,6 +437,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 			}
 
 			if !skip {
+				content.Fill()
 				if ns, err := pc.buildNewStore(content); err != nil {
 					pc.dt.Infof("debugPlugins", "Skipping %s because of bad store: %v\n", pp.Name, err)
 					return err
