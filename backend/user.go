@@ -127,7 +127,7 @@ func (u *User) OnLoad() error {
 	if err == nil && mustSave {
 		v := u.SaveValidation()
 		u.ClearValidation()
-		err = u.stores("machines").backingStore.Save(u.Key(), u)
+		err = u.stores("users").backingStore.Save(u.Key(), u)
 		u.RestoreValidation(v)
 	}
 	return err
