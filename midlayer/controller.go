@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
@@ -596,5 +597,20 @@ func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) 
 
 func (pc *PluginController) RemovePlugin(name string) error {
 	pluginProviderName := path.Join(pc.pluginDir, path.Base(name))
-	return os.Remove(pluginProviderName)
+	if err := os.Remove(pluginProviderName); err != nil {
+		return err
+	}
+
+	for true {
+		pc.lock.Lock()
+		_, ok := pc.AvailableProviders[name]
+		pc.lock.Unlock()
+		if !ok {
+			return nil
+		} else {
+			time.Sleep(time.Second)
+		}
+	}
+
+	return nil
 }
