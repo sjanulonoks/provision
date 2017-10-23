@@ -511,7 +511,7 @@ func (f *Frontend) InitContentApi() {
 						Key:      name,
 						Type:     c.Request.Method,
 						Messages: []string{"No such content store"},
-						Code:     404,
+						Code:     http.StatusNotFound,
 					}
 					c.JSON(http.StatusNotFound, res)
 					return
