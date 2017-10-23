@@ -1,13 +1,17 @@
 package frontend
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
+	"sync"
 
 	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/olahol/melody.v1"
 )
+
+var wsLock = &sync.Mutex{}
 
 func (fe *Frontend) InitWebSocket() {
 	fe.melody = melody.New()
@@ -50,6 +54,8 @@ func (f *Frontend) Publish(e *models.Event) error {
 		return err
 	} else {
 		return f.melody.BroadcastFilter(msg, func(s *melody.Session) bool {
+			wsLock.Lock()
+			defer wsLock.Unlock()
 			return filterFunction(s, e)
 		})
 	}
@@ -62,38 +68,40 @@ func (f *Frontend) Reserve() error {
 func (f *Frontend) Release() {}
 func (f *Frontend) Unload()  {}
 
-func (f *Frontend) websocketHandler(s *melody.Session, msg []byte) {
-	str := strings.TrimSpace(string(msg))
-	if strings.HasPrefix(str, "register ") {
-		val, ok := s.Get("EventMap")
-		if !ok {
-			val = []string{}
-		}
-		emap := val.([]string)
-		str = strings.TrimPrefix(str, "register ")
+func (f *Frontend) websocketHandler(s *melody.Session, buf []byte) {
+	splitMsg := bytes.SplitN(bytes.TrimSpace(buf), []byte(" "), 2)
+	if len(splitMsg) != 2 {
+		f.Logger.Printf("WS: Unknown: Received message: %s\n", string(buf))
+		return
+	}
+	prefix, msg := string(splitMsg[0]), string(splitMsg[1])
+	if !(prefix == "register" || prefix == "deregister") {
+		f.Logger.Printf("WS: Invalid msg prefix %s", prefix)
+		return
+	}
+	wsLock.Lock()
+	defer wsLock.Unlock()
+	val, ok := s.Get("EventMap")
+	if !ok {
+		val = []string{}
+	}
+	emap := val.([]string)
+	switch prefix {
+	case "register":
 		for _, test := range emap {
-			if test == str {
+			if test == msg {
 				return
 			}
 		}
-		emap = append(emap, str)
-		s.Set("EventMap", emap)
-	} else if strings.HasPrefix(str, "deregister ") {
-		val, ok := s.Get("EventMap")
-		if !ok {
-			return
-		}
-		str = strings.TrimPrefix(str, "deregister ")
-		emap := val.([]string)
-		newmap := []string{}
+		emap = append(emap, msg)
+	case "deregister":
+		res := make([]string, 0, len(emap))
 		for _, test := range emap {
-			if test == str {
+			if test == msg {
 				continue
 			}
-			newmap = append(newmap, test)
 		}
-		s.Set("EventMap", emap)
-	} else {
-		f.Logger.Printf("Unknown: Received message: %s\n", str)
+		emap = res
 	}
+	s.Set("EventMap", emap)
 }
