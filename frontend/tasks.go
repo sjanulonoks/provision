@@ -132,6 +132,7 @@ func (f *Frontend) InitTaskApi() {
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/tasks",
 		func(c *gin.Context) {
@@ -154,7 +155,7 @@ func (f *Frontend) InitTaskApi() {
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
 				}
 			} else {
 				s, ok := models.Model(b).(Sanitizable)
@@ -212,6 +213,7 @@ func (f *Frontend) InitTaskApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       406: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/tasks/:name",
 		func(c *gin.Context) {
@@ -230,6 +232,7 @@ func (f *Frontend) InitTaskApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/tasks/:name",
 		func(c *gin.Context) {

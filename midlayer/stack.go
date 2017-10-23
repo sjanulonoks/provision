@@ -3,6 +3,7 @@ package midlayer
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -76,6 +77,9 @@ type FixerUpper func(*DataStack, store.Store) error
 
 func (d *DataStack) rebuild(oldStore store.Store, logger *log.Logger, fixup FixerUpper, newStore store.Store) (*DataStack, error, error) {
 	if err := d.buildStack(fixup, newStore); err != nil {
+		if m, ok := err.(*models.Error); ok {
+			return nil, m, nil
+		}
 		return nil, models.NewError("ValidationError", 422, err.Error()), nil
 	}
 	hard, soft := backend.ValidateDataTrackerStore(d, logger)
@@ -159,6 +163,15 @@ func fixBasic(d *DataStack, l store.Store) error {
 }
 
 func (d *DataStack) buildStack(fixup FixerUpper, newStore store.Store) error {
+	if ns, ok := newStore.(store.MetaSaver); ok && ns.MetaData()["Name"] == "" {
+		ret := &models.Error{
+			Model: "contents",
+			Type:  "STORE_ERROR",
+			Code:  http.StatusUnprocessableEntity,
+		}
+		ret.Errorf("Content Store must have a name")
+		return ret
+	}
 	wrapperFixup := func(ns store.Store, f1, f2 bool) error {
 		if fixup != nil && newStore == ns {
 			if err := fixup(d, ns); err != nil {

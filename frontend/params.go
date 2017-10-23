@@ -130,6 +130,7 @@ func (f *Frontend) InitParamApi() {
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/params",
 		func(c *gin.Context) {
@@ -183,6 +184,7 @@ func (f *Frontend) InitParamApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       406: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/params/*name",
 		func(c *gin.Context) {
@@ -202,6 +204,7 @@ func (f *Frontend) InitParamApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/params/*name",
 		func(c *gin.Context) {

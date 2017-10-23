@@ -49,7 +49,7 @@ func (f *Frontend) InitInterfaceApi() {
 			intfs, err := f.dt.GetInterfaces()
 			if err != nil {
 				c.JSON(http.StatusInternalServerError,
-					models.NewError("API_ERROR", http.StatusInternalServerError,
+					models.NewError(c.Request.Method, http.StatusInternalServerError,
 						fmt.Sprintf("interfaces list: %v", err)))
 				return
 			}
@@ -73,14 +73,20 @@ func (f *Frontend) InitInterfaceApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/interfaces/:name",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "interfaces", "get", c.Param(`name`)) {
+			name := c.Param(`name`)
+			if !f.assureAuth(c, "interfaces", "get", name) {
 				return
 			}
-			intfs, err := f.dt.GetInterfaces()
-			if err != nil {
-				c.JSON(http.StatusInternalServerError,
-					models.NewError("API_ERROR", http.StatusInternalServerError,
-						fmt.Sprintf("interface get: %v", err)))
+			err := &models.Error{
+				Model: "interfaces",
+				Key:   name,
+				Type:  c.Request.Method,
+			}
+			intfs, getErr := f.dt.GetInterfaces()
+			if getErr != nil {
+				err.Code = http.StatusInternalServerError
+				err.Errorf("Cannot get interfaces")
+				c.JSON(err.Code, err)
 				return
 			}
 
@@ -90,9 +96,8 @@ func (f *Frontend) InitInterfaceApi() {
 					return
 				}
 			}
-			c.JSON(http.StatusNotFound,
-				models.NewError("API_ERROR", http.StatusNotFound,
-					fmt.Sprintf("interface get: not found: %s", c.Param(`name`))))
-
+			err.Code = http.StatusNotFound
+			err.Errorf("No interface")
+			c.JSON(err.Code, err)
 		})
 }

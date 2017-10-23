@@ -128,6 +128,7 @@ func (f *Frontend) InitReservationApi() {
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/reservations",
 		func(c *gin.Context) {
@@ -152,7 +153,7 @@ func (f *Frontend) InitReservationApi() {
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
-					models.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError(c.Request.Method, http.StatusBadRequest,
 						fmt.Sprintf("reservation get: address not valid: %v", c.Param(`address`))))
 				return
 			}
@@ -188,13 +189,14 @@ func (f *Frontend) InitReservationApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       406: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/reservations/:address",
 		func(c *gin.Context) {
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
-					models.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError(c.Request.Method, http.StatusBadRequest,
 						fmt.Sprintf("reservation get: address not valid: %v", c.Param(`address`))))
 				return
 			}
@@ -213,13 +215,14 @@ func (f *Frontend) InitReservationApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/reservations/:address",
 		func(c *gin.Context) {
 			ip := net.ParseIP(c.Param(`address`))
 			if ip == nil {
 				c.JSON(http.StatusBadRequest,
-					models.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError(c.Request.Method, http.StatusBadRequest,
 						fmt.Sprintf("reservation put: address not valid: %v", c.Param(`address`))))
 				return
 			}
@@ -244,7 +247,7 @@ func (f *Frontend) InitReservationApi() {
 			addr := net.ParseIP(c.Param(`address`))
 			if addr == nil {
 				c.JSON(http.StatusBadRequest,
-					models.NewError("API_ERROR", http.StatusBadRequest,
+					models.NewError(c.Request.Method, http.StatusBadRequest,
 						fmt.Sprintf("reservation delete: address not valid: %v", c.Param(`address`))))
 				return
 			}

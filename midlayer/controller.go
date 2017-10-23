@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
@@ -407,15 +408,14 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 	if err != nil {
 		pc.dt.Infof("debugPlugins", "Skipping %s because %s\n", provider, err)
 	} else {
-		var pp models.PluginProvider
-		err = json.Unmarshal(out, &pp)
+		pp := &models.PluginProvider{}
+		err = json.Unmarshal(out, pp)
 		if err != nil {
 			pc.dt.Infof("debugPlugins", "Skipping %s because of bad json: %s\n%s\n", provider, err, out)
 		} else {
 			skip := false
-
+			pp.Fill()
 			content := &models.Content{}
-
 			cName := fmt.Sprintf("plugin-provider-%s", pp.Name)
 			content.Meta.Name = cName
 			content.Meta.Version = pp.Version
@@ -424,7 +424,6 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 			content.Meta.MetaData.Meta = pp.MetaData.Meta
 			content.Sections = models.Sections{}
 			content.Sections["params"] = models.Section{}
-
 			for _, p := range pp.Parameters {
 				p.ClearValidation()
 				p.AddError(p.ValidateSchema())
@@ -439,6 +438,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 			}
 
 			if !skip {
+				content.Fill()
 				if ns, err := pc.buildNewStore(content); err != nil {
 					pc.dt.Infof("debugPlugins", "Skipping %s because of bad store: %v\n", pp.Name, err)
 					return err
@@ -463,7 +463,8 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 
 				if _, ok := pc.AvailableProviders[pp.Name]; !ok {
 					pc.dt.Infof("debugPlugins", "Adding plugin provider: %s\n", pp.Name)
-					pc.AvailableProviders[pp.Name] = &pp
+					pp.Fill()
+					pc.AvailableProviders[pp.Name] = pp
 					for _, aa := range pp.AvailableActions {
 						aa.Provider = pp.Name
 					}
@@ -596,5 +597,20 @@ func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) 
 
 func (pc *PluginController) RemovePlugin(name string) error {
 	pluginProviderName := path.Join(pc.pluginDir, path.Base(name))
-	return os.Remove(pluginProviderName)
+	if err := os.Remove(pluginProviderName); err != nil {
+		return err
+	}
+
+	for true {
+		pc.lock.Lock()
+		_, ok := pc.AvailableProviders[name]
+		pc.lock.Unlock()
+		if !ok {
+			return nil
+		} else {
+			time.Sleep(time.Second)
+		}
+	}
+
+	return nil
 }

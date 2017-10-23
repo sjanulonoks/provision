@@ -78,6 +78,7 @@ type Fake string
 
 func (f Fake) Prefix() string { return "fake" }
 func (f Fake) Key() string    { return string(f) }
+func (f Fake) Fill()          {}
 
 func MakeKey() Maker {
 	return Maker{
@@ -102,6 +103,7 @@ type FakeValid bool
 
 func (f FakeValid) Prefix() string    { return "fakevalid" }
 func (f FakeValid) Key() string       { return "noID" }
+func (f FakeValid) Fill()             {}
 func (f FakeValid) Validate()         {}
 func (f FakeValid) ClearValidation()  {}
 func (f FakeValid) Useable() bool     { return bool(f) }

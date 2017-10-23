@@ -30,6 +30,13 @@ type PluginParamsResponse struct {
 	Body map[string]interface{}
 }
 
+// PluginParamResponse return on a successful GET of one Plugin's Param
+// swagger:response
+type PluginParamResponse struct {
+	// in: body
+	Body interface{}
+}
+
 // PluginBodyParameter used to inject a Plugin
 // swagger:parameters createPlugin putPlugin
 type PluginBodyParameter struct {
@@ -47,11 +54,22 @@ type PluginPatchBodyParameter struct {
 }
 
 // PluginPathParameter used to find a Plugin in the path
-// swagger:parameters putPlugins getPlugin putPlugin patchPlugin deletePlugin getPluginParams postPluginParams headPlugin
+// swagger:parameters putPlugins getPlugin putPlugin patchPlugin deletePlugin getPluginParams postPluginParams headPlugin patchPluginParams
 type PluginPathParameter struct {
 	// in: path
 	// required: true
 	Name string `json:"name"`
+}
+
+// PluginParamsPathParameter used to find a Plugin in the path
+// swagger:parameters getPluginParam postPluginParam
+type PluginParamsPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Key string `json:"key"`
 }
 
 // PluginParamsBodyParameter used to set Plugin Params
@@ -60,6 +78,14 @@ type PluginParamsBodyParameter struct {
 	// in: body
 	// required: true
 	Body map[string]interface{}
+}
+
+// PluginParamBodyParameter used to set Plugin Param
+// swagger:parameters postPluginParam
+type PluginParamBodyParameter struct {
+	// in: body
+	// required: true
+	Body interface{}
 }
 
 // PluginListPathParameter used to limit lists of Plugin by path options
@@ -134,6 +160,7 @@ func (f *Frontend) InitPluginApi() {
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/plugins",
 		func(c *gin.Context) {
@@ -144,12 +171,18 @@ func (f *Frontend) InitPluginApi() {
 			if !assureDecode(c, b) {
 				return
 			}
-			var res models.Model
 			var err error
-			func() {
+			res, err := func() (models.Model, error) {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("create")...)
 				defer unlocker()
-				_, err = f.dt.Create(d, b)
+				if _, err := f.dt.Create(d, b); err != nil {
+					return nil, err
+				}
+				s, ok := models.Model(b).(Sanitizable)
+				if ok {
+					return s.Sanitize(), nil
+				}
+				return models.Clone(b), nil
 			}()
 			if err != nil {
 				be, ok := err.(*models.Error)
@@ -159,12 +192,6 @@ func (f *Frontend) InitPluginApi() {
 					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				s, ok := models.Model(b).(Sanitizable)
-				if ok {
-					res = s.Sanitize()
-				} else {
-					res = b
-				}
 				c.JSON(http.StatusCreated, res)
 			}
 		})
@@ -214,6 +241,7 @@ func (f *Frontend) InitPluginApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       406: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/plugins/:name",
 		func(c *gin.Context) {
@@ -232,6 +260,7 @@ func (f *Frontend) InitPluginApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/plugins/:name",
 		func(c *gin.Context) {
@@ -255,6 +284,8 @@ func (f *Frontend) InitPluginApi() {
 			f.Remove(c, &backend.Plugin{}, c.Param(`name`))
 		})
 
+	pGetAll, pGetOne, pPatch, pSetThem, pSetOne := f.makeParamEndpoints(&backend.Plugin{}, "name")
+
 	// swagger:route GET /plugins/{name}/params Plugins getPluginParams
 	//
 	// List plugin params Plugin
@@ -266,37 +297,24 @@ func (f *Frontend) InitPluginApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
-	f.ApiGroup.GET("/plugins/:name/params",
-		func(c *gin.Context) {
-			name := c.Param(`name`)
-			b := &backend.Plugin{}
-			var ref models.Model
-			func() {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("get")...)
-				defer unlocker()
-				ref = d("plugins").Find(name)
-			}()
-			if ref == nil {
-				err := &models.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: "plugins",
-					Key:   name,
-				}
-				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
-				return
-			}
-			if !f.assureAuth(c, ref.Prefix(), "get", ref.Key()) {
-				return
-			}
-			p := backend.AsPlugin(ref).GetParams()
-			c.JSON(http.StatusOK, p)
-		})
+	f.ApiGroup.GET("/plugins/:name/params", pGetAll)
 
-	// swagger:route POST /plugins/{name}/params Plugins postPluginParams
+	// swagger:route GET /plugins/{name}/params/{key} Plugins getPluginParam
 	//
-	// Set/Replace all the Parameters for a plugin specified by {name}
+	// Get a single plugin parameter
+	//
+	// Get a single parameter {key} for a Plugin specified by {name}
+	//
+	//     Responses:
+	//       200: PluginParamResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/plugins/:name/params/*key", pGetOne)
+
+	// swagger:route PATCH /plugins/{name}/params Plugins patchPluginParams
+	//
+	// Update params for Plugin {name} with the passed-in patch
 	//
 	//     Responses:
 	//       200: PluginParamsResponse
@@ -304,48 +322,29 @@ func (f *Frontend) InitPluginApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       409: ErrorResponse
-	f.ApiGroup.POST("/plugins/:name/params",
-		func(c *gin.Context) {
-			var val map[string]interface{}
-			if !assureDecode(c, &val) {
-				return
-			}
-			name := c.Param(`name`)
-			b := &backend.Plugin{}
-			var ref models.Model
-			func() {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("get")...)
-				defer unlocker()
-				ref = d("plugins").Find(name)
-			}()
-			if ref == nil {
-				err := &models.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: "plugins",
-					Key:   name,
-				}
-				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
-				return
-			}
-			if !f.assureAuth(c, ref.Prefix(), "get", ref.Key()) {
-				return
-			}
+	f.ApiGroup.PATCH("/plugins/:name/params", pPatch)
 
-			m := backend.AsPlugin(ref)
-			var err error
-			func() {
-				d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
-				defer unlocker()
-				err = m.SetParams(d, val)
-			}()
-			if err != nil {
-				be, _ := err.(*models.Error)
-				c.JSON(be.Code, be)
-			} else {
-				c.JSON(http.StatusOK, val)
-			}
-		})
+	// swagger:route POST /plugins/{name}/params Plugins postPluginParams
+	//
+	// Sets parameters for a machine specified by {name}
+	//
+	//     Responses:
+	//       200: PluginParamsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/plugins/:name/params", pSetThem)
 
+	// swagger:route POST /plugins/{name}/params/{key} Plugins postPluginParam
+	//
+	// Set as single Parameter {key} for a machine specified by {name}
+	//
+	//     Responses:
+	//       200: PluginParamResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/plugins/:name/params/*key", pSetOne)
 }

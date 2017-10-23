@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	melody "gopkg.in/olahol/melody.v1"
+
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
@@ -22,7 +24,6 @@ import (
 	"github.com/gin-contrib/location"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"gopkg.in/olahol/melody.v1"
 )
 
 // ErrorResponse is returned whenever an error occurs
@@ -88,154 +89,174 @@ func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 }
 
 func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
-	getAll, setAll, getOne, setOne func(c *gin.Context)) {
+	getAll, getOne, patchThem, setThem, setOne func(c *gin.Context)) {
+	trimmer := func(s string) string {
+		return strings.TrimLeft(s, `/`)
+	}
+	aggregator := func(c *gin.Context) bool {
+		return c.Query("aggregate") == "true"
+	}
+	pFetch := func(obj backend.Paramer, id string, aggregate bool) (
+		bool,
+		map[string]interface{},
+	) {
+		d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
+		defer unlocker()
+		ref := d(obj.Prefix()).Find(id)
+		if ref != nil {
+			return true, ref.(backend.Paramer).GetParams(d, aggregate)
+		}
+		return false, nil
+	}
+	pSet := func(c *gin.Context,
+		key, line string,
+		munger func(backend.Paramer,
+			map[string]interface{}) (map[string]interface{},
+			interface{},
+			*models.Error)) (interface{}, *models.Error) {
+		d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("update")...)
+		defer unlocker()
+		thing := d(obj.Prefix()).Find(key)
+		err := &models.Error{
+			Code:  http.StatusNotFound,
+			Type:  c.Request.Method,
+			Model: obj.Prefix(),
+			Key:   key,
+		}
+		if thing == nil {
+			err.Errorf("Not Found")
+			return nil, err
+		}
+		ref := thing.(backend.Paramer)
+		params, res, err := munger(ref, ref.GetParams(d, false))
+		if err != nil {
+			return res, err
+		}
+		if setErr := ref.SetParams(d, params); setErr != nil {
+			return res, setErr.(*models.Error)
+		}
+		return res, nil
+	}
+	item404 := func(c *gin.Context, found bool, key, line string) bool {
+		if !found {
+			err := &models.Error{
+				Code:  http.StatusNotFound,
+				Type:  c.Request.Method,
+				Model: obj.Prefix(),
+				Key:   key,
+			}
+			err.Errorf("Not Found")
+			c.JSON(err.Code, err)
+		}
+		return !found
+	}
 	return func(c *gin.Context) {
 			id := c.Param(idKey)
-			var ref models.Model
-			aggregate := false
-			if c.Query("aggregate") == "true" {
-				aggregate = true
-			}
-			p := func() map[string]interface{} {
-				d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
-				defer unlocker()
-				ref = d(obj.Prefix()).Find(id)
-				if ref != nil {
-					return ref.(backend.Paramer).GetParams(d, aggregate)
-				}
-				return nil
-			}()
-			if ref == nil {
-				err := &models.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: obj.Prefix(),
-					Key:   id,
-				}
-				err.Errorf("%s GET Params: %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
+			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
 			}
-			if !f.assureAuth(c, ref.Prefix(), "get", ref.Key()) {
+			found, params := pFetch(obj, id, aggregator(c))
+			if item404(c, found, id, "Params") {
 				return
 			}
-			c.JSON(http.StatusOK, p)
+			c.JSON(http.StatusOK, params)
 		},
 		func(c *gin.Context) {
-			var val map[string]interface{}
-			if !assureDecode(c, &val) {
-				return
-			}
 			id := c.Param(idKey)
-			var ref models.Model
-			func() {
-				d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
-				defer unlocker()
-				ref = d(obj.Prefix()).Find(id)
-			}()
-			if ref == nil {
-				err := &models.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: obj.Prefix(),
-					Key:   id,
-				}
-				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
+			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
 			}
-			if !f.assureAuth(c, ref.Prefix(), "get", ref.Key()) {
+			found, params := pFetch(obj, id, aggregator(c))
+			if item404(c, found, id, "Param") {
 				return
 			}
-
-			m := ref.(backend.Paramer)
-			var err error
-			func() {
-				d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
-				defer unlocker()
-				err = m.SetParams(d, val)
-			}()
+			c.JSON(http.StatusOK, params[trimmer(c.Param("key"))])
+		},
+		func(c *gin.Context) {
+			id := c.Param(idKey)
+			if !f.assureAuth(c, obj.Prefix(), "get", id) {
+				return
+			}
+			var patch jsonpatch2.Patch
+			if !assureDecode(c, &patch) {
+				return
+			}
+			res, err := pSet(c, id, "Params",
+				func(m backend.Paramer,
+					params map[string]interface{}) (map[string]interface{},
+					interface{},
+					*models.Error) {
+					var val map[string]interface{}
+					res := &models.Error{
+						Code:  http.StatusConflict,
+						Type:  c.Request.Method,
+						Model: obj.Prefix(),
+						Key:   id,
+					}
+					buf, err := json.Marshal(params)
+					if err != nil {
+						res.AddError(err)
+						return val, nil, res
+					}
+					patched, err, loc := patch.Apply(buf)
+					if err != nil {
+						res.Errorf("Patch failed to apply at line %d", loc)
+						res.AddError(err)
+						return val, nil, res
+					}
+					if err := json.Unmarshal(patched, &val); err != nil {
+						res.AddError(err)
+						return val, nil, res
+					}
+					return val, val, nil
+				})
 			if err != nil {
-				be, _ := err.(*models.Error)
-				c.JSON(be.Code, be)
+				c.JSON(err.Code, err)
 			} else {
-				c.JSON(http.StatusOK, val)
+				c.JSON(http.StatusOK, res)
 			}
 		},
 		func(c *gin.Context) {
 			id := c.Param(idKey)
-			var ref models.Model
-			aggregate := false
-			if c.Query("aggregate") == "true" {
-				aggregate = true
-			}
-			paramKey := c.Param("key")
-			paramKey = strings.TrimLeft(paramKey, `/`)
-			val, _ := func() (interface{}, bool) {
-				d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
-				defer unlocker()
-				ref = d(obj.Prefix()).Find(id)
-				if ref != nil {
-					return ref.(backend.Paramer).GetParam(d, paramKey, aggregate)
-				}
-				return nil, false
-			}()
-			if ref == nil {
-				err := &models.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: obj.Prefix(),
-					Key:   id,
-				}
-				err.Errorf("%s GET Param: %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
+			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
 			}
-			if !f.assureAuth(c, ref.Prefix(), "get", ref.Key()) {
+			var replacement map[string]interface{}
+			if !assureDecode(c, &replacement) {
 				return
 			}
-			c.JSON(http.StatusOK, val)
-		},
-		func(c *gin.Context) {
-			var val interface{}
-			if !assureDecode(c, &val) {
-				return
-			}
-			id := c.Param(idKey)
-			paramKey := c.Param("key")
-			paramKey = strings.TrimLeft(paramKey, `/`)
-			var ref models.Model
-			func() {
-				d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
-				defer unlocker()
-				ref = d(obj.Prefix()).Find(id)
-			}()
-			if ref == nil {
-				err := &models.Error{
-					Code:  http.StatusNotFound,
-					Type:  "API_ERROR",
-					Model: obj.Prefix(),
-					Key:   id,
-				}
-				err.Errorf("%s SET Params: %s: Not Found", err.Model, err.Key)
-				c.JSON(err.Code, err)
-				return
-			}
-			if !f.assureAuth(c, ref.Prefix(), "get", ref.Key()) {
-				return
-			}
-			m := ref.(backend.Paramer)
-			var err error
-			func() {
-				d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
-				defer unlocker()
-				err = m.SetParam(d, paramKey, val)
-			}()
+			res, err := pSet(c, id, "Params",
+				func(m backend.Paramer,
+					params map[string]interface{}) (map[string]interface{}, interface{},
+					*models.Error) {
+					return replacement, replacement, nil
+				})
 			if err != nil {
-				be, _ := err.(*models.Error)
-				c.JSON(be.Code, be)
+				c.JSON(err.Code, err)
 			} else {
-				c.JSON(http.StatusOK, val)
+				c.JSON(http.StatusOK, res)
+			}
+		},
+		func(c *gin.Context) {
+			id := c.Param(idKey)
+			if !f.assureAuth(c, obj.Prefix(), "get", id) {
+				return
+			}
+			var replacement interface{}
+			if !assureDecode(c, &replacement) {
+				return
+			}
+			res, err := pSet(c, id, "Params",
+				func(m backend.Paramer,
+					params map[string]interface{}) (map[string]interface{}, interface{},
+					*models.Error) {
+					params[trimmer(c.Param("key"))] = replacement
+					return params, replacement, nil
+				})
+			if err != nil {
+				c.JSON(err.Code, err)
+			} else {
+				c.JSON(http.StatusOK, res)
 			}
 		}
 }
@@ -450,7 +471,7 @@ func assureContentType(c *gin.Context, ct string) bool {
 	if testContentType(c, ct) {
 		return true
 	}
-	err := &models.Error{Type: "API_ERROR", Code: http.StatusBadRequest}
+	err := &models.Error{Type: c.Request.Method, Code: http.StatusBadRequest}
 	err.Errorf("Invalid content type: %s", c.ContentType())
 	c.JSON(err.Code, err)
 	return false
@@ -495,30 +516,24 @@ func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bo
 
 	if drpClaim.HasUserId() {
 		ref := &backend.User{}
-		var obj models.Model
 		func() {
 			d, unlocker := f.dt.LockEnts(ref.Locks("get")...)
 			defer unlocker()
-			obj = d("users").Find(drpClaim.UserId())
+			if obj := d("users").Find(drpClaim.UserId()); obj != nil {
+				userSecret = backend.AsUser(obj).Secret
+			}
 		}()
-		if obj != nil {
-			user := backend.AsUser(obj)
-			userSecret = user.Secret
-		}
 	}
 	if drpClaim.HasGrantorId() {
 		if drpClaim.GrantorId() != "system" {
 			ref := &backend.User{}
-			var obj models.Model
 			func() {
 				d, unlocker := f.dt.LockEnts(ref.Locks("get")...)
 				defer unlocker()
-				obj = d("users").Find(drpClaim.GrantorId())
+				if obj := d("users").Find(drpClaim.UserId()); obj != nil {
+					grantorSecret = backend.AsUser(obj).Secret
+				}
 			}()
-			if obj != nil {
-				user := backend.AsUser(obj)
-				grantorSecret = user.Secret
-			}
 		} else {
 			prefs := f.dt.Prefs()
 			if ss, ok := prefs["systemGrantorSecret"]; ok {
@@ -528,18 +543,17 @@ func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bo
 	}
 	if drpClaim.HasMachineUuid() {
 		ref := &backend.Machine{}
-		var obj models.Model
 		func() {
 			d, unlocker := f.dt.LockEnts(ref.Locks("get")...)
 			defer unlocker()
-			obj = d("machines").Find(drpClaim.MachineUuid())
+			if obj := d("machines").Find(drpClaim.MachineUuid()); obj != nil {
+				machineSecret = backend.AsMachine(obj).Secret
+			}
 		}()
-		if obj == nil {
+		if machineSecret == "" {
 			c.AbortWithStatus(http.StatusForbidden)
 			return false
 		}
-		machine := backend.AsMachine(obj)
-		machineSecret = machine.Secret
 	}
 
 	if !drpClaim.ValidateSecrets(grantorSecret, userSecret, machineSecret) {
@@ -558,7 +572,7 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	if marshalErr == nil {
 		return true
 	}
-	err := &models.Error{Type: "API_ERROR", Code: http.StatusBadRequest}
+	err := &models.Error{Type: c.Request.Method, Code: http.StatusBadRequest}
 	err.AddError(marshalErr)
 	c.JSON(err.Code, err)
 	return false
@@ -699,7 +713,13 @@ func jsonError(c *gin.Context, err error, code int, base string) {
 	if ne, ok := err.(*models.Error); ok {
 		c.JSON(ne.Code, ne)
 	} else {
-		c.JSON(code, models.NewError("API_ERROR", code, fmt.Sprintf(base+"%v", err.Error())))
+		res := &models.Error{
+			Type:  c.Request.Method,
+			Code:  code,
+			Model: base,
+		}
+		res.AddError(err)
+		c.JSON(res.Code, res)
 	}
 }
 
@@ -710,11 +730,11 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 	}
 	res := &models.Error{
 		Code:  http.StatusNotAcceptable,
-		Type:  "API_ERROR",
+		Type:  c.Request.Method,
 		Model: ref.Prefix(),
 	}
-	var idx *index.Index
 	var err error
+	arr := []models.Model{}
 	func() {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("get")...)
 		defer unlocker()
@@ -723,19 +743,27 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 		if err != nil {
 			return
 		}
-		idx, err = index.All(filters...)(&d(ref.Prefix()).Index)
+		idx, err := index.All(filters...)(&d(ref.Prefix()).Index)
+		if err != nil {
+			res.AddError(err)
+			return
+		}
+		items := idx.Items()
+		for i, item := range items {
+			arr = append(arr, models.Clone(item))
+			f, ok := arr[i].(models.Filler)
+			if ok {
+				f.Fill()
+			}
+			s, ok := arr[i].(Sanitizable)
+			if ok {
+				arr[i] = s.Sanitize()
+			}
+		}
 	}()
-	if err != nil {
-		res.AddError(err)
+	if res.ContainsError() {
 		c.JSON(res.Code, res)
 		return
-	}
-	arr := idx.Items()
-	for i, res := range arr {
-		s, ok := res.(Sanitizable)
-		if ok {
-			arr[i] = s.Sanitize()
-		}
 	}
 	c.JSON(http.StatusOK, arr)
 }
@@ -765,7 +793,7 @@ func (f *Frontend) Exists(c *gin.Context, ref store.KeySaver, key string) {
 			}
 		}
 		if !found {
-			found = objs.Find(key) == nil
+			found = objs.Find(key) != nil
 		}
 	}()
 	if found {
@@ -798,13 +826,13 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 				}
 				items, err := index.All(index.Sort(idx))(&objs.Index)
 				if err == nil {
-					res = items.Find(idxKey)
+					res = models.Clone(items.Find(idxKey))
 				}
 				break
 			}
 		}
 		if !found {
-			res = objs.Find(key)
+			res = models.Clone(objs.Find(key))
 		}
 	}()
 	if res != nil {
@@ -820,15 +848,14 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	} else {
 		rerr := &models.Error{
 			Code:  http.StatusNotFound,
-			Type:  "API_ERROR",
+			Type:  c.Request.Method,
 			Model: prefix,
 			Key:   key,
 		}
-		estring := ""
+		rerr.Errorf("Not Found")
 		if err != nil {
-			estring = err.Error()
+			rerr.AddError(err)
 		}
-		rerr.Errorf("%s GET: %s: Not Found%s", rerr.Model, rerr.Key, estring)
 		c.JSON(rerr.Code, rerr)
 	}
 }
@@ -841,20 +868,21 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 		return
 	}
 	var err error
+	var res models.Model
 	func() {
 		d, unlocker := f.dt.LockEnts(val.(Lockable).Locks("create")...)
 		defer unlocker()
 		_, err = f.dt.Create(d, val)
+		if err == nil {
+			res = models.Clone(val)
+		}
 	}()
-	var res models.Model
 	if err != nil {
 		jsonError(c, err, http.StatusBadRequest, "")
 	} else {
-		s, ok := val.(Sanitizable)
+		s, ok := res.(Sanitizable)
 		if ok {
 			res = s.Sanitize()
-		} else {
-			res = val
 		}
 		c.JSON(http.StatusCreated, res)
 	}
@@ -867,32 +895,30 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	}
 	var err error
 	var tref models.Model
+	authKey := ""
 
 	func() {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
 		defer unlocker()
 
 		tref = d(ref.Prefix()).Find(key)
+		if tref != nil {
+			authKey = tref.(backend.AuthSaver).AuthKey()
+		}
 	}()
 
-	if tref != nil {
-		aref := tref.(backend.AuthSaver)
-		if !f.assureAuth(c, ref.Prefix(), "patch", aref.AuthKey()) {
-			return
-		}
+	if authKey != "" && !f.assureAuth(c, ref.Prefix(), "patch", authKey) {
+		return
 	}
 
 	var res models.Model
-	bad := func() bool {
+	res, err = func() (models.Model, error) {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
 		defer unlocker()
 		// This will fail with notfound as well.
-		res, err = f.dt.Patch(d, ref, key, patch)
-		return false
+		a, b := f.dt.Patch(d, ref, key, patch)
+		return models.Clone(a), b
 	}()
-	if bad {
-		return
-	}
 	if err == nil {
 		s, ok := res.(Sanitizable)
 		if ok {
@@ -911,41 +937,35 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 	if ref.Key() != key {
 		err := &models.Error{
 			Code:  http.StatusBadRequest,
-			Type:  "API_ERROR",
+			Type:  c.Request.Method,
 			Model: ref.Prefix(),
 			Key:   key,
 		}
-		err.Errorf("%s PUT: Key change from %s to %s not allowed", err.Model, key, ref.Key())
+		err.Errorf("Key change from %s to %s not allowed", key, ref.Key())
 		c.JSON(err.Code, err)
 		return
 	}
 	var err error
-	var tref models.Model
+	authKey := ""
 	func() {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
 		defer unlocker()
 
-		tref = d(ref.Prefix()).Find(ref.Key())
-	}()
-
-	if tref != nil {
-		aref := tref.(backend.AuthSaver)
-		if !f.assureAuth(c, ref.Prefix(), "update", aref.AuthKey()) {
-			return
+		tref := d(ref.Prefix()).Find(ref.Key())
+		if tref != nil {
+			authKey = tref.(backend.AuthSaver).AuthKey()
 		}
-	}
-
-	bad := func() bool {
-		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
-		defer unlocker()
-		_, err = f.dt.Update(d, ref)
-		return false
 	}()
-	if bad {
+	if !f.assureAuth(c, ref.Prefix(), "update", authKey) {
 		return
 	}
-
-	res := ref.(models.Model)
+	var res models.Model
+	res, err = func() (models.Model, error) {
+		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("update")...)
+		defer unlocker()
+		_, b := f.dt.Update(d, ref)
+		return models.Clone(ref), b
+	}()
 	if err == nil {
 		s, ok := ref.(Sanitizable)
 		if ok {
@@ -961,19 +981,21 @@ func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, key string) {
 	var err error
 	var res models.Model
 
-	func() {
+	res, err = func() (models.Model, error) {
 		d, unlocker := f.dt.LockEnts(ref.(Lockable).Locks("delete")...)
 		defer unlocker()
-		res = d(ref.Prefix()).Find(key)
-		if res == nil {
-			ret := &models.Error{
-				Code:  http.StatusNotFound,
-				Key:   key,
-				Model: ref.Prefix(),
+		a := models.Clone(d(ref.Prefix()).Find(key))
+		if a == nil {
+			b := &models.Error{
+				Type:     "DELETE",
+				Code:     http.StatusNotFound,
+				Key:      key,
+				Model:    ref.Prefix(),
+				Messages: []string{"Not Found"},
 			}
-			ret.Errorf("%s: DELETE %s: Not Found", ret.Model, ret.Key)
-			err = ret
+			return a, b
 		}
+		return a, nil
 	}()
 
 	if res != nil {

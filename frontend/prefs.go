@@ -60,7 +60,11 @@ func (f *Frontend) InitPrefApi() {
 			if !assureDecode(c, &prefs) {
 				return
 			}
-			err := &models.Error{Type: "API_ERROR", Key: "Preference", Code: http.StatusBadRequest}
+			err := &models.Error{
+				Type:  c.Request.Method,
+				Model: "prefs",
+				Code:  http.StatusBadRequest,
+			}
 			// Filter unknown preferences here
 			for k := range prefs {
 				switch k {
@@ -69,7 +73,7 @@ func (f *Frontend) InitPrefApi() {
 						return
 					}
 					if len(prefs[k]) != 32 {
-						err.Errorf("Preference %s: Must be 32 bytes long", k)
+						err.Errorf("%s: Must be 32 bytes long", k)
 					}
 				case "defaultBootEnv", "unknownBootEnv", "defaultStage", "systemGrantorSecret":
 					if !f.assureAuth(c, "prefs", "post", k) {
@@ -80,7 +84,7 @@ func (f *Frontend) InitPrefApi() {
 						return
 					}
 					if _, e := strconv.Atoi(prefs[k]); e != nil {
-						err.Errorf("Preference %s: %v", k, e)
+						err.Errorf("%s: %v", k, e)
 					}
 				default:
 					err.Errorf("Unknown Preference %s", k)

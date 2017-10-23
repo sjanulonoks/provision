@@ -79,8 +79,32 @@ type MachinePatchBodyParameter struct {
 	Body jsonpatch2.Patch
 }
 
+// MachinePatchBodyParameter used to patch a Machine
+// swagger:parameters patchMachineParams
+type MachinePatchParamsParameter struct {
+	// in: body
+	// required: true
+	Body jsonpatch2.Patch
+}
+
+//MachinePostParamParameter used to POST a machine parameter
+//swagger:parameters postMachineParam
+type MachinePostParamParameter struct {
+	// in: body
+	// required: true
+	Body interface{}
+}
+
+//MachinePostParamsParameter used to POST machine parameters
+//swagger:parameters postMachineParams
+type MachinePostParamsParameter struct {
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 // MachinePathParameter used to find a Machine in the path
-// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine postMachineParams getMachineActions headMachine
+// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine getMachineActions headMachine patchMachineParams postMachineParams
 type MachinePathParameter struct {
 	// in: path
 	// required: true
@@ -88,9 +112,9 @@ type MachinePathParameter struct {
 	Uuid uuid.UUID `json:"uuid"`
 }
 
-// MachineSetPathParameter used to set a single parameter on a single machine
+// MachinePostParamPathParemeter used to get a single Parameter for a single Machine
 // swagger:parameters postMachineParam
-type MachinePostParamPathParameter struct {
+type MachinePostParamPathParemeter struct {
 	// in: path
 	// required: true
 	// swagger:strfmt uuid
@@ -150,22 +174,6 @@ type MachineActionBodyParameter struct {
 	// in: body
 	// required: true
 	Body map[string]interface{}
-}
-
-// MachineParamsBodyParameter used to set Machine Params
-// swagger:parameters postMachineParams
-type MachineParamsBodyParameter struct {
-	// in: body
-	// required: true
-	Body map[string]interface{}
-}
-
-// MachineParamsBodyParameter used to set Machine Params
-// swagger:parameters postMachineParam
-type MachineParamBodyParameter struct {
-	// in: body
-	// required: true
-	Body interface{}
 }
 
 // MachineListPathParameter used to limit lists of Machine by path options
@@ -249,6 +257,7 @@ func (f *Frontend) InitMachineApi() {
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/machines",
 		func(c *gin.Context) {
@@ -274,7 +283,7 @@ func (f *Frontend) InitMachineApi() {
 				if ok {
 					c.JSON(be.Code, be)
 				} else {
-					c.JSON(http.StatusBadRequest, models.NewError("API_ERROR", http.StatusBadRequest, err.Error()))
+					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
 				}
 			} else {
 				s, ok := models.Model(b).(Sanitizable)
@@ -332,6 +341,7 @@ func (f *Frontend) InitMachineApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       406: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/machines/:uuid",
 		func(c *gin.Context) {
@@ -355,6 +365,7 @@ func (f *Frontend) InitMachineApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/machines/:uuid",
 		func(c *gin.Context) {
@@ -383,7 +394,7 @@ func (f *Frontend) InitMachineApi() {
 			f.Remove(c, &backend.Machine{}, c.Param(`uuid`))
 		})
 
-	pGetAll, pSetAll, pGetOne, pSetOne := f.makeParamEndpoints(&backend.Machine{}, "uuid")
+	pGetAll, pGetOne, pPatch, pSetThem, pSetOne := f.makeParamEndpoints(&backend.Machine{}, "uuid")
 
 	// swagger:route GET /machines/{uuid}/params Machines getMachineParams
 	//
@@ -398,18 +409,6 @@ func (f *Frontend) InitMachineApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/machines/:uuid/params", pGetAll)
 
-	// swagger:route POST /machines/{uuid}/params Machines postMachineParams
-	//
-	// Set/Replace all the Parameters for a machine specified by {uuid}
-	//
-	//     Responses:
-	//       200: MachineParamsResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
-	//       404: ErrorResponse
-	//       409: ErrorResponse
-	f.ApiGroup.POST("/machines/:uuid/params", pSetAll)
-
 	// swagger:route GET /machines/{uuid}/params/{key} Machines getMachineParam
 	//
 	// Get a single machine parameter
@@ -422,6 +421,30 @@ func (f *Frontend) InitMachineApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/machines/:uuid/params/*key", pGetOne)
+
+	// swagger:route PATCH /machines/{uuid}/params Machines patchMachineParams
+	//
+	// Update params for Machine {uuid} with the passed-in patch
+	//
+	//     Responses:
+	//       200: MachineParamsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.PATCH("/machines/:uuid/params", pPatch)
+
+	// swagger:route POST /machines/{uuid}/params Machines postMachineParams
+	//
+	// Sets parameters for a machine specified by {uuid}
+	//
+	//     Responses:
+	//       200: MachineParamsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/machines/:uuid/params", pSetThem)
 
 	// swagger:route POST /machines/{uuid}/params/{key} Machines postMachineParam
 	//
@@ -454,36 +477,34 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			b := &backend.Machine{}
 			var ref models.Model
-			list := make([]*models.AvailableAction, 0, 0)
-			bad := func() bool {
+			actions, err := func() ([]models.AvailableAction, *models.Error) {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 				if ref == nil {
 					err := &models.Error{
 						Code:  http.StatusNotFound,
-						Type:  "API_ERROR",
+						Type:  c.Request.Method,
 						Model: "machines",
 						Key:   uuid,
 					}
-					err.Errorf("%s Actions Get: %s: Not Found", err.Model, err.Key)
-					c.JSON(err.Code, err)
-					return true
+					err.Errorf("Not Found")
+					return nil, err
 				}
-
+				list := make([]models.AvailableAction, 0, 0)
 				m := backend.AsMachine(ref)
 				for _, aa := range f.pc.MachineActions.List() {
 					if _, err := validateMachineAction(f, d, aa.Command, m, make(map[string]interface{}, 0)); err == nil {
-						list = append(list, aa)
+						list = append(list, *aa)
 					}
 				}
-				return false
+				return list, nil
 			}()
-			if bad {
-				return
+			if err != nil {
+				c.JSON(err.Code, err)
+			} else {
+				c.JSON(http.StatusOK, actions)
 			}
-
-			c.JSON(http.StatusOK, list)
 		})
 
 	// swagger:route GET /machines/{uuid}/actions/{name} Machines getMachineAction
@@ -506,37 +527,29 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			b := &backend.Machine{}
 			var ref models.Model
-			var aa *models.AvailableAction
-			bad := func() bool {
+			action, err := func() (models.AvailableAction, *models.Error) {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
+				res := models.AvailableAction{}
 				ref = d("machines").Find(uuid)
 				if ref == nil {
 					err := &models.Error{
 						Code:  http.StatusNotFound,
-						Type:  "API_ERROR",
+						Type:  c.Request.Method,
 						Model: "machines",
 						Key:   uuid,
 					}
-					err.Errorf("%s Action Get: %s: Not Found", err.Model, err.Key)
-					c.JSON(err.Code, err)
-					return true
+					err.Errorf("Action Get: '%s': Not Found", c.Param(`name`))
+					return res, err
 				}
 				m := backend.AsMachine(ref)
-				var err *models.Error
-				aa, err = validateMachineAction(f, d, c.Param(`name`), m, make(map[string]interface{}, 0))
-				if err != nil {
-					c.JSON(err.Code, err)
-					return true
-				}
-				return false
+				return validateMachineAction(f, d, c.Param(`name`), m, make(map[string]interface{}, 0))
 			}()
-
-			if bad {
-				return
+			if err != nil {
+				c.JSON(err.Code, err)
+			} else {
+				c.JSON(http.StatusOK, action)
 			}
-
-			c.JSON(http.StatusOK, aa)
 		})
 
 	// swagger:route POST /machines/{uuid}/actions/{name} Machines postMachineAction
@@ -559,56 +572,50 @@ func (f *Frontend) InitMachineApi() {
 			uuid := c.Param(`uuid`)
 			name := c.Param(`name`)
 
-			ma := &models.MachineAction{Command: name, Params: val}
-
 			if !f.assureAuth(c, "machines", name, uuid) {
 				return
 			}
 
 			b := &backend.Machine{}
 			var ref models.Model
-			bad := func() bool {
+			ma, err := func() (*models.MachineAction, *models.Error) {
 				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
 				defer unlocker()
 				ref = d("machines").Find(uuid)
 				if ref == nil {
 					err := &models.Error{
 						Code:  http.StatusNotFound,
-						Type:  "API_ERROR",
+						Type:  "INVOKE",
 						Model: "machines",
 						Key:   uuid,
 					}
-					err.Errorf("%s Call Action: machine %s: Not Found", err.Model, err.Key)
-					c.JSON(err.Code, err)
-					return true
+					err.Errorf("Not Found")
+					return nil, err
 				}
-
+				res := &models.MachineAction{Command: name, Params: val}
 				m := backend.AsMachine(ref)
 
-				ma.Name = m.Name
-				ma.Uuid = m.Uuid
-				ma.Address = m.Address
-				ma.BootEnv = m.BootEnv
-
-				var err *models.Error
-				_, err = validateMachineAction(f, d, name, m, val)
-				if err != nil {
-					c.JSON(err.Code, err)
-					return true
+				res.Name = m.Name
+				res.Uuid = m.Uuid
+				res.Address = m.Address
+				res.BootEnv = m.BootEnv
+				if _, err := validateMachineAction(f, d, name, m, val); err != nil {
+					err.Type = "INVOKE"
+					return nil, err
 				}
-				return false
+				return res, nil
 			}()
-
-			if bad {
+			if err != nil {
+				c.JSON(err.Code, err)
 				return
 			}
 
 			f.pubs.Publish("machines", name, uuid, ma)
-			err := f.pc.MachineActions.Run(ma)
-			if err != nil {
-				be, ok := err.(*models.Error)
+			runErr := f.pc.MachineActions.Run(ma)
+			if runErr != nil {
+				be, ok := runErr.(*models.Error)
 				if !ok {
-					c.JSON(409, err)
+					c.JSON(409, runErr)
 				} else {
 					c.JSON(be.Code, be)
 				}
@@ -619,18 +626,20 @@ func (f *Frontend) InitMachineApi() {
 
 }
 
-func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backend.Machine, val map[string]interface{}) (*models.AvailableAction, *models.Error) {
+func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backend.Machine, val map[string]interface{}) (models.AvailableAction, *models.Error) {
+	aa := models.AvailableAction{}
 	err := &models.Error{
 		Code:  http.StatusBadRequest,
-		Type:  "API_ERROR",
+		Type:  "GET",
 		Model: "machines",
-		Key:   m.Uuid.String(),
+		Key:   m.Key(),
 	}
 
-	aa, ok := f.pc.MachineActions.Get(name)
-	if !ok {
-		err.Errorf("%s Call Action: action %s: Not Found", err.Model, name)
-		return nil, err
+	if raa, ok := f.pc.MachineActions.Get(name); !ok {
+		err.Errorf("Action %s: Not Found", name)
+		return aa, err
+	} else {
+		aa = *raa
 	}
 
 	for _, param := range aa.RequiredParams {
@@ -653,14 +662,14 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 			}
 		}
 		if obj == nil {
-			err.Errorf("%s Call Action: machine %s: Missing Parameter %s", err.Model, err.Key, param)
+			err.Errorf("Action %s Missing Parameter %s", name, param)
 		} else {
 			pobj := d("params").Find(param)
 			if pobj != nil {
 				rp := backend.AsParam(pobj)
 
 				if ev := rp.ValidateValue(obj); ev != nil {
-					err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
+					err.Errorf("Action %s: Invalid Parameter: %s: %s", name, param, ev.Error())
 				}
 			}
 		}
@@ -690,12 +699,11 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 				rp := backend.AsParam(pobj)
 
 				if ev := rp.ValidateValue(obj); ev != nil {
-					err.Errorf("%s Call Action machine %s: Invalid Parameter: %s: %s", err.Model, err.Key, param, ev.Error())
+					err.Errorf("Action %s: Invalid Parameter: %s: %s", name, param, ev.Error())
 				}
 			}
 		}
 	}
-
 	if err.HasError() == nil {
 		return aa, nil
 	}

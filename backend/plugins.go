@@ -84,7 +84,7 @@ func (n *Plugin) Key() string {
 	return n.Name
 }
 
-func (n *Plugin) GetParams() map[string]interface{} {
+func (n *Plugin) GetParams(d Stores, _ bool) map[string]interface{} {
 	m := n.Params
 	if m == nil {
 		m = map[string]interface{}{}
@@ -100,12 +100,20 @@ func (n *Plugin) SetParams(d Stores, values map[string]interface{}) error {
 	return e.HasError()
 }
 
-func (n *Plugin) GetParam(d Stores, key string, searchProfiles bool) (interface{}, bool) {
-	mm := n.GetParams()
+func (n *Plugin) GetParam(d Stores, key string, aggregate bool) (interface{}, bool) {
+	mm := n.GetParams(d, aggregate)
 	if v, found := mm[key]; found {
 		return v, true
 	}
 	return nil, false
+}
+
+func (n *Plugin) SetParam(d Stores, key string, val interface{}) error {
+	n.Params[key] = val
+	e := &models.Error{Code: 422, Type: ValidationError, Object: n}
+	_, e2 := n.p.Save(d, n)
+	e.AddError(e2)
+	return e.HasError()
 }
 
 func (n *Plugin) New() store.KeySaver {

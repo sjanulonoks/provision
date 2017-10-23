@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"fmt"
 	"net"
 	"net/http"
 
@@ -73,6 +72,22 @@ type LeaseListPathParameter struct {
 	ExpireTime string
 }
 
+func ipOrFail(c *gin.Context, model string) (net.IP, bool) {
+	ip := net.ParseIP(c.Param(`address`))
+	if ip != nil {
+		return ip, false
+	}
+	res := &models.Error{
+		Code:  http.StatusBadRequest,
+		Model: model,
+		Key:   c.Param(`address`),
+		Type:  c.Request.Method,
+	}
+	res.Errorf("address not valid")
+	c.JSON(res.Code, res)
+	return nil, true
+}
+
 func (f *Frontend) InitLeaseApi() {
 	// swagger:route GET /leases Leases listLeases
 	//
@@ -128,6 +143,7 @@ func (f *Frontend) InitLeaseApi() {
 	//       400: ErrorResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/leases",
 		func(c *gin.Context) {
@@ -148,11 +164,8 @@ func (f *Frontend) InitLeaseApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/leases/:address",
 		func(c *gin.Context) {
-			ip := net.ParseIP(c.Param(`address`))
-			if ip == nil {
-				c.JSON(http.StatusBadRequest,
-					models.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("lease get: address not valid: %v", c.Param(`address`))))
+			ip, fail := ipOrFail(c, "leases")
+			if fail {
 				return
 			}
 			f.Fetch(c, &backend.Lease{}, models.Hexaddr(ip))
@@ -187,14 +200,12 @@ func (f *Frontend) InitLeaseApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	//       406: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/leases/:address",
 		func(c *gin.Context) {
-			ip := net.ParseIP(c.Param(`address`))
-			if ip == nil {
-				c.JSON(http.StatusBadRequest,
-					models.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("lease get: address not valid: %v", c.Param(`address`))))
+			ip, fail := ipOrFail(c, "leases")
+			if fail {
 				return
 			}
 			f.Patch(c, &backend.Lease{}, models.Hexaddr(ip))
@@ -212,14 +223,12 @@ func (f *Frontend) InitLeaseApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/leases/:address",
 		func(c *gin.Context) {
-			ip := net.ParseIP(c.Param(`address`))
-			if ip == nil {
-				c.JSON(http.StatusBadRequest,
-					models.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("lease put: address not valid: %v", c.Param(`address`))))
+			ip, fail := ipOrFail(c, "leases")
+			if fail {
 				return
 			}
 			f.Update(c, &backend.Lease{}, models.Hexaddr(ip))
@@ -237,16 +246,14 @@ func (f *Frontend) InitLeaseApi() {
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: ErrorResponse
+	//       409: ErrorResponse
 	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/leases/:address",
 		func(c *gin.Context) {
-			addr := net.ParseIP(c.Param(`address`))
-			if addr == nil {
-				c.JSON(http.StatusBadRequest,
-					models.NewError("API_ERROR", http.StatusBadRequest,
-						fmt.Sprintf("lease delete: address not valid: %v", c.Param(`address`))))
+			ip, fail := ipOrFail(c, "leases")
+			if fail {
 				return
 			}
-			f.Remove(c, &backend.Lease{}, models.Hexaddr(addr))
+			f.Remove(c, &backend.Lease{}, models.Hexaddr(ip))
 		})
 }
