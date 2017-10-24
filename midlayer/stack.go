@@ -280,9 +280,16 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 	err := filepath.Walk(saasDir, func(filepath string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
 			ext := path.Ext(filepath)
-			codec := "json"
+			codec := "unknown"
 			if ext == ".yaml" || ext == ".yml" {
 				codec = "yaml"
+			} else if ext == ".json" {
+				codec = "json"
+			}
+
+			if codec == "unknown" {
+				// Skip unknown codecs
+				return nil
 			}
 
 			fs, err := store.Open(fmt.Sprintf("file://%s?codec=%s", filepath, codec))
