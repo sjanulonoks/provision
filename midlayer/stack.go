@@ -287,7 +287,7 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 
 			fs, err := store.Open(fmt.Sprintf("file://%s?codec=%s", filepath, codec))
 			if err != nil {
-				return err
+				return fmt.Errorf("Failed to open saas content: %s: %v", filepath, err)
 			}
 
 			mst, _ := fs.(store.MetaSaver)
@@ -299,7 +299,7 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to open backend content: %v", err)
+		return nil, err
 	}
 
 	if defaultContent != "" {

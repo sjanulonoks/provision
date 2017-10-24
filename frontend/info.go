@@ -33,6 +33,7 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 			"api-v3",
 			"sane-exit-codes",
 			"common-blob-size",
+			"change-stage-map",
 		},
 	}
 
