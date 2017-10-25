@@ -72,9 +72,27 @@ for arch in "${arches[@]}"; do
             echo "Building binaries for ${arch} ${os}"
             binpath="bin/$os/$arch"
             mkdir -p "$binpath"
-            go build -ldflags "$VERFLAGS" -o "$binpath/incrementer" cmds/incrementer/incrementer.go
-            go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision/dr-provision.go
             go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli/drpcli.go
+            go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision/dr-provision.go
+        )
+        done
+done
+
+if [[ `uname -s` == Darwin ]] ; then
+    PATH=`pwd`/bin/darwin/amd64:$PATH
+else
+    PATH=`pwd`/bin/linux/amd64:$PATH
+fi
+
+for arch in "${arches[@]}"; do
+    for os in "${oses[@]}"; do
+        (
+            export GOOS="$os" GOARCH="$arch"
+            echo "Building plugins for ${arch} ${os}"
+            binpath="bin/$os/$arch"
+            mkdir -p "$binpath"
+            go generate cmds/incrementer/incrementer.go
+            go build -ldflags "$VERFLAGS" -o "$binpath/incrementer" cmds/incrementer/incrementer.go cmds/incrementer/content.go
         )
         done
 done
