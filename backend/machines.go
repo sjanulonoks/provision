@@ -631,10 +631,14 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	if n.Stage == "" {
 		n.Stage = "none"
 	}
-	e := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
+	e := &models.Error{
+		Code:  http.StatusUnprocessableEntity,
+		Type:  ValidationError,
+		Model: n.Prefix(),
+		Key:   n.Key(),
+	}
 	if n.oldStage != n.Stage && oldm.CurrentTask != len(oldm.Tasks) && !n.ChangeForced() {
 		e.Errorf("Can not change stages with pending tasks unless forced")
-		return e
 	}
 	if oldm.Tasks != nil && len(oldm.Tasks) != 0 && n.Stage == oldm.Stage {
 		if n.Tasks == nil || len(n.Tasks) < len(oldm.Tasks) {
@@ -646,9 +650,8 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	}
 	if n.Stage != "none" && n.oldStage == n.Stage && n.oldBootEnv != n.BootEnv && !n.ChangeForced() {
 		e.Errorf("Can not change bootenv while in a stage unless forced. old: %s new %s", n.oldBootEnv, n.BootEnv)
-		return e
 	}
-	return nil
+	return e.HasError()
 }
 
 func (n *Machine) AfterSave() {
