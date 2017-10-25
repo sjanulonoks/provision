@@ -63,6 +63,9 @@ go generate server/assets.go
 # Update cli docs if needed. - does change date.
 go build -o drpcli-docs cmds/drpcli-docs/drpcli-docs.go
 
+# Put the drbundler tool in place.
+go install github.com/digitalrebar/provision/cmds/drbundler
+
 arches=("amd64")
 oses=("linux" "darwin" "windows")
 for arch in "${arches[@]}"; do
@@ -74,26 +77,10 @@ for arch in "${arches[@]}"; do
             mkdir -p "$binpath"
             go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli/drpcli.go
             go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision/dr-provision.go
-        )
-        done
-done
-
-if [[ `uname -s` == Darwin ]] ; then
-    PATH=`pwd`/bin/darwin/amd64:$PATH
-else
-    PATH=`pwd`/bin/linux/amd64:$PATH
-fi
-
-for arch in "${arches[@]}"; do
-    for os in "${oses[@]}"; do
-        (
-            export GOOS="$os" GOARCH="$arch"
-            echo "Building plugins for ${arch} ${os}"
-            binpath="bin/$os/$arch"
-            mkdir -p "$binpath"
             go generate cmds/incrementer/incrementer.go
             go build -ldflags "$VERFLAGS" -o "$binpath/incrementer" cmds/incrementer/incrementer.go cmds/incrementer/content.go
         )
         done
 done
+
 echo "To run tests, run: tools/test.sh"
