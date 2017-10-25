@@ -3,7 +3,6 @@ package frontend
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/digitalrebar/provision/midlayer"
 	"github.com/digitalrebar/provision/models"
@@ -58,6 +57,7 @@ func (f *Frontend) buildNewStore(content *models.Content) (newStore store.Store,
 			"Source":      content.Meta.Source,
 			"Description": content.Meta.Description,
 			"Version":     content.Meta.Version,
+			"Type":        "dynamic",
 		}
 		md.SetMetaData(data)
 	}
@@ -93,9 +93,12 @@ func buildSummary(st store.Store) *models.ContentSummary {
 	cs.Meta.Source = metaData["Source"]
 	cs.Meta.Description = metaData["Description"]
 	cs.Meta.Version = metaData["Version"]
-
+	if val, ok := metaData["Type"]; ok {
+		cs.Meta.Type = val
+	} else {
+		cs.Meta.Type = "dynamic"
+	}
 	cs.Meta.Writable = false
-	cs.Meta.Type = "dynamic"
 	cs.Meta.Overwritable = false
 	if cs.Meta.Name == "BackingStore" {
 		cs.Meta.Type = "writable"
@@ -104,8 +107,6 @@ func buildSummary(st store.Store) *models.ContentSummary {
 		cs.Meta.Type = "local"
 	} else if cs.Meta.Name == "BasicStore" {
 		cs.Meta.Type = "basic"
-	} else if strings.HasPrefix(cs.Meta.Name, "plugin-provider-") {
-		cs.Meta.Type = "plugin"
 	} else if cs.Meta.Name == "DefaultStore" {
 		cs.Meta.Type = "default"
 		cs.Meta.Overwritable = true
@@ -154,9 +155,13 @@ func (f *Frontend) buildContent(st store.Store) (*models.Content, *models.Error)
 	} else {
 		content.Meta.Version = "Unknown"
 	}
+	if val, ok := md["Type"]; ok {
+		content.Meta.Type = val
+	} else {
+		content.Meta.Type = "dynamic"
+	}
 
 	content.Meta.Writable = false
-	content.Meta.Type = "dynamic"
 	content.Meta.Overwritable = false
 	if content.Meta.Name == "BackingStore" {
 		content.Meta.Type = "writable"
@@ -165,8 +170,6 @@ func (f *Frontend) buildContent(st store.Store) (*models.Content, *models.Error)
 		content.Meta.Type = "local"
 	} else if content.Meta.Name == "BasicStore" {
 		content.Meta.Type = "basic"
-	} else if strings.HasPrefix(content.Meta.Name, "plugin-provider-") {
-		content.Meta.Type = "plugin"
 	} else if content.Meta.Name == "DefaultStore" {
 		content.Meta.Type = "default"
 		content.Meta.Overwritable = true

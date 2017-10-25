@@ -349,6 +349,7 @@ func (pc *PluginController) buildNewStore(content *models.Content) (newStore sto
 			"Source":      content.Meta.Source,
 			"Description": content.Meta.Description,
 			"Version":     content.Meta.Version,
+			"Type":        content.Meta.Type,
 		}
 		md.SetMetaData(data)
 	}
@@ -415,30 +416,42 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 		} else {
 			skip := false
 			pp.Fill()
+
 			content := &models.Content{}
-			cName := fmt.Sprintf("plugin-provider-%s", pp.Name)
-			content.Meta.Name = cName
-			content.Meta.Version = pp.Version
-			content.Meta.Description = fmt.Sprintf("Content layer for %s plugin provider", pp.Name)
-			content.Meta.Source = "FromPluginProvider"
-			content.Meta.MetaData.Meta = pp.MetaData.Meta
-			content.Sections = models.Sections{}
-			content.Sections["params"] = models.Section{}
-			for _, p := range pp.Parameters {
-				p.ClearValidation()
-				p.AddError(p.ValidateSchema())
-				if err := p.MakeError(422, "ValidateError", p); err != nil {
-					pc.dt.Infof("debugPlugins", "Skipping %s because of bad required scheme: %s %s\n", pp.Name, p.Name, err)
-					skip = true
-				} else {
-					content.Sections["params"][p.Name] = p
+			content.Fill()
+
+			if pp.Content != "" {
+				codec := store.YamlCodec
+				if err := codec.Decode([]byte(pp.Content), content); err != nil {
+					return err
 				}
-				p.SetValid()
-				p.SetAvailable()
+			} else {
+				content.Meta.MetaData.Meta = pp.MetaData.Meta
+			}
+			cName := pp.Name
+			content.Meta.Name = cName
+
+			if content.Meta.Version == "" || content.Meta.Version == "Unspecified" {
+				content.Meta.Version = pp.Version
+			}
+			if content.Meta.Description == "" {
+				content.Meta.Description = fmt.Sprintf("Content layer for %s plugin provider", pp.Name)
+			}
+			if content.Meta.Source == "" {
+				content.Meta.Source = "FromPluginProvider"
+			}
+			content.Meta.Type = "plugin"
+
+			// Merge in parameters if old plugin.
+			if _, ok := content.Sections["params"]; !ok {
+				content.Sections["params"] = models.Section{}
+			}
+			for _, p := range pp.Parameters {
+				p.Fill()
+				content.Sections["params"][p.Name] = p
 			}
 
 			if !skip {
-				content.Fill()
 				if ns, err := pc.buildNewStore(content); err != nil {
 					pc.dt.Infof("debugPlugins", "Skipping %s because of bad store: %v\n", pp.Name, err)
 					return err
@@ -514,8 +527,8 @@ func (pc *PluginController) removePluginProvider(provider string) {
 			_, unlocker := pc.dt.LockAll()
 			defer unlocker()
 			ds := pc.dt.Backend.(*DataStack)
-			cName := fmt.Sprintf("plugin-provider-%s", name)
-			if nbs, hard, _ := ds.RemovePlugin(cName, pc.dt.Logger); hard != nil {
+			if nbs, hard, _ := ds.RemovePlugin(name, pc.dt.Logger); hard != nil {
+				fmt.Printf("Skipping removal of plugin content layer %s because of bad store errors: %v\n", name, hard)
 				pc.dt.Infof("debugPlugins", "Skipping removal of plugin content layer %s because of bad store errors: %v\n", name, hard)
 			} else {
 				pc.dt.ReplaceBackend(nbs)

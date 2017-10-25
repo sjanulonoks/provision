@@ -15,6 +15,12 @@ github.com/digitalrebar/provision/plugin,\
 github.com/digitalrebar/provision/cli\
 "
 
+if [[ `uname -s` == Darwin ]] ; then
+    PATH=`pwd`/bin/darwin/amd64:$PATH
+else
+    PATH=`pwd`/bin/linux/amd64:$PATH
+fi
+
 for d in $(go list ./... 2>/dev/null | grep -v cmds | grep -v vendor | grep -v github.com/digitalrebar/provision/client  | grep -v github.com/digitalrebar/provision/genmodels) ; do
     tdir=$PWD
     dir=${d//github.com\/digitalrebar\/provision}
