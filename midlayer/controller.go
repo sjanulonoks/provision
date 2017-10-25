@@ -431,7 +431,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 			cName := pp.Name
 			content.Meta.Name = cName
 
-			if content.Meta.Version == "" {
+			if content.Meta.Version == "" || content.Meta.Version == "Unspecified" {
 				content.Meta.Version = pp.Version
 			}
 			if content.Meta.Description == "" {
