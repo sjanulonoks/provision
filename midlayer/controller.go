@@ -440,6 +440,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 			if content.Meta.Source == "" {
 				content.Meta.Source = "FromPluginProvider"
 			}
+			content.Meta.Type = "plugin"
 
 			// Merge in parameters if old plugin.
 			if _, ok := content.Sections["params"]; !ok {
