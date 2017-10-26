@@ -357,7 +357,7 @@ case $1 in
              echo
              echo "# Once dr-provision is started, these commands will install the isos for the community defaults"
              echo "  ${EP}drpcli bootenvs uploadiso ubuntu-16.04-install"
-             echo "  ${EP}drpcli bootenvs uploadiso centos-7.3.1611-install"
+             echo "  ${EP}drpcli bootenvs uploadiso centos-7-install"
              echo "  ${EP}drpcli bootenvs uploadiso sledgehammer"
              echo
 
