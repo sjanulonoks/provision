@@ -34,6 +34,7 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 			"sane-exit-codes",
 			"common-blob-size",
 			"change-stage-map",
+			"job-exit-states",
 		},
 	}
 
