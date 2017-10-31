@@ -456,9 +456,9 @@ func (n *Machine) setDT(p *DataTracker) {
 }
 
 func (n *Machine) OnCreate() error {
+	n.oldStage = "none"
 	if n.Stage == "" {
 		n.Stage = n.p.pref("defaultStage")
-		n.oldStage = "none"
 	}
 	if n.BootEnv == "" {
 		n.BootEnv = n.p.pref("defaultBootEnv")
@@ -517,16 +517,13 @@ func (n *Machine) Validate() {
 			}
 		}
 	}
-	for i, taskName := range n.Tasks {
-		if tasks == nil || tasks.Find(taskName) == nil {
-			n.Errorf("Task %s (at %d) does not exist", taskName, i)
-		}
-	}
 	if stages == nil {
+		// No stages at all
 		n.Errorf("Stage %s does not exist", n.Stage)
 		n.SetInvalid() // Force Fatal
 	} else {
 		if nbFound := stages.Find(n.Stage); nbFound == nil {
+			// Our particular stage is missing
 			n.CurrentTask = 0
 			n.Tasks = []string{}
 			n.Errorf("Stage %s does not exist", n.Stage)
@@ -534,22 +531,26 @@ func (n *Machine) Validate() {
 		} else {
 			stage := AsStage(nbFound)
 			if !stage.Available {
+				// We are changing stages, but the target stage is not available
 				n.CurrentTask = 0
 				n.Tasks = []string{}
 				n.Errorf("Machine %s wants Stage %s, which is not available", n.UUID(), n.Stage)
-			} else {
+			} else if n.oldStage != n.Stage {
+				if obFound := stages.Find(n.oldStage); obFound != nil {
+					oldStage := AsStage(obFound)
+					oldStage.Render(objs, n, n).deregister(n.p.FS)
+				}
 				// Only change bootenv if specified
 				if stage.BootEnv != "" {
 					// BootEnv should still be valid because Stage is valid.
 					n.BootEnv = stage.BootEnv
 				}
-
-				// XXX: For sanity, check the path of templates to make sure not overlap
-				// with the bootenv.  This is hard - do this last
-
-				if obFound := stages.Find(n.oldStage); obFound != nil {
-					oldStage := AsStage(obFound)
-					oldStage.Render(objs, n, n).deregister(n.p.FS)
+				n.Tasks = make([]string, len(stage.Tasks))
+				copy(n.Tasks, stage.Tasks)
+				if len(n.Tasks) > 0 {
+					n.CurrentTask = -1
+				} else {
+					n.CurrentTask = 0
 				}
 				stage.Render(objs, n, n).register(n.p.FS)
 			}
@@ -576,6 +577,12 @@ func (n *Machine) Validate() {
 			}
 		}
 	}
+
+	for i, taskName := range n.Tasks {
+		if tasks == nil || tasks.Find(taskName) == nil {
+			n.Errorf("Task %s (at %d) does not exist", taskName, i)
+		}
+	}
 	n.SetAvailable()
 }
 
@@ -583,6 +590,13 @@ func (n *Machine) BeforeSave() error {
 	// Always make sure we have a secret
 	if n.Secret == "" {
 		n.Secret = randString(16)
+	}
+	if n.oldStage == "" && n.Stage != "" {
+		n.oldStage = n.Stage
+	}
+
+	if n.oldBootEnv == "" && n.BootEnv != "" {
+		n.oldBootEnv = n.BootEnv
 	}
 	n.Validate()
 	if !n.Useable() {
@@ -593,6 +607,9 @@ func (n *Machine) BeforeSave() error {
 	}
 	return nil
 }
+func (n *Machine) AfterSave() {
+	n.oldStage = n.Stage
+}
 
 func (n *Machine) OnLoad() error {
 	n.stores = func(ref string) *Store {
@@ -600,7 +617,6 @@ func (n *Machine) OnLoad() error {
 	}
 	if n.Stage == "" {
 		n.Stage = "none"
-		n.oldStage = "none"
 	}
 	defer func() { n.stores = nil }()
 
@@ -622,8 +638,8 @@ func (n *Machine) OnLoad() error {
 
 func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	oldm := AsMachine(oldThing)
-	n.oldBootEnv = AsMachine(oldThing).BootEnv
-	n.oldStage = AsMachine(oldThing).Stage
+	n.oldBootEnv = oldm.BootEnv
+	n.oldStage = oldm.Stage
 
 	// If we are changing stages and we aren't done running tasks,
 	// Fail unless the users marks a force
@@ -640,58 +656,25 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	if n.oldStage != n.Stage && oldm.CurrentTask != len(oldm.Tasks) && !n.ChangeForced() {
 		e.Errorf("Can not change stages with pending tasks unless forced")
 	}
-	if oldm.Tasks != nil && len(oldm.Tasks) != 0 && n.Stage == oldm.Stage {
-		if n.Tasks == nil || len(n.Tasks) < len(oldm.Tasks) {
-			e.Errorf("Cannot remove tasks from machines without changing stage")
+	if n.oldStage == n.Stage && !(n.CurrentTask == -1 || n.CurrentTask == oldm.CurrentTask) {
+		e.Errorf("Cannot change CurrentTask from %d to %d", oldm.CurrentTask, n.CurrentTask)
+	}
+
+	if n.CurrentTask != -1 && !reflect.DeepEqual(oldm.Tasks, n.Tasks) {
+		runningBound := n.CurrentTask
+		if runningBound != len(oldm.Tasks) {
+			runningBound += 1
 		}
-		if !reflect.DeepEqual(n.Tasks[:len(oldm.Tasks)], oldm.Tasks) {
-			e.Errorf("Can only append tasks to the task list on a machine.")
+		if len(n.Tasks) < len(oldm.Tasks) && len(n.Tasks) < runningBound {
+			e.Errorf("Cannot remove tasks that have already executed or are already executing")
+		} else if !reflect.DeepEqual(n.Tasks[:runningBound], oldm.Tasks[:runningBound]) {
+			e.Errorf("Cannot change tasks that have already executed or are executing")
 		}
 	}
 	if n.Stage != "none" && n.oldStage == n.Stage && n.oldBootEnv != n.BootEnv && !n.ChangeForced() {
 		e.Errorf("Can not change bootenv while in a stage unless forced. old: %s new %s", n.oldBootEnv, n.BootEnv)
 	}
 	return e.HasError()
-}
-
-func (n *Machine) AfterSave() {
-	// Have we changed stages.  Rebuild the task lists
-	if n.oldStage == n.Stage || !n.Available {
-		// If we don't have a stage, init structs
-		if n.Stage == "" && n.Tasks == nil {
-			n.Tasks = []string{}
-			n.CurrentTask = -1
-			_, e2 := n.p.Save(n.stores, n)
-			if e2 != nil {
-				n.p.Logger.Printf("Failed to save machine in after Save. %v\n", n)
-			}
-		}
-		return
-	}
-	objs := n.stores
-	stages := objs("stages")
-
-	taskList := []string{}
-	if obj := stages.Find(n.Stage); obj != nil {
-		stage := AsStage(obj)
-		taskList = append(taskList, stage.Tasks...)
-	}
-
-	// Reset the task list, set currentTask to 0
-	n.Tasks = taskList
-	n.CurrentTask = -1
-	if len(taskList) == 0 {
-		// Already done.
-		n.CurrentTask = 0
-	}
-
-	// Reset this here to keep from looping forever.
-	n.oldStage = n.Stage
-
-	_, e2 := n.p.Save(objs, n)
-	if e2 != nil {
-		n.p.Logger.Printf("Failed to save machine in after Save. %v\n", n)
-	}
 }
 
 func (n *Machine) AfterDelete() {

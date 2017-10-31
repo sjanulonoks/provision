@@ -281,7 +281,7 @@ func (f *Frontend) InitJobApi() {
 					// Nothing to do.
 					if newCT != m.CurrentTask {
 						m.CurrentTask = newCT
-						_, err = f.dt.Update(d, m)
+						_, err = f.dt.Save(d, m)
 						if err != nil {
 							return http.StatusInternalServerError
 						}
@@ -305,9 +305,10 @@ func (f *Frontend) InitJobApi() {
 				if err == nil {
 					m.CurrentTask = newCT
 					m.CurrentJob = b.Uuid
-					_, err = f.dt.Update(d, m)
+					_, err = f.dt.Save(d, m)
 					if err != nil {
-						_, err = f.dt.Remove(d, b)
+						f.dt.Remove(d, b)
+						return http.StatusBadRequest
 					}
 				}
 
