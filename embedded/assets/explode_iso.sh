@@ -1,10 +1,13 @@
 #!/bin/bash
 
+export PS4='${BASH_SOURCE}@${LINENO}(${FUNCNAME[0]}): '
+# set -x
 echo "Explode iso $1 $2 $3 $4"
 
 rhelish_re='^(redhat|centos|fedora)'
 
 os_name="$1"
+canary_name="${1//\//_}"
 tftproot="$2"
 iso="$3"
 os_install_dir="$4"
@@ -106,10 +109,13 @@ if [[ $os_name =~ $rhelish_re ]]; then
         createrepo -g "${groups[-1]}" .
     )
 fi
-printf '%s' "$expected_sha" > "${os_install_dir}.extracting/.${os_name}.rebar_canary"
+echo "Writing canary to ${os_install_dir}.extracting/.${canary_name}.rebar_canary"
+printf '%s' "$expected_sha" > "${os_install_dir}.extracting/.${canary_name}.rebar_canary"
 [[ -d "${os_install_dir}" ]] && mv "${os_install_dir}" "${os_install_dir}.deleting"
 mv "${os_install_dir}.extracting" "${os_install_dir}"
-rm -rf "${os_install_dir}.deleting"
+if [[ -d  "${os_install_dir}.deleting" ]]; then
+    rm -rf  "${os_install_dir}.deleting"
+fi
 
 if which selinuxenabled && selinuxenabled; then
     restorecon -R -F "$tftproot"

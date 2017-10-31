@@ -842,7 +842,7 @@ func (p *DataTracker) RenderUnknown(d Stores) error {
 	}
 	env := AsBootEnv(envIsh)
 	err := &models.Error{Object: env, Type: "StartupError"}
-	if !env.Available {
+	if !env.Validated {
 		err.AddError(env)
 		return err
 	}
