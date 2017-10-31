@@ -20,6 +20,8 @@ import (
 	"github.com/digitalrebar/store"
 )
 
+var explodeMux = &sync.Mutex{}
+
 // BootEnv encapsulates the machine-agnostic information needed by the
 // provisioner to set up a boot environment.
 //
@@ -135,6 +137,64 @@ func (b *BootEnv) genRoot(commonRoot *template.Template, e models.ErrorAdder) *t
 	return res
 }
 
+func explodeISO(p *DataTracker, envName, osName, fileRoot, isoFile, dest, shaSum string) {
+	explodeMux.Lock()
+	defer explodeMux.Unlock()
+	res := &models.Error{
+		Model: "bootenvs",
+		Key:   envName,
+	}
+
+	// Only check the has if we have one.
+	if shaSum != "" {
+		f, err := os.Open(isoFile)
+		if err != nil {
+			res.Errorf("Explode ISO: failed to open iso file %s: %v", isoFile, err)
+		} else {
+			defer f.Close()
+			hasher := sha256.New()
+			if _, err := io.Copy(hasher, f); err != nil {
+				res.Errorf("Explode ISO: failed to read iso file %s: %v", isoFile, err)
+			} else {
+				hash := hex.EncodeToString(hasher.Sum(nil))
+				if hash != shaSum {
+					res.Errorf("Explode ISO: SHA256 bad. actual: %v expected: %v", hash, shaSum)
+				}
+			}
+		}
+	}
+	if !res.ContainsError() {
+		// Call extract script
+		// /explode_iso.sh b.OS.Name fileRoot isoPath path.Dir(canaryPath)
+		cmdName := path.Join(fileRoot, "explode_iso.sh")
+		cmdArgs := []string{osName, fileRoot, isoFile, dest, shaSum}
+		out, err := exec.Command(cmdName, cmdArgs...).CombinedOutput()
+		if err != nil {
+			res.Errorf("Explode ISO: explode_iso.sh failed for %s: %s", envName, err)
+			res.Errorf("Command output:\n%s", string(out))
+		}
+	}
+	ref := &BootEnv{}
+	d, unlocker := p.LockEnts(ref.Locks("update")...)
+	defer unlocker()
+	b := d("bootenvs").Find(envName)
+	if b == nil {
+		// Bootenv vanished
+		return
+	}
+	ref = AsBootEnv(b)
+	if ref.Available {
+		// Bootenv must have vanished
+		return
+	}
+	if res.ContainsError() {
+		ref.AddError(res)
+	} else {
+		ref.Available = true
+		p.Save(d, ref)
+	}
+}
+
 func (b *BootEnv) explodeIso() {
 	// Only work on things that are requested.
 	if b.OS.IsoFile == "" {
@@ -142,9 +202,9 @@ func (b *BootEnv) explodeIso() {
 		return
 	}
 	// Have we already exploded this?  If file exists, then good!
-	canaryPath := b.localPathFor("." + b.OS.Name + ".rebar_canary")
+	canaryPath := b.localPathFor("." + strings.Replace(b.OS.Name, "/", "_", -1) + ".rebar_canary")
 	buf, err := ioutil.ReadFile(canaryPath)
-	if err == nil && len(buf) != 0 && string(bytes.TrimSpace(buf)) == b.OS.IsoSha256 {
+	if err == nil && string(bytes.TrimSpace(buf)) == b.OS.IsoSha256 {
 		b.p.Infof("debugBootEnv", "Explode ISO: canary file %s, in place and has proper SHA256\n", canaryPath)
 		return
 	}
@@ -157,40 +217,8 @@ func (b *BootEnv) explodeIso() {
 		}
 		return
 	}
-
-	// Only check the has if we have one.
-	if b.OS.IsoSha256 != "" {
-		f, err := os.Open(isoPath)
-		if err != nil {
-			b.Errorf("Explode ISO: failed to open iso file %s: %v", isoPath, err)
-			return
-		}
-		defer f.Close()
-		hasher := sha256.New()
-		if _, err := io.Copy(hasher, f); err != nil {
-			b.Errorf("Explode ISO: failed to read iso file %s: %v", isoPath, err)
-			return
-		}
-		hash := hex.EncodeToString(hasher.Sum(nil))
-		if hash != b.OS.IsoSha256 {
-			b.Errorf("Explode ISO: SHA256 bad. actual: %v expected: %v", hash, b.OS.IsoSha256)
-			return
-		}
-	}
-
-	// Call extract script
-	// /explode_iso.sh b.OS.Name fileRoot isoPath path.Dir(canaryPath)
-	cmdName := path.Join(b.p.FileRoot, "explode_iso.sh")
-	cmdArgs := []string{b.OS.Name, b.p.FileRoot, isoPath, b.localPathFor(""), b.OS.IsoSha256}
-	if out, err := exec.Command(cmdName, cmdArgs...).Output(); err != nil {
-		b.Errorf("Explode ISO: explode_iso.sh failed for %s: %s", b.Name, err)
-		b.Errorf("Command output:\n%s", string(out))
-
-	} else {
-		b.p.Infof("debugBootEnv", "Explode ISO: %s exploded to %s", b.OS.IsoFile, isoPath)
-		b.p.Debugf("debugBootEnv", "Explode ISO Log:\n%s", string(out))
-	}
-	return
+	b.Errorf("Exploding ISO: %s", isoPath)
+	go explodeISO(b.p, b.Name, b.OS.Name, b.p.FileRoot, isoPath, b.localPathFor(""), b.OS.IsoSha256)
 }
 
 func (b *BootEnv) Validate() {
