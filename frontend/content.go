@@ -203,7 +203,7 @@ func (f *Frontend) buildContent(st store.Store) (*models.Content, *models.Error)
 
 		content.Sections[prefix] = objs
 	}
-
+	content.Fill()
 	return content, nil
 }
 
