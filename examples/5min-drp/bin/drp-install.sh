@@ -60,8 +60,8 @@ cat <<'EOFISOS' > drp-isos.sh
 # for 5min demo we don't want any community content - we use RackN 
 # content for pacekt.net functionality
 
-#ISOS="ce-ubuntu-16.04-install ce-centos-7.3.1611-install ce-sledgehammer"
-#ISOS="ce-centos-7.3.1611-install ce-sledgehammer"
+#ISOS="ubuntu-16.04-install centos-7-install sledgehammer"
+#ISOS="centos-7-install sledgehammer"
 
 if [[ -n "$ISOS" ]]
 then

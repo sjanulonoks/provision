@@ -458,7 +458,7 @@ func (j *Job) RenderActions() ([]*models.JobAction, error) {
 		}
 		m := AsMachine(mo)
 
-		err := &models.Error{}
+		err := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
 		renderers := t.Render(d, m, err)
 		if err.HasError() != nil {
 			return nil, nil, err
