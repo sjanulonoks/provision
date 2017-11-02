@@ -104,9 +104,11 @@ if [[ $os_name =~ $rhelish_re ]]; then
     # handling the case where we only use disc 1 of a multi-disc set
     # for initial install purposes.
     (
-        cd "${oid_cwd}${os_install_dir}.extracting"
-        groups=($(echo repodata/*comps*.xml))
-        createrepo -g "${groups[-1]}" .
+        if [[ -d "${oid_cwd}${os_install_dir}.extracting"/repodata ]]; then
+            cd "${oid_cwd}${os_install_dir}.extracting"
+            groups=($(echo repodata/*comps*.xml))
+            createrepo -g "${groups[-1]}" .
+        fi
     )
 fi
 echo "Writing canary to ${os_install_dir}.extracting/.${canary_name}.rebar_canary"

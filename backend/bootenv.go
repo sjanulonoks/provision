@@ -211,7 +211,7 @@ func (b *BootEnv) explodeIso() {
 
 	isoPath := filepath.Join(b.p.FileRoot, "isos", b.OS.IsoFile)
 	if _, err := os.Stat(isoPath); os.IsNotExist(err) {
-		b.Errorf("Explode ISO: iso doesn't exist: %s\n", isoPath)
+		b.Errorf("Explode ISO: iso does not exist: %s\n", isoPath)
 		if b.OS.IsoUrl != "" {
 			b.Errorf("You can download the required ISO from %s", b.OS.IsoUrl)
 		}
