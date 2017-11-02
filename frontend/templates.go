@@ -46,7 +46,7 @@ type TemplatePathParameter struct {
 }
 
 // TemplateListPathParameter used to limit lists of Template by path options
-// swagger:parameters listTemplates
+// swagger:parameters listTemplates listStatsTemplates
 type TemplateListPathParameter struct {
 	// in: query
 	Offest int `json:"offset"`
@@ -100,6 +100,45 @@ func (f *Frontend) InitTemplateApi() {
 	f.ApiGroup.GET("/templates",
 		func(c *gin.Context) {
 			f.List(c, &backend.Template{})
+		})
+
+	// swagger:route HEAD /templates Templates listStatsTemplates
+	//
+	// Stats of the List Templates filtered by some parameters.
+	//
+	// This will return headers with the stats of the list.
+	//
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    ID = string
+	//    Available = boolean
+	//    Valid = boolean
+	//    ReadOnly = boolean
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    ID=fred - returns items named fred
+	//    ID=Lt(fred) - returns items that alphabetically less than fred.
+	//
+	// Responses:
+	//    200: NoContentResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
+	f.ApiGroup.HEAD("/templates",
+		func(c *gin.Context) {
+			f.ListStats(c, &backend.Template{})
 		})
 
 	// swagger:route POST /templates Templates createTemplate

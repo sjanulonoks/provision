@@ -89,7 +89,7 @@ type PluginParamBodyParameter struct {
 }
 
 // PluginListPathParameter used to limit lists of Plugin by path options
-// swagger:parameters listPlugins
+// swagger:parameters listPlugins listStatsPlugins
 type PluginListPathParameter struct {
 	// in: query
 	Offest int `json:"offset"`
@@ -147,6 +147,47 @@ func (f *Frontend) InitPluginApi() {
 	f.ApiGroup.GET("/plugins",
 		func(c *gin.Context) {
 			f.List(c, &backend.Plugin{})
+		})
+
+	// swagger:route HEAD /plugins Plugins listStatsPlugins
+	//
+	// Stats of the List Plugins filtered by some parameters.
+	//
+	// This will return headers with the stats of the list.
+	//
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    Name = string
+	//    Provider = string
+	//    Available = boolean
+	//    Valid = boolean
+	//    ReadOnly = boolean
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    Name=fred - returns items named fred
+	//    Name=Lt(fred) - returns items that alphabetically less than fred.
+	//    Name=Lt(fred)&Available=true - returns items with Name less than fred and Available is true
+	//
+	// Responses:
+	//    200: NoContentResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
+	f.ApiGroup.HEAD("/plugins",
+		func(c *gin.Context) {
+			f.ListStats(c, &backend.Plugin{})
 		})
 
 	// swagger:route POST /plugins Plugins createPlugin

@@ -87,7 +87,7 @@ type ProfileParamBodyParameter struct {
 }
 
 // ProfileListPathParameter used to limit lists of Profile by path options
-// swagger:parameters listProfiles
+// swagger:parameters listProfiles listStatsProfiles
 type ProfileListPathParameter struct {
 	// in: query
 	Offest int `json:"offset"`
@@ -141,6 +141,45 @@ func (f *Frontend) InitProfileApi() {
 	f.ApiGroup.GET("/profiles",
 		func(c *gin.Context) {
 			f.List(c, &backend.Profile{})
+		})
+
+	// swagger:route HEAD /profiles Profiles listStatsProfiles
+	//
+	// Stats of the List Profiles filtered by some parameters.
+	//
+	// This will return headers with the stats of the list.
+	//
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    Name = string
+	//    Available = boolean
+	//    Valid = boolean
+	//    ReadOnly = boolean
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    Name=fred - returns items named fred
+	//    Name=Lt(fred) - returns items that alphabetically less than fred.
+	//
+	// Responses:
+	//    200: NoContentResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
+	f.ApiGroup.HEAD("/profiles",
+		func(c *gin.Context) {
+			f.ListStats(c, &backend.Profile{})
 		})
 
 	// swagger:route POST /profiles Profiles createProfile
