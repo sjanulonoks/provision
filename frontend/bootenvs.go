@@ -46,7 +46,7 @@ type BootEnvPathParameter struct {
 }
 
 // BootEnvListPathParameter used to limit lists of BootEnv by path options
-// swagger:parameters listBootEnvs
+// swagger:parameters listBootEnvs listStatsBootEnvs
 type BootEnvListPathParameter struct {
 	// in: query
 	Offest int `json:"offset"`
@@ -104,6 +104,47 @@ func (f *Frontend) InitBootEnvApi() {
 	f.ApiGroup.GET("/bootenvs",
 		func(c *gin.Context) {
 			f.List(c, &backend.BootEnv{})
+		})
+
+	// swagger:route HEAD /bootenvs BootEnvs listStatsBootEnvs
+	//
+	// Stats of the List BootEnvs filtered by some parameters.
+	//
+	// This will return headers with the stats of the list.
+	//
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    Name = string
+	//    Available = boolean
+	//    Valid = boolean
+	//    ReadOnly = boolean
+	//    OnlyUnknown = boolean
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    Name=fred - returns items named fred
+	//    Name=Lt(fred) - returns items that alphabetically less than fred.
+	//    Name=Lt(fred)&Available=true - returns items with Name less than fred and Available is true
+	//
+	// Responses:
+	//    200: NoContentResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
+	f.ApiGroup.HEAD("/bootenvs",
+		func(c *gin.Context) {
+			f.ListStats(c, &backend.BootEnv{})
 		})
 
 	// swagger:route POST /bootenvs BootEnvs createBootEnv

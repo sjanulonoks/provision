@@ -50,7 +50,7 @@ type LeasePathParameter struct {
 }
 
 // LeaseListPathParameter used to limit lists of Lease by path options
-// swagger:parameters listLeases
+// swagger:parameters listLeases listStatsLeases
 type LeaseListPathParameter struct {
 	// in: query
 	Offest int `json:"offset"`
@@ -130,6 +130,49 @@ func (f *Frontend) InitLeaseApi() {
 	f.ApiGroup.GET("/leases",
 		func(c *gin.Context) {
 			f.List(c, &backend.Lease{})
+		})
+
+	// swagger:route HEAD /leases Leases listStatsLeases
+	//
+	// Stats of the List Leases filtered by some parameters.
+	//
+	// This return headers with the stats of the list.
+	//
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    Addr = IP Address
+	//    Token = string
+	//    Strategy = string
+	//    ExpireTime = Date/Time
+	//    Available = boolean
+	//    Valid = boolean
+	//    ReadOnly = boolean
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    Name=fred - returns items named fred
+	//    Name=Lt(fred) - returns items that alphabetically less than fred.
+	//    Name=Lt(fred)&Available=true - returns items with Name less than fred and Available is true
+	//
+	// Responses:
+	//    200: NoContentResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
+	f.ApiGroup.HEAD("/leases",
+		func(c *gin.Context) {
+			f.ListStats(c, &backend.Lease{})
 		})
 
 	// swagger:route POST /leases Leases createLease

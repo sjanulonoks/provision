@@ -89,7 +89,7 @@ type UserTokenQuerySpecificParameter struct {
 }
 
 // UserListPathParameter used to limit lists of User by path options
-// swagger:parameters listUsers
+// swagger:parameters listUsers listStatsUsers
 type UserListPathParameter struct {
 	// in: query
 	Offest int `json:"offset"`
@@ -143,6 +143,45 @@ func (f *Frontend) InitUserApi(drpid string) {
 	f.ApiGroup.GET("/users",
 		func(c *gin.Context) {
 			f.List(c, &backend.User{})
+		})
+
+	// swagger:route HEAD /users Users listStatsUsers
+	//
+	// Stats of the List Users filtered by some parameters.
+	//
+	// This will return headers with the stats of the list.
+	//
+	// You may specify:
+	//    Offset = integer, 0-based inclusive starting point in filter data.
+	//    Limit = integer, number of items to return
+	//
+	// Functional Indexs:
+	//    Name = string
+	//    Available = boolean
+	//    Valid = boolean
+	//    ReadOnly = boolean
+	//
+	// Functions:
+	//    Eq(value) = Return items that are equal to value
+	//    Lt(value) = Return items that are less than value
+	//    Lte(value) = Return items that less than or equal to value
+	//    Gt(value) = Return items that are greater than value
+	//    Gte(value) = Return items that greater than or equal to value
+	//    Between(lower,upper) = Return items that are inclusively between lower and upper
+	//    Except(lower,upper) = Return items that are not inclusively between lower and upper
+	//
+	// Example:
+	//    Name=fred - returns items named fred
+	//    Name=Lt(fred) - returns items that alphabetically less than fred.
+	//
+	// Responses:
+	//    200: NoContentResponse
+	//    401: NoContentResponse
+	//    403: NoContentResponse
+	//    406: ErrorResponse
+	f.ApiGroup.HEAD("/users",
+		func(c *gin.Context) {
+			f.ListStats(c, &backend.User{})
 		})
 
 	// swagger:route POST /users Users createUser

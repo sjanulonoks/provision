@@ -387,6 +387,8 @@ func NewFrontend(
 			"Access-Control-Allow-Credentials",
 			"Access-Control-Allow-Origin",
 			"X-Return-Attributes",
+			"X-DRP-LIST-COUNT",
+			"X-DRP-LIST-TOTAL-COUNT",
 		},
 	}))
 
@@ -723,8 +725,7 @@ func jsonError(c *gin.Context, err error, code int, base string) {
 	}
 }
 
-// XXX: Auth enforce may need to limit return values based up access to get - one day.
-func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
+func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 	if !f.assureAuth(c, ref.Prefix(), "list", "") {
 		return
 	}
@@ -743,11 +744,21 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 		if err != nil {
 			return
 		}
-		idx, err := index.All(filters...)(&d(ref.Prefix()).Index)
+
+		mainIndex := &d(ref.Prefix()).Index
+		c.Header("X-DRP-LIST-TOTAL-COUNT", fmt.Sprintf("%d", mainIndex.Count()))
+
+		idx, err := index.All(filters...)(mainIndex)
 		if err != nil {
 			res.AddError(err)
 			return
 		}
+
+		c.Header("X-DRP-LIST-COUNT", fmt.Sprintf("%d", idx.Count()))
+		if statsOnly {
+			return
+		}
+
 		items := idx.Items()
 		for i, item := range items {
 			arr = append(arr, models.Clone(item))
@@ -761,11 +772,26 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 			}
 		}
 	}()
+
 	if res.ContainsError() {
 		c.JSON(res.Code, res)
 		return
 	}
-	c.JSON(http.StatusOK, arr)
+
+	if statsOnly {
+		c.Status(http.StatusOK)
+	} else {
+		c.JSON(http.StatusOK, arr)
+	}
+}
+
+func (f *Frontend) ListStats(c *gin.Context, ref store.KeySaver) {
+	f.list(c, ref, true)
+}
+
+// XXX: Auth enforce may need to limit return values based up access to get - one day.
+func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
+	f.list(c, ref, false)
 }
 
 func (f *Frontend) Exists(c *gin.Context, ref store.KeySaver, key string) {
