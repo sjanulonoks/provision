@@ -25,6 +25,7 @@ type crudTest struct {
 }
 
 func (test *crudTest) Test(t *testing.T, d Stores) {
+	t.Helper()
 	passed, err := test.op(d, test.t)
 	msg := fmt.Sprintf("%s: wanted to pass: %v, passed: %v", test.name, test.pass, passed)
 	if passed == test.pass {

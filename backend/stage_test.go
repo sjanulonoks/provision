@@ -22,13 +22,13 @@ func TestStageCrud(t *testing.T) {
 		{"Create Stage with no BootEnv", dt.Create, &models.Stage{Name: "nobootenv"}, true},
 		{"Create Stage with bad name /", dt.Create, &models.Stage{Name: "no/bootenv"}, false},
 		{"Create Stage with bad name \\", dt.Create, &models.Stage{Name: "no\\bootenv"}, false},
-		{"Create Stage with nonexistent BootEnv", dt.Create, &models.Stage{Name: "missingbootenv", BootEnv: "missingbootenv"}, false},
-		{"Create Stage with missing Task", dt.Create, &models.Stage{Name: "missingtask", BootEnv: "local", Tasks: []string{"jj"}}, false},
-		{"Create Stage with missing profile", dt.Create, &models.Stage{Name: "missingprofile", BootEnv: "local", Profiles: []string{"jj"}}, false},
+		{"Create Stage with nonexistent BootEnv", dt.Create, &models.Stage{Name: "missingbootenv", BootEnv: "missingbootenv"}, true},
+		{"Create Stage with missing Task", dt.Create, &models.Stage{Name: "missingtask", BootEnv: "local", Tasks: []string{"jj"}}, true},
+		{"Create Stage with missing profile", dt.Create, &models.Stage{Name: "missingprofile", BootEnv: "local", Profiles: []string{"jj"}}, true},
 		{"Create Stage with invalid models.TemplateInfo (missing Name)", dt.Create, &models.Stage{Name: "test 3", BootEnv: "local", Templates: []models.TemplateInfo{{Path: "{{ .Env.Name }}", ID: "ok"}}}, false},
 		{"Create Stage with invalid models.TemplateInfo (missing ID)", dt.Create, &models.Stage{Name: "test 3", BootEnv: "local", Templates: []models.TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}"}}}, false},
 		{"Create Stage with invalid models.TemplateInfo (missing Path)", dt.Create, &models.Stage{Name: "test 3", BootEnv: "local", Templates: []models.TemplateInfo{{Name: "test 3", ID: "ok"}}}, false},
-		{"Create Stage with invalid models.TemplateInfo (invalid ID)", dt.Create, &models.Stage{Name: "test 3", BootEnv: "local", Templates: []models.TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}", ID: "okp"}}}, false},
+		{"Create Stage with invalid models.TemplateInfo (invalid ID)", dt.Create, &models.Stage{Name: "invalidTemplateID", BootEnv: "local", Templates: []models.TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }}", ID: "okp"}}}, true},
 		{"Create Stage with invalid models.TemplateInfo (invalid Path)", dt.Create, &models.Stage{Name: "test 3", BootEnv: "local", Templates: []models.TemplateInfo{{Name: "test 3", Path: "{{ .Env.Name }", ID: "ok"}}}, false},
 		{"Create Stage with valid models.TemplateInfo (not available}", dt.Create, &models.Stage{Name: "test 1", BootEnv: "local", Templates: []models.TemplateInfo{{Name: "unavailable", Path: "{{ .Env.Name }}", ID: "ok"}}}, true},
 		{"Create Stage with valid models.TemplateInfo (available)", dt.Create, &models.Stage{Name: "available", BootEnv: "local", Templates: []models.TemplateInfo{{Name: "ipxe", Path: "{{ .Env.Name }}", ID: "ok"}}}, true},
@@ -41,8 +41,8 @@ func TestStageCrud(t *testing.T) {
 	// List test.
 	bes := d("stages").Items()
 	if bes != nil {
-		if len(bes) != 4 {
-			t.Errorf("List function should have returned: 4, but got %d\n", len(bes))
+		if len(bes) != 8 {
+			t.Errorf("List function should have returned: 8, but got %d\n", len(bes))
 		}
 	} else {
 		t.Errorf("List function returned nil!!")
