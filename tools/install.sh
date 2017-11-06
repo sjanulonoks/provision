@@ -156,7 +156,9 @@ ensure_packages() {
         if ! which 7z &>/dev/null; then
             echo "Installing 7z"
             if [[ $OS_FAMILY == rhel ]] ; then
-                sudo yum install -y epel-release
+                if [[ $OS_TYPE != fedora ]] ; then
+                    sudo yum install -y epel-release
+                fi
                 sudo yum install -y p7zip
             elif [[ $OS_FAMILY == debian ]] ; then
                 sudo apt-get install -y p7zip-full
