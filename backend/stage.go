@@ -147,9 +147,17 @@ func (s *Stage) Validate() {
 	if strings.Contains(s.Name, "/") || strings.Contains(s.Name, "\\") {
 		s.Errorf("Name must not contain a '/' or '\\'")
 	}
+	for idx, ti := range s.Templates {
+		ti.SanityCheck(idx, s, false)
+	}
+	s.AddError(index.CheckUnique(s, s.stores("stages").Items()))
+	if !s.SetValid() {
+		// If we have not been validated at this point, return.
+		return
+	}
+	// We are syntactically valid, although we may not be useable.
 	s.renderers = renderers{}
 	// First, the stuff that must be correct in order for
-	s.AddError(index.CheckUnique(s, s.stores("stages").Items()))
 	for _, taskName := range s.Tasks {
 		if s.stores("tasks").Find(taskName) == nil {
 			s.Errorf("Task %s does not exist", taskName)
@@ -188,13 +196,9 @@ func (s *Stage) Validate() {
 		s.rootTemplate = root
 	}
 	s.tmplMux.Unlock()
-	if !s.SetValid() {
-		// If we have not been validated at this point, return.
-		return
-	}
 	// Update renderers on machines
 	machines := s.stores("machines")
-	if machines != nil {
+	if machines != nil && root != nil {
 		for _, i := range machines.Items() {
 			machine := AsMachine(i)
 			if machine.Stage != s.Name {

@@ -327,6 +327,7 @@ func (b *BootEnv) Validate() {
 			func() {
 				stage.stores = b.stores
 				defer func() { stage.stores = nil }()
+				stage.ClearValidation()
 				stage.Validate()
 			}()
 		}
