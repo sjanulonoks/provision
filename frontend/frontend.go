@@ -645,9 +645,6 @@ func (f *Frontend) processFilters(d backend.Stores, ref models.Model, params map
 		if k == "offset" || k == "limit" || k == "sort" || k == "reverse" {
 			continue
 		}
-		type dynParameter interface {
-			ParameterMaker(backend.Stores, string) (index.Maker, error)
-		}
 		maker, ok := indexes[k]
 		pMaker, found := ref.(dynParameter)
 		if !ok {
