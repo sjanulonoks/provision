@@ -67,6 +67,7 @@ function confirm() {
 #  we assume you've checked out the examples/5min-drp/ directory from the
 #  Digital Rebar Provision repo ... do something like:
 ###
+
 # echo "ACTION: Cloning GIT repo contents ... "
 # git clone -n https://github.com/digitalrebar/provision.git --depth=1
 # cd provision
@@ -75,16 +76,11 @@ function confirm() {
 # mv examples/5min-drp $HOME/
 # cd $HOME/5min-drp
 
-#
-# vim private-content/secrets
 if [[ "$USER" == "shane" ]]
 then
-  echo "<<SHANE>> Staging terraform plugins, private content, and secrets ... "
+  echo "<<SHANE>> Staging secrets ... "
   set -x
   cp $HOME/private-content/secrets ./private-content
-#  not needed - 'terraform init' now gets good version
-#  go get -u github.com/terraform-providers/terraform-provider-packet
-#  cp $HOME/go/bin/terraform-provider-packet private-content/
   set +x
 fi
 
@@ -133,16 +129,12 @@ confirm control.sh drp-install $DRP
 case $1 in 
   local)
     echo "Installing content to DRP endpoint ('$DRP') from local system (push to endpoint)..."
-    # installs DRP community content locally
-    confirm control.sh get-drp-cc
-    # installs DRP Packet Plugins
-    confirm control.sh get-drp-plugins      
-    # perform content and plugins setup on <ID> endpoint
-    confirm control.sh drp-setup $DRP
+    # runs get-drp-cc, get-drp-plugins, and drp-setup locally
+    confirm control.sh local-content $DRP
   ;;
   remote|*)
     echo "Installing content from DRP endpoint ('$DRP') (pull from endpoint)..."
-    # runs 'get-drp-cc', 'get-drp-plugins', and 'drp-setup' on remote <ID>
+    # runs 'local-content' on remote <DRP>
     echo ""
     cprintf $bold "   SSH to remote DRP, stop, restart in foreground ... ? \n"
     cprintf $bold "   Maybe launch UI to show empty content too ... ? \n"
@@ -163,8 +155,8 @@ confirm control.sh set-drp-endpoint $DRP
 
 # bug in Stages causes stage "discover" to be marked bad
 # the simplest fix is to HUP the dr-provision service
-confirm echo "Restart DRP Endpoint to fix stages bug ?" \
-  && control.sh ssh $DRP 'kill -HUP `pidof dr-provision`'
+#confirm echo "Restart DRP Endpoint to fix stages bug ?" \
+#  && control.sh ssh $DRP 'kill -HUP `pidof dr-provision`'
 
 # bring up our DRP target machines:
 confirm terraform apply -target=packet_device.drp-machines
