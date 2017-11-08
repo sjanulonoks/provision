@@ -68,6 +68,8 @@ go install github.com/digitalrebar/provision/cmds/drbundler
 
 arches=("amd64")
 oses=("linux" "darwin" "windows")
+[[ $1 ]] && arches=($1)
+[[ $2 ]] && oses=($2)
 for arch in "${arches[@]}"; do
     for os in "${oses[@]}"; do
         (

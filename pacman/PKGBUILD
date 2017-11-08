@@ -1,0 +1,34 @@
+pkgname=dr-provision-git
+pkgver=$(ver="$(../tools/version.sh)"; ver="${ver#*v}"; echo ${ver%%-*})
+pkgrel=$(ver="$(../tools/version.sh)"; ver="${ver#*-}"; echo ${ver%%-*})
+pkgdesc="Digital Rebar Provision, an API-driven DHCP/PXE/TFTP provisioning system."
+arch=('x86_64')
+url="https://github.com/digitalrebar/provision"
+license=('Apache')
+conflicts=('drpcli' 'dr-provision')
+provides=('dr-provision' 'drpcli')
+optdepends=('jq: for parsing and syntax colouring JSON responses'
+            'bash-completion: tab completion')
+makedepends=('git' 'go' 'go-tools' 'glide')
+source=()
+sha256sums=()
+install=dr-provision-git.install
+
+build() {
+    (cd ../.. && tools/build.sh amd64 linux)
+    cp ../../bin/linux/amd64/* .
+    cp ../../assets/startup/dr-provision.service .
+    sed -i -e 's@usr/local/bin@usr/bin@g' dr-provision.service
+    ./drpcli autocomplete drpcli.definitions
+}
+
+check() {
+    (cd ../.. && tools/test.sh)
+}
+
+package() {
+    install -Dm755 drpcli "${pkgdir}/usr/bin/drpcli"
+    install -Dm755 dr-provision "${pkgdir}/usr/bin/dr-provision"
+    install -Dm644 drpcli.definitions "${pkgdir}/usr/share/bash-completion/completions/drpcli"
+    install -Dm644 dr-provision.service "${pkgdir}/etc/systemd/system/dr-provision.service"
+}

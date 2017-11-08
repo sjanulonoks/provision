@@ -1,0 +1,22 @@
+#!/bin/bash
+post_install() {
+    systemctl daemon-reload
+    systemctl restart dr-provision
+}
+
+pre_upgrade() {
+    systemctl stop dr-provision
+}
+
+post_upgrade() {
+    systemctl daemon-reload
+    systemctl start dr-provision
+}
+
+pre_remove() {
+    systemctl stop dr-provision
+}
+
+post_remove() {
+    systemctl daemon-reload
+}
