@@ -67,7 +67,7 @@ CREDS=${CREDS:-"--username=rocketskates --password=r0cketsk8ts"}
 
 _machines=`grep '^variable "machines_os' vars.tf | cut -d '"' -f 4`
 case $_machines in
-  centos_7)     MACHINES_OS=${MACHINES_OS:-"centos-7.3.1611-install"}
+  centos_7)     MACHINES_OS=${MACHINES_OS:-"centos-7.4.1708-install"}
     ;;
   ubuntu_16_04) MACHINES_OS=${MACHINES_OS:-"ubuntu-16.04-install"}
     ;;
@@ -75,7 +75,7 @@ case $_machines in
     ;;
 esac
 # do not use the CE based bootenvs for the Packet.net demo
-MACHINES_OS=${MACHINES_OS:-"centos-7.3.1611-install"}  # ubuntu-16.04-install
+MACHINES_OS=${MACHINES_OS:-"centos-7.4.1708-install"}  # ubuntu-16.04-install
 
 CURL="curl -sfSL"
 DRPCLI="drpcli"
@@ -273,7 +273,6 @@ case $1 in
     cd dr-provision-install
 
     # community contents
-    # it appears it's distributed by default now ... 
     $CURL \
       https://github.com/digitalrebar/provision-content/releases/download/${VER_CONTENT}/drp-community-content.yaml \
       -o drp-community-content.yaml
@@ -286,10 +285,31 @@ case $1 in
 
     ;;
 
+  # get-drp-plugins only works with 3.2.x and newer plugins - prior to that
+  # plugin_provider and plugin_content were two separate pieces - now they are
+  # a single piece, and the plugin installs it's associated content on upload
+  #
   # get-drp-plugins relies on private-content for the RackN specific conent 
-  # this is VERY different from the get-drp-cc (Community Content)
+  # this is different from the get-drp-cc (Community Content)
   get-drp-plugins)
-#    [[ ! -r private-content/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip ]] && xiterr 1 "missing private-content plugins"
+
+    mkdir -p dr-provision-install
+    cd dr-provision-install
+
+    # get our packet-ipmi provider plugin location 
+    PACKET_URL="https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/plugins/packet-ipmi${RACKN_AUTH}"
+    PART=`$CURL $PACKET_URL | jq -r ".$DRP_ARCH.$DRP_OS"`
+    BASE=`$CURL $PACKET_URL | jq -r '.base'`
+    # download the plugin - AWS cares about extra slashes ... blech 
+    curl -s ${BASE}${PART} -o drp-plugin-packet-ipmi
+
+    cd ..
+  ;;
+
+  # plugins have changed in v3.2.x - provider and contents are now integrated
+  # this is left in place for legacy in the event a v3.1 endpoint and content
+  # needs to be built
+  get-drp-plugins-old)
 
     rm -rf dr-provision-install/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.*
     mkdir -p dr-provision-install
@@ -313,27 +333,18 @@ case $1 in
     # download the plugin - AWS cares about extra slashes ... blech 
     curl -s ${BASE}${PART} -o drp-plugin-packet-ipmi
 
-# currently these plugins are closed to community - so you MUST obtain this
-# with authenticated gitlab account, and copy to the private-content directory
-#    $CURL \
-#      https://github.com/rackn/provision-plugins/releases/download/${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.sha256 \
-#      -o drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.sha256
-#    $CURL  \
-#      https://github.com/rackn/provision-plugins/releases/download/${VER_PLUGINS}/drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip \
-#      -o drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip
-
-# moved to CURL grab of the plugin with authenticated username
-#    cp ../private-content/drp-rack-plugins* ./
-#    check_sum drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.sha256
-
-#		rm -rf plugins
-#    mkdir -p plugins
-#		cd plugins
-#		unzip ../drp-rack-plugins-${DRP_OS}-${DRP_ARCH}.zip
-#    check_sum sha256sums
-
-    cd ../..
+    cd ..
     ;;
+
+  local-content)
+    [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
+    ADDR=`$0 get-address $2`
+
+    for ACTION in get-drp-cc get-drp-plugins drp-setup; 
+    do 
+      ./bin/control.sh $ACTION $2
+    done
+  ;;
 
   remote-content)
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
@@ -342,7 +353,7 @@ case $1 in
     # drp-community-content is  installed by default (unless '--nocontent' specified)
     # do not attempt to install it again
     # $0 ssh $2 "hostname; $0 get-drp-cc $2; $0 get-drp-plugins $2; bash -x $0 drp-setup $2"
-    CMD="hostname; ./bin/control.sh get-drp-plugins $2; bash -x ./bin/control.sh drp-setup $2"
+    CMD="hostname; ./bin/control.sh local-content $2"
     my_ssh $2 "$CMD"
     xit $?
     ;;
@@ -412,8 +423,11 @@ case $1 in
     my_ssh $2 "mv *.sh bin/; chmod 755 bin/*.sh; VER_DRP=${VER_DRP} ./bin/drp-install.sh"
     ;;
 
+  # v3.2.1 is supposed to (re)fix this issue
+  #
   # NOTE:  Shouldn't need this - simply send -HUP signal to dr-provision
   #        demo-run.sh now SSHs to DRP Endpoint and sends kill -HUP signal
+  #
   # horri-bad hack to fix bug w/ stages not eval as valid
   # intended to be run on remote DRP endpoint
   fix-stages-bug)
@@ -426,9 +440,11 @@ case $1 in
     $DRPCLI $ENDPOINT contents create - < $CONTENT
     set +x
     ;;
-  # sets up the RackN specific content packs on a DRP endpoint - VERY different
-  # from CC (community content)
-  drp-setup)
+
+  # v3.1.0 content setup - this should be injected PRIOR to any 
+  # other remaining drp-setup items - retaining this for reference
+  #
+  drp-setup-old)
     _ext=""
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
@@ -449,6 +465,16 @@ case $1 in
       $CURL $URL -o dr-provision-install/$CONTENT_NAME
       set +x
     done
+  # sets up the RackN specific content packs on a DRP endpoint - VERY different
+  # from CC (community content)
+  ;;
+
+  drp-setup)
+    _ext=""
+    [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
+    ADDR=`$0 get-address $2`
+
+    ENDPOINT="--endpoint=https://$ADDR:8092 $CREDS"
 
     # install content 
     for CONTENT in dr-provision-install/*content*.[jy][sa]*
@@ -476,7 +502,7 @@ case $1 in
     done  
 
     # install packet-ipmi plugin
-    for PLUGIN in `ls -1 dr-provision-install/drp-plugin-* | egrep -e "yaml$|json$"`
+    for PLUGIN in `ls -1 dr-provision-install/drp-plugin-*`
     do
       PLUG_NAME=`basename $PLUGIN | sed 's/^drp-plugin-//'`
 
@@ -492,28 +518,27 @@ case $1 in
       set +x
     done
 
-#    if ( $DRPCLI $ENDPOINT plugins exists packet-ipmi > /dev/null 2>&1 )
-#    then
-#      set -x
-#      $DRPCLI $ENDPOINT plugins destroy packet-ipmi
-#      set +x
-#    fi
-
-    cat <<EOFPLUGIN > private-content/packet-ipmi-plugin-create.json
-    {
-      "Available": true,
-      "Name": "packet-ipmi",
-      "Description": "Packet IPMI API Key",
-      "Provider": "packet-ipmi",
-      "Params": { "packet/api-key": "$API_KEY" }
-    }
+    if ( $DRPCLI $ENDPOINT plugin_providers exists packet-ipmi 2> /dev/null )
+    then
+      cat <<EOFPLUGIN > private-content/packet-ipmi-plugin-create.json
+      {
+        "Available": true,
+        "Name": "packet-ipmi",
+        "Description": "Packet IPMI API Key",
+        "Provider": "packet-ipmi",
+        "Params": { "packet/api-key": "$API_KEY" }
+      }
 EOFPLUGIN
 
-    if ( $DRPCLI $ENDPOINT plugins exists "packet-ipmi" > /dev/null 2>&1 )
-    then
-      $DRPCLI $ENDPOINT plugins destroy "packet-ipmi"
-    fi
-    $DRPCLI $ENDPOINT plugins create - < private-content/packet-ipmi-plugin-create.json
+      if ( $DRPCLI $ENDPOINT plugins exists "packet-ipmi" > /dev/null 2>&1 )
+      then
+        $DRPCLI $ENDPOINT plugins destroy "packet-ipmi"
+      fi
+      $DRPCLI $ENDPOINT plugins create - < private-content/packet-ipmi-plugin-create.json
+  else
+      echo "'plugin_providers packet-ipmi' DOES NOT EXIST - not installing plugin"
+  fi
+
     # set up the packet stage map 
     # create stagemap JSON (MACHINES_OS:  ubuntu-16.04-install)
 	  cat <<EOFSTAGE > private-content/stagemap-create.json
@@ -525,8 +550,8 @@ EOFPLUGIN
           "change-stage/map": {
             "discover": "packet-discover:Success",
             "packet-discover": "${MACHINES_OS}:Reboot",
-            "packet-ssh-keys": "complete-nowait:Success",
-            "${MACHINES_OS}": "packet-ssh-keys:Success"
+            "${MACHINES_OS}": "packet-ssh-keys:Success",
+            "packet-ssh-keys": "complete-nowait:Success"
         }
       }
     }
@@ -554,6 +579,75 @@ EOFSTAGE
 
     # set our default Stage, Default Boot Enviornment, and our Unknown Boot Environment
     $DRPCLI $ENDPOINT prefs set defaultStage discover defaultBootEnv sledgehammer unknownBootEnv discovery
+    ;;
+
+  ###
+  #  add all stages for all BootEnv types - since it's a relatively lightweight
+  #  operationg to plumb in Profiles, we're going to just go ahead and 
+  #  stage them all for use on the DRP endpoint
+  #  
+  #     DRP ID       :: endpoint to operate against
+  ###
+  drp-setup-stages)
+    [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
+    ADDR=`$0 get-address $2`
+
+    ENDPOINT="--endpoint=https://$ADDR:8092 $CREDS"
+
+    # filter out the BootEnvs that aren't operating systems
+    # we also filter out MACHINE_OS because we install it by
+    # default in the 'drp-setup' stage - don't re-install
+    FILTER="discovery|sledgehammer|ignore|local|$MACHINE_OS"
+
+    MACHINE_OSES=`$DRPCLI $ENDPOINT bootenvs list \
+      | jq -r '.[].Name' | egrep -v $FILTER`
+
+    for MOS in MACHINE_OSES
+    do
+      PROFILE=stagemap-$MOS
+      MAP="private-content/stagemap-create-$MOS.json"
+
+      cat <<EOFSTAGE > ${MAP}
+        {{
+        "Available": true,
+        "Description": "Stagemap for '${MOS}' BootEnv",
+        "Name": "${MOS}",
+        "Params": {
+            "change-stage/map": {
+              "discover": "packet-discover:Success",
+              "packet-discover": "${MOS}:Reboot",
+              "packet-ssh-keys": "complete-nowait:Success",
+              "${MOS}": "packet-ssh-keys:Success"
+          }
+        }
+      }
+EOFSTAGE
+
+      # inject our stagemap now
+      if ( $DRPCLI $ENDPOINT profiles exists ${MOS} > /dev/null 2>&1 )
+      then
+        $DRPCLI $ENDPOINT profiles destroy ${MOS}
+      fi
+
+      $DRPCLI $ENDPOINT profiles create - < ${MAP}
+
+    done
+    ;;
+
+  # run the setup process for each machine that is going to be given a unique
+  # stagemap - we require the following input
+  #
+  #   MACHINE_OS     -- bootenv operating system 
+  #   MAcHINE_UUID   -- UUID of the machine we're going to build
+  drp-setup-machine-*)
+    [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
+    ADDR=`$0 get-address $2`
+
+    ENDPOINT="--endpoint=https://$ADDR:8092 $CREDS"
+    MOS=${/drp-setup-machine-/}
+    BOOTENV=${MOS//drp-setup-machine-/}
+    MAP="stagemap-$BOOTENV"
+
     ;;
 
   cleanup)
