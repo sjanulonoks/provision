@@ -666,7 +666,7 @@ EOFSTAGE
     set -x
     rm -f ${SSH_DRP_KEY} ${SSH_DRP_KEY}.pub
     rm -f ${SSH_MACHINES_KEY} ${SSH_MACHINES_KEY}.pub
-    rm -f drpcli dr-provision-install
+    rm -rf drpcli dr-provision-install
     rm -rf tmp 
     rm -rf bin/terraform bin/drpcli bin/dr-provision bin/terraform-provider-packet bin/yq
 
@@ -687,19 +687,12 @@ EOFSTAGE
     find private-content/ -type f | grep -v "/secrets$" | xargs rm -rf 
     set +x
 
-    ssh-keygen -R $ADDR
+    [[ -n $ADDR ]] && ssh-keygen -R $ADDR
 
-    echo "No terraform actions taken - please nuke resources via terraform ... "
-    echo "       Suggest:  terraform destroy --force"
-    echo "                 $0 extra-cleanup"
-    ;;
+    terraform destroy --force
 
-  extra-cleanup)
-    echo "performing extra cleanup tasks .... "
-    set -x
     rm -rf *bak private-content/*bak terraform.tfstate* ./.terraform
-    rm -rf dr-provision-install
-    set +x
+
     ;;
 
   *) 
