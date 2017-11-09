@@ -371,7 +371,7 @@ func (j *Job) Validate() {
 		env = AsStage(nbFound)
 	}
 	if env != nil && !env.Available {
-		j.Errorf("Jobs %s wants Stage %s, which is not available", j.UUID(), j.Stage)
+		j.Errorf("Stage %s is not available", j.Stage)
 	}
 
 	found := false
@@ -382,7 +382,7 @@ func (j *Job) Validate() {
 		}
 	}
 	if !found {
-		j.Errorf("Jobs %s wants State %v, which is not valid", j.UUID(), j.State)
+		j.Errorf("State %s is not valid", j.State)
 	}
 
 	if j.LogPath == "" {
@@ -410,7 +410,7 @@ func (j *Job) BeforeSave() error {
 }
 
 func (j *Job) BeforeDelete() error {
-	e := &models.Error{Code: 422, Type: ValidationError, Object: j}
+	e := &models.Error{Code: 422, Type: ValidationError, Model: j.Prefix(), Key: j.Key()}
 	if j.State == "finished" || j.State == "failed" {
 		return nil
 	}

@@ -391,7 +391,7 @@ func (n *Machine) GetParams(d Stores, aggregate bool) map[string]interface{} {
 
 func (n *Machine) SetParams(d Stores, values map[string]interface{}) error {
 	n.Profile.Params = values
-	e := &models.Error{Code: 422, Type: ValidationError, Object: n}
+	e := &models.Error{Code: 422, Type: ValidationError, Model: n.Prefix(), Key: n.Key()}
 	_, e2 := n.p.Save(d, n)
 	e.AddError(e2)
 	return e.HasError()
@@ -434,7 +434,7 @@ func (n *Machine) GetParam(d Stores, key string, aggregate bool) (interface{}, b
 
 func (n *Machine) SetParam(d Stores, key string, val interface{}) error {
 	n.Profile.Params[key] = val
-	e := &models.Error{Code: 422, Type: ValidationError, Object: n}
+	e := &models.Error{Code: 422, Type: ValidationError, Model: n.Prefix(), Key: n.Key()}
 	_, e2 := n.p.Save(d, n)
 	e.AddError(e2)
 	return e.HasError()

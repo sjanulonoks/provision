@@ -94,7 +94,7 @@ func (n *Plugin) GetParams(d Stores, _ bool) map[string]interface{} {
 
 func (n *Plugin) SetParams(d Stores, values map[string]interface{}) error {
 	n.Params = values
-	e := &models.Error{Code: 422, Type: ValidationError, Object: n}
+	e := &models.Error{Code: 422, Type: ValidationError, Model: n.Prefix(), Key: n.Key()}
 	_, e2 := n.p.Save(d, n)
 	e.AddError(e2)
 	return e.HasError()
@@ -110,7 +110,7 @@ func (n *Plugin) GetParam(d Stores, key string, aggregate bool) (interface{}, bo
 
 func (n *Plugin) SetParam(d Stores, key string, val interface{}) error {
 	n.Params[key] = val
-	e := &models.Error{Code: 422, Type: ValidationError, Object: n}
+	e := &models.Error{Code: 422, Type: ValidationError, Model: n.Prefix(), Key: n.Key()}
 	_, e2 := n.p.Save(d, n)
 	e.AddError(e2)
 	return e.HasError()
@@ -132,7 +132,7 @@ func (n *Plugin) setDT(p *DataTracker) {
 func (n *Plugin) Validate() {
 	n.AddError(index.CheckUnique(n, n.stores("plugins").Items()))
 	if n.Provider == "" {
-		n.Errorf("Plugin %s must have a provider", n.Name)
+		n.Errorf("Missing provider")
 	}
 	if strings.Contains(n.Name, "/") || strings.Contains(n.Name, "\\") {
 		n.Errorf("Name must not contain a '/' or '\\'")

@@ -68,7 +68,7 @@ func (p *Profile) GetParams(d Stores, aggregate bool) map[string]interface{} {
 
 func (p *Profile) SetParams(d Stores, values map[string]interface{}) error {
 	p.Params = values
-	e := &models.Error{Code: 422, Type: ValidationError, Object: p}
+	e := &models.Error{Code: 422, Type: ValidationError, Model: p.Prefix(), Key: p.Key()}
 	_, e2 := p.p.Save(d, p)
 	e.AddError(e2)
 	return e.HasError()
@@ -84,7 +84,7 @@ func (p *Profile) GetParam(d Stores, key string, aggregate bool) (interface{}, b
 
 func (p *Profile) SetParam(d Stores, key string, val interface{}) error {
 	p.Params[key] = val
-	e := &models.Error{Code: 422, Type: ValidationError, Object: p}
+	e := &models.Error{Code: 422, Type: ValidationError, Model: p.Prefix(), Key: p.Key()}
 	_, e2 := p.p.Save(d, p)
 	e.AddError(e2)
 	return e.HasError()
@@ -105,7 +105,7 @@ func (p *Profile) setDT(dp *DataTracker) {
 }
 
 func (p *Profile) BeforeDelete() error {
-	e := &models.Error{Code: 422, Type: ValidationError, Object: p}
+	e := &models.Error{Code: 422, Type: ValidationError, Model: p.Prefix(), Key: p.Key()}
 	machines := p.stores("machines")
 	for _, i := range machines.Items() {
 		m := AsMachine(i)
