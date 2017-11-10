@@ -464,22 +464,15 @@ func (n *Machine) OnCreate() error {
 	if n.BootEnv == "" {
 		n.BootEnv = n.p.pref("defaultBootEnv")
 	}
-	bootenvs := n.stores("bootenvs")
-	stages := n.stores("stages")
 	if n.Tasks == nil {
 		n.Tasks = []string{}
 	}
-	if bootenvs.Find(n.BootEnv) == nil {
-		n.Errorf("Bootenv %s does not exist", n.BootEnv)
-	} else if stages.Find(n.Stage) == nil {
-		n.Errorf("Stage %s does not exist", n.Stage)
-	} else {
-		// All machines start runnable.
-		n.Runnable = true
-	}
+	// All machines start runnable.
+	n.Runnable = true
 	if n.Tasks != nil && len(n.Tasks) > 0 {
 		n.CurrentTask = -1
 	}
+	n.Validate()
 	return n.MakeError(422, ValidationError, n)
 }
 
@@ -488,7 +481,7 @@ func (n *Machine) Validate() {
 		n.Errorf("Machine %#v was not assigned a uuid!", n)
 	}
 	if n.Name == "" {
-		n.Errorf("Machine %s must have a name", n.Uuid)
+		n.Errorf("Missing Name")
 	}
 	if strings.Contains(n.Name, "/") || strings.Contains(n.Name, "\\") {
 		n.Errorf("Name must not contain a '/' or '\\'")
@@ -568,7 +561,7 @@ func (n *Machine) Validate() {
 			if env.OnlyUnknown {
 				n.Errorf("BootEnv %s does not allow Machine assignments, it has the OnlyUnknown flag.", env.Name)
 			} else if !env.Available {
-				n.Errorf("Machine %s wants BootEnv %s, which is not available", n.UUID(), n.BootEnv)
+				n.Errorf("BootEnv %s is not available", n.BootEnv)
 			} else {
 				if obFound := bootenvs.Find(n.oldBootEnv); obFound != nil {
 					oldEnv := AsBootEnv(obFound)
