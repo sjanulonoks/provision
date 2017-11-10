@@ -11,6 +11,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/VictorLowther/jsonpatch2/utils"
 	"github.com/digitalrebar/provision/models"
 )
 
@@ -59,45 +60,58 @@ func newRenderedTemplate(r *RenderData,
 	p := r.p
 	var prefixes, keys []string
 	if r.Task != nil {
-		prefixes = []string{"tasks", "machines"}
-		keys = []string{r.target.Key(), r.Machine.Key()}
-	} else if r.Machine == nil {
-		prefixes = []string{"bootenvs"}
-		keys = []string{r.target.Key()}
-	} else if r.Stage != nil {
-		prefixes = []string{"machines", "stages"}
-		keys = []string{r.Machine.Key(), r.target.Key()}
-	} else {
-		prefixes = []string{"machines", "bootenvs"}
-		keys = []string{r.Machine.Key(), r.target.Key()}
+		prefixes = append(prefixes, "tasks")
+		keys = append(keys, r.Task.Key())
 	}
+	if r.Stage != nil {
+		prefixes = append(prefixes, "stages")
+		keys = append(keys, r.Stage.Key())
+	}
+	if r.Env != nil {
+		prefixes = append(prefixes, "bootenvs")
+		keys = append(keys, r.Env.Key())
+	}
+	if r.Machine != nil {
+		prefixes = append(prefixes, "machines")
+		keys = append(keys, r.Machine.Key())
+	}
+	targetPrefix := r.target.Prefix()
 	return renderer{
 		path: path,
 		name: tmplKey,
 		write: func(remoteIP net.IP) (*bytes.Reader, error) {
 			objs, unlocker := p.LockEnts("stages", "tasks", "machines", "bootenvs", "profiles")
 			defer unlocker()
-			var rd *RenderData
-			var machine *Machine
-			var target renderable
+			rd := &RenderData{d: objs, p: p}
 			for i, prefix := range prefixes {
 				item := objs(prefix).Find(keys[i])
 				if item == nil {
 					return nil, fmt.Errorf("%s:%s has vanished", prefix, keys[i])
 				}
-				switch item.(type) {
-				case renderable:
-					target = item.(renderable)
+				switch obj := item.(type) {
+				case *Task:
+					rd.Task = &rTask{Task: obj, renderData: rd}
+				case *Stage:
+					rd.Stage = &rStage{Stage: obj, renderData: rd}
+				case *BootEnv:
+					rd.Env = &rBootEnv{BootEnv: obj, renderData: rd}
 				case *Machine:
-					machine = AsMachine(item)
+					rd.Machine = &rMachine{Machine: obj, renderData: rd}
 				default:
 					p.Logger.Panicf("%s:%s is neither Renderable nor a machine", item.Prefix(), item.Key())
 				}
 			}
-			rd = newRenderData(objs, p, machine, target)
+			switch targetPrefix {
+			case "tasks":
+				rd.target = renderable(rd.Task.Task)
+			case "stages":
+				rd.target = renderable(rd.Stage.Stage)
+			case "bootenvs":
+				rd.target = renderable(rd.Env.BootEnv)
+			}
 			rd.remoteIP = remoteIP
 			buf := bytes.Buffer{}
-			tmpl := target.templates().Lookup(tmplKey)
+			tmpl := rd.target.templates().Lookup(tmplKey)
 			if err := tmpl.Execute(&buf, rd); err != nil {
 				return nil, err
 			}
@@ -151,8 +165,146 @@ func (b *rBootEnv) PathFor(proto, f string) string {
 	return ""
 }
 
-func (b *rBootEnv) InstallUrl() string {
-	return b.p.FileURL(b.renderData.remoteIP) + "/" + path.Join(b.OS.Name, "install")
+type Repo struct {
+	Tag            string   `json:"tag"`
+	OS             []string `json:"os"`
+	URL            string   `json:"url"`
+	PackageType    string   `json:"packageType"`
+	RepoType       string   `json:"repoType"`
+	InstallSource  bool     `json:"installSource"`
+	SecuritySource bool     `json:"securitySource"`
+	Distribution   string   `json:"distribution"`
+	Components     []string `json:"components"`
+	r              *RenderData
+	targetOS       string
+}
+
+func (rd *Repo) JoinedComponents() string {
+	return strings.Join(rd.Components, " ")
+}
+
+func (rd *Repo) R() *RenderData {
+	return rd.r
+}
+
+func (rd *Repo) Target() string {
+	return rd.targetOS
+}
+
+func (rd *Repo) osParts() (string, string) {
+	parts := strings.SplitN(rd.targetOS, "-", 2)
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return rd.targetOS, ""
+}
+
+func (rd *Repo) renderStyle() string {
+	if rd.RepoType != "" {
+		return rd.RepoType
+	}
+	osName, _ := rd.osParts()
+	switch osName {
+	case "redhat", "rhel", "centos", "scientificlinux":
+		return "yum"
+	case "suse", "sles", "opensuse":
+		return "zypp"
+	case "debian", "ubuntu":
+		return "apt"
+	default:
+		return "unknown"
+	}
+}
+
+func (rd *Repo) UrlFor(component string) string {
+	if rd.InstallSource || rd.Distribution == "" {
+		return rd.URL
+	}
+	osName, _ := rd.osParts()
+	switch osName {
+	case "centos":
+		return fmt.Sprintf("%s/%s/%s/$basearch", rd.URL, rd.Distribution, component)
+	case "scientificlinux":
+		return fmt.Sprintf("%s/%s/$basearch/%s", rd.URL, rd.Distribution, component)
+	default:
+		return rd.URL
+	}
+}
+
+func (rd *Repo) Install() (string, error) {
+	tmpl := template.New("installLines").Option("missingkey=error")
+	var err error
+	switch rd.renderStyle() {
+	case "yum":
+		if rd.InstallSource {
+			tmpl, err = tmpl.Parse(`install
+url --url {{.URL}}
+repo --name="{{.Tag}}" --baseurl={{.URL}} --cost=100{{if .R.ParamExists "proxy-servers"}} --proxy="{{index (.R.Param "proxy-servers") 0}}"{{end}}`)
+		} else {
+			tmpl, err = tmpl.Parse(`
+repo --name="{{.Tag}}" --baseurl={{.URL}} --cost=100{{if .R.ParamExists "proxy-servers"}} --proxy="{{index (.R.Param "proxy-servers") 0}}"{{end}}`)
+		}
+	case "apt":
+		if rd.InstallSource {
+			tmpl, err = tmpl.Parse(`d-i mirror/protocol string {{.R.ParseUrl "scheme" .URL}}
+d-i mirror/http/hostname string {{.R.ParseUrl "host" .URL}}
+d-i mirror/http/directory string {{.R.ParseUrl "path" .URL}}
+`)
+		} else {
+			tmpl, err = tmpl.Parse(`{{if (eq "debian" .R.Env.OS.Family)}}
+d-i apt-setup/security_host string {{.URL}}
+{{else}}
+d-i apt-setup/security_host string {{.R.ParseUrl "host" .URL}}
+d-i apt-setup/security_path string {{.R.ParseUrl "path" .URL}}
+{{end}}`)
+		}
+	default:
+		return "", fmt.Errorf("No idea how to handle repos for %s", rd.targetOS)
+	}
+	if err != nil {
+		return "", err
+	}
+	buf := &bytes.Buffer{}
+	err = tmpl.Execute(buf, rd)
+	return buf.String(), err
+}
+
+func (rd *Repo) Lines() (string, error) {
+	tmpl := template.New("installLines").Option("missingkey=error")
+	var err error
+	switch rd.renderStyle() {
+	case "yum":
+		tmpl, err = tmpl.Parse(`{{range $component := $.Components}}
+[{{$.Tag}}-{{$component}}]
+name={{$.Tag}} - {{$component}}
+baseurl={{$.UrlFor $component}}
+gpgcheck=0
+{{else}}
+[{{$.Tag}}]
+name={{$.Target}} - {{$.Tag}}
+baseurl={{$.UrlFor ""}}
+gpgcheck=0
+{{ end }}`)
+	case "apt":
+		tmpl, err = tmpl.Parse(`deb {{.URL}} {{.Distribution}} {{.JoinedComponents}}
+`)
+	default:
+		return "", fmt.Errorf("No idea how to handle repos for %s", rd.targetOS)
+	}
+	if err != nil {
+		return "", err
+	}
+	buf := &bytes.Buffer{}
+	err = tmpl.Execute(buf, rd)
+	return buf.String(), err
+}
+
+func (b *rBootEnv) InstallUrl() (string, error) {
+	repos := b.renderData.InstallRepos()
+	if len(repos) == 0 {
+		return "", fmt.Errorf("No install repository available")
+	}
+	return repos[0].URL, nil
 }
 
 // JoinInitrds joins the fully expanded initrd paths into a comma-separated string.
@@ -177,6 +329,86 @@ type RenderData struct {
 	remoteIP net.IP
 }
 
+func (r *RenderData) fetchRepos(test func(*Repo) bool) (res []*Repo) {
+	res = []*Repo{}
+	p, err := r.Param("package-repositories")
+	if p == nil || err != nil {
+		return
+	}
+	repos := []*Repo{}
+	if utils.Remarshal(p, &repos) != nil {
+		return
+	}
+	for _, repo := range repos {
+		if !test(repo) {
+			continue
+		}
+		repo.r = r
+		res = append(res, repo)
+	}
+	return
+}
+
+func (r *RenderData) Repos(tags ...string) []*Repo {
+	return r.fetchRepos(func(rd *Repo) bool {
+		for _, t := range tags {
+			if t == rd.Tag {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+func (r *RenderData) MachineRepos() []*Repo {
+	found := r.fetchRepos(func(rd *Repo) bool {
+		for _, os := range rd.OS {
+			if os == r.Machine.OS {
+				rd.targetOS = r.Machine.OS
+				return true
+			}
+		}
+		return false
+	})
+	if len(found) == 0 {
+		// See if we have something locally available
+		for _, obj := range r.d("bootenvs").Items() {
+			env := obj.(*BootEnv)
+			if env.OS.Name == r.Machine.OS {
+				found = append(found, &Repo{
+					Tag:           env.Name,
+					InstallSource: true,
+					OS:            []string{r.Machine.OS},
+					URL:           r.p.FileURL(r.remoteIP) + "/" + path.Join(r.Machine.OS, "install"),
+					r:             r,
+					targetOS:      r.Machine.OS,
+				})
+				break
+			}
+		}
+	}
+	return found
+}
+
+func (r *RenderData) InstallRepos() []*Repo {
+	found := r.MachineRepos()
+	var installRepo, updateRepo *Repo
+	res := []*Repo{}
+	for _, repo := range found {
+		if installRepo == nil && repo.InstallSource {
+			installRepo = repo
+		}
+		if updateRepo == nil && repo.SecuritySource {
+			updateRepo = repo
+		}
+	}
+	res = append(res, installRepo)
+	if updateRepo != nil {
+		res = append(res, updateRepo)
+	}
+	return res
+}
+
 func newRenderData(d Stores, p *DataTracker, m *Machine, r renderable) *RenderData {
 	res := &RenderData{d: d, p: p}
 	res.target = r
@@ -190,6 +422,20 @@ func newRenderData(d Stores, p *DataTracker, m *Machine, r renderable) *RenderDa
 		res.Task = &rTask{Task: obj, renderData: res}
 	case *Stage:
 		res.Stage = &rStage{Stage: obj, renderData: res}
+	}
+	if m != nil {
+		if res.Env == nil {
+			obj := d("bootenvs").Find(m.BootEnv)
+			if obj != nil {
+				res.Env = &rBootEnv{BootEnv: obj.(*BootEnv), renderData: res}
+			}
+		}
+		if res.Stage == nil {
+			obj := d("stages").Find(m.Stage)
+			if obj != nil {
+				res.Stage = &rStage{Stage: obj.(*Stage), renderData: res}
+			}
+		}
 	}
 	return res
 }

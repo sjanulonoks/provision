@@ -457,6 +457,7 @@ func (n *Machine) setDT(p *DataTracker) {
 
 func (n *Machine) OnCreate() error {
 	n.oldStage = "none"
+	n.oldBootEnv = "local"
 	if n.Stage == "" {
 		n.Stage = n.p.pref("defaultStage")
 	}
@@ -604,6 +605,11 @@ func (n *Machine) BeforeSave() error {
 	}
 	if !n.Available {
 		n.Runnable = false
+	}
+	if n.oldBootEnv != n.BootEnv &&
+		strings.HasSuffix(n.BootEnv, "-install") {
+		env := n.stores("bootenvs").Find(n.BootEnv).(*BootEnv)
+		n.OS = env.OS.Name
 	}
 	return nil
 }

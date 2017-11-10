@@ -35,6 +35,7 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 			"common-blob-size",
 			"change-stage-map",
 			"job-exit-states",
+			"package-repository-handling",
 		},
 	}
 
