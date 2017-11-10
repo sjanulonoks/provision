@@ -175,24 +175,6 @@ func (f *Frontend) InitLeaseApi() {
 			f.ListStats(c, &backend.Lease{})
 		})
 
-	// swagger:route POST /leases Leases createLease
-	//
-	// Create a Lease
-	//
-	// Create a Lease from the provided object
-	//
-	//     Responses:
-	//       201: LeaseResponse
-	//       400: ErrorResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
-	//       409: ErrorResponse
-	//       422: ErrorResponse
-	f.ApiGroup.POST("/leases",
-		func(c *gin.Context) {
-			b := &backend.Lease{}
-			f.Create(c, b)
-		})
 	// swagger:route GET /leases/{address} Leases getLease
 	//
 	// Get a Lease
@@ -228,53 +210,6 @@ func (f *Frontend) InitLeaseApi() {
 	f.ApiGroup.HEAD("/leases/:address",
 		func(c *gin.Context) {
 			f.Exists(c, &backend.Lease{}, c.Param(`address`))
-		})
-
-	// swagger:route PATCH /leases/{address} Leases patchLease
-	//
-	// Patch a Lease
-	//
-	// Update a Lease specified by {address} using a RFC6902 Patch structure
-	//
-	//     Responses:
-	//       200: LeaseResponse
-	//       400: ErrorResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
-	//       404: ErrorResponse
-	//       406: ErrorResponse
-	//       409: ErrorResponse
-	//       422: ErrorResponse
-	f.ApiGroup.PATCH("/leases/:address",
-		func(c *gin.Context) {
-			ip, fail := ipOrFail(c, "leases")
-			if fail {
-				return
-			}
-			f.Patch(c, &backend.Lease{}, models.Hexaddr(ip))
-		})
-
-	// swagger:route PUT /leases/{address} Leases putLease
-	//
-	// Put a Lease
-	//
-	// Update a Lease specified by {address} using a JSON Lease
-	//
-	//     Responses:
-	//       200: LeaseResponse
-	//       400: ErrorResponse
-	//       401: NoContentResponse
-	//       403: NoContentResponse
-	//       404: ErrorResponse
-	//       409: ErrorResponse
-	//       422: ErrorResponse
-	f.ApiGroup.PUT("/leases/:address",
-		func(c *gin.Context) {
-			ip, fail := ipOrFail(c, "leases")
-			if fail {
-				return
-			}
-			f.Update(c, &backend.Lease{}, models.Hexaddr(ip))
 		})
 
 	// swagger:route DELETE /leases/{address} Leases deleteLease
