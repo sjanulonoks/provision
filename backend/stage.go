@@ -252,7 +252,7 @@ func (s *Stage) BeforeSave() error {
 }
 
 func (s *Stage) BeforeDelete() error {
-	e := &models.Error{Code: 409, Type: StillInUseError, Object: s}
+	e := &models.Error{Code: 409, Type: StillInUseError, Model: s.Prefix(), Key: s.Key()}
 	machines := s.stores("machines")
 	for _, i := range machines.Items() {
 		machine := AsMachine(i)

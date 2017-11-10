@@ -181,7 +181,7 @@ func (t *Template) AfterSave() {
 }
 
 func (t *Template) BeforeDelete() error {
-	e := &models.Error{Code: 409, Type: StillInUseError, Object: t}
+	e := &models.Error{Code: 409, Type: StillInUseError, Model: t.Prefix(), Key: t.Key()}
 	buf := &bytes.Buffer{}
 	for _, i := range t.stores("templates").Items() {
 		tmpl := AsTemplate(i)

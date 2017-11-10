@@ -364,7 +364,7 @@ func (b *BootEnv) BeforeSave() error {
 }
 
 func (b *BootEnv) BeforeDelete() error {
-	e := &models.Error{Code: 409, Type: StillInUseError, Object: b}
+	e := &models.Error{Code: 409, Type: StillInUseError, Model: b.Prefix(), Key: b.Key()}
 	machines := b.stores("machines")
 	stages := b.stores("stages")
 	prefToFind := ""

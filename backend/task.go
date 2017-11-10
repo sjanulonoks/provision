@@ -154,7 +154,7 @@ type taskHaver interface {
 }
 
 func (t *Task) BeforeDelete() error {
-	e := &models.Error{Code: 409, Type: StillInUseError, Object: t}
+	e := &models.Error{Code: 409, Type: StillInUseError, Model: t.Prefix(), Key: t.Key()}
 	for _, objPrefix := range []string{"machines", "stages"} {
 		for _, j := range t.stores(objPrefix).Items() {
 			thing := j.(taskHaver)

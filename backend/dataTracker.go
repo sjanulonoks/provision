@@ -841,7 +841,7 @@ func (p *DataTracker) RenderUnknown(d Stores) error {
 		return fmt.Errorf("No such BootEnv: %s", pref)
 	}
 	env := AsBootEnv(envIsh)
-	err := &models.Error{Object: env, Type: "StartupError"}
+	err := &models.Error{Object: env, Model: env.Prefix(), Key: env.Key(), Type: "StartupError"}
 	if !env.Validated {
 		err.AddError(env)
 		return err
