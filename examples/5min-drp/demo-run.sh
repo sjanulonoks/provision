@@ -18,6 +18,7 @@
 ################## SEE README for details on usage of this script .... 
 ################## 
 
+function xiterr() { [[ $1 =~ ^[0-9]+$ ]] && { local _xit=$1; shift; } || local _xit=255; echo "FATAL: $*"; exit $_xit; }
 [[ -f ./bin/color.sh ]] && source ./bin/color.sh
 ( type -t cprintf > /dev/null 2>&1 ) || function cprintf() { printf "%s" "$*"; }
 
@@ -29,14 +30,17 @@ CONFIRM=${CONFIRM:-"yes"}
 
 function confirm() {
   local _sep="--------------------------------------------------------------------------------"
-  local _err
-  local _wait
+  local _err=0
+  local _wait=yes
+  local _exit_if_fail=0
   local _action=`cprintf "$bold$underline" "ACTION"`
   local _msg=`cprintf $green "$*"`
   local _default=`cprintf $cyan "<Enter>"`
   local _failed=`cprintf $red "FAILED"`
   local _success=`cprintf $green "Success... "`
   local _skipping=`cprintf $yellow "Skipping..."`
+
+  [[ $1 == "exit_if_fail" ]] && { shift 1; _exit_if_fail=1; }
 
   echo ""
   cprintf $magenta "${_sep}\n"
@@ -59,6 +63,7 @@ function confirm() {
     eval $*
     _err=$?
 
+    ((  $_err && $_exit_if_fail )) && xiterr 2 "FAILURE: exiting - '$*'"
     (( $_err )) && echo "$_failed" || echo "$_success"
   fi
 }
@@ -94,11 +99,11 @@ confirm control.sh install-secrets
 confirm control.sh ssh-keys             
 
 # apply our SSH keys 
-confirm terraform apply -target=packet_ssh_key.drp-ssh-key
-confirm terraform apply -target=packet_ssh_key.machines-ssh-key
+confirm exit_if_fail terraform apply -target=packet_ssh_key.drp-ssh-key
+confirm exit_if_fail terraform apply -target=packet_ssh_key.machines-ssh-key
 
 # build our DRP server
-confirm terraform apply -target=packet_device.drp-endpoint
+confirm exit_if_fail terraform apply -target=packet_device.drp-endpoint
 
 
 # view our completed plan status -- NOTE the "machines"
