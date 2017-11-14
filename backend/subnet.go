@@ -372,6 +372,34 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 			}
 			return res, nil
 		})
+	res["Proxy"] = index.Make(
+		false,
+		"boolean",
+		func(i, j models.Model) bool {
+			return (!fix(i).Proxy) && fix(j).Proxy
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			avail := fix(ref).Proxy
+			return func(s models.Model) bool {
+					v := fix(s).Proxy
+					return v || (v == avail)
+				},
+				func(s models.Model) bool {
+					return fix(s).Proxy && !avail
+				}
+		},
+		func(st string) (models.Model, error) {
+			res := &Subnet{Subnet: &models.Subnet{}}
+			switch st {
+			case "true":
+				res.Proxy = true
+			case "false":
+				res.Proxy = false
+			default:
+				return nil, errors.New("Proxy must be true or false")
+			}
+			return res, nil
+		})
 	return res
 }
 

@@ -48,10 +48,12 @@ type ProgOpts struct {
 	DisableTftpServer   bool   `long:"disable-tftp" description:"Disable TFTP server"`
 	DisableProvisioner  bool   `long:"disable-provisioner" description:"Disable provisioner"`
 	DisableDHCP         bool   `long:"disable-dhcp" description:"Disable DHCP server"`
+	DisablePXE          bool   `long:"disable-pxe" description:"Disable PXE/BINL server"`
 	StaticPort          int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
 	TftpPort            int    `long:"tftp-port" description:"Port for the TFTP server to listen on" default:"69"`
 	ApiPort             int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
 	DhcpPort            int    `long:"dhcp-port" description:"Port for the DHCP server to listen on" default:"67"`
+	PxePort             int    `long:"pxe-port" description:"Port for the PXE/BINL server to listen on" default:"4011"`
 	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
 	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
 	OurAddress          string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
@@ -228,10 +230,19 @@ func Server(c_opts *ProgOpts) {
 
 	if !c_opts.DisableDHCP {
 		logger.Printf("Starting DHCP server")
-		if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.DhcpPort, publishers); err != nil {
+		if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.DhcpPort, publishers, false); err != nil {
 			logger.Fatalf("Error starting DHCP server: %v", err)
 		} else {
 			services = append(services, svc)
+		}
+
+		if !c_opts.DisablePXE {
+			logger.Printf("Starting PXE/BINL server")
+			if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.PxePort, publishers, true); err != nil {
+				logger.Fatalf("Error starting PXE/BINL server: %v", err)
+			} else {
+				services = append(services, svc)
+			}
 		}
 	}
 
