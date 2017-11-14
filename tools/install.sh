@@ -167,20 +167,24 @@ ensure_packages() {
     fi
 }
 
-family=386
-if [[ $(uname -m) == x86_64 ]] ; then
-        family=amd64
-fi
+arch=$(uname -m)
+case $arch in
+	x86_64|amd64) arch=amd64 ;;
+	aarch64)      arch=arm64 ;;
+	*) 	echo "FATAL: architecture ('$arch') not supported"
+		exit 1 
+	;;
+esac
 
 case $(uname -s) in
     Darwin)
-        binpath="bin/darwin/$family"
+        binpath="bin/darwin/$arch"
         bindest="/usr/local/bin"
         tar="command bsdtar"
         # Someday, handle adding all the launchd stuff we will need.
         shasum="command shasum -a 256";;
     Linux)
-        binpath="bin/linux/$family"
+        binpath="bin/linux/$arch"
         bindest="/usr/local/bin"
         tar="command bsdtar"
         if [[ -d /etc/systemd/system ]]; then
