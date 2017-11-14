@@ -66,23 +66,25 @@ go build -o drpcli-docs cmds/drpcli-docs/drpcli-docs.go
 # Put the drbundler tool in place.
 go install github.com/digitalrebar/provision/cmds/drbundler
 
-arches=("amd64")
-oses=("linux" "darwin" "windows")
-[[ $1 ]] && arches=($1)
-[[ $2 ]] && oses=($2)
-for arch in "${arches[@]}"; do
-    for os in "${oses[@]}"; do
-        (
-            export GOOS="$os" GOARCH="$arch"
-            echo "Building binaries for ${arch} ${os}"
-            binpath="bin/$os/$arch"
-            mkdir -p "$binpath"
-            go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli/drpcli.go
-            go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision/dr-provision.go
-            go generate cmds/incrementer/incrementer.go
-            go build -ldflags "$VERFLAGS" -o "$binpath/incrementer" cmds/incrementer/incrementer.go cmds/incrementer/content.go
-        )
-        done
-done
+# set our arch:os build pairs to compile for
+builds="amd64:linux amd64:darwin amd64:windows arm64:linux"
+
+# anything on command line will override our pairs listed above
+[[ $* ]] && builds="$*"
+
+for build in ${builds}; do
+  (
+    os=${build##*:}
+    arch=${build%:*}
+    export GOOS="$os" GOARCH="$arch"
+    echo "Building binaries for ${arch} ${os}"
+    binpath="bin/$os/$arch"
+    mkdir -p "$binpath"
+    go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli/drpcli.go
+    go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision/dr-provision.go
+    go generate cmds/incrementer/incrementer.go
+    go build -ldflags "$VERFLAGS" -o "$binpath/incrementer" cmds/incrementer/incrementer.go cmds/incrementer/content.go
+  )
+  done
 
 echo "To run tests, run: tools/test.sh"
