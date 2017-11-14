@@ -302,6 +302,35 @@ func (j *Job) Indexes() map[string]index.Maker {
 			job.EndTime = parsedTime
 			return job, nil
 		})
+	res["Current"] = index.Make(
+		false,
+		"boolean",
+		func(i, j models.Model) bool {
+			j1, j2 := fix(i), fix(j)
+			return (!j1.Current) && j2.Current
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			current := fix(ref).Current
+			return func(s models.Model) bool {
+					v := fix(s).Current
+					return v || (v == current)
+				},
+				func(s models.Model) bool {
+					return fix(s).Current && !current
+				}
+		},
+		func(s string) (models.Model, error) {
+			res := fix(j.New())
+			switch s {
+			case "true":
+				res.Current = true
+			case "false":
+				res.Current = false
+			default:
+				return nil, errors.New("Current must be true or false")
+			}
+			return res, nil
+		})
 	return res
 }
 
@@ -311,6 +340,11 @@ var JobValidStates []string = []string{
 	"failed",
 	"finished",
 	"incomplete",
+}
+
+func (j *Job) OnCreate() error {
+	j.Current = true
+	return nil
 }
 
 func (j *Job) OnLoad() error {
@@ -325,7 +359,9 @@ func (j *Job) OnLoad() error {
 }
 
 func (j *Job) OnChange(oldThing store.KeySaver) error {
-	j.oldState = AsJob(oldThing).State
+	ot := AsJob(oldThing)
+	j.Current = ot.Current
+	j.oldState = ot.State
 	return nil
 }
 
@@ -342,6 +378,11 @@ func (j *Job) Validate() {
 		}
 		j.SetValid()
 	}
+	if !j.Current {
+		j.SetValid()
+		j.SetAvailable()
+		return
+	}
 
 	objs := j.stores
 	tasks := objs("tasks")
@@ -353,7 +394,7 @@ func (j *Job) Validate() {
 		j.Errorf("Machine %s does not exist", j.Machine.String())
 	} else {
 		m = AsMachine(om)
-		if j.State == "failed" {
+		if j.oldState != j.State && j.State == "failed" {
 			m.Runnable = false
 			_, e2 := j.p.Save(objs, m)
 			j.AddError(e2)
@@ -407,6 +448,19 @@ func (j *Job) BeforeSave() error {
 		return j.MakeError(422, ValidationError, j)
 	}
 	return nil
+}
+
+func (j *Job) AfterSave() {
+	if !j.Current {
+		return
+	}
+	oldJ := j.stores("jobs").Find(j.Previous.String())
+	if oldJ == nil {
+		return
+	}
+	oj := oldJ.(*Job)
+	oj.Current = false
+	oj.p.Save(j.stores, oj)
 }
 
 func (j *Job) BeforeDelete() error {

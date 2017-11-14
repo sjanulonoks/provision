@@ -684,6 +684,11 @@ func (n *Machine) AfterDelete() {
 	if s := n.stores("stages").Find(n.Stage); s != nil {
 		AsStage(s).Render(n.stores, n, e).deregister(n.p.FS)
 	}
+	if j := n.stores("jobs").Find(n.CurrentJob.String()); j != nil {
+		job := AsJob(j)
+		job.Current = false
+		n.p.Save(n.stores, job)
+	}
 }
 
 func AsMachine(o models.Model) *Machine {
@@ -703,7 +708,7 @@ var machineLockMap = map[string][]string{
 	"create":  []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
 	"update":  []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
 	"patch":   []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
-	"delete":  []string{"stages", "bootenvs", "machines"},
+	"delete":  []string{"stages", "bootenvs", "machines", "jobs", "tasks"},
 	"actions": []string{"stages", "machines", "profiles", "params"},
 }
 
