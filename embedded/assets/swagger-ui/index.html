@@ -38,7 +38,9 @@
       if (url && url.length > 1) {
         url = decodeURIComponent(url[1]);
       } else {
-        url = "https://127.0.0.1:8092/swagger.json";
+        // does not work correctly with file:// URIs
+        var Location = window.location.protocol + "//" + window.location.hostname + ":" + window.location.port;
+        url = Location + "/swagger.json";
       }
 
       hljs.configure({
