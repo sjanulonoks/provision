@@ -199,6 +199,26 @@ func (h *DhcpHandler) listenAddrs(cm *ipv4.ControlMessage) []*net.IPNet {
 	return res
 }
 
+func (h *DhcpHandler) isOneOfMyAddrs(srcAddr net.IP) bool {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return true
+	}
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			ip, _, _ := net.ParseCIDR(addr.String())
+			if ip.Equal(srcAddr) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (h *DhcpHandler) listenIPs(cm *ipv4.ControlMessage) []net.IP {
 	addrs := h.listenAddrs(cm)
 	res := make([]net.IP, len(addrs))
@@ -318,6 +338,17 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 	req, reqState := reqAddr(p, msgType, options)
 	var err error
 	switch msgType {
+	case dhcp.Offer:
+		serverBytes, ok := options[dhcp.OptionServerIdentifier]
+		server := net.IP(serverBytes)
+		if ok && !h.isOneOfMyAddrs(server) {
+			h.Infof("%s: Competing DHCP server on network: %s", xid(p), server)
+		}
+		if !h.isOneOfMyAddrs(cm.Src) {
+			h.Infof("%s: Competing DHCP server on network: %s", xid(p), cm.Src)
+		}
+
+		return nil
 	case dhcp.Decline:
 		if h.proxyOnly {
 			return nil
