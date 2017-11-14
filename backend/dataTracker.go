@@ -954,7 +954,7 @@ func (p *DataTracker) Patch(d Stores, obj models.Model, key string, patch jsonpa
 	resBuf, patchErr, loc := patch.Apply(buf)
 	if patchErr != nil {
 		err := &models.Error{
-			Code:  http.StatusNotAcceptable,
+			Code:  http.StatusConflict,
 			Key:   key,
 			Model: ref.Prefix(),
 			Type:  "PATCH",
@@ -967,7 +967,7 @@ func (p *DataTracker) Patch(d Stores, obj models.Model, key string, patch jsonpa
 	toSave := ref.New()
 	if err := json.Unmarshal(resBuf, &toSave); err != nil {
 		retErr := &models.Error{
-			Code:  http.StatusConflict,
+			Code:  http.StatusNotAcceptable,
 			Key:   key,
 			Model: ref.Prefix(),
 			Type:  "PATCH",
