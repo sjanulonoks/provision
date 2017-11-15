@@ -7,7 +7,8 @@ fgrep -q "$GOPATH/bin" <<< "$PATH" || export PATH="$PATH:$GOPATH/bin"
 
 [[ -d "$GOPATH/src/github.com/digitalrebar/provision" ]] || go get github.com/digitalrebar/provision
 
-cd "$GOPATH/src/github.com/digitalrebar/provision"
+BLD="$GOPATH/src/github.com/digitalrebar/provision"
+cd $BLD
 if ! which go &>/dev/null; then
         echo "Must have go installed"
         exit 255
@@ -67,7 +68,7 @@ go build -o drpcli-docs cmds/drpcli-docs/drpcli-docs.go
 go install github.com/digitalrebar/provision/cmds/drbundler
 
 # set our arch:os build pairs to compile for
-builds="amd64:linux amd64:darwin amd64:windows arm64:linux"
+builds="amd64:linux amd64:darwin amd64:windows arm64:linux arm:7:linux"
 
 # anything on command line will override our pairs listed above
 [[ $* ]] && builds="$*"
@@ -76,15 +77,28 @@ for build in ${builds}; do
   (
     os=${build##*:}
     arch=${build%:*}
-    export GOOS="$os" GOARCH="$arch"
-    echo "Building binaries for ${arch} ${os}"
-    binpath="bin/$os/$arch"
+    export GOARM=""
+
+    if [[ "$arch" =~ ^arm:[567]$ ]]
+    then
+      ver=${arch##*:}
+      arch=${arch%:*}
+      export GOARM=$ver
+      ver_part=" (v$ver)"
+      binpath="bin/$os/${arch}_v${GOARM}"
+    else
+      ver_part=""
+      binpath="bin/$os/$arch"
+    fi
+
+    export GOOS="$os" GOARCH="$arch" 
+    echo "Building binaries for ${arch}${ver_part} ${os} (staging to: '$BLD/$binpath')"
     mkdir -p "$binpath"
     go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli/drpcli.go
     go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision/dr-provision.go
     go generate cmds/incrementer/incrementer.go
     go build -ldflags "$VERFLAGS" -o "$binpath/incrementer" cmds/incrementer/incrementer.go cmds/incrementer/content.go
   )
-  done
+done
 
 echo "To run tests, run: tools/test.sh"
