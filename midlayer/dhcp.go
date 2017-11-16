@@ -76,18 +76,18 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 		opts[dhcp.OptionRebindingTimeValue] = rbt
 	} else {
 		dur = 0
-	}
 
-	// Build PXEClient reply parts to get the client booting.
-	if srcOpts[int(dhcp.OptionClientArchitecture)] == "0" {
-		// Option encoded byte array: option 6: len: 1 value: 8, 255 (end of options)
-		opts[dhcp.OptionVendorSpecificInformation] = []byte{6, 1, 8, 255}
-	}
-	opts[dhcp.OptionVendorClassIdentifier] = []byte("PXEClient")
+		// Build PXEClient reply parts to get the client booting.
+		if srcOpts[int(dhcp.OptionClientArchitecture)] == "0" {
+			// Option encoded byte array: option 6: len: 1 value: 8, 255 (end of options)
+			opts[dhcp.OptionVendorSpecificInformation] = []byte{6, 1, 8, 255}
+		}
+		opts[dhcp.OptionVendorClassIdentifier] = []byte("PXEClient")
 
-	// Send back the GUID if we got a guid
-	if options[97] != nil {
-		opts[97] = options[97]
+		// Send back the GUID if we got a guid
+		if options[97] != nil {
+			opts[97] = options[97]
+		}
 	}
 
 	nextServer := h.respondFrom(l.Addr, cm)
@@ -541,9 +541,8 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 					repType = dhcp.ACK
 					addr = p.YIAddr()
 				}
-				if subnet != nil && subnet.Proxy && !h.proxyOnly {
-					// Proxy should force broadcast if we are the DHCP subnet proxy
-					p.SetBroadcast(true)
+				if (subnet != nil && subnet.Proxy) || h.proxyOnly {
+					// Return the address if we are a proxy
 					addr = p.YIAddr()
 				}
 				reply := dhcp.ReplyPacket(p, repType,
@@ -551,8 +550,15 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 					addr,
 					duration,
 					opts.SelectOrderOrAll(opts[dhcp.OptionParameterRequestList]))
-				if nextServer.IsGlobalUnicast() {
-					reply.SetSIAddr(nextServer)
+				if (subnet != nil && subnet.Proxy) || h.proxyOnly {
+					// If we are a true proxy (NOT BINL/PXE), then broadcast
+					if !h.proxyOnly {
+						reply.SetBroadcast(true)
+					}
+					// Say who we are.
+					if nextServer.IsGlobalUnicast() {
+						reply.SetSIAddr(nextServer)
+					}
 				}
 				h.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
 				return reply
