@@ -25,9 +25,9 @@ further down in this README:
 
   * get the 5min-drp code from the github repo
 
-  * have a packet.net account, and your API KEY, and PROJECT ID
-
-  * get your RackN USERNAME for registered content download authorization
+  * get your API and Username secrets - modify the "secrets" file
+    * have a packet.net account, and your API KEY, and PROJECT ID
+    * get your RackN USERNAME for registered content download authorization
 
   * [optional] make changes to the terraform "vars.tf" parameters
 
@@ -94,7 +94,7 @@ FINAL CHECK BEFORE RUNNING
     (change 'cluster_name', 'machines_count', etc....)
 
 
-[optional] MODIFY THE TERRAFOMR "vars.tf" FILE
+[optional] MODIFY THE TERRAFORM "vars.tf" FILE
 ----------------------------------------------
 
   * you may optionally make changes to the "vars.tf" file - specifically, you can 
@@ -122,12 +122,22 @@ process.  Simply start this script.
 If you re-run the script and want to skip steps that have run previously, simply 
 answer "no" to the "ACTION" input. 
 
+USAGE options for "demo-run.sh"
+
+  CONFIRM=no ./demo-run.sh      # disable prompting for each step - auto run
+  SKIP_LOCAL=yes ./demo-run.sh  # skip installing DRP locally - if you have a
+                                # current copy installed already - mostly used
+                                # in bandwidth constrained environments to 
+                                # avoid downloading the dr-provision.zip
+
+  CONFIRM and SKIP_LOCAL can be combined if you choose
 
 WHAT HAPPENS?
 -------------
 
 1.  set PATH to include the ./bin directory for DRP and terraform/etc.
-2.  install terraform locally in your ./bin directory
+2.  install terraform locally in your ./bin directory 
+    (can be skipped, eg for demo in bandwidth constrained environments)
 3.  install the secrets to the terraform vars.tf file
 4.  create SSH keys for DRP endpoint and nodes
 5.  inject the SSH keys in to packet.net Project
@@ -139,6 +149,7 @@ WHAT HAPPENS?
 10. set the DRP endpoint IP address to terraform 'drp-machines.tf'
 11. kick over "N" number of machines to provision against the new
     DRP endpoint 
+    (set "N" in vars.tf for "machines_count" variable)
 
 
 CLEANUP:
@@ -147,9 +158,8 @@ CLEANUP:
 You can cleanup/reset the 5min-drp/ directory back to "factory
 defaults" with the following:
 
-  bin/terraform destroy --force
+  bin/terraform destroy --force # wipe the terraform resources
   bin/control.sh cleanup        # restores ~/.terraformrc backup
-  bin/control.sh extra-cleanup
 
 
 WARNING:  THIS NUKES things - including your SSH keys, which 
@@ -183,6 +193,17 @@ set CONFIRM variable to "no":
 The entire demo will run through without (hopefully...) any interactions. 
 
 
+If you are running in a bandwidth constrained environment (ge poor WiFi, 
+or Cellular based Hotspot), and IF you have current version of DRP 
+installed on your laptop (and in your PATH), then you can skip the local
+download/install step, with:
+
+  SKIP_LOCAL=yes ./demo-run.sh
+
+
+CONFIRM and SKIP_LOCAL can be combined if you want.
+
+
 You can manually drive some things with the "bin/control.sh" script - simply
 run it with the "--usage" or "--help" flags, it'll print out usage statement. 
 
@@ -196,7 +217,7 @@ You can get your DRP Endpoint provisioned IP address with the "bin/control.sh"
 script (AFTER it has been successfully provisioned, of course):
 
   DRP_ID=`bin/control.sh get-drp-id`
-  DRP_IP=`bin/control.sh get-address $DRP_ID`
+  DRP_ADDR=`bin/control.sh get-address $DRP_ID`
 
 
 You can SSH directly to the DRP Endpoint using the injected SSH keys:

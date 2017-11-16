@@ -27,9 +27,14 @@ function xiterr() { [[ $1 =~ ^[0-9]+$ ]] && { local _xit=$1; shift; } || local _
 cloudia.sh
 
 CONFIRM=${CONFIRM:-"yes"}
+SKIP_LOCAL=${CONFIRM:-"no"}
+
+function sep() {
+  local _sep="--------------------------------------------------------------------------------"
+  cprintf $magenta "${_sep}\n"
+}
 
 function confirm() {
-  local _sep="--------------------------------------------------------------------------------"
   local _err=0
   local _wait=yes
   local _exit_if_fail=0
@@ -43,7 +48,7 @@ function confirm() {
   [[ $1 == "exit_if_fail" ]] && { shift 1; _exit_if_fail=1; }
 
   echo ""
-  cprintf $magenta "${_sep}\n"
+  sep
   echo "$_action :: $_msg"
 
   if [[ $CONFIRM == "yes" ]] 
@@ -55,10 +60,10 @@ function confirm() {
   if [[ "$_wait" =~ [Nn].* ]] 
   then
     echo "$_skipping"
-    echo "$_sep"
+    sep
     return
   else
-    echo "$_sep"
+    sep
     echo ""
     eval $*
     _err=$?
@@ -110,8 +115,16 @@ confirm exit_if_fail terraform apply -target=packet_device.drp-endpoint
 # do NOT get applied until after 'drp' endpoint is finished 
 confirm terraform plan                    
 
-# installs DRP locally for CLI commands
-confirm control.sh get-drp-local        
+if [[ SKIP_LOCAL == "no" ]] 
+then
+  # installs DRP locally for CLI commands
+  confirm control.sh get-drp-local        
+else
+  sep
+  _skip_local=`cprintf $green "Skipping 'get-drp-local' as requested... "`
+  echo "$_skip_local"
+  sep
+fi
 
 # get the DRP endpoint server ID
 confirm control.sh get-drp-id           
