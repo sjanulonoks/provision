@@ -57,8 +57,9 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 	}
 
 	opts := make(dhcp.Options)
+	options := p.ParseOptions()
 	srcOpts := map[int]string{}
-	for c, v := range p.ParseOptions() {
+	for c, v := range options {
 		srcOpts[int(c)] = convertByteToOptionValue(c, v)
 		h.Debugf("Received option: %v: %v", c, srcOpts[int(c)])
 	}
@@ -75,6 +76,18 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 		opts[dhcp.OptionRebindingTimeValue] = rbt
 	} else {
 		dur = 0
+	}
+
+	// Build PXEClient reply parts to get the client booting.
+	if srcOpts[int(dhcp.OptionClientArchitecture)] == "0" {
+		// Option encoded byte array: option 6: len: 1 value: 8, 255 (end of options)
+		opts[dhcp.OptionVendorSpecificInformation] = []byte{6, 1, 8, 255}
+	}
+	opts[dhcp.OptionVendorClassIdentifier] = []byte("PXEClient")
+
+	// Send back the GUID if we got a guid
+	if options[97] != nil {
+		opts[97] = options[97]
 	}
 
 	nextServer := h.respondFrom(l.Addr, cm)
@@ -327,12 +340,13 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 	msgType dhcp.MessageType,
 	options dhcp.Options,
 	cm *ipv4.ControlMessage) (res dhcp.Packet) {
-	h.Infof("Received DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s chaddr %s",
+	h.Infof("Received DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s server %s chaddr %s",
 		msgType.String(),
 		xid(p),
 		p.CIAddr(),
 		p.YIAddr(),
 		p.GIAddr(),
+		p.SIAddr(),
 		p.CHAddr().String())
 	// need code to figure out which interface or relay it came from
 	req, reqState := reqAddr(p, msgType, options)
@@ -514,7 +528,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 				} else {
 					h.Debugf("%s: Resusing lease for %s", xid(p), lease.Addr)
 				}
-				opts, duration, _ := h.buildOptions(p, lease, subnet, reservation, cm)
+				opts, duration, nextServer := h.buildOptions(p, lease, subnet, reservation, cm)
 				repType := dhcp.Offer
 				addr := lease.Addr
 				// Depending upon proxy state, we'll do different things.
@@ -537,6 +551,9 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 					addr,
 					duration,
 					opts.SelectOrderOrAll(opts[dhcp.OptionParameterRequestList]))
+				if nextServer.IsGlobalUnicast() {
+					reply.SetSIAddr(nextServer)
+				}
 				h.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
 				return reply
 			}
@@ -549,7 +566,9 @@ func (h *DhcpHandler) Shutdown(ctx context.Context) error {
 	h.Printf("Shutting down DHCP handler")
 	h.closing = true
 	h.conn.Close()
-	h.pinger.Close()
+	if h.pinger != nil {
+		h.pinger.Close()
+	}
 	h.waitGroup.Wait()
 	h.Printf("DHCP handler shut down")
 	return nil
