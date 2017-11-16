@@ -169,8 +169,9 @@ ensure_packages() {
 
 arch=$(uname -m)
 case $arch in
-	x86_64|amd64) arch=amd64 ;;
-	aarch64)      arch=arm64 ;;
+	x86_64|amd64) arch=amd64  ;;
+	aarch64)      arch=arm64  ;;
+  armv7l)       arch=arm_v7 ;;
 	*) 	echo "FATAL: architecture ('$arch') not supported"
 		exit 1 
 	;;
