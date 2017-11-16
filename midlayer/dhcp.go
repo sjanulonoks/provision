@@ -356,10 +356,10 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
 		if ok && !h.isOneOfMyAddrs(server) {
-			h.Infof("%s: Competing DHCP server on network: %s", xid(p), server)
+			h.Printf("WARNING: %s: Competing DHCP server on network: %s", xid(p), server)
 		}
 		if !h.isOneOfMyAddrs(cm.Src) {
-			h.Infof("%s: Competing DHCP server on network: %s", xid(p), cm.Src)
+			h.Printf("WARNING: %s: Competing DHCP server on network: %s", xid(p), cm.Src)
 		}
 
 		return nil
@@ -412,7 +412,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
 		if ok && !h.listenOn(server, cm) {
-			h.Infof("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
+			h.Printf("WARNING: %s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
 			return nil
 		}
 		if !req.IsGlobalUnicast() {
@@ -439,6 +439,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 						lease.Token,
 						err)
 				} else {
+					h.Printf("WARNING: %s: Another DHCP server may be on the network: %s", xid(p), net.IP(server))
 					h.Infof("%s: %s is no longer able to be leased: %s",
 						xid(p),
 						req,
