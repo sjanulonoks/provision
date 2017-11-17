@@ -68,6 +68,8 @@ type SubnetListPathParameter struct {
 	Name string
 	// in: query
 	Enabled string
+	// in: query
+	Proxy string
 }
 
 func (f *Frontend) InitSubnetApi() {
@@ -89,6 +91,8 @@ func (f *Frontend) InitSubnetApi() {
 	//    Available = boolean
 	//    Valid = boolean
 	//    ReadOnly = boolean
+	//    Enabled = boolean
+	//    Proxy = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value
@@ -132,6 +136,8 @@ func (f *Frontend) InitSubnetApi() {
 	//    Available = boolean
 	//    Valid = boolean
 	//    ReadOnly = boolean
+	//    Enabled = boolean
+	//    Proxy = boolean
 	//
 	// Functions:
 	//    Eq(value) = Return items that are equal to value

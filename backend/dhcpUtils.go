@@ -106,7 +106,7 @@ func FindLease(dt *DataTracker,
 	return
 }
 
-func findViaReservation(leases, reservations *Store, strat, token string, req net.IP) (lease *Lease, reservation *Reservation) {
+func findViaReservation(leases, reservations *Store, strat, token string, req net.IP) (lease *Lease, reservation *Reservation, ok bool) {
 	if req != nil && req.IsGlobalUnicast() {
 		hex := models.Hexaddr(req)
 		ok := reservations.Find(hex)
@@ -130,7 +130,9 @@ func findViaReservation(leases, reservations *Store, strat, token string, req ne
 	}
 	// We found a reservation for this strategy/token
 	// combination, see if we can create a lease using it.
+	ok = false
 	if found := leases.Find(reservation.Key()); found != nil {
+		ok = true
 		// We found a lease for this IP.
 		lease = AsLease(found)
 		if lease.Token == reservation.Token &&
@@ -162,7 +164,6 @@ func findViaReservation(leases, reservations *Store, strat, token string, req ne
 	lease.Strategy = reservation.Strategy
 	lease.Token = reservation.Token
 	lease.State = "OFFER"
-	leases.Add(lease)
 	return
 }
 
@@ -185,6 +186,16 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 	}
 	if !subnet.Enabled {
 		// Subnet isn't enabled, don't give out leases.
+		return
+	}
+	// Return a fake lease
+	if subnet.Proxy {
+		fresh = true
+		lease = &Lease{}
+		Fill(lease)
+		lease.Strategy = strat
+		lease.Token = token
+		lease.State = "OFFER"
 		return
 	}
 	currLeases, _ := index.Between(
@@ -248,7 +259,8 @@ func FindOrCreateLease(dt *DataTracker,
 	d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
 	defer unlocker()
 	leases, reservations, subnets := d("leases"), d("reservations"), d("subnets")
-	lease, reservation = findViaReservation(leases, reservations, strat, token, req)
+	var ok bool
+	lease, reservation, ok = findViaReservation(leases, reservations, strat, token, req)
 	if lease == nil {
 		lease, subnet, fresh = findViaSubnet(leases, subnets, reservations, strat, token, req, via)
 	} else {
@@ -266,9 +278,18 @@ func FindOrCreateLease(dt *DataTracker,
 			}
 		}
 		leases.Remove(toRemove...)
-		lease.p = dt
+
+		// If ViaReservation created it, then add it
+		if !ok && (subnet == nil || !subnet.Proxy) {
+			leases.Add(lease)
+		}
 		lease.ExpireTime = time.Now().Add(time.Minute)
-		dt.Save(d, lease)
+
+		// If we are proxy, we don't save leases.  The address is empty.
+		if subnet == nil || !subnet.Proxy {
+			lease.p = dt
+			dt.Save(d, lease)
+		}
 	}
 	return
 }
