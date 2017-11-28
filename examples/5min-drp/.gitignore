@@ -18,4 +18,4 @@ drpcli
 packet-ipmi-plugin-create.json
 stagemap-create.json
 !private-content/secrets
-examples/5min-drp/NOTES
+NOTES
