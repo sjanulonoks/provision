@@ -480,12 +480,7 @@ func (n *Machine) Validate() {
 	if n.Uuid == nil {
 		n.Errorf("Machine %#v was not assigned a uuid!", n)
 	}
-	if n.Name == "" {
-		n.Errorf("Missing Name")
-	}
-	if strings.Contains(n.Name, "/") || strings.Contains(n.Name, "\\") {
-		n.Errorf("Name must not contain a '/' or '\\'")
-	}
+	n.Machine.Validate()
 	validateMaybeZeroIP4(n, n.Address)
 	n.AddError(index.CheckUnique(n, n.stores("machines").Items()))
 	n.SetValid()
@@ -538,6 +533,12 @@ func (n *Machine) Validate() {
 				if stage.BootEnv != "" {
 					// BootEnv should still be valid because Stage is valid.
 					n.BootEnv = stage.BootEnv
+					// If the bootenv changes, force the machine to not Runnable.
+					// This keeps the task list from advancing in the wrong
+					// BootEnv.
+					if n.oldBootEnv != n.BootEnv {
+						n.Runnable = false
+					}
 				}
 				n.Tasks = make([]string, len(stage.Tasks))
 				copy(n.Tasks, stage.Tasks)
@@ -599,11 +600,29 @@ func (n *Machine) BeforeSave() error {
 	if !n.Available {
 		n.Runnable = false
 	}
-	if n.oldBootEnv != n.BootEnv &&
-		strings.HasSuffix(n.BootEnv, "-install") {
-		env := n.stores("bootenvs").Find(n.BootEnv).(*BootEnv)
-		n.OS = env.OS.Name
+
+	// Set the features meta tag.
+	n.ClearFeatures()
+	env := n.stores("bootenvs").Find(n.BootEnv)
+	if env != nil {
+		// Glean OS
+		if n.oldBootEnv != n.BootEnv &&
+			strings.HasSuffix(n.BootEnv, "-install") {
+			n.OS = env.(*BootEnv).OS.Name
+		}
+		n.MergeFeatures(env.(*BootEnv).Features())
 	}
+	stage := n.stores("stages").Find(n.Stage)
+	if stage != nil {
+		n.MergeFeatures(stage.(*Stage).Features())
+	}
+	if n.HasFeature("original-change-stage") {
+		n.RemoveFeature("change-stage-v2")
+	}
+	if !n.HasFeature("change-stage-v2") {
+		n.AddFeature("original-change-stage")
+	}
+
 	return nil
 }
 func (n *Machine) AfterSave() {
@@ -704,12 +723,12 @@ func AsMachines(o []models.Model) []*Machine {
 }
 
 var machineLockMap = map[string][]string{
-	"get":     []string{"stages", "machines", "profiles", "params"},
+	"get":     []string{"stages", "bootenvs", "machines", "profiles", "params"},
 	"create":  []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
 	"update":  []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
 	"patch":   []string{"stages", "bootenvs", "machines", "tasks", "profiles", "templates", "params"},
 	"delete":  []string{"stages", "bootenvs", "machines", "jobs", "tasks"},
-	"actions": []string{"stages", "machines", "profiles", "params"},
+	"actions": []string{"stages", "bootenvs", "machines", "profiles", "params"},
 }
 
 func (m *Machine) Locks(action string) []string {

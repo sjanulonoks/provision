@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/digitalrebar/provision/models"
@@ -21,7 +22,7 @@ type PluginProvidersResponse struct {
 	Body []*models.PluginProvider
 }
 
-// swagger:parameters getPluginProvider uploadPluginProvider deletePluginProvider
+// swagger:parameters getPluginProvider headPluginProviders uploadPluginProvider deletePluginProvider
 type PluginProviderParameter struct {
 	// in: path
 	Name string `json:"name"`
@@ -62,6 +63,31 @@ func (f *Frontend) InitPluginProviderApi() {
 			c.JSON(http.StatusOK, f.pc.GetPluginProviders())
 		})
 
+	// swagger:route HEAD /plugin_providers PluginProviders headPluginProviders
+	//
+	// Stats of the list of plugin_provider on the system to create plugins
+	//
+	//     Produces:
+	//       application/json
+	//
+	//     Responses:
+	//       200: PluginProvidersResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       406: ErrorResponse
+	//       500: ErrorResponse
+	f.ApiGroup.HEAD("/plugin_providers",
+		func(c *gin.Context) {
+			if !f.assureAuth(c, "plugin_providers", "list", "") {
+				return
+			}
+			pp := f.pc.GetPluginProviders()
+			count := fmt.Sprintf("%d", len(pp))
+			c.Header("X-DRP-LIST-TOTAL-COUNT", count)
+			c.Header("X-DRP-LIST-COUNT", count)
+			c.Status(http.StatusOK)
+		})
+
 	// swagger:route GET /plugin_providers/{name} PluginProviders getPluginProvider
 	//
 	// Get a specific plugin with {name}
@@ -97,6 +123,30 @@ func (f *Frontend) InitPluginProviderApi() {
 				c.JSON(res.Code, res)
 			}
 
+		})
+
+	// swagger:route HEAD /plugin_providers/{name} PluginProviders headPluginProvider
+	//
+	// See if a Plugin Provider exists
+	//
+	// Return 200 if the Plugin Provider specified by {name} exists, or return NotFound.
+	//
+	//     Responses:
+	//       200: NoContentResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: NoContentResponse
+	f.ApiGroup.HEAD("/plugin_providers/:name",
+		func(c *gin.Context) {
+			if !f.assureAuth(c, "plugin_providers", "get", c.Param(`name`)) {
+				return
+			}
+			pp := f.pc.GetPluginProvider(c.Param(`name`))
+			if pp != nil {
+				c.Status(http.StatusOK)
+			} else {
+				c.Status(http.StatusNotFound)
+			}
 		})
 
 	// swagger:route POST /plugin_providers/{name} PluginProviders uploadPluginProvider

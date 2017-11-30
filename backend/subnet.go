@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"net"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/digitalrebar/provision/backend/index"
@@ -510,9 +509,7 @@ func AsSubnets(o []models.Model) []*Subnet {
 }
 
 func (s *Subnet) Validate() {
-	if strings.Contains(s.Name, "/") || strings.Contains(s.Name, "\\") {
-		s.Errorf("Name must not contain a '/' or '\\'")
-	}
+	s.Subnet.Validate()
 	_, subnet, err := net.ParseCIDR(s.Subnet.Subnet)
 	if err != nil {
 		s.Errorf("Invalid subnet %s: %v", s.Subnet.Subnet, err)
@@ -534,20 +531,20 @@ func (s *Subnet) Validate() {
 	needMask := true
 	needBCast := true
 	for _, opt := range s.Options {
-		if opt.Code == dhcp.OptionBroadcastAddress {
+		if opt.Code == byte(dhcp.OptionBroadcastAddress) {
 			opt.Value = net.IP(buf).String()
 			needBCast = false
 		}
-		if opt.Code == dhcp.OptionSubnetMask {
+		if opt.Code == byte(dhcp.OptionSubnetMask) {
 			opt.Value = mask.String()
 			needMask = false
 		}
 	}
 	if needMask {
-		s.Options = append(s.Options, &models.DhcpOption{dhcp.OptionSubnetMask, mask.String()})
+		s.Options = append(s.Options, &models.DhcpOption{byte(dhcp.OptionSubnetMask), mask.String()})
 	}
 	if needBCast {
-		s.Options = append(s.Options, &models.DhcpOption{dhcp.OptionBroadcastAddress, net.IP(buf).String()})
+		s.Options = append(s.Options, &models.DhcpOption{byte(dhcp.OptionBroadcastAddress), net.IP(buf).String()})
 	}
 
 	if !s.OnlyReservations {

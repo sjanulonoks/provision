@@ -53,6 +53,9 @@ chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 `,
 				},
 			},
+			MetaData: models.MetaData{Meta: map[string]string{
+				"feature-flags": "change-stage-v2",
+			}},
 		}
 
 		localBoot = &models.BootEnv{
@@ -86,11 +89,25 @@ exit
 `,
 				},
 			},
+			MetaData: models.MetaData{Meta: map[string]string{
+				"feature-flags": "change-stage-v2",
+			}},
 		}
 		noneStage = &models.Stage{
-			Name: "none",
+			Name:        "none",
+			Description: "Noop / Nothing stage",
 			MetaData: models.MetaData{Meta: map[string]string{
 				"icon":  "circle thin",
+				"color": "green",
+				"title": "Digital Rebar Provision",
+			}},
+		}
+		localStage = &models.Stage{
+			Name:        "local",
+			BootEnv:     "local",
+			Description: "Stage to boot into the local BootEnv.",
+			MetaData: models.MetaData{Meta: map[string]string{
+				"icon":  "radio",
 				"color": "green",
 				"title": "Digital Rebar Provision",
 			}},
@@ -102,12 +119,15 @@ exit
 	localBoot.ClearValidation()
 	ignoreBoot.ClearValidation()
 	noneStage.ClearValidation()
+	localStage.ClearValidation()
 	localBoot.Fill()
 	ignoreBoot.Fill()
 	noneStage.Fill()
+	localStage.Fill()
 	bootEnvs.Save("local", localBoot)
 	bootEnvs.Save("ignore", ignoreBoot)
 	stages.Save("none", noneStage)
+	stages.Save("local", localStage)
 	res.(*store.Memory).SetMetaData(map[string]string{
 		"Name":        "BasicStore",
 		"Description": "Default objects that must be present",
@@ -413,6 +433,10 @@ type DataTracker struct {
 	publishers          *Publishers
 }
 
+func (dt *DataTracker) reportPath(s string) string {
+	return strings.TrimPrefix(s, dt.FileRoot)
+}
+
 type Stores func(string) *Store
 
 func allKeySavers(res *DataTracker) []models.Model {
@@ -581,12 +605,12 @@ func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 	return
 }
 
-// This must be locked with ALL locks from the caller.
+// This must be locked with ALL locks on the source datatracker from the caller.
 func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, soft error) {
 	res := &DataTracker{
 		Backend:           backend,
-		FileRoot:          ".",
-		LogRoot:           ".",
+		FileRoot:          "baddir",
+		LogRoot:           "baddir",
 		StaticPort:        1,
 		ApiPort:           2,
 		OurAddress:        "1.1.1.1",
@@ -604,7 +628,9 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, so
 		publishers:        &Publishers{},
 	}
 
-	// Load stores. - This must be All locked by the caller
+	// Load stores.
+	_, ul := res.LockAll()
+	defer ul()
 	a, b := res.rebuildCache()
 	return a.HasError(), b.HasError()
 }
@@ -639,6 +665,7 @@ func NewDataTracker(backend store.Store,
 	}
 
 	// Make sure incoming writable backend has all stores created
+	_, ul := res.LockAll()
 	objs := allKeySavers(res)
 	for _, obj := range objs {
 		prefix := obj.Prefix()
@@ -648,11 +675,12 @@ func NewDataTracker(backend store.Store,
 		}
 	}
 
-	// Load stores. - This is implicitly locked because we are creating a new one.
+	// Load stores.
 	hard, _ := res.rebuildCache()
 	if hard.HasError() != nil {
 		res.Logger.Fatalf("dataTracker: Error loading data: %v", hard.HasError())
 	}
+	ul()
 
 	// Create minimal content.
 	d, unlocker := res.LockEnts("stages", "bootenvs", "preferences", "users", "machines", "profiles", "params")
@@ -680,8 +708,9 @@ func NewDataTracker(backend store.Store,
 
 	if d("profiles").Find(res.GlobalProfileName) == nil {
 		res.Create(d, &models.Profile{
-			Name:   res.GlobalProfileName,
-			Params: map[string]interface{}{},
+			Name:        res.GlobalProfileName,
+			Description: "Global profile attached automatically to all machines.",
+			Params:      map[string]interface{}{},
 			MetaData: models.MetaData{Meta: map[string]string{
 				"icon":  "world",
 				"color": "blue",

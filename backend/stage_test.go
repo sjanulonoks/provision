@@ -41,8 +41,8 @@ func TestStageCrud(t *testing.T) {
 	// List test.
 	bes := d("stages").Items()
 	if bes != nil {
-		if len(bes) != 8 {
-			t.Errorf("List function should have returned: 8, but got %d\n", len(bes))
+		if len(bes) != 9 {
+			t.Errorf("List function should have returned: 9, but got %d\n", len(bes))
 		}
 	} else {
 		t.Errorf("List function returned nil!!")

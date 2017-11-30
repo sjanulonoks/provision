@@ -279,7 +279,18 @@ func (f *Frontend) InitUserApi(drpid string) {
 			sttl, _ := c.GetQuery("ttl")
 			ttl := time.Hour
 			if sttl != "" {
-				ttl64, _ := strconv.ParseInt(sttl, 10, 64)
+				ttl64, err := strconv.ParseInt(sttl, 10, 64)
+				if err != nil {
+					res := &models.Error{
+						Type:  c.Request.Method,
+						Model: "users",
+						Key:   c.Param(`name`),
+						Code:  http.StatusBadRequest,
+					}
+					res.AddError(err)
+					c.JSON(res.Code, res)
+					return
+				}
 				ttl = time.Second * time.Duration(ttl64)
 			}
 			scope, _ := c.GetQuery("scope")

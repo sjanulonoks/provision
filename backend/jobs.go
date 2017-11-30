@@ -63,6 +63,10 @@ func (obj *Job) SetReadOnly(b bool) {
 	obj.ReadOnly = b
 }
 
+func (j *Job) LogPath() string {
+	return filepath.Join(j.p.LogRoot, j.Uuid.String())
+}
+
 func (obj *Job) SaveClean() store.KeySaver {
 	mod := *obj.Job
 	mod.ClearValidation()
@@ -334,17 +338,19 @@ func (j *Job) Indexes() map[string]index.Maker {
 	return res
 }
 
-var JobValidStates []string = []string{
-	"created",
-	"running",
-	"failed",
-	"finished",
-	"incomplete",
-}
-
 func (j *Job) OnCreate() error {
 	j.Current = true
-	return nil
+	if _, err := os.Stat(j.LogPath()); err != nil {
+		if f, err := os.Create(j.LogPath()); err != nil {
+			j.AddError(err)
+		} else {
+			f.Close()
+		}
+		buf := &bytes.Buffer{}
+		fmt.Fprintf(buf, "Log for Job: %s\n", j.Uuid.String())
+		j.AddError(j.Log(buf))
+	}
+	return j.HasError()
 }
 
 func (j *Job) OnLoad() error {
@@ -383,7 +389,7 @@ func (j *Job) Validate() {
 		j.SetAvailable()
 		return
 	}
-
+	j.Job.Validate()
 	objs := j.stores
 	tasks := objs("tasks")
 	stages := objs("stages")
@@ -413,24 +419,6 @@ func (j *Job) Validate() {
 	}
 	if env != nil && !env.Available {
 		j.Errorf("Stage %s is not available", j.Stage)
-	}
-
-	found := false
-	for _, s := range JobValidStates {
-		if s == j.State {
-			found = true
-			break
-		}
-	}
-	if !found {
-		j.Errorf("State %s is not valid", j.State)
-	}
-
-	if j.LogPath == "" {
-		j.LogPath = filepath.Join(j.p.LogRoot, j.Uuid.String())
-		buf := &bytes.Buffer{}
-		fmt.Fprintf(buf, "Log for Job: %s\n", j.Uuid.String())
-		j.AddError(j.Log(buf))
 	}
 
 	j.SetValid()
@@ -545,7 +533,7 @@ func (j *Job) RenderActions() ([]*models.JobAction, error) {
 }
 
 func (j *Job) Log(src io.Reader) error {
-	f, err := os.OpenFile(j.LogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(j.LogPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		fmt.Printf("Umm err: %v\n", err)
 		return err

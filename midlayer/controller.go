@@ -13,13 +13,11 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
-	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,7 +33,6 @@ type PluginController struct {
 	runningPlugins     map[string]*RunningPlugin
 	dt                 *backend.DataTracker
 	pluginDir          string
-	watcher            *fsnotify.Watcher
 	done               chan bool
 	finished           chan bool
 	events             chan *models.Event
@@ -52,16 +49,6 @@ func InitPluginController(pluginDir string, dt *backend.DataTracker, pubs *backe
 	pc.MachineActions = NewMachineActions()
 	pubs.Add(pc)
 
-	pc.watcher, err = fsnotify.NewWatcher()
-	if err != nil {
-		return
-	}
-
-	err = pc.watcher.Add(pc.pluginDir)
-	if err != nil {
-		return
-	}
-
 	pc.done = make(chan bool)
 	pc.finished = make(chan bool)
 	pc.events = make(chan *models.Event, 1000)
@@ -70,33 +57,6 @@ func InitPluginController(pluginDir string, dt *backend.DataTracker, pubs *backe
 		done := false
 		for !done {
 			select {
-			case event := <-pc.watcher.Events:
-				// Skip events on the parent directory.
-				if event.Name == pc.pluginDir {
-					continue
-				}
-				// Skip downloading files
-				if strings.HasSuffix(event.Name, ".part") {
-					continue
-				}
-
-				arr := strings.Split(event.Name, "/")
-				file := arr[len(arr)-1]
-				if event.Op&fsnotify.Remove == fsnotify.Remove {
-					pc.lock.Lock()
-					pc.removePluginProvider(file)
-					pc.lock.Unlock()
-				} else if event.Op&fsnotify.Write == fsnotify.Write ||
-					event.Op&fsnotify.Create == fsnotify.Create ||
-					event.Op&fsnotify.Chmod == fsnotify.Chmod {
-					pc.lock.Lock()
-					pc.importPluginProvider(file)
-					pc.lock.Unlock()
-				} else if event.Op&fsnotify.Rename == fsnotify.Rename {
-					pc.dt.Infof("debugPlugins", "Rename file: %s %v\n", event.Name, event)
-				} else {
-					pc.dt.Infof("debugPlugins", "Unhandled file event:", event.Name)
-				}
 			case event := <-pc.events:
 				if event.Action == "create" {
 					pc.lock.Lock()
@@ -138,8 +98,6 @@ func InitPluginController(pluginDir string, dt *backend.DataTracker, pubs *backe
 				} else {
 					pc.dt.Infof("debugPlugins", "internal event:", event)
 				}
-			case err := <-pc.watcher.Errors:
-				pc.dt.Infof("debugPlugins", "error:", err)
 			case <-pc.done:
 				done = true
 			}
@@ -147,23 +105,26 @@ func InitPluginController(pluginDir string, dt *backend.DataTracker, pubs *backe
 		pc.finished <- true
 	}()
 
+	err = pc.WalkPluginDir()
+	return
+}
+
+func (pc *PluginController) WalkPluginDir() error {
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
-
 	// Walk plugin dir contents with lock
 	files, err := ioutil.ReadDir(pc.pluginDir)
 	if err != nil {
-		return
+		return err
 	}
 	for _, f := range files {
+		pc.dt.Infof("debugPlugins", "Walk plugin dir: %s\n", f.Name())
 		err = pc.importPluginProvider(f.Name())
 		if err != nil {
-			return
+			return err
 		}
-
 	}
-
-	return
+	return nil
 }
 
 func (pc *PluginController) walkPlugins(provider string) (err error) {
@@ -189,7 +150,7 @@ func (pc *PluginController) walkPlugins(provider string) (err error) {
 func (pc *PluginController) Shutdown(ctx context.Context) error {
 	pc.done <- true
 	<-pc.finished
-	return pc.watcher.Close()
+	return nil
 }
 
 func (pc *PluginController) Publish(e *models.Event) error {
@@ -493,7 +454,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 }
 
 // Try to stop using plugins and remove available - Must lock before calling
-func (pc *PluginController) removePluginProvider(provider string) {
+func (pc *PluginController) removePluginProvider(provider string) error {
 	var name string
 	for _, pp := range pc.AvailableProviders {
 		if provider == pp.Name {
@@ -536,6 +497,8 @@ func (pc *PluginController) removePluginProvider(provider string) {
 		}()
 		delete(pc.AvailableProviders, name)
 	}
+
+	return nil
 }
 
 func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) (*models.PluginProviderUploadInfo, *models.Error) {
@@ -605,7 +568,16 @@ func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) 
 	os.Remove(ppName)
 	os.Rename(ppTmpName, ppName)
 	os.Chmod(ppName, 0700)
-	return &models.PluginProviderUploadInfo{Path: name, Size: copied}, nil
+
+	pc.lock.Lock()
+	defer pc.lock.Unlock()
+	var berr *models.Error
+	err = pc.importPluginProvider(name)
+	if err != nil {
+		berr = models.NewError("API ERROR", http.StatusBadRequest,
+			fmt.Sprintf("Import plugin failed %s: %v", name, err))
+	}
+	return &models.PluginProviderUploadInfo{Path: name, Size: copied}, berr
 }
 
 func (pc *PluginController) RemovePlugin(name string) error {
@@ -613,17 +585,7 @@ func (pc *PluginController) RemovePlugin(name string) error {
 	if err := os.Remove(pluginProviderName); err != nil {
 		return err
 	}
-
-	for true {
-		pc.lock.Lock()
-		_, ok := pc.AvailableProviders[name]
-		pc.lock.Unlock()
-		if !ok {
-			return nil
-		} else {
-			time.Sleep(time.Second)
-		}
-	}
-
-	return nil
+	pc.lock.Lock()
+	defer pc.lock.Unlock()
+	return pc.removePluginProvider(name)
 }

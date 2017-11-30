@@ -2,7 +2,6 @@ package backend
 
 import (
 	"errors"
-	"strings"
 	"sync"
 	"text/template"
 
@@ -144,9 +143,7 @@ func (s *Stage) genRoot(commonRoot *template.Template, e models.ErrorAdder) *tem
 }
 
 func (s *Stage) Validate() {
-	if strings.Contains(s.Name, "/") || strings.Contains(s.Name, "\\") {
-		s.Errorf("Name must not contain a '/' or '\\'")
-	}
+	s.Stage.Validate()
 	for idx, ti := range s.Templates {
 		ti.SanityCheck(idx, s, false)
 	}

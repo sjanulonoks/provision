@@ -91,7 +91,7 @@ func (p *Param) Indexes() map[string]index.Maker {
 }
 
 func (p *Param) Validate() {
-	p.AddError(p.ValidateSchema())
+	p.Param.Validate()
 	p.SetValid()
 	p.SetAvailable()
 }

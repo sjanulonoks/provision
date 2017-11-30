@@ -1,8 +1,6 @@
 package backend
 
 import (
-	"strings"
-
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
@@ -130,13 +128,8 @@ func (n *Plugin) setDT(p *DataTracker) {
 }
 
 func (n *Plugin) Validate() {
+	n.Plugin.Validate()
 	n.AddError(index.CheckUnique(n, n.stores("plugins").Items()))
-	if n.Provider == "" {
-		n.Errorf("Missing provider")
-	}
-	if strings.Contains(n.Name, "/") || strings.Contains(n.Name, "\\") {
-		n.Errorf("Name must not contain a '/' or '\\'")
-	}
 	n.SetValid()
 	n.SetAvailable()
 }

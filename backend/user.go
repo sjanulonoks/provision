@@ -1,8 +1,6 @@
 package backend
 
 import (
-	"strings"
-
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
@@ -93,10 +91,8 @@ func (u *User) ChangePassword(d Stores, newPass string) error {
 }
 
 func (u *User) Validate() {
+	u.User.Validate()
 	u.AddError(index.CheckUnique(u, u.stores("users").Items()))
-	if strings.Contains(u.Name, "/") || strings.Contains(u.Name, "\\") {
-		u.Errorf("Name must not contain a '/' or '\\'")
-	}
 	u.SetValid()
 	u.SetAvailable()
 }
