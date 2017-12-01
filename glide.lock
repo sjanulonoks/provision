@@ -122,7 +122,7 @@ imports:
   subpackages:
   - codec
 - name: github.com/VictorLowther/jsonpatch2
-  version: c7b50f49dce1ebe7c627bf0a92c87b633a45bf43
+  version: 728f2fee2a186b5764d9c9a8fa904279a22b1960
   subpackages:
   - utils
 - name: github.com/xeipuuv/gojsonpointer
