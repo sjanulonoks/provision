@@ -571,6 +571,9 @@ func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) 
 
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
+	// If it is here, remove it.
+	pc.removePluginProvider(name)
+
 	var berr *models.Error
 	err = pc.importPluginProvider(name)
 	if err != nil {
