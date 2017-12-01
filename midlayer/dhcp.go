@@ -102,7 +102,7 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 				h.Printf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
 				continue
 			}
-			opts[c] = v
+			opts[dhcp.OptionCode(c)] = v
 		}
 		if s.NextServer.IsGlobalUnicast() {
 			nextServer = s.NextServer
@@ -119,7 +119,7 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 				h.Printf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
 				continue
 			}
-			opts[c] = v
+			opts[dhcp.OptionCode(c)] = v
 		}
 		if r.NextServer.IsGlobalUnicast() {
 			nextServer = r.NextServer

@@ -135,6 +135,7 @@ func AsProfiles(o []models.Model) []*Profile {
 	return res
 }
 func (p *Profile) Validate() {
+	p.Profile.Validate()
 	p.AddError(index.CheckUnique(p, p.stores("profiles").Items()))
 	p.SetValid()
 	params := p.stores("params")

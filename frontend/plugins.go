@@ -325,7 +325,7 @@ func (f *Frontend) InitPluginApi() {
 			f.Remove(c, &backend.Plugin{}, c.Param(`name`))
 		})
 
-	pGetAll, pGetOne, pPatch, pSetThem, pSetOne := f.makeParamEndpoints(&backend.Plugin{}, "name")
+	pGetAll, pGetOne, pPatch, pSetThem, pSetOne, pDeleteOne := f.makeParamEndpoints(&backend.Plugin{}, "name")
 
 	// swagger:route GET /plugins/{name}/params Plugins getPluginParams
 	//
@@ -353,6 +353,19 @@ func (f *Frontend) InitPluginApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/plugins/:name/params/*key", pGetOne)
 
+	// swagger:route DELETE /plugins/{uuid}/params/{key} Plugins getPluginParam
+	//
+	// Delete a single plugin parameter
+	//
+	// Delete a single parameter {key} for a Plugin specified by {uuid}
+	//
+	//     Responses:
+	//       200: PluginParamResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.DELETE("/plugins/:name/params/*key", pDeleteOne)
+
 	// swagger:route PATCH /plugins/{name}/params Plugins patchPluginParams
 	//
 	// Update params for Plugin {name} with the passed-in patch
@@ -367,7 +380,7 @@ func (f *Frontend) InitPluginApi() {
 
 	// swagger:route POST /plugins/{name}/params Plugins postPluginParams
 	//
-	// Sets parameters for a machine specified by {name}
+	// Sets parameters for a plugin specified by {name}
 	//
 	//     Responses:
 	//       200: PluginParamsResponse
@@ -379,7 +392,7 @@ func (f *Frontend) InitPluginApi() {
 
 	// swagger:route POST /plugins/{name}/params/{key} Plugins postPluginParam
 	//
-	// Set as single Parameter {key} for a machine specified by {name}
+	// Set as single Parameter {key} for a plugin specified by {name}
 	//
 	//     Responses:
 	//       200: PluginParamResponse

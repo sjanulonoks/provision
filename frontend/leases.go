@@ -1,9 +1,6 @@
 package frontend
 
 import (
-	"net"
-	"net/http"
-
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
@@ -70,22 +67,6 @@ type LeaseListPathParameter struct {
 	Strategy string
 	// in: query
 	ExpireTime string
-}
-
-func ipOrFail(c *gin.Context, model string) (net.IP, bool) {
-	ip := net.ParseIP(c.Param(`address`))
-	if ip != nil {
-		return ip, false
-	}
-	res := &models.Error{
-		Code:  http.StatusBadRequest,
-		Model: model,
-		Key:   c.Param(`address`),
-		Type:  c.Request.Method,
-	}
-	res.Errorf("address not valid")
-	c.JSON(res.Code, res)
-	return nil, true
 }
 
 func (f *Frontend) InitLeaseApi() {
@@ -189,11 +170,7 @@ func (f *Frontend) InitLeaseApi() {
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/leases/:address",
 		func(c *gin.Context) {
-			ip, fail := ipOrFail(c, "leases")
-			if fail {
-				return
-			}
-			f.Fetch(c, &backend.Lease{}, models.Hexaddr(ip))
+			f.Fetch(c, &backend.Lease{}, ifIpConvertToHex(c.Param(`address`)))
 		})
 
 	// swagger:route HEAD /leases/{address} Leases headLease
@@ -209,7 +186,7 @@ func (f *Frontend) InitLeaseApi() {
 	//       404: NoContentResponse
 	f.ApiGroup.HEAD("/leases/:address",
 		func(c *gin.Context) {
-			f.Exists(c, &backend.Lease{}, c.Param(`address`))
+			f.Exists(c, &backend.Lease{}, ifIpConvertToHex(c.Param(`address`)))
 		})
 
 	// swagger:route DELETE /leases/{address} Leases deleteLease
@@ -228,10 +205,6 @@ func (f *Frontend) InitLeaseApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.DELETE("/leases/:address",
 		func(c *gin.Context) {
-			ip, fail := ipOrFail(c, "leases")
-			if fail {
-				return
-			}
-			f.Remove(c, &backend.Lease{}, models.Hexaddr(ip))
+			f.Remove(c, &backend.Lease{}, ifIpConvertToHex(c.Param(`address`)))
 		})
 }

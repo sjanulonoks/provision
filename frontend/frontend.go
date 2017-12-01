@@ -89,7 +89,7 @@ func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 }
 
 func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
-	getAll, getOne, patchThem, setThem, setOne func(c *gin.Context)) {
+	getAll, getOne, patchThem, setThem, setOne, deleteOne func(c *gin.Context)) {
 	trimmer := func(s string) string {
 		return strings.TrimLeft(s, `/`)
 	}
@@ -150,7 +150,7 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 		}
 		return !found
 	}
-	return func(c *gin.Context) {
+	return /* getAll */ func(c *gin.Context) {
 			id := c.Param(idKey)
 			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
@@ -161,7 +161,7 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 			}
 			c.JSON(http.StatusOK, params)
 		},
-		func(c *gin.Context) {
+		/* getOne */ func(c *gin.Context) {
 			id := c.Param(idKey)
 			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
@@ -172,7 +172,7 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 			}
 			c.JSON(http.StatusOK, params[trimmer(c.Param("key"))])
 		},
-		func(c *gin.Context) {
+		/* patchThem */ func(c *gin.Context) {
 			id := c.Param(idKey)
 			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
@@ -216,7 +216,7 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 				c.JSON(http.StatusOK, res)
 			}
 		},
-		func(c *gin.Context) {
+		/* setThem */ func(c *gin.Context) {
 			id := c.Param(idKey)
 			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
@@ -237,7 +237,7 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 				c.JSON(http.StatusOK, res)
 			}
 		},
-		func(c *gin.Context) {
+		/* setOne */ func(c *gin.Context) {
 			id := c.Param(idKey)
 			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
@@ -252,6 +252,35 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 					*models.Error) {
 					params[trimmer(c.Param("key"))] = replacement
 					return params, replacement, nil
+				})
+			if err != nil {
+				c.JSON(err.Code, err)
+			} else {
+				c.JSON(http.StatusOK, res)
+			}
+		},
+		/* deleteOne */ func(c *gin.Context) {
+			id := c.Param(idKey)
+			if !f.assureAuth(c, obj.Prefix(), "get", id) {
+				return
+			}
+			res, err := pSet(c, id, "Params",
+				func(m backend.Paramer,
+					params map[string]interface{}) (map[string]interface{}, interface{},
+					*models.Error) {
+					k := trimmer(c.Param("key"))
+					if _, ok := params[k]; ok {
+						res := params[k]
+						delete(params, k)
+						return params, res, nil
+					} else {
+						return params, nil, &models.Error{
+							Code:  http.StatusNotFound,
+							Type:  c.Request.Method,
+							Model: "params",
+							Key:   k,
+						}
+					}
 				})
 			if err != nil {
 				c.JSON(err.Code, err)
@@ -570,6 +599,10 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	if !assureContentType(c, "application/json") {
 		return false
 	}
+	if c.Request.ContentLength == 0 {
+		val = nil
+		return true
+	}
 	marshalErr := binding.JSON.Bind(c.Request, &val)
 	if marshalErr == nil {
 		return true
@@ -739,6 +772,7 @@ func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 		var filters []index.Filter
 		filters, err = f.processFilters(d, ref, c.Request.URL.Query())
 		if err != nil {
+			res.AddError(err)
 			return
 		}
 

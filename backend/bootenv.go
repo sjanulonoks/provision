@@ -149,12 +149,12 @@ func explodeISO(p *DataTracker, envName, osName, fileRoot, isoFile, dest, shaSum
 	if shaSum != "" {
 		f, err := os.Open(isoFile)
 		if err != nil {
-			res.Errorf("Explode ISO: failed to open iso file %s: %v", isoFile, err)
+			res.Errorf("Explode ISO: failed to open iso file %s: %v", p.reportPath(isoFile), err)
 		} else {
 			defer f.Close()
 			hasher := sha256.New()
 			if _, err := io.Copy(hasher, f); err != nil {
-				res.Errorf("Explode ISO: failed to read iso file %s: %v", isoFile, err)
+				res.Errorf("Explode ISO: failed to read iso file %s: %v", p.reportPath(isoFile), err)
 			} else {
 				hash := hex.EncodeToString(hasher.Sum(nil))
 				if hash != shaSum {
@@ -205,29 +205,26 @@ func (b *BootEnv) explodeIso() {
 	canaryPath := b.localPathFor("." + strings.Replace(b.OS.Name, "/", "_", -1) + ".rebar_canary")
 	buf, err := ioutil.ReadFile(canaryPath)
 	if err == nil && string(bytes.TrimSpace(buf)) == b.OS.IsoSha256 {
-		b.p.Infof("debugBootEnv", "Explode ISO: canary file %s, in place and has proper SHA256\n", canaryPath)
+		b.p.Infof("debugBootEnv", "Explode ISO: canary file %s, in place and has proper SHA256\n", b.p.reportPath(canaryPath))
 		return
 	}
-
 	isoPath := filepath.Join(b.p.FileRoot, "isos", b.OS.IsoFile)
 	if _, err := os.Stat(isoPath); os.IsNotExist(err) {
-		b.Errorf("Explode ISO: iso does not exist: %s\n", isoPath)
+		b.Errorf("Explode ISO: iso does not exist: %s\n", b.p.reportPath(isoPath))
 		if b.OS.IsoUrl != "" {
 			b.Errorf("You can download the required ISO from %s", b.OS.IsoUrl)
 		}
 		return
 	}
-	b.Errorf("Exploding ISO: %s", isoPath)
+	b.Errorf("Exploding ISO: %s", b.p.reportPath(isoPath))
 	go explodeISO(b.p, b.Name, b.OS.Name, b.p.FileRoot, isoPath, b.localPathFor(""), b.OS.IsoSha256)
 }
 
 func (b *BootEnv) Validate() {
 	b.renderers = renderers{}
+	b.BootEnv.Validate()
 	// First, the stuff that must be correct in order for
 	b.AddError(index.CheckUnique(b, b.stores("bootenvs").Items()))
-	if strings.Contains(b.Name, "/") || strings.Contains(b.Name, "\\") {
-		b.Errorf("Name must not contain a '/' or '\\'")
-	}
 	// If our basic templates do not parse, it is game over for us
 	b.p.tmplMux.Lock()
 	b.tmplMux.Lock()
@@ -274,12 +271,12 @@ func (b *BootEnv) Validate() {
 			b.Errorf("bootenv: %s: missing kernel %s (%s)",
 				b.Name,
 				b.Kernel,
-				kPath)
+				b.p.reportPath(kPath))
 		} else if !kernelStat.Mode().IsRegular() {
 			b.Errorf("bootenv: %s: invalid kernel %s (%s)",
 				b.Name,
 				b.Kernel,
-				kPath)
+				b.p.reportPath(kPath))
 		}
 	}
 	// Ditto for all the initrds.
@@ -291,14 +288,14 @@ func (b *BootEnv) Validate() {
 				b.Errorf("bootenv: %s: missing initrd %s (%s)",
 					b.Name,
 					initrd,
-					iPath)
+					b.p.reportPath(iPath))
 				continue
 			}
 			if !initrdStat.Mode().IsRegular() {
 				b.Errorf("bootenv: %s: invalid initrd %s (%s)",
 					b.Name,
 					initrd,
-					iPath)
+					b.p.reportPath(iPath))
 			}
 		}
 	}

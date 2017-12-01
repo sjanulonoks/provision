@@ -7,7 +7,6 @@ package server
 //go:generate swagger generate spec -i ./swagger.base.yml -o ../embedded/assets/swagger.json
 //go:generate ../tools/build-all-license.sh .. embedded/assets/ALL-LICENSE
 //go:generate ../tools/build-all-license.sh .. ALL-LICENSE
-//go:generate swagger generate client  -f ../embedded/assets/swagger.json -A DigitalRebarProvision --principal User -t .. --template-dir ../override -m genmodels
 //go:generate ../tools/build_cli.sh
 //go:generate go-bindata -prefix ../embedded/assets -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 

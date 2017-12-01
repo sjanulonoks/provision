@@ -440,7 +440,7 @@ func (f *Frontend) InitMachineApi() {
 			f.Remove(c, &backend.Machine{}, c.Param(`uuid`))
 		})
 
-	pGetAll, pGetOne, pPatch, pSetThem, pSetOne := f.makeParamEndpoints(&backend.Machine{}, "uuid")
+	pGetAll, pGetOne, pPatch, pSetThem, pSetOne, pDeleteOne := f.makeParamEndpoints(&backend.Machine{}, "uuid")
 
 	// swagger:route GET /machines/{uuid}/params Machines getMachineParams
 	//
@@ -467,6 +467,19 @@ func (f *Frontend) InitMachineApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/machines/:uuid/params/*key", pGetOne)
+
+	// swagger:route DELETE /machines/{uuid}/params/{key} Machines getMachineParam
+	//
+	// Delete a single machine parameter
+	//
+	// Delete a single parameter {key} for a Machine specified by {uuid}
+	//
+	//     Responses:
+	//       200: MachineParamResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.DELETE("/machines/:uuid/params/*key", pDeleteOne)
 
 	// swagger:route PATCH /machines/{uuid}/params Machines patchMachineParams
 	//

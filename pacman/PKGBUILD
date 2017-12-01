@@ -15,7 +15,7 @@ sha256sums=()
 install=dr-provision-git.install
 
 build() {
-    (cd ../.. && tools/build.sh amd64 linux)
+    (cd ../.. && tools/build.sh amd64:linux)
     cp ../../bin/linux/amd64/* .
     cp ../../assets/startup/dr-provision.service .
     sed -i -e 's@usr/local/bin@usr/bin@g' dr-provision.service

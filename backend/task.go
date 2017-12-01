@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"strings"
 	"sync"
 	"text/template"
 
@@ -93,9 +92,7 @@ func (t *Task) genRoot(common *template.Template, e models.ErrorAdder) *template
 }
 
 func (t *Task) Validate() {
-	if strings.Contains(t.Name, "/") || strings.Contains(t.Name, "\\") {
-		t.Errorf("Name must not contain a '/' or '\\'")
-	}
+	t.Task.Validate()
 	t.tmplMux.Lock()
 	defer t.tmplMux.Unlock()
 	t.p.tmplMux.Lock()

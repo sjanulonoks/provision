@@ -567,7 +567,7 @@ func (f *Frontend) InitJobApi() {
 			}
 
 			c.Writer.Header().Set("Content-Type", "application/octet-stream")
-			c.File(j.LogPath)
+			c.File(j.LogPath())
 		})
 
 	// swagger:route PUT /jobs/{uuid}/log Jobs putJobLog

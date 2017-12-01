@@ -288,7 +288,7 @@ func (f *Frontend) InitProfileApi() {
 			f.Remove(c, &backend.Profile{}, c.Param(`name`))
 		})
 
-	pGetAll, pGetOne, pPatch, pSetThem, pSetOne := f.makeParamEndpoints(&backend.Profile{}, "name")
+	pGetAll, pGetOne, pPatch, pSetThem, pSetOne, pDeleteOne := f.makeParamEndpoints(&backend.Profile{}, "name")
 
 	// swagger:route GET /profiles/{name}/params Profiles getProfileParams
 	//
@@ -315,6 +315,19 @@ func (f *Frontend) InitProfileApi() {
 	//       403: NoContentResponse
 	//       404: ErrorResponse
 	f.ApiGroup.GET("/profiles/:name/params/*key", pGetOne)
+
+	// swagger:route DELETE /profiles/{uuid}/params/{key} Profiles getProfileParam
+	//
+	// Delete a single profile parameter
+	//
+	// Delete a single parameter {key} for a Profile specified by {uuid}
+	//
+	//     Responses:
+	//       200: ProfileParamResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.DELETE("/profiles/:name/params/*key", pDeleteOne)
 
 	// swagger:route PATCH /profiles/{name}/params Profiles patchProfileParams
 	//
