@@ -109,6 +109,7 @@ func TestRenderData(t *testing.T) {
 		objs := []crudTest{
 			{"Update global profile to have test with a value", dt.Update, &models.Profile{Name: "global", Params: map[string]interface{}{"test": "foreal"}}, true},
 			{"create test profile to have test with a value", dt.Create, &models.Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true},
+			{"create test profile to have test with a value meta data", dt.Create, &models.Profile{Name: "test2", Params: map[string]interface{}{"test": "fred"}, MetaData: models.MetaData{Meta: map[string]string{"cluster": "true"}}}, true},
 
 			{"Create included template", dt.Create, &models.Template{ID: "included", Contents: tmplIncluded}, true},
 			{"Create default template", dt.Create, &models.Template{ID: "default", Contents: tmplDefault}, true},
@@ -334,6 +335,11 @@ func TestRenderData(t *testing.T) {
 		if s != "" {
 			t.Errorf("Infinite Token should not be allowed for non-machine templates\n")
 		}
+
+		s = rd.GenerateProfileToken("foo", 30)
+		if s != "UnknownMachineTokenNotAllowed" {
+			t.Errorf("GenerateProfileToken should not generate a valid token for non-machines.\n")
+		}
 	}()
 
 	func() {
@@ -389,7 +395,7 @@ func TestRenderData(t *testing.T) {
 		}
 
 		// Test a machine profile parameter
-		machine.Profiles = []string{"test"}
+		machine.Profiles = []string{"test", "test2"}
 		saved, err := dt.Save(d, machine)
 		if !saved {
 			t.Errorf("Failed to save test machine with new profile list: %v", err)
@@ -571,6 +577,97 @@ func TestRenderData(t *testing.T) {
 				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
 				machineSecret+"1", claim.GrantorClaims.MachineSecret)
 		}
+
+		s = rd.GenerateProfileToken("noprofile", 30)
+		if s != "InvalidTokenNotAllowedNotOnMachine" {
+			t.Errorf("GenerateProfileToken should return a bad token for profiles not on the machine: actual: %s", s)
+		}
+
+		s = rd.GenerateProfileToken("test", 30)
+		if s != "InvalidTokenNotAllowedNotCluster" {
+			t.Errorf("GenerateProfileToken should return a bad token for profiles without cluster meta data: actual: %s", s)
+		}
+
+		s = rd.GenerateProfileToken("test2", 30)
+		claim, e = dt.GetToken(s)
+		if e != nil {
+			t.Errorf("GenerateProfileToken should return a good claim. %v, %s\n", e, s)
+		}
+		if !claim.Match("profiles", "patch", "test2") {
+			t.Errorf("ProfileToken should match patch/test2")
+		}
+		if !claim.Match("profiles", "update", "test2") {
+			t.Errorf("ProfileToken should match update/test2")
+		}
+		if claim.ExpiresAt-claim.IssuedAt != 30 {
+			t.Errorf("ProfileToken timeout should = 30, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "", machineSecret) {
+			t.Errorf("Secrets validate to validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "empty", machineSecret) {
+			t.Errorf("Secrets validate to validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", machineSecret) {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret, "", machineSecret+"1") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret+"1", claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", machineSecret+"1") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
+				machineSecret+"1", claim.GrantorClaims.MachineSecret)
+		}
+
+		s = rd.GenerateProfileToken("test2", 0)
+		claim, e = dt.GetToken(s)
+		if e != nil {
+			t.Errorf("GenerateProfileToken should return a good claim. %v, %s\n", e, s)
+		}
+		if !claim.Match("profiles", "patch", "test2") {
+			t.Errorf("ProfileToken should match patch/test2")
+		}
+		if !claim.Match("profiles", "update", "test2") {
+			t.Errorf("ProfileToken should match update/test2")
+		}
+		if claim.ExpiresAt-claim.IssuedAt < 100000 {
+			t.Errorf("ProfileToken timeout should be > 10000, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "", machineSecret) {
+			t.Errorf("Secrets validate to validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if !claim.ValidateSecrets(grantorSecret, "empty", machineSecret) {
+			t.Errorf("Secrets validate to validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", machineSecret) {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
+				machineSecret, claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret, "", machineSecret+"1") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret, claim.GrantorClaims.GrantorSecret,
+				machineSecret+"1", claim.GrantorClaims.MachineSecret)
+		}
+		if claim.ValidateSecrets(grantorSecret+"1", "", machineSecret+"1") {
+			t.Errorf("Secrets validate should not validate correctly: %s %s %s %s",
+				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
+				machineSecret+"1", claim.GrantorClaims.MachineSecret)
+		}
+
 	}()
 
 }
