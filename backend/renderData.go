@@ -528,6 +528,46 @@ func (r *RenderData) GenerateInfiniteToken() string {
 	return t
 }
 
+func (r *RenderData) GenerateProfileToken(profile string, duration int) string {
+	if r.Machine == nil {
+		// Don't allow profile tokens.
+		return "UnknownMachineTokenNotAllowed"
+	}
+
+	if !r.Machine.HasProfile(profile) {
+		// Don't allow profile tokens.
+		return "InvalidTokenNotAllowedNotOnMachine"
+	}
+
+	if p := r.Machine.getProfile(r.d, profile); p == nil {
+		// Don't allow profile tokens.
+		return "InvalidTokenNotAllowedNoProfile"
+	} else if _, ok := p.Meta["cluster"]; !ok {
+		// Don't allow profile tokens.
+		return "InvalidTokenNotAllowedNotCluster"
+	}
+
+	grantor := "system"
+	grantorSecret := ""
+	if ss := r.p.pref("systemGrantorSecret"); ss != "" {
+		grantorSecret = ss
+	}
+
+	if duration <= 0 {
+		duration = 2000000000
+	}
+	ttl := time.Second * time.Duration(duration)
+
+	t, _ := NewClaim(r.Machine.Key(), grantor, ttl).
+		Add("profiles", "get", profile).
+		Add("profiles", "update", profile).
+		Add("profiles", "patch", profile).
+		AddMachine(r.Machine.Key()).
+		AddSecrets("", grantorSecret, r.Machine.Secret).
+		Seal(r.p.tokenManager)
+	return t
+}
+
 // BootParams is a helper function that expands the BootParams
 // template from the boot environment.
 func (r *RenderData) BootParams() (string, error) {
