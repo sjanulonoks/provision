@@ -677,7 +677,6 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	if n.oldStage == n.Stage && !(n.CurrentTask == -1 || n.CurrentTask == oldm.CurrentTask) {
 		e.Errorf("Cannot change CurrentTask from %d to %d", oldm.CurrentTask, n.CurrentTask)
 	}
-
 	if n.CurrentTask != -1 && !reflect.DeepEqual(oldm.Tasks, n.Tasks) {
 		runningBound := n.CurrentTask
 		if runningBound != len(oldm.Tasks) {
@@ -692,6 +691,11 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	if n.Stage != "none" && n.oldStage == n.Stage && n.oldBootEnv != n.BootEnv && !n.ChangeForced() {
 		e.Errorf("Can not change bootenv while in a stage unless forced. old: %s new %s", n.oldBootEnv, n.BootEnv)
 	}
+	// Id we go from having no tasks to having tasks, set the CurrentTask to -1
+	if n.Runnable && len(oldm.Tasks) == 0 && len(n.Tasks) != 0 {
+		n.CurrentTask = -1
+	}
+
 	return e.HasError()
 }
 
