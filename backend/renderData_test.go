@@ -109,7 +109,6 @@ func TestRenderData(t *testing.T) {
 		objs := []crudTest{
 			{"Update global profile to have test with a value", dt.Update, &models.Profile{Name: "global", Params: map[string]interface{}{"test": "foreal"}}, true},
 			{"create test profile to have test with a value", dt.Create, &models.Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true},
-			{"create test profile to have test with a value meta data", dt.Create, &models.Profile{Name: "test2", Params: map[string]interface{}{"test": "fred"}, MetaData: models.MetaData{Meta: map[string]string{"cluster": "true"}}}, true},
 
 			{"Create included template", dt.Create, &models.Template{ID: "included", Contents: tmplIncluded}, true},
 			{"Create default template", dt.Create, &models.Template{ID: "default", Contents: tmplDefault}, true},
@@ -395,7 +394,7 @@ func TestRenderData(t *testing.T) {
 		}
 
 		// Test a machine profile parameter
-		machine.Profiles = []string{"test", "test2"}
+		machine.Profiles = []string{"test"}
 		saved, err := dt.Save(d, machine)
 		if !saved {
 			t.Errorf("Failed to save test machine with new profile list: %v", err)
@@ -584,20 +583,15 @@ func TestRenderData(t *testing.T) {
 		}
 
 		s = rd.GenerateProfileToken("test", 30)
-		if s != "InvalidTokenNotAllowedNotCluster" {
-			t.Errorf("GenerateProfileToken should return a bad token for profiles without cluster meta data: actual: %s", s)
-		}
-
-		s = rd.GenerateProfileToken("test2", 30)
 		claim, e = dt.GetToken(s)
 		if e != nil {
 			t.Errorf("GenerateProfileToken should return a good claim. %v, %s\n", e, s)
 		}
-		if !claim.Match("profiles", "patch", "test2") {
-			t.Errorf("ProfileToken should match patch/test2")
+		if !claim.Match("profiles", "patch", "test") {
+			t.Errorf("ProfileToken should match patch/test")
 		}
-		if !claim.Match("profiles", "update", "test2") {
-			t.Errorf("ProfileToken should match update/test2")
+		if !claim.Match("profiles", "update", "test") {
+			t.Errorf("ProfileToken should match update/test")
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 30 {
 			t.Errorf("ProfileToken timeout should = 30, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
@@ -628,16 +622,16 @@ func TestRenderData(t *testing.T) {
 				machineSecret+"1", claim.GrantorClaims.MachineSecret)
 		}
 
-		s = rd.GenerateProfileToken("test2", 0)
+		s = rd.GenerateProfileToken("test", 0)
 		claim, e = dt.GetToken(s)
 		if e != nil {
 			t.Errorf("GenerateProfileToken should return a good claim. %v, %s\n", e, s)
 		}
-		if !claim.Match("profiles", "patch", "test2") {
-			t.Errorf("ProfileToken should match patch/test2")
+		if !claim.Match("profiles", "patch", "test") {
+			t.Errorf("ProfileToken should match patch/test")
 		}
-		if !claim.Match("profiles", "update", "test2") {
-			t.Errorf("ProfileToken should match update/test2")
+		if !claim.Match("profiles", "update", "test") {
+			t.Errorf("ProfileToken should match update/test")
 		}
 		if claim.ExpiresAt-claim.IssuedAt < 100000 {
 			t.Errorf("ProfileToken timeout should be > 10000, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
