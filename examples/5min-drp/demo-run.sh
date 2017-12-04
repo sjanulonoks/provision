@@ -104,11 +104,11 @@ confirm control.sh install-secrets
 confirm control.sh ssh-keys             
 
 # apply our SSH keys 
-confirm exit_if_fail terraform apply -target=packet_ssh_key.drp-ssh-key
-confirm exit_if_fail terraform apply -target=packet_ssh_key.machines-ssh-key
+confirm exit_if_fail terraform apply -target=packet_ssh_key.drp-ssh-key -auto-approve
+confirm exit_if_fail terraform apply -target=packet_ssh_key.machines-ssh-key -auto-approve
 
 # build our DRP server
-confirm exit_if_fail terraform apply -target=packet_device.drp-endpoint
+confirm exit_if_fail terraform apply -target=packet_device.drp-endpoint -auto-approve
 
 
 # view our completed plan status -- NOTE the "machines"
@@ -177,7 +177,7 @@ confirm control.sh set-drp-endpoint $DRP
 #  && control.sh ssh $DRP 'kill -HUP `pidof dr-provision`'
 
 # bring up our DRP target machines:
-confirm terraform apply -target=packet_device.drp-machines
+confirm terraform apply -target=packet_device.drp-machines -auto-approve
 
 # helper functions ... not used in demo
 #control.sh get-address <ID>     # get the IP address of new DRP server identified by <ID>
