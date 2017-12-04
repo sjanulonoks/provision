@@ -79,6 +79,10 @@ func (p *Profile) GetParam(d Stores, key string, aggregate bool) (interface{}, b
 	if v, found := mm[key]; found {
 		return v, true
 	}
+	if p := d("params").Find(key); p != nil && aggregate {
+		param := p.(*Param)
+		return param.DefaultValue()
+	}
 	return nil, false
 }
 
@@ -173,7 +177,7 @@ func (p *Profile) OnLoad() error {
 }
 
 var profileLockMap = map[string][]string{
-	"get":    []string{"profiles"},
+	"get":    []string{"profiles", "params"},
 	"create": []string{"profiles", "tasks", "params"},
 	"update": []string{"profiles", "tasks", "params"},
 	"patch":  []string{"profiles", "tasks", "params"},
