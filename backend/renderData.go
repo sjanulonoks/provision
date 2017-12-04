@@ -542,9 +542,6 @@ func (r *RenderData) GenerateProfileToken(profile string, duration int) string {
 	if p := r.Machine.getProfile(r.d, profile); p == nil {
 		// Don't allow profile tokens.
 		return "InvalidTokenNotAllowedNoProfile"
-	} else if _, ok := p.Meta["cluster"]; !ok {
-		// Don't allow profile tokens.
-		return "InvalidTokenNotAllowedNotCluster"
 	}
 
 	grantor := "system"
