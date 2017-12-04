@@ -484,6 +484,7 @@ func (r *RenderData) GenerateToken() string {
 			Add("jobs", "create", r.Machine.Key()).
 			Add("jobs", "get", r.Machine.Key()).
 			Add("jobs", "patch", r.Machine.Key()).
+			Add("jobs", "update", r.Machine.Key()).
 			Add("jobs", "actions", r.Machine.Key()).
 			Add("jobs", "log", r.Machine.Key()).
 			Add("tasks", "get", "*").
@@ -516,6 +517,7 @@ func (r *RenderData) GenerateInfiniteToken() string {
 		Add("jobs", "create", r.Machine.Key()).
 		Add("jobs", "get", r.Machine.Key()).
 		Add("jobs", "patch", r.Machine.Key()).
+		Add("jobs", "update", r.Machine.Key()).
 		Add("jobs", "actions", r.Machine.Key()).
 		Add("jobs", "log", r.Machine.Key()).
 		Add("tasks", "get", "*").
