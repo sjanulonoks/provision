@@ -106,6 +106,9 @@ func (p *Profile) setDT(dp *DataTracker) {
 
 func (p *Profile) BeforeDelete() error {
 	e := &models.Error{Code: 422, Type: ValidationError, Model: p.Prefix(), Key: p.Key()}
+	if p.Name == p.p.GlobalProfileName {
+		e.Errorf("Profile %s is the global profile, you cannot delete it", p.Name)
+	}
 	machines := p.stores("machines")
 	for _, i := range machines.Items() {
 		m := AsMachine(i)
