@@ -70,6 +70,7 @@ type ProgOpts struct {
 	LogRoot         string `long:"log-root" description:"Directory for job logs" default:"job-logs"`
 	SaasContentRoot string `long:"saas-content-root" description:"Directory for additional content" default:"saas-content"`
 	FileRoot        string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
+	ReplaceRoot     string `long:"replace-root" description:"Root of filesystem we should use to replace embedded assets" default:"replace"`
 
 	DevUI          string `long:"dev-ui" description:"Root of UI Pages for Development"`
 	UIUrl          string `long:"ui-url" description:"URL to redirect to UI" default:"https://rackn.github.io/provision-ux"`
@@ -128,13 +129,17 @@ func Server(c_opts *ProgOpts) {
 	if strings.IndexRune(c_opts.SaasContentRoot, filepath.Separator) != 0 {
 		c_opts.SaasContentRoot = filepath.Join(c_opts.BaseRoot, c_opts.SaasContentRoot)
 	}
+	if strings.IndexRune(c_opts.ReplaceRoot, filepath.Separator) != 0 {
+		c_opts.ReplaceRoot = filepath.Join(c_opts.BaseRoot, c_opts.ReplaceRoot)
+	}
 	mkdir(c_opts.FileRoot, logger)
+	mkdir(c_opts.ReplaceRoot, logger)
 	mkdir(c_opts.PluginRoot, logger)
 	mkdir(c_opts.DataRoot, logger)
 	mkdir(c_opts.LogRoot, logger)
 	mkdir(c_opts.SaasContentRoot, logger)
 	logger.Printf("Extracting Default Assets\n")
-	if err := ExtractAssets(c_opts.FileRoot); err != nil {
+	if err := ExtractAssets(c_opts.ReplaceRoot, c_opts.FileRoot); err != nil {
 		logger.Fatalf("Unable to extract assets: %v", err)
 	}
 
