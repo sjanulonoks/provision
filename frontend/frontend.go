@@ -108,6 +108,16 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 		}
 		return false, nil
 	}
+	pFetchOne := func(obj backend.Paramer, id, key string, aggregate bool) (bool, interface{}) {
+		d, unlocker := f.dt.LockEnts(obj.(Lockable).Locks("get")...)
+		defer unlocker()
+		ref := d(obj.Prefix()).Find(id)
+		if ref == nil {
+			return false, nil
+		}
+		v, _ := ref.(backend.Paramer).GetParam(d, key, aggregate)
+		return true, v
+	}
 	pSet := func(c *gin.Context,
 		key, line string,
 		munger func(backend.Paramer,
@@ -166,11 +176,11 @@ func (f *Frontend) makeParamEndpoints(obj backend.Paramer, idKey string) (
 			if !f.assureAuth(c, obj.Prefix(), "get", id) {
 				return
 			}
-			found, params := pFetch(obj, id, aggregator(c))
+			found, val := pFetchOne(obj, id, trimmer(c.Param("key")), aggregator(c))
 			if item404(c, found, id, "Param") {
 				return
 			}
-			c.JSON(http.StatusOK, params[trimmer(c.Param("key"))])
+			c.JSON(http.StatusOK, val)
 		},
 		/* patchThem */ func(c *gin.Context) {
 			id := c.Param(idKey)

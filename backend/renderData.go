@@ -80,7 +80,7 @@ func newRenderedTemplate(r *RenderData,
 		path: path,
 		name: tmplKey,
 		write: func(remoteIP net.IP) (*bytes.Reader, error) {
-			objs, unlocker := p.LockEnts("stages", "tasks", "machines", "bootenvs", "profiles")
+			objs, unlocker := p.LockEnts("stages", "tasks", "machines", "bootenvs", "profiles", "params")
 			defer unlocker()
 			rd := &RenderData{d: objs, p: p}
 			for i, prefix := range prefixes {
@@ -599,23 +599,6 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 	return "", fmt.Errorf("No idea how to get URL part %s from %s", segment, rawUrl)
 }
 
-// ParamExists is a helper function for determining the existence of a machine parameter.
-func (r *RenderData) ParamExists(key string) bool {
-	if r.Machine != nil {
-		_, ok := r.Machine.GetParam(r.d, key, true)
-		if ok {
-			return ok
-		}
-	}
-	if o := r.d("profiles").Find(r.p.GlobalProfileName); o != nil {
-		p := AsProfile(o)
-		if _, ok := p.Params[key]; ok {
-			return true
-		}
-	}
-	return false
-}
-
 // Param is a helper function for extracting a parameter from Machine.Params
 func (r *RenderData) Param(key string) (interface{}, error) {
 	if r.Machine != nil {
@@ -626,11 +609,17 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 	}
 	if o := r.d("profiles").Find(r.p.GlobalProfileName); o != nil {
 		p := AsProfile(o)
-		if v, ok := p.Params[key]; ok {
+		if v, ok := p.GetParam(r.d, key, true); ok {
 			return v, nil
 		}
 	}
 	return nil, fmt.Errorf("No such machine parameter %s", key)
+}
+
+// ParamExists is a helper function for determining the existence of a machine parameter.
+func (r *RenderData) ParamExists(key string) bool {
+	_, err := r.Param(key)
+	return err == nil
 }
 
 func (r *RenderData) CallTemplate(name string, data interface{}) (ret interface{}, err error) {

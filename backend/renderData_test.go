@@ -67,6 +67,15 @@ BootParams = default`
 func TestRenderData(t *testing.T) {
 	dt := mkDT(nil)
 	var machine *Machine
+	paramWithDefault := AsParam(toBackend(dt,
+		nil,
+		&models.Param{
+			Name: "withDefault",
+			Schema: map[string]interface{}{
+				"type":    "string",
+				"default": "default",
+			},
+		}))
 	defaultBootEnv := AsBootEnv(toBackend(dt,
 		nil,
 		&models.BootEnv{
@@ -116,6 +125,7 @@ func TestRenderData(t *testing.T) {
 			{"Create default bootenv", dt.Create, defaultBootEnv, true},
 			{"Create nothing bootenv", dt.Create, nothingBootEnv, true},
 			{"Create bad bootenv", dt.Create, badBootEnv, true},
+			{"Create param with default", dt.Create, paramWithDefault, true},
 		}
 		for _, obj := range objs {
 			obj.Test(t, d)
@@ -261,6 +271,17 @@ func TestRenderData(t *testing.T) {
 		if !ok {
 			t.Errorf("ParamExists test should return true when machine has foo defined in RenderData\n")
 		}
+		// Test a parameter with a default value embedded in the schema
+		p, e = rd.Param("withDefault")
+		if e != nil {
+			t.Errorf("Param withDefault should NOT return an error: %v", e)
+		}
+		s, ok = p.(string)
+		if !ok {
+			t.Errorf("Parameter test with default should have been a string")
+		} else if s != "default" {
+			t.Errorf("Parameter test with default should have been `default`m not `%v`", s)
+		}
 
 		s, e = rd.BootParams()
 		if e == nil {
@@ -391,6 +412,17 @@ func TestRenderData(t *testing.T) {
 		ok = rd.ParamExists("test")
 		if !ok {
 			t.Errorf("ParamExists test should return true when machine has foo defined in RenderData\n")
+		}
+		// Test a parameter with a default value embedded in the schema
+		p, e = rd.Param("withDefault")
+		if e != nil {
+			t.Errorf("Param withDefault should NOT return an error: %v", e)
+		}
+		s, ok = p.(string)
+		if !ok {
+			t.Errorf("Parameter test with default should have been a string")
+		} else if s != "default" {
+			t.Errorf("Parameter test with default should have been `default`m not `%v`", s)
 		}
 
 		// Test a machine profile parameter

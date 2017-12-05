@@ -428,6 +428,11 @@ func (n *Machine) GetParam(d Stores, key string, aggregate bool) (interface{}, b
 				return v, true
 			}
 		}
+		// Check the param itself
+		if p := d("params").Find(key); p != nil {
+			param := p.(*Param)
+			return param.DefaultValue()
+		}
 	}
 	return nil, false
 }

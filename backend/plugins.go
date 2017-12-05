@@ -103,6 +103,11 @@ func (n *Plugin) GetParam(d Stores, key string, aggregate bool) (interface{}, bo
 	if v, found := mm[key]; found {
 		return v, true
 	}
+	// Check the param itself
+	if p := d("params").Find(key); p != nil && aggregate {
+		param := p.(*Param)
+		return param.DefaultValue()
+	}
 	return nil, false
 }
 
