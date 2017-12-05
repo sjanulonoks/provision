@@ -19,7 +19,7 @@ import (
 	"github.com/digitalrebar/provision/embedded"
 )
 
-func ExtractAssets(fileRoot string) error {
+func ExtractAssets(replaceRoot, fileRoot string) error {
 	dirs := []string{"isos", "files", "machines", "pxelinux.cfg"}
 	for _, dest := range dirs {
 		destDir := path.Join(fileRoot, dest)
@@ -61,6 +61,17 @@ func ExtractAssets(fileRoot string) error {
 		if err != nil {
 			return fmt.Errorf("No such embedded asset %s: %v", src, err)
 		}
+
+		// If a file is present in replaceRoot,
+		// use it instead of the embedded asset
+		srcFile := path.Join(replaceRoot, dest, src)
+		if s, err := os.Lstat(srcFile); err == nil && s.Mode().IsRegular() {
+			sbuf, err := ioutil.ReadFile(srcFile)
+			if err == nil {
+				buf = sbuf
+			}
+		}
+
 		info, err := embedded.AssetInfo(src)
 		if err != nil {
 			return fmt.Errorf("No mode info for embedded asset %s: %v", src, err)

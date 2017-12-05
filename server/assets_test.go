@@ -14,7 +14,7 @@ func TestExtractAssets(t *testing.T) {
 		return
 	}
 	defer os.RemoveAll(tgt)
-	if err := ExtractAssets(tgt); err != nil {
+	if err := ExtractAssets("jj", tgt); err != nil {
 		t.Errorf("Could not extract assets: %v", err)
 		return
 	}
@@ -43,4 +43,23 @@ func TestExtractAssets(t *testing.T) {
 		}
 	}
 
+	if err := ExtractAssets("extract_test", tgt); err != nil {
+		t.Errorf("Could not extract assets: %v", err)
+		return
+	}
+
+	for _, f := range files {
+		if _, err := os.Stat(path.Join(tgt, f)); os.IsNotExist(err) {
+			t.Errorf("File %s does NOT exist, but should.", f)
+		}
+	}
+
+	buf1, _ := ioutil.ReadFile(path.Join(tgt, "explode_iso.sh"))
+	buf2, _ := ioutil.ReadFile(path.Join(tgt, "files", "jq"))
+	if string(buf1) != "Test2\n" {
+		t.Error("Expected explode_iso.sh to be replaced")
+	}
+	if string(buf2) != "Test1\n" {
+		t.Error("Expected files/jq to be replaced")
+	}
 }
