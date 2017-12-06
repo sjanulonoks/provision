@@ -101,6 +101,7 @@ type ltc struct {
 }
 
 func (l *ltc) test(t *testing.T, dt *DataTracker) {
+	t.Helper()
 	res, _, _, _ := FindOrCreateLease(dt, l.strat, l.token, l.req, []net.IP{l.via})
 	if l.created {
 		if res == nil {

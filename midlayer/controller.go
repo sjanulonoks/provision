@@ -387,7 +387,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 					return err
 				}
 			} else {
-				content.Meta.MetaData.Meta = pp.MetaData.Meta
+				content.Meta.Meta = pp.Meta
 			}
 			cName := pp.Name
 			content.Meta.Name = cName

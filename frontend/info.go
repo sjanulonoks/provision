@@ -36,6 +36,7 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 			"change-stage-map",
 			"job-exit-states",
 			"package-repository-handling",
+			"profileless-machine",
 		},
 	}
 

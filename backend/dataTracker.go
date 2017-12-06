@@ -53,9 +53,9 @@ chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 `,
 				},
 			},
-			MetaData: models.MetaData{Meta: map[string]string{
+			Meta: map[string]string{
 				"feature-flags": "change-stage-v2",
-			}},
+			},
 		}
 
 		localBoot = &models.BootEnv{
@@ -89,28 +89,28 @@ exit
 `,
 				},
 			},
-			MetaData: models.MetaData{Meta: map[string]string{
+			Meta: map[string]string{
 				"feature-flags": "change-stage-v2",
-			}},
+			},
 		}
 		noneStage = &models.Stage{
 			Name:        "none",
 			Description: "Noop / Nothing stage",
-			MetaData: models.MetaData{Meta: map[string]string{
+			Meta: map[string]string{
 				"icon":  "circle thin",
 				"color": "green",
 				"title": "Digital Rebar Provision",
-			}},
+			},
 		}
 		localStage = &models.Stage{
 			Name:        "local",
 			BootEnv:     "local",
 			Description: "Stage to boot into the local BootEnv.",
-			MetaData: models.MetaData{Meta: map[string]string{
+			Meta: map[string]string{
 				"icon":  "radio",
 				"color": "green",
 				"title": "Digital Rebar Provision",
-			}},
+			},
 		}
 	)
 	res, _ := store.Open("memory:///")
@@ -711,11 +711,11 @@ func NewDataTracker(backend store.Store,
 			Name:        res.GlobalProfileName,
 			Description: "Global profile attached automatically to all machines.",
 			Params:      map[string]interface{}{},
-			MetaData: models.MetaData{Meta: map[string]string{
+			Meta: map[string]string{
 				"icon":  "world",
 				"color": "blue",
 				"title": "Digital Rebar Provision",
-			}},
+			},
 		})
 	}
 	users := d("users")

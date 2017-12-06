@@ -281,7 +281,7 @@ func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error
 		},
 		func(s string) (models.Model, error) {
 			res := fix(n.New())
-			res.Profile = models.Profile{Params: map[string]interface{}{}}
+			res.Params = map[string]interface{}{}
 
 			var obj interface{}
 			err := json.Unmarshal([]byte(s), &obj)
@@ -291,7 +291,7 @@ func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error
 			if err := param.ValidateValue(obj); err != nil {
 				return nil, err
 			}
-			res.Profile.Params[parameter] = obj
+			res.Params[parameter] = obj
 			return res, nil
 		}), nil
 
@@ -376,21 +376,21 @@ func (n *Machine) GetParams(d Stores, aggregate bool) map[string]interface{} {
 			}
 		}
 		// The machine's Params
-		if n.Profile.Params != nil {
-			for k, v := range n.Profile.Params {
+		if n.Params != nil {
+			for k, v := range n.Params {
 				m[k] = v
 			}
 		}
 	} else {
-		if n.Profile.Params != nil {
-			m = n.Profile.Params
+		if n.Params != nil {
+			m = n.Params
 		}
 	}
 	return m
 }
 
 func (n *Machine) SetParams(d Stores, values map[string]interface{}) error {
-	n.Profile.Params = values
+	n.Params = values
 	e := &models.Error{Code: 422, Type: ValidationError, Model: n.Prefix(), Key: n.Key()}
 	_, e2 := n.p.Save(d, n)
 	e.AddError(e2)
@@ -438,7 +438,7 @@ func (n *Machine) GetParam(d Stores, key string, aggregate bool) (interface{}, b
 }
 
 func (n *Machine) SetParam(d Stores, key string, val interface{}) error {
-	n.Profile.Params[key] = val
+	n.Params[key] = val
 	e := &models.Error{Code: 422, Type: ValidationError, Model: n.Prefix(), Key: n.Key()}
 	_, e2 := n.p.Save(d, n)
 	e.AddError(e2)
@@ -471,6 +471,11 @@ func (n *Machine) OnCreate() error {
 	}
 	if n.Tasks == nil {
 		n.Tasks = []string{}
+	}
+	// Migrate old params to new Params
+	if n.Profile.Params != nil {
+		n.Params = n.Profile.Params
+		n.Profile.Params = nil
 	}
 	// All machines start runnable.
 	n.Runnable = true
@@ -647,6 +652,13 @@ func (n *Machine) OnLoad() error {
 	mustSave := false
 	if n.Secret == "" {
 		mustSave = true
+	}
+
+	// Migrate old params to new Params
+	if n.Profile.Params != nil {
+		mustSave = true
+		n.Params = n.Profile.Params
+		n.Profile.Params = nil
 	}
 
 	err := n.BeforeSave()
