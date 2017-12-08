@@ -120,6 +120,9 @@ func (p *Param) ValidateValue(val interface{}) error {
 	if !p.Useable() {
 		return p.MakeError(422, ValidationError, p)
 	}
+	if p.Schema == nil {
+		return nil
+	}
 	if p.validator == nil {
 		p.validator, _ = gojsonschema.NewSchema(gojsonschema.NewGoLoader(p.Schema))
 	}
