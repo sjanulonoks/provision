@@ -235,7 +235,7 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 			return
 		}
 	case `multipart/form-data`:
-		header, err := c.FormFile("file")
+		_, err := c.FormFile("file")
 		if err != nil {
 			res.Code = http.StatusBadRequest
 			res.Errorf("Missing multipart file")
@@ -243,7 +243,6 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 			c.JSON(res.Code, res)
 			return
 		}
-		name = path.Base(header.Filename)
 	default:
 		res.Code = http.StatusUnsupportedMediaType
 		res.Errorf("Invalid content type %s,", ctype)
