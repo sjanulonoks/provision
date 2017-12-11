@@ -253,7 +253,10 @@ func (h *DhcpHandler) respondFrom(testAddr net.IP, cm *ipv4.ControlMessage) net.
 		return addrs[0].IP.To4()
 	}
 	// Well, this really sucks.  Return our global listen-on address
-	return net.ParseIP(h.bk.OurAddress).To4()
+	if h.bk.OurAddress != "" {
+		return net.ParseIP(h.bk.OurAddress).To4()
+	}
+	return backend.DefaultIP()
 }
 
 func (h *DhcpHandler) listenOn(testAddr net.IP, cm *ipv4.ControlMessage) bool {

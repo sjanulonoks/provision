@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"log"
 	"math/big"
 	"net"
 	"sort"
@@ -71,6 +72,30 @@ func LocalFor(remote net.IP) net.IP {
 	if idx < len(addrCache) && addrCache[idx].remote.Equal(remote) {
 		addrCache[idx].unused = false
 		return addrCache[idx].local
+	}
+	return nil
+}
+
+func DefaultIP() net.IP {
+	iface, gw, err := defaultIPByRoute()
+	if err != nil {
+		log.Printf("Error getting default route: %v", err)
+		return nil
+	}
+	if iface == nil || gw == nil {
+		log.Printf("No default route on system.")
+		return nil
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		log.Printf("Error getting addresses on %s: %v", iface.Name, err)
+		return nil
+	}
+	for _, addr := range addrs {
+		thisIP, thisNet, err := net.ParseCIDR(addr.String())
+		if err == nil && thisNet.Contains(gw) {
+			return thisIP
+		}
 	}
 	return nil
 }
