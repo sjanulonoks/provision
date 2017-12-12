@@ -25,9 +25,12 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 		Id:                 drpid,
 		ApiPort:            f.ApiPort,
 		FilePort:           f.ProvPort,
+		TftpPort:           f.TftpPort,
+		PxePort:            f.PxePort,
 		TftpEnabled:        !f.NoTftp,
 		DhcpEnabled:        !f.NoDhcp,
 		ProvisionerEnabled: !f.NoProv,
+		PxeEnabled:         !f.NoPxe,
 		Stats:              make([]*models.Stat, 0, 0),
 		Features: []string{
 			"api-v3",

@@ -212,6 +212,9 @@ func Server(c_opts *ProgOpts) {
 		c_opts.DevUI, c_opts.UIUrl, nil, publishers, c_opts.DrpId, pc,
 		c_opts.DisableDHCP, c_opts.DisableTftpServer, c_opts.DisableProvisioner,
 		c_opts.SaasContentRoot)
+	fe.TftpPort = c_opts.TftpPort
+	fe.PxePort = c_opts.PxePort
+	fe.NoPxe = c_opts.DisablePXE
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)
