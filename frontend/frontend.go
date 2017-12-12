@@ -59,9 +59,12 @@ type Frontend struct {
 	melody     *melody.Melody
 	ApiPort    int
 	ProvPort   int
+	TftpPort   int
+	PxePort    int
 	NoDhcp     bool
 	NoTftp     bool
 	NoProv     bool
+	NoPxe      bool
 	SaasDir    string
 }
 

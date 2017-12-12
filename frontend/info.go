@@ -1,10 +1,12 @@
 package frontend
 
 import (
+	"net"
 	"net/http"
 	"runtime"
 
 	"github.com/digitalrebar/provision"
+	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
@@ -25,9 +27,12 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 		Id:                 drpid,
 		ApiPort:            f.ApiPort,
 		FilePort:           f.ProvPort,
+		TftpPort:           f.TftpPort,
+		PxePort:            f.PxePort,
 		TftpEnabled:        !f.NoTftp,
 		DhcpEnabled:        !f.NoDhcp,
 		ProvisionerEnabled: !f.NoProv,
+		PxeEnabled:         !f.NoPxe,
 		Stats:              make([]*models.Stat, 0, 0),
 		Features: []string{
 			"api-v3",
@@ -92,6 +97,9 @@ func (f *Frontend) InitInfoApi(drpid string) {
 			if err != nil {
 				c.JSON(err.Code, err)
 				return
+			}
+			if a, _, e := net.SplitHostPort(c.Request.RemoteAddr); e == nil {
+				info.Address = backend.LocalFor(net.ParseIP(a))
 			}
 			c.JSON(http.StatusOK, info)
 		})
