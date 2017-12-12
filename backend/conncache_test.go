@@ -12,6 +12,8 @@ func TestConnCache(t *testing.T) {
 	addrCacheMux.Lock()
 	connCacheTimeout = time.Second * 5
 	addrCacheMux.Unlock()
+	defaultIP := DefaultIP()
+	t.Logf("Last-ditch fallback IP address: %s", defaultIP)
 
 	t.Log("Testing ConnCache - takes a minute")
 

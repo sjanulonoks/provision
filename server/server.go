@@ -57,7 +57,7 @@ type ProgOpts struct {
 	PxePort             int    `long:"pxe-port" description:"Port for the PXE/BINL server to listen on" default:"4011"`
 	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
 	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
-	OurAddress          string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:"192.168.124.11"`
+	OurAddress          string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:""`
 	ForceStatic         bool   `long:"force-static" description:"Force the system to always use the static IP."`
 
 	BackEndType    string `long:"backend" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI" default:"directory"`
@@ -282,6 +282,14 @@ func Server(c_opts *ProgOpts) {
 		TLSConfig: cfg,
 		Addr:      fmt.Sprintf(":%d", c_opts.ApiPort),
 		Handler:   fe.MgmtApi,
+		ConnState: func(n net.Conn, cs http.ConnState) {
+			laddr, lok := n.LocalAddr().(*net.TCPAddr)
+			raddr, rok := n.RemoteAddr().(*net.TCPAddr)
+			if lok && rok && cs == http.StateActive {
+				backend.AddToCache(laddr.IP, raddr.IP)
+			}
+			return
+		},
 	}
 	services = append(services, srv)
 

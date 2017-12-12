@@ -511,7 +511,7 @@ func (p *DataTracker) LockAll() (stores Stores, unlocker func()) {
 
 func (p *DataTracker) LocalIP(remote net.IP) string {
 	// If we are behind a NAT, always use Our Address
-	if p.ForceOurAddress {
+	if p.ForceOurAddress && p.OurAddress != "" {
 		return p.OurAddress
 	}
 	if localIP := LocalFor(remote); localIP != nil {
@@ -521,7 +521,19 @@ func (p *DataTracker) LocalIP(remote net.IP) string {
 	// firguing out which interface the default route goes over for ipv4
 	// then ipv6, and then figurig out the appropriate address on that
 	// interface
-	return p.OurAddress
+	if p.OurAddress != "" {
+		return p.OurAddress
+	}
+	gwIp := DefaultIP()
+	if gwIp == nil {
+		p.Printf("Failed to find appropriate local IP to use for %s", remote)
+		p.Printf("No --static-ip and no default gateway to use in its place")
+		p.Printf("Please set --static-ip ")
+		return ""
+	}
+	p.Printf("Falling back to local address %s as default target for remote %s", gwIp, remote)
+	AddToCache(gwIp, remote)
+	return gwIp.String()
 }
 
 func (p *DataTracker) urlFor(scheme string, remoteIP net.IP, port int) string {
@@ -613,7 +625,6 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, so
 		LogRoot:           "baddir",
 		StaticPort:        1,
 		ApiPort:           2,
-		OurAddress:        "1.1.1.1",
 		Logger:            logger,
 		defaultPrefs:      map[string]string{},
 		runningPrefs:      map[string]string{},

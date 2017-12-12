@@ -27,6 +27,7 @@ import:
 - package: github.com/gorilla/websocket
 - package: gopkg.in/olahol/melody.v1
 - package: github.com/fsnotify/fsnotify
+- package: github.com/vishvananda/netlink
 - package: golang.org/x/net
   subpackages:
   - context
