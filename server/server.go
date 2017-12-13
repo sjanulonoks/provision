@@ -91,6 +91,7 @@ type ProgOpts struct {
 
 	BaseTokenSecret     string `long:"base-token-secret" description:"Auth Token secret to allow revocation of all tokens" default:""`
 	SystemGrantorSecret string `long:"system-grantor-secret" description:"Auth Token secret to allow revocation of all Machine tokens" default:""`
+	FakePinger          bool   `hidden:"true" long:"fake-pinger"`
 }
 
 func mkdir(d string, logger *log.Logger) {
@@ -208,9 +209,11 @@ func Server(c_opts *ProgOpts) {
 	}
 
 	fe := frontend.NewFrontend(dt, logger,
-		c_opts.OurAddress, c_opts.ApiPort, c_opts.StaticPort, c_opts.FileRoot,
+		c_opts.OurAddress,
+		c_opts.ApiPort, c_opts.StaticPort, c_opts.DhcpPort, c_opts.PxePort,
+		c_opts.FileRoot,
 		c_opts.DevUI, c_opts.UIUrl, nil, publishers, c_opts.DrpId, pc,
-		c_opts.DisableDHCP, c_opts.DisableTftpServer, c_opts.DisableProvisioner,
+		c_opts.DisableDHCP, c_opts.DisableTftpServer, c_opts.DisableProvisioner, c_opts.DisablePXE,
 		c_opts.SaasContentRoot)
 	fe.TftpPort = c_opts.TftpPort
 	fe.PxePort = c_opts.PxePort
@@ -240,7 +243,7 @@ func Server(c_opts *ProgOpts) {
 
 	if !c_opts.DisableDHCP {
 		logger.Printf("Starting DHCP server")
-		if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.DhcpPort, publishers, false); err != nil {
+		if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.DhcpPort, publishers, false, c_opts.FakePinger); err != nil {
 			logger.Fatalf("Error starting DHCP server: %v", err)
 		} else {
 			services = append(services, svc)
@@ -248,7 +251,7 @@ func Server(c_opts *ProgOpts) {
 
 		if !c_opts.DisablePXE {
 			logger.Printf("Starting PXE/BINL server")
-			if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.PxePort, publishers, true); err != nil {
+			if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.PxePort, publishers, true, c_opts.FakePinger); err != nil {
 				logger.Fatalf("Error starting PXE/BINL server: %v", err)
 			} else {
 				services = append(services, svc)

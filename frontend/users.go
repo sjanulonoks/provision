@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -321,6 +322,11 @@ func (f *Frontend) InitUserApi(drpid string) {
 				// Error is only if stats are not filled in.  User
 				// Token should work regardless of that.
 				info, _ := f.GetInfo(drpid)
+				if info != nil {
+					if a, _, e := net.SplitHostPort(c.Request.RemoteAddr); e == nil {
+						info.Address = backend.LocalFor(net.ParseIP(a))
+					}
+				}
 				c.JSON(http.StatusOK, models.UserToken{Token: t, Info: *info})
 			}
 		})
