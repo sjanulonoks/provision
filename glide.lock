@@ -10,7 +10,7 @@ imports:
 - name: github.com/dgrijalva/jwt-go
   version: a539ee1a749a2b895533f979515ac7e6e0f5b650
 - name: github.com/digitalrebar/pinger
-  version: 5430ec21bf3a5c1dd6c4ce4db1e0fc0a17b94bde
+  version: 4b06d02345cad02a772ff21f13e1ef3551c943d4
 - name: github.com/digitalrebar/store
   version: f88fa4df9c617dc0bbd7b4361fd882dabbc44ad6
 - name: github.com/elazarl/go-bindata-assetfs

@@ -41,7 +41,7 @@ type DhcpHandler struct {
 	port       int
 	conn       *ipv4.PacketConn
 	bk         *backend.DataTracker
-	pinger     *pinger.Pinger
+	pinger     pinger.Pinger
 	strats     []*Strategy
 	publishers *backend.Publishers
 }
@@ -409,9 +409,6 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		}
 		return nil
 	case dhcp.Request:
-		if h.proxyOnly {
-			return nil
-		}
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
 		if ok && !h.listenOn(server, cm) {
@@ -421,6 +418,9 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		if !req.IsGlobalUnicast() {
 			h.Infof("%s: NAK'ing invalid requested IP %s", xid(p), req)
 			return h.nak(p, h.respondFrom(req, cm))
+		}
+		if h.proxyOnly {
+			return nil
 		}
 		var lease *backend.Lease
 		var reservation *backend.Reservation
@@ -508,7 +508,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 						return nil
 					}
 					h.Debugf("%s: Testing to see if %s is in use", xid(p), lease.Addr)
-					addrUsed, valid := <-h.pinger.InUse(lease.Addr, 3*time.Second)
+					addrUsed, valid := <-h.pinger.InUse(lease.Addr.String(), 3*time.Second)
 					if !valid {
 						func() {
 							h.Debugf("%s: System shutting down, deleting lease for %s", xid(p), lease.Addr)
@@ -592,7 +592,8 @@ func StartDhcpHandler(dhcpInfo *backend.DataTracker,
 	dhcpIfs string,
 	dhcpPort int,
 	pubs *backend.Publishers,
-	proxyOnly bool) (Service, error) {
+	proxyOnly bool,
+	fakePinger bool) (Service, error) {
 
 	ifs := []string{}
 	if dhcpIfs != "" {
@@ -610,11 +611,17 @@ func StartDhcpHandler(dhcpInfo *backend.DataTracker,
 
 	// If we aren't the PXE/BINL proxy, run a pinger
 	if !proxyOnly {
-		pinger, err := pinger.New()
-		if err != nil {
-			return nil, err
+		if handler.pinger == nil {
+			if fakePinger {
+				handler.pinger = pinger.Fake(true)
+			} else {
+				pinger, err := pinger.ICMP()
+				if err != nil {
+					return nil, err
+				}
+				handler.pinger = pinger
+			}
 		}
-		handler.pinger = pinger
 
 		func() {
 			d, unlocker := dhcpInfo.LockEnts("leases")

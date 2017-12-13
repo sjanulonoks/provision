@@ -28,6 +28,7 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 		ApiPort:            f.ApiPort,
 		FilePort:           f.ProvPort,
 		TftpPort:           f.TftpPort,
+		DhcpPort:           f.DhcpPort,
 		PxePort:            f.PxePort,
 		TftpEnabled:        !f.NoTftp,
 		DhcpEnabled:        !f.NoDhcp,

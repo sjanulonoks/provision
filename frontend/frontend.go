@@ -60,6 +60,7 @@ type Frontend struct {
 	ApiPort    int
 	ProvPort   int
 	TftpPort   int
+	DhcpPort   int
 	PxePort    int
 	NoDhcp     bool
 	NoTftp     bool
@@ -373,13 +374,13 @@ func NewFrontend(
 	dt *backend.DataTracker,
 	logger *log.Logger,
 	address string,
-	apiport, provport int,
+	apiport, provport, dhcpport, pxeport int,
 	fileRoot, devUI, UIUrl string,
 	authSource AuthSource,
 	pubs *backend.Publishers,
 	drpid string,
 	pc *midlayer.PluginController,
-	noDhcp, noTftp, noProv bool,
+	noDhcp, noTftp, noProv, noPxe bool,
 	saasDir string) (me *Frontend) {
 	me = &Frontend{
 		Logger:     logger,
@@ -389,9 +390,12 @@ func NewFrontend(
 		pc:         pc,
 		ApiPort:    apiport,
 		ProvPort:   provport,
+		DhcpPort:   dhcpport,
+		PxePort:    pxeport,
 		NoDhcp:     noDhcp,
 		NoTftp:     noTftp,
 		NoProv:     noProv,
+		NoPxe:      noPxe,
 		SaasDir:    saasDir,
 		authSource: authSource,
 	}
