@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -15,6 +16,7 @@ import (
 	"sync"
 	"text/template"
 
+	"github.com/VictorLowther/jsonpatch2/utils"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
@@ -30,6 +32,9 @@ type BootEnv struct {
 	*models.BootEnv
 	validate
 	renderers      renderers
+	pathLookaside  func(string) (io.Reader, error)
+	installRepo    *Repo
+	kernelVerified bool
 	bootParamsTmpl *template.Template
 	p              *DataTracker
 	rootTemplate   *template.Template
@@ -67,6 +72,26 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 		func(s string) (models.Model, error) {
 			res := fix(b.New())
 			res.Name = s
+			return res, nil
+		})
+	res["OsName"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool {
+			return fix(i).OS.Name < fix(j).OS.Name
+		},
+		func(ref models.Model) (gte, gt index.Test) {
+			name := fix(ref).OS.Name
+			return func(s models.Model) bool {
+					return fix(s).OS.Name >= name
+				},
+				func(s models.Model) bool {
+					return fix(s).OS.Name > name
+				}
+		},
+		func(s string) (models.Model, error) {
+			res := fix(b.New())
+			res.OS.Name = s
 			return res, nil
 		})
 	res["OnlyUnknown"] = index.Make(
@@ -109,7 +134,56 @@ func (b *BootEnv) pathFor(f string) string {
 	if strings.HasSuffix(b.Name, "-install") {
 		res = path.Join(res, "install")
 	}
-	return path.Clean(path.Join(res, f))
+	return path.Clean(path.Join("/", res, f))
+}
+
+type rt struct {
+	io.ReadCloser
+	sz int64
+}
+
+func (r *rt) Size() int64 {
+	return r.sz
+}
+
+func (b *BootEnv) fillInstallRepo() {
+	if b.Kernel == "" {
+		return
+	}
+	o := b.stores("profiles").Find(b.p.GlobalProfileName)
+	if o == nil {
+		return
+	}
+	p := AsProfile(o)
+	repos := []*Repo{}
+	r, ok := p.Params["package-repositories"]
+	if !ok || utils.Remarshal(r, &repos) != nil {
+		return
+	}
+	for _, r := range repos {
+		if !r.InstallSource || len(r.OS) != 1 || r.OS[0] != b.OS.Name {
+			continue
+		}
+		b.kernelVerified = true
+		b.installRepo = r
+		pf := b.pathFor("")
+		b.pathLookaside = func(p string) (io.Reader, error) {
+			// Always use local copy if available
+			if _, err := os.Stat(path.Join(b.p.FileRoot, p)); err == nil || b.installRepo == nil {
+				return nil, nil
+			}
+			tgtUri := strings.TrimSuffix(b.installRepo.URL, "/") + "/" + strings.TrimPrefix(p, pf)
+			resp, err := http.Get(tgtUri)
+			if err != nil {
+				return nil, err
+			}
+			if resp.ContentLength < 0 {
+				return resp.Body, nil
+			}
+			return &rt{resp.Body, resp.ContentLength}, nil
+		}
+		return
+	}
 }
 
 func (b *BootEnv) localPathFor(f string) string {
@@ -201,6 +275,7 @@ func (b *BootEnv) explodeIso() {
 		b.p.Infof("debugBootEnv", "Explode ISO: Skipping %s becausing no iso image specified\n", b.Name)
 		return
 	}
+	b.kernelVerified = false
 	// Have we already exploded this?  If file exists, then good!
 	canaryPath := b.localPathFor("." + strings.Replace(b.OS.Name, "/", "_", -1) + ".rebar_canary")
 	buf, err := ioutil.ReadFile(canaryPath)
@@ -210,6 +285,11 @@ func (b *BootEnv) explodeIso() {
 	}
 	isoPath := filepath.Join(b.p.FileRoot, "isos", b.OS.IsoFile)
 	if _, err := os.Stat(isoPath); os.IsNotExist(err) {
+		if b.installRepo != nil {
+			b.p.Infof("BootEnv: Explode ISO: ISO does not exist, falling back to install repo at %s", b.installRepo.URL)
+			b.kernelVerified = true
+			return
+		}
 		b.Errorf("Explode ISO: iso does not exist: %s\n", b.p.reportPath(isoPath))
 		if b.OS.IsoUrl != "" {
 			b.Errorf("You can download the required ISO from %s", b.OS.IsoUrl)
@@ -238,6 +318,7 @@ func (b *BootEnv) Validate() {
 		// If we have not been validated at this point, return.
 		return
 	}
+	b.fillInstallRepo()
 	// OK, we are sane, if not useable.  Check to see if we are useable
 	seenPxeLinux := false
 	seenELilo := false
@@ -260,42 +341,42 @@ func (b *BootEnv) Validate() {
 	}
 	// Make sure the ISO for this bootenv has been exploded locally so that
 	// the boot env can use its contents.
-	if b.OS.IsoFile != "" {
-		b.explodeIso()
-	}
-	// If we have a non-empty Kernel, make sure it points at something kernel-ish.
-	if b.Kernel != "" {
-		kPath := b.localPathFor(b.Kernel)
-		kernelStat, err := os.Stat(kPath)
-		if err != nil {
-			b.Errorf("bootenv: %s: missing kernel %s (%s)",
-				b.Name,
-				b.Kernel,
-				b.p.reportPath(kPath))
-		} else if !kernelStat.Mode().IsRegular() {
-			b.Errorf("bootenv: %s: invalid kernel %s (%s)",
-				b.Name,
-				b.Kernel,
-				b.p.reportPath(kPath))
-		}
-	}
-	// Ditto for all the initrds.
-	if len(b.Initrds) > 0 {
-		for _, initrd := range b.Initrds {
-			iPath := b.localPathFor(initrd)
-			initrdStat, err := os.Stat(iPath)
+	b.explodeIso()
+	if !b.kernelVerified {
+		// If we have a non-empty Kernel, make sure it points at something kernel-ish.
+		if b.Kernel != "" {
+			kPath := b.localPathFor(b.Kernel)
+			kernelStat, err := os.Stat(kPath)
 			if err != nil {
-				b.Errorf("bootenv: %s: missing initrd %s (%s)",
+				b.Errorf("bootenv: %s: missing kernel %s (%s)",
 					b.Name,
-					initrd,
-					b.p.reportPath(iPath))
-				continue
+					b.Kernel,
+					b.p.reportPath(kPath))
+			} else if !kernelStat.Mode().IsRegular() {
+				b.Errorf("bootenv: %s: invalid kernel %s (%s)",
+					b.Name,
+					b.Kernel,
+					b.p.reportPath(kPath))
 			}
-			if !initrdStat.Mode().IsRegular() {
-				b.Errorf("bootenv: %s: invalid initrd %s (%s)",
-					b.Name,
-					initrd,
-					b.p.reportPath(iPath))
+		}
+		// Ditto for all the initrds.
+		if len(b.Initrds) > 0 {
+			for _, initrd := range b.Initrds {
+				iPath := b.localPathFor(initrd)
+				initrdStat, err := os.Stat(iPath)
+				if err != nil {
+					b.Errorf("bootenv: %s: missing initrd %s (%s)",
+						b.Name,
+						initrd,
+						b.p.reportPath(iPath))
+					continue
+				}
+				if !initrdStat.Mode().IsRegular() {
+					b.Errorf("bootenv: %s: invalid initrd %s (%s)",
+						b.Name,
+						initrd,
+						b.p.reportPath(iPath))
+				}
 			}
 		}
 	}
@@ -401,6 +482,12 @@ func (b *BootEnv) AfterDelete() {
 		} else {
 			rts.deregister(b.p.FS)
 		}
+		idx, idxerr := index.All(
+			index.Sort(b.Indexes()["OsName"]),
+			index.Eq(b.OS.Name))(&(b.stores("bootenvs").Index))
+		if idxerr == nil && idx.Count() == 0 {
+			b.p.FS.DelDynamicTree(b.pathFor(""))
+		}
 	}
 }
 
@@ -437,6 +524,7 @@ func (b *BootEnv) AfterSave() {
 	if b.Available && b.renderers != nil {
 		b.renderers.register(b.p.FS)
 	}
+	b.p.FS.AddDynamicTree(b.pathFor(""), b.pathLookaside)
 	b.renderers = nil
 }
 
