@@ -1,4 +1,4 @@
-package server
+package embedded
 
 // Yes - Twice - once to get the basic pieces in place to let swagger run, then the final parts
 //
@@ -19,20 +19,20 @@ import (
 	"os"
 	"path"
 
-	"github.com/digitalrebar/provision/embedded"
 	"github.com/digitalrebar/provision/frontend"
+	"github.com/digitalrebar/provision/server"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-gonic/gin"
 )
 
 func init() {
 	frontend.EmbeddedAssetsServerFunc = easf
-	EmbeddedAssetsExtractFunc = extractAssets
+	server.EmbeddedAssetsExtractFunc = extractAssets
 }
 
 func easf(mgmtApi *gin.Engine, logger *log.Logger) error {
 	// Swagger.json serve
-	buf, err := embedded.Asset("swagger.json")
+	buf, err := Asset("swagger.json")
 	if err != nil {
 		logger.Fatalf("Failed to load swagger.json asset")
 	}
@@ -44,7 +44,7 @@ func easf(mgmtApi *gin.Engine, logger *log.Logger) error {
 
 	// Server Swagger UI.
 	mgmtApi.StaticFS("/swagger-ui",
-		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "swagger-ui"})
+		&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, AssetInfo: AssetInfo, Prefix: "swagger-ui"})
 
 	return nil
 }
@@ -87,7 +87,7 @@ func extractAssets(replaceRoot, fileRoot string) error {
 	}
 
 	for src, dest := range assets {
-		buf, err := embedded.Asset(src)
+		buf, err := Asset(src)
 		if err != nil {
 			return fmt.Errorf("No such embedded asset %s: %v", src, err)
 		}
@@ -102,7 +102,7 @@ func extractAssets(replaceRoot, fileRoot string) error {
 			}
 		}
 
-		info, err := embedded.AssetInfo(src)
+		info, err := AssetInfo(src)
 		if err != nil {
 			return fmt.Errorf("No mode info for embedded asset %s: %v", src, err)
 		}

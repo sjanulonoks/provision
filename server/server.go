@@ -141,8 +141,8 @@ func Server(c_opts *ProgOpts) {
 	mkdir(c_opts.DataRoot, logger)
 	mkdir(c_opts.LogRoot, logger)
 	mkdir(c_opts.SaasContentRoot, logger)
-	logger.Printf("Extracting Default Assets\n")
 	if EmbeddedAssetsExtractFunc != nil {
+		logger.Printf("Extracting Default Assets\n")
 		if err := EmbeddedAssetsExtractFunc(c_opts.ReplaceRoot, c_opts.FileRoot); err != nil {
 			logger.Fatalf("Unable to extract assets: %v", err)
 		}

@@ -1,4 +1,4 @@
-package server
+package embedded
 
 import (
 	"io/ioutil"
