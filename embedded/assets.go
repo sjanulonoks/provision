@@ -49,6 +49,8 @@ func easf(mgmtApi *gin.Engine, logger *log.Logger) error {
 	return nil
 }
 
+func IncludeMeFunction() {}
+
 func extractAssets(replaceRoot, fileRoot string) error {
 	dirs := []string{"isos", "files", "machines", "pxelinux.cfg"}
 	for _, dest := range dirs {
