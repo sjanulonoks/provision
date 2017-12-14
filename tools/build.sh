@@ -59,7 +59,7 @@ export VERFLAGS="-X github.com/digitalrebar/provision.RS_MAJOR_VERSION=$MajorV \
 
 glide install
 rm -rf client genmodels embedded/assets/swagger.json
-go generate server/assets.go
+go generate embedded/assets.go
 
 # Update cli docs if needed. - does change date.
 go build -o drpcli-docs cmds/drpcli-docs/drpcli-docs.go

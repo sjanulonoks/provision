@@ -1,4 +1,4 @@
-package server
+package embedded
 
 import (
 	"io/ioutil"
@@ -14,7 +14,7 @@ func TestExtractAssets(t *testing.T) {
 		return
 	}
 	defer os.RemoveAll(tgt)
-	if err := ExtractAssets("jj", tgt); err != nil {
+	if err := extractAssets("jj", tgt); err != nil {
 		t.Errorf("Could not extract assets: %v", err)
 		return
 	}
@@ -43,7 +43,7 @@ func TestExtractAssets(t *testing.T) {
 		}
 	}
 
-	if err := ExtractAssets("extract_test", tgt); err != nil {
+	if err := extractAssets("extract_test", tgt); err != nil {
 		t.Errorf("Could not extract assets: %v", err)
 		return
 	}
