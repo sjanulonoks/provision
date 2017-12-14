@@ -15,11 +15,9 @@ import (
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
-	"github.com/digitalrebar/provision/embedded"
 	"github.com/digitalrebar/provision/midlayer"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
-	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/location"
 	"github.com/gin-gonic/gin"
@@ -370,6 +368,8 @@ func (fe *Frontend) userAuth() gin.HandlerFunc {
 	}
 }
 
+var EmbeddedAssetsServerFunc func(*gin.Engine, *log.Logger) error
+
 func NewFrontend(
 	dt *backend.DataTracker,
 	logger *log.Logger,
@@ -469,20 +469,9 @@ func NewFrontend(
 	me.InitEventApi()
 	me.InitContentApi()
 
-	// Swagger.json serve
-	buf, err := embedded.Asset("swagger.json")
-	if err != nil {
-		logger.Fatalf("Failed to load swagger.json asset")
+	if EmbeddedAssetsServerFunc != nil {
+		EmbeddedAssetsServerFunc(mgmtApi, logger)
 	}
-	var f interface{}
-	err = json.Unmarshal(buf, &f)
-	mgmtApi.GET("/swagger.json", func(c *gin.Context) {
-		c.JSON(http.StatusOK, f)
-	})
-
-	// Server Swagger UI.
-	mgmtApi.StaticFS("/swagger-ui",
-		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "swagger-ui"})
 
 	// Optionally add a local dev-ui
 	if len(devUI) != 0 {

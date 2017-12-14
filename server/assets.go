@@ -11,15 +11,45 @@ package server
 //go:generate go-bindata -prefix ../embedded/assets -pkg embedded -o ../embedded/embed.go ../embedded/assets/...
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"path"
 
 	"github.com/digitalrebar/provision/embedded"
+	"github.com/digitalrebar/provision/frontend"
+	assetfs "github.com/elazarl/go-bindata-assetfs"
+	"github.com/gin-gonic/gin"
 )
 
-func ExtractAssets(replaceRoot, fileRoot string) error {
+func init() {
+	frontend.EmbeddedAssetsServerFunc = easf
+	EmbeddedAssetsExtractFunc = extractAssets
+}
+
+func easf(mgmtApi *gin.Engine, logger *log.Logger) error {
+	// Swagger.json serve
+	buf, err := embedded.Asset("swagger.json")
+	if err != nil {
+		logger.Fatalf("Failed to load swagger.json asset")
+	}
+	var f interface{}
+	err = json.Unmarshal(buf, &f)
+	mgmtApi.GET("/swagger.json", func(c *gin.Context) {
+		c.JSON(http.StatusOK, f)
+	})
+
+	// Server Swagger UI.
+	mgmtApi.StaticFS("/swagger-ui",
+		&assetfs.AssetFS{Asset: embedded.Asset, AssetDir: embedded.AssetDir, AssetInfo: embedded.AssetInfo, Prefix: "swagger-ui"})
+
+	return nil
+}
+
+func extractAssets(replaceRoot, fileRoot string) error {
 	dirs := []string{"isos", "files", "machines", "pxelinux.cfg"}
 	for _, dest := range dirs {
 		destDir := path.Join(fileRoot, dest)
