@@ -30,7 +30,7 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 	if err != nil {
 		return nil, err
 	}
-	svr := tftp.NewServer(func(filename string, rf io.ReaderFrom) error {
+	readHandler := func(filename string, rf io.ReaderFrom) error {
 		var local net.IP
 		var remote net.UDPAddr
 		t, outgoing := rf.(tftp.OutgoingTransfer)
@@ -67,7 +67,8 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 			return err
 		}
 		return nil
-	}, nil)
+	}
+	svr := tftp.NewServer(readHandler, nil)
 
 	th := &TftpHandler{srv: svr}
 

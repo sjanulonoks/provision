@@ -172,7 +172,7 @@ func (b *BootEnv) fillInstallRepo() {
 			if _, err := os.Stat(path.Join(b.p.FileRoot, p)); err == nil || b.installRepo == nil {
 				return nil, nil
 			}
-			tgtUri := strings.TrimSuffix(b.installRepo.URL, "/") + "/" + strings.TrimPrefix(p, pf)
+			tgtUri := strings.TrimSuffix(b.installRepo.URL, "/") + strings.TrimPrefix(p, pf)
 			resp, err := http.Get(tgtUri)
 			if err != nil {
 				return nil, err
