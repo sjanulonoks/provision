@@ -158,12 +158,15 @@ func (b *BootEnv) fillInstallRepo() {
 	repos := []*Repo{}
 	r, ok := p.Params["package-repositories"]
 	if !ok || utils.Remarshal(r, &repos) != nil {
+		b.p.Infof("debugBootEnv", "BootEnv %s: No package repositories to use", b.Name)
 		return
 	}
 	for _, r := range repos {
+		b.p.Debugf("debugBootEnv", "BootEnv %s: Considering repo %s", b.Name, r.Tag)
 		if !r.InstallSource || len(r.OS) != 1 || r.OS[0] != b.OS.Name {
 			continue
 		}
+		b.p.Infof("debugBootEnv", "BootEnv %s: Using repo %s as an install source", b.Name, r.Tag)
 		b.kernelVerified = true
 		b.installRepo = r
 		pf := b.pathFor("")
@@ -173,6 +176,7 @@ func (b *BootEnv) fillInstallRepo() {
 				return nil, nil
 			}
 			tgtUri := strings.TrimSuffix(b.installRepo.URL, "/") + strings.TrimPrefix(p, pf)
+			b.p.Debugf("debugBootEnv", "Proxying %s to %s", p, tgtUri)
 			resp, err := http.Get(tgtUri)
 			if err != nil {
 				return nil, err
@@ -183,6 +187,12 @@ func (b *BootEnv) fillInstallRepo() {
 			return &rt{resp.Body, resp.ContentLength}, nil
 		}
 		return
+	}
+}
+
+func (b *BootEnv) AddDynamicTree() {
+	if b.pathLookaside != nil {
+		b.p.FS.AddDynamicTree(b.pathFor(""), b.pathLookaside)
 	}
 }
 
@@ -286,7 +296,7 @@ func (b *BootEnv) explodeIso() {
 	isoPath := filepath.Join(b.p.FileRoot, "isos", b.OS.IsoFile)
 	if _, err := os.Stat(isoPath); os.IsNotExist(err) {
 		if b.installRepo != nil {
-			b.p.Infof("BootEnv: Explode ISO: ISO does not exist, falling back to install repo at %s", b.installRepo.URL)
+			b.p.Infof("debugBootEnv", "BootEnv: Explode ISO: ISO does not exist, falling back to install repo at %s", b.installRepo.URL)
 			b.kernelVerified = true
 			return
 		}
@@ -524,7 +534,7 @@ func (b *BootEnv) AfterSave() {
 	if b.Available && b.renderers != nil {
 		b.renderers.register(b.p.FS)
 	}
-	b.p.FS.AddDynamicTree(b.pathFor(""), b.pathLookaside)
+	b.AddDynamicTree()
 	b.renderers = nil
 }
 
