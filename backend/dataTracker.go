@@ -598,6 +598,12 @@ func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 		}
 
 		p.objs[prefix].Index = *index.Create(res)
+		if prefix == "bootenvs" {
+			for _, thing := range p.objs[prefix].Items() {
+				benv := AsBootEnv(thing)
+				benv.AddDynamicTree()
+			}
+		}
 
 		if prefix == "templates" {
 			buf := &bytes.Buffer{}

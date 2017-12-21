@@ -3,8 +3,10 @@ package backend
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -15,17 +17,26 @@ import (
 	"github.com/digitalrebar/provision/models"
 )
 
+type Sizer interface {
+	Size() int64
+}
+
+type ReadSizer interface {
+	io.Reader
+	Sizer
+}
+
 type renderer struct {
 	path, name string
-	write      func(net.IP) (*bytes.Reader, error)
+	write      func(net.IP) (io.Reader, error)
 }
 
 func (r renderer) register(fs *FileSystem) {
-	fs.addDynamic(r.path, r.write)
+	fs.AddDynamicFile(r.path, r.write)
 }
 
 func (r renderer) deregister(fs *FileSystem) {
-	fs.delDynamic(r.path)
+	fs.DelDynamicFile(r.path)
 }
 
 type renderers []renderer
@@ -79,7 +90,7 @@ func newRenderedTemplate(r *RenderData,
 	return renderer{
 		path: path,
 		name: tmplKey,
-		write: func(remoteIP net.IP) (*bytes.Reader, error) {
+		write: func(remoteIP net.IP) (io.Reader, error) {
 			objs, unlocker := p.LockEnts("stages", "tasks", "machines", "bootenvs", "profiles", "params")
 			defer unlocker()
 			rd := &RenderData{d: objs, p: p}
@@ -156,9 +167,9 @@ func (b *rBootEnv) PathFor(proto, f string) string {
 	tail := b.pathFor(f)
 	switch proto {
 	case "tftp":
-		return tail
+		return strings.TrimPrefix(tail, "/")
 	case "http":
-		return b.p.FileURL(b.renderData.remoteIP) + "/" + tail
+		return b.p.FileURL(b.renderData.remoteIP) + tail
 	default:
 		b.p.Logger.Fatalf("Unknown protocol %v", proto)
 	}
@@ -375,15 +386,18 @@ func (r *RenderData) MachineRepos() []*Repo {
 		for _, obj := range r.d("bootenvs").Items() {
 			env := obj.(*BootEnv)
 			if env.OS.Name == r.Machine.OS {
-				found = append(found, &Repo{
-					Tag:           env.Name,
-					InstallSource: true,
-					OS:            []string{r.Machine.OS},
-					URL:           r.p.FileURL(r.remoteIP) + "/" + path.Join(r.Machine.OS, "install"),
-					r:             r,
-					targetOS:      r.Machine.OS,
-				})
-				break
+				fi, err := os.Stat(path.Join(r.p.FileRoot, r.Machine.OS, "install", env.Kernel))
+				if err == nil && fi.Mode().IsRegular() {
+					found = append(found, &Repo{
+						Tag:           env.Name,
+						InstallSource: true,
+						OS:            []string{r.Machine.OS},
+						URL:           r.p.FileURL(r.remoteIP) + "/" + path.Join(r.Machine.OS, "install"),
+						r:             r,
+						targetOS:      r.Machine.OS,
+					})
+					break
+				}
 			}
 		}
 	}

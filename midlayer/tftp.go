@@ -1,7 +1,6 @@
 package midlayer
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"log"
@@ -31,7 +30,7 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 	if err != nil {
 		return nil, err
 	}
-	svr := tftp.NewServer(func(filename string, rf io.ReaderFrom) error {
+	readHandler := func(filename string, rf io.ReaderFrom) error {
 		var local net.IP
 		var remote net.UDPAddr
 		t, outgoing := rf.(tftp.OutgoingTransfer)
@@ -57,7 +56,7 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 				if fi, err := src.Stat(); err == nil {
 					size = fi.Size()
 				}
-			case *bytes.Reader:
+			case backend.Sizer:
 				size = src.Size()
 			}
 			t.SetSize(size)
@@ -68,7 +67,8 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 			return err
 		}
 		return nil
-	}, nil)
+	}
+	svr := tftp.NewServer(readHandler, nil)
 
 	th := &TftpHandler{srv: svr}
 
