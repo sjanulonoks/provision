@@ -17,7 +17,11 @@ func (fe *Frontend) InitWebSocket() {
 	fe.melody = melody.New()
 
 	fe.ApiGroup.GET("/ws", func(c *gin.Context) {
-		fe.melody.HandleRequest(c.Writer, c.Request)
+		claim, _ := c.Get("DRP-CLAIM")
+		keys := map[string]interface{}{
+			"DRP-CLAIM": claim,
+		}
+		fe.melody.HandleRequestWithKeys(c.Writer, c.Request, keys)
 	})
 
 	fe.melody.HandleMessage(fe.websocketHandler)
@@ -26,12 +30,9 @@ func (fe *Frontend) InitWebSocket() {
 // Callers register or deregister values.
 // type.action.key = with * as wildcard spots.
 
-func filterFunction(s *melody.Session, e *models.Event) bool {
-	val, ok := s.Get("EventMap")
-	if !ok {
-		return false
-	}
-	emap := val.([]string)
+func (f *Frontend) filterFunction(emap []string, claim interface{}, e *models.Event) bool {
+	// Check for an event to map.
+	matched := false
 	for _, test := range emap {
 		arr := strings.SplitN(test, ".", 3)
 
@@ -44,9 +45,15 @@ func filterFunction(s *melody.Session, e *models.Event) bool {
 		if arr[2] != "*" && arr[2] != e.Key {
 			continue
 		}
-		return true
+		matched = true
+		break
 	}
-	return false
+
+	// Make sure we are authorized to see this event.
+	if matched {
+		matched = f.assureAuthWithClaim(claim, e.Type, e.Action, e.Key)
+	}
+	return matched
 }
 
 func (f *Frontend) Publish(e *models.Event) error {
@@ -54,9 +61,27 @@ func (f *Frontend) Publish(e *models.Event) error {
 		return err
 	} else {
 		return f.melody.BroadcastFilter(msg, func(s *melody.Session) bool {
-			wsLock.Lock()
-			defer wsLock.Unlock()
-			return filterFunction(s, e)
+			var emap []string
+			var claim interface{}
+			hasMap := func() bool {
+				wsLock.Lock()
+				defer wsLock.Unlock()
+				claim = s.MustGet("DRP-CLAIM")
+				if val, ok := s.Get("EventMap"); !ok {
+					return false
+				} else {
+					tmap := val.([]string)
+					emap = make([]string, len(tmap), len(tmap))
+					for i, v := range tmap {
+						emap[i] = v
+					}
+					return true
+				}
+			}()
+			if !hasMap {
+				return false
+			}
+			return f.filterFunction(emap, claim, e)
 		})
 	}
 }
