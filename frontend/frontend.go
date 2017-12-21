@@ -529,21 +529,13 @@ func (f *Frontend) getAuthUser(c *gin.Context) string {
 //
 // THIS MUST NOT BE CALLED UNDER LOCKS!
 //
-func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bool {
-	obj, ok := c.Get("DRP-CLAIM")
-	if !ok {
-		f.Logger.Printf("Request with no claims\n")
-		c.AbortWithStatus(http.StatusForbidden)
-		return false
-	}
-	drpClaim, ok := obj.(*backend.DrpCustomClaims)
+func (f *Frontend) assureAuthWithClaim(claim interface{}, scope, action, specific string) bool {
+	drpClaim, ok := claim.(*backend.DrpCustomClaims)
 	if !ok {
 		f.Logger.Printf("Request with bad claims\n")
-		c.AbortWithStatus(http.StatusForbidden)
 		return false
 	}
 	if !drpClaim.Match(scope, action, specific) {
-		c.AbortWithStatus(http.StatusForbidden)
 		return false
 	}
 
@@ -588,16 +580,32 @@ func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bo
 			}
 		}()
 		if machineSecret == "" {
-			c.AbortWithStatus(http.StatusForbidden)
 			return false
 		}
 	}
 
 	if !drpClaim.ValidateSecrets(grantorSecret, userSecret, machineSecret) {
-		c.AbortWithStatus(http.StatusForbidden)
 		return false
 	}
 
+	return true
+
+}
+
+//
+// THIS MUST NOT BE CALLED UNDER LOCKS!
+//
+func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bool {
+	obj, ok := c.Get("DRP-CLAIM")
+	if !ok {
+		f.Logger.Printf("Request with no claims\n")
+		c.AbortWithStatus(http.StatusForbidden)
+		return false
+	}
+	if !f.assureAuthWithClaim(obj, scope, action, specific) {
+		c.AbortWithStatus(http.StatusForbidden)
+		return false
+	}
 	return true
 }
 
