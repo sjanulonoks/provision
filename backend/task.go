@@ -15,7 +15,6 @@ import (
 type Task struct {
 	*models.Task
 	validate
-	p            *DataTracker
 	rootTemplate *template.Template
 	tmplMux      sync.Mutex
 }
@@ -27,7 +26,7 @@ func (obj *Task) SetReadOnly(b bool) {
 func (obj *Task) SaveClean() store.KeySaver {
 	mod := *obj.Task
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 
 func AsTask(o models.Model) *Task {
@@ -42,21 +41,13 @@ func AsTasks(o []models.Model) []*Task {
 	return res
 }
 
-func (t *Task) Backend() store.Store {
-	return t.p.getBackend(t)
-}
-
 func (t *Task) New() store.KeySaver {
 	res := &Task{Task: &models.Task{}}
 	if t.Task != nil && t.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = t.p
+	res.rt = t.rt
 	return res
-}
-
-func (t *Task) setDT(dp *DataTracker) {
-	t.p = dp
 }
 
 func (t *Task) Indexes() map[string]index.Maker {
@@ -95,15 +86,15 @@ func (t *Task) Validate() {
 	t.Task.Validate()
 	t.tmplMux.Lock()
 	defer t.tmplMux.Unlock()
-	t.p.tmplMux.Lock()
-	defer t.p.tmplMux.Unlock()
-	root := t.genRoot(t.p.rootTemplate, t)
+	t.rt.dt.tmplMux.Lock()
+	defer t.rt.dt.tmplMux.Unlock()
+	root := t.genRoot(t.rt.dt.rootTemplate, t)
 	t.SetValid()
 	if t.Useable() {
 		t.rootTemplate = root
 		t.SetAvailable()
 	}
-	stages := t.stores("stages")
+	stages := t.rt.stores("stages")
 	if stages != nil {
 		for _, i := range stages.Items() {
 			stage := AsStage(i)
@@ -115,8 +106,8 @@ func (t *Task) Validate() {
 					continue
 				}
 				func() {
-					stage.stores = t.stores
-					defer func() { stage.stores = nil }()
+					stage.rt = t.rt
+					defer func() { stage.rt = nil }()
 					stage.Validate()
 				}()
 				break
@@ -127,10 +118,7 @@ func (t *Task) Validate() {
 }
 
 func (t *Task) OnLoad() error {
-	t.stores = func(ref string) *Store {
-		return t.p.objs[ref]
-	}
-	defer func() { t.stores = nil }()
+	defer func() { t.rt = nil }()
 	return t.BeforeSave()
 }
 
@@ -153,7 +141,7 @@ type taskHaver interface {
 func (t *Task) BeforeDelete() error {
 	e := &models.Error{Code: 409, Type: StillInUseError, Model: t.Prefix(), Key: t.Key()}
 	for _, objPrefix := range []string{"machines", "stages"} {
-		for _, j := range t.stores(objPrefix).Items() {
+		for _, j := range t.rt.stores(objPrefix).Items() {
 			thing := j.(taskHaver)
 			if thing.HasTask(t.Name) {
 				e.Errorf("%s:%s still uses %s", thing.Prefix(), thing.Key(), t.Name)
@@ -171,12 +159,12 @@ func (t *Task) templates() *template.Template {
 	return t.rootTemplate
 }
 
-func (t *Task) Render(d Stores, m *Machine, e *models.Error) renderers {
+func (t *Task) Render(rt *RequestTracker, m *Machine, e *models.Error) renderers {
 	if m == nil {
 		e.Errorf("No machine to render against")
 		return nil
 	}
-	r := newRenderData(d, t.p, m, t)
+	r := newRenderData(rt, m, t)
 	return r.makeRenderers(e)
 }
 

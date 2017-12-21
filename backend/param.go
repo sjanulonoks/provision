@@ -23,7 +23,6 @@ type Paramer interface {
 type Param struct {
 	*models.Param
 	validate
-	p         *DataTracker
 	validator *gojsonschema.Schema
 }
 
@@ -34,7 +33,7 @@ func (obj *Param) SetReadOnly(b bool) {
 func (obj *Param) SaveClean() store.KeySaver {
 	mod := *obj.Param
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 
 func AsParam(o models.Model) *Param {
@@ -49,21 +48,13 @@ func AsParams(o []models.Model) []*Param {
 	return res
 }
 
-func (p *Param) Backend() store.Store {
-	return p.p.getBackend(p)
-}
-
 func (p *Param) New() store.KeySaver {
 	res := &Param{Param: &models.Param{}}
 	if p.Param != nil && p.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = p.p
+	res.rt = p.rt
 	return res
-}
-
-func (p *Param) setDT(dp *DataTracker) {
-	p.p = dp
 }
 
 func (p *Param) Indexes() map[string]index.Maker {
@@ -109,10 +100,7 @@ func (p *Param) BeforeSave() error {
 }
 
 func (p *Param) OnLoad() error {
-	p.stores = func(ref string) *Store {
-		return p.p.objs[ref]
-	}
-	defer func() { p.stores = nil }()
+	defer func() { p.rt = nil }()
 	return p.BeforeSave()
 }
 

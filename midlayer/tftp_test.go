@@ -15,14 +15,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/pin/tftp"
 )
 
 func TestTftpFiles(t *testing.T) {
-	logger := log.New(os.Stderr, "", log.LstdFlags)
-	fs := backend.NewFS(".", logger)
-	_, hh := ServeTftp(":3235235", fs.TftpResponder(), logger, backend.NewPublishers(logger))
+	locallogger := log.New(os.Stderr, "", log.LstdFlags)
+	l := logger.New(locallogger).Log("static")
+	fs := backend.NewFS(".", l)
+	_, hh := ServeTftp(":3235235", fs.TftpResponder(), l, backend.NewPublishers(locallogger))
 	if hh != nil {
 		if hh.Error() != "address 3235235: invalid port" {
 			t.Errorf("Expected a different error: %v", hh.Error())
@@ -31,7 +33,7 @@ func TestTftpFiles(t *testing.T) {
 		t.Errorf("Should have returned an error")
 	}
 
-	_, hh = ServeTftp("1.1.1.1:11112", fs.TftpResponder(), logger, backend.NewPublishers(logger))
+	_, hh = ServeTftp("1.1.1.1:11112", fs.TftpResponder(), l, backend.NewPublishers(locallogger))
 	if hh != nil {
 		if !strings.Contains(hh.Error(), "listen udp 1.1.1.1:11112: bind: ") {
 			t.Errorf("Expected a different error: %v", hh.Error())
@@ -44,8 +46,8 @@ func TestTftpFiles(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	fs = backend.NewFS(dir, logger)
-	srv, hh := ServeTftp("127.0.0.1:11112", fs.TftpResponder(), logger, backend.NewPublishers(logger))
+	fs = backend.NewFS(dir, l)
+	srv, hh := ServeTftp("127.0.0.1:11112", fs.TftpResponder(), l, backend.NewPublishers(locallogger))
 	if hh != nil {
 		t.Errorf("Should not return an error: %v", hh)
 	} else {

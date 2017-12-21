@@ -58,46 +58,29 @@ func InitPluginController(pluginDir string, dt *backend.DataTracker, pubs *backe
 		for !done {
 			select {
 			case event := <-pc.events:
-				if event.Action == "create" {
-					pc.lock.Lock()
-					ref := &backend.Plugin{}
-					d, unlocker := dt.LockEnts(ref.Locks("get")...)
-					ref2 := d(ref.Prefix()).Find(event.Key)
-					// May be deleted before we get here.
-					if ref2 != nil {
-						pc.startPlugin(d, ref2.(*backend.Plugin))
+				pc.lock.Lock()
+				ref := &backend.Plugin{}
+				rt := pc.dt.Request(pc.dt.Logger, ref.Locks("get")...)
+				rt.Do(func(d backend.Stores) {
+					ref2 := rt.Find(ref.Prefix(), event.Key)
+					switch event.Action {
+					case "create":
+						// May be deleted before we get here.
+						if ref2 != nil {
+							pc.startPlugin(rt, ref2.(*backend.Plugin))
+						}
+					case "save", "update":
+						// May be deleted before we get here.
+						if ref2 != nil {
+							pc.restartPlugin(rt, ref2.(*backend.Plugin))
+						}
+					case "delete":
+						pc.stopPlugin(event.Object.(*backend.Plugin))
+					default:
+						rt.Infof("debugPlugins", "internal event:", event)
 					}
-					unlocker()
-					pc.lock.Unlock()
-				} else if event.Action == "save" {
-					pc.lock.Lock()
-					ref := &backend.Plugin{}
-					d, unlocker := dt.LockEnts(ref.Locks("get")...)
-					ref2 := d(ref.Prefix()).Find(event.Key)
-					// May be deleted before we get here.
-					if ref2 != nil {
-						pc.restartPlugin(d, ref2.(*backend.Plugin))
-					}
-					unlocker()
-					pc.lock.Unlock()
-				} else if event.Action == "update" {
-					pc.lock.Lock()
-					ref := &backend.Plugin{}
-					d, unlocker := dt.LockEnts(ref.Locks("get")...)
-					// May be deleted before we get here.
-					ref2 := d(ref.Prefix()).Find(event.Key)
-					if ref2 != nil {
-						pc.restartPlugin(d, ref2.(*backend.Plugin))
-					}
-					unlocker()
-					pc.lock.Unlock()
-				} else if event.Action == "delete" {
-					pc.lock.Lock()
-					pc.stopPlugin(event.Object.(*backend.Plugin))
-					pc.lock.Unlock()
-				} else {
-					pc.dt.Infof("debugPlugins", "internal event:", event)
-				}
+				})
+				pc.lock.Unlock()
 			case <-pc.done:
 				done = true
 			}
@@ -129,21 +112,22 @@ func (pc *PluginController) WalkPluginDir() error {
 
 func (pc *PluginController) walkPlugins(provider string) (err error) {
 	// Walk all plugin objects from dt.
-	var idx *index.Index
 	ref := &backend.Plugin{}
-	d, unlocker := pc.dt.LockEnts(ref.Locks("get")...)
-	defer unlocker()
-	idx, err = index.All([]index.Filter{index.Native()}...)(&d(ref.Prefix()).Index)
-	if err != nil {
-		return
-	}
-	arr := idx.Items()
-	for _, res := range arr {
-		plugin := res.(*backend.Plugin)
-		if plugin.Provider == provider {
-			pc.startPlugin(d, plugin)
+	rt := pc.dt.Request(pc.dt.Logger, ref.Locks("get")...)
+	rt.Do(func(d backend.Stores) {
+		var idx *index.Index
+		idx, err = index.All([]index.Filter{index.Native()}...)(&d(ref.Prefix()).Index)
+		if err != nil {
+			return
 		}
-	}
+		arr := idx.Items()
+		for _, res := range arr {
+			plugin := res.(*backend.Plugin)
+			if plugin.Provider == provider {
+				pc.startPlugin(rt, plugin)
+			}
+		}
+	})
 	return
 }
 
@@ -197,7 +181,7 @@ func (pc *PluginController) GetPluginProviders() []*models.PluginProvider {
 	return answer
 }
 
-func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin) {
+func (pc *PluginController) startPlugin(rt *backend.RequestTracker, plugin *backend.Plugin) {
 	pc.dt.Infof("debugPlugins", "Starting plugin: %s(%s)\n", plugin.Name, plugin.Provider)
 	if _, ok := pc.runningPlugins[plugin.Name]; ok {
 		pc.dt.Infof("debugPlugins", "Already started plugin: %s(%s)\n", plugin.Name, plugin.Provider)
@@ -211,7 +195,7 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 			if !ok {
 				errors = append(errors, fmt.Sprintf("Missing required parameter: %s", parmName))
 			} else {
-				pobj := d("params").Find(parmName)
+				pobj := rt.Find("params", parmName)
 				if pobj != nil {
 					rp := pobj.(*backend.Param)
 
@@ -224,7 +208,7 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 		for _, parmName := range pp.OptionalParams {
 			obj, ok := plugin.Params[parmName]
 			if ok {
-				pobj := d("params").Find(parmName)
+				pobj := rt.Find("params", parmName)
 				if pobj != nil {
 					rp := pobj.(*backend.Param)
 
@@ -258,7 +242,7 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 		}
 		if len(plugin.PluginErrors) != len(errors) {
 			plugin.PluginErrors = errors
-			pc.dt.Update(d, plugin)
+			rt.Update(plugin)
 		}
 		pc.publishers.Publish("plugin", "started", plugin.Name, plugin)
 		pc.dt.Infof("debugPlugins", "Starting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
@@ -266,7 +250,7 @@ func (pc *PluginController) startPlugin(d backend.Stores, plugin *backend.Plugin
 		pc.dt.Infof("debugPlugins", "Starting plugin: %s(%s) missing provider\n", plugin.Name, plugin.Provider)
 		if plugin.PluginErrors == nil || len(plugin.PluginErrors) == 0 {
 			plugin.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", plugin.Provider)}
-			pc.dt.Update(d, plugin)
+			rt.Update(plugin)
 		}
 	}
 }
@@ -289,11 +273,11 @@ func (pc *PluginController) stopPlugin(plugin *backend.Plugin) {
 	}
 }
 
-func (pc *PluginController) restartPlugin(d backend.Stores, plugin *backend.Plugin) {
-	pc.dt.Infof("debugPlugins", "Restarting plugin: %s(%s)\n", plugin.Name, plugin.Provider)
+func (pc *PluginController) restartPlugin(rt *backend.RequestTracker, plugin *backend.Plugin) {
+	rt.Infof("debugPlugins", "Restarting plugin: %s(%s)\n", plugin.Name, plugin.Provider)
 	pc.stopPlugin(plugin)
-	pc.startPlugin(d, plugin)
-	pc.dt.Infof("debugPlugins", "Restarting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
+	pc.startPlugin(rt, plugin)
+	rt.Infof("debugPlugins", "Restarting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
 }
 
 func (pc *PluginController) buildNewStore(content *models.Content) (newStore store.Store, err error) {
@@ -469,16 +453,17 @@ func (pc *PluginController) removePluginProvider(provider string) error {
 				remove = append(remove, rp.Plugin)
 			}
 		}
-		for _, p := range remove {
-			ref := &backend.Plugin{}
-			d, unlocker := pc.dt.LockEnts(ref.Locks("get")...)
-			pc.stopPlugin(p)
-			ref2 := d(ref.Prefix()).Find(p.Name)
-			myPP := ref2.(*backend.Plugin)
-			myPP.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", provider)}
-			pc.dt.Update(d, myPP)
-			unlocker()
-		}
+		ref := &backend.Plugin{}
+		rt := pc.dt.Request(pc.dt.Logger, ref.Locks("get")...)
+		rt.Do(func(d backend.Stores) {
+			for _, p := range remove {
+				pc.stopPlugin(p)
+				ref2 := rt.Find(ref.Prefix(), p.Name)
+				myPP := ref2.(*backend.Plugin)
+				myPP.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", provider)}
+				rt.Update(myPP)
+			}
+		})
 
 		pc.dt.Infof("debugPlugins", "Removing plugin provider: %s\n", name)
 		pc.publishers.Publish("plugin_provider", "delete", name, pc.AvailableProviders[name])

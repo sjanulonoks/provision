@@ -38,6 +38,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/frontend"
@@ -81,11 +82,11 @@ type ProgOpts struct {
 	DefaultBootEnv string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"local"`
 	UnknownBootEnv string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`
 
-	DebugBootEnv  int    `long:"debug-bootenv" description:"Debug level for the BootEnv System - 0 = off, 1 = info, 2 = debug" default:"0"`
-	DebugDhcp     int    `long:"debug-dhcp" description:"Debug level for the DHCP Server - 0 = off, 1 = info, 2 = debug" default:"0"`
-	DebugRenderer int    `long:"debug-renderer" description:"Debug level for the Template Renderer - 0 = off, 1 = info, 2 = debug" default:"0"`
-	DebugFrontend int    `long:"debug-frontend" description:"Debug level for the Frontend - 0 = off, 1 = info, 2 = debug" default:"1"`
-	DebugPlugins  int    `long:"debug-plugins" description:"Debug level for the Plug-in layer - 0 = off, 1 = info, 2 = debug" default:"0"`
+	DebugBootEnv  string `long:"debug-bootenv" description:"Debug level for the BootEnv System" default:"warn"`
+	DebugDhcp     string `long:"debug-dhcp" description:"Debug level for the DHCP Server" default:"warn"`
+	DebugRenderer string `long:"debug-renderer" description:"Debug level for the Template Renderer" default:"warn"`
+	DebugFrontend string `long:"debug-frontend" description:"Debug level for the Frontend" default:"warn"`
+	DebugPlugins  string `long:"debug-plugins" description:"Debug level for the Plug-in layer" default:"warn"`
 	TlsKeyFile    string `long:"tls-key" description:"The TLS Key File" default:"server.key"`
 	TlsCertFile   string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
 	UseOldCiphers bool   `long:"use-old-ciphers" description:"Use Original Less Secure Cipher List"`
@@ -94,27 +95,27 @@ type ProgOpts struct {
 	BaseTokenSecret     string `long:"base-token-secret" description:"Auth Token secret to allow revocation of all tokens" default:""`
 	SystemGrantorSecret string `long:"system-grantor-secret" description:"Auth Token secret to allow revocation of all Machine tokens" default:""`
 	FakePinger          bool   `hidden:"true" long:"fake-pinger"`
+	DefaultLogLevel     string `long:"log-level" description:"Level to log messages at" default:"warn"`
 }
 
-func mkdir(d string, logger *log.Logger) {
+func mkdir(d string, localLogger *log.Logger) {
 	err := os.MkdirAll(d, 0755)
 	if err != nil {
-		logger.Fatalf("Error creating required directory %s: %v", d, err)
+		localLogger.Fatalf("Error creating required directory %s: %v", d, err)
 	}
 }
 
 func Server(c_opts *ProgOpts) {
 	var err error
-
-	logger := log.New(os.Stderr, "dr-provision", log.LstdFlags|log.Lmicroseconds|log.LUTC)
+	localLogger := log.New(os.Stderr, "dr-provision", log.LstdFlags|log.Lmicroseconds|log.LUTC)
 
 	if c_opts.VersionFlag {
-		logger.Fatalf("Version: %s", provision.RS_VERSION)
+		localLogger.Fatalf("Version: %s", provision.RS_VERSION)
 	}
-	logger.Printf("Version: %s\n", provision.RS_VERSION)
+	localLogger.Printf("Version: %s\n", provision.RS_VERSION)
 
 	// Make base root dir
-	mkdir(c_opts.BaseRoot, logger)
+	mkdir(c_opts.BaseRoot, localLogger)
 
 	// Make other dirs as needed - adjust the dirs as well.
 	if strings.IndexRune(c_opts.FileRoot, filepath.Separator) != 0 {
@@ -135,16 +136,16 @@ func Server(c_opts *ProgOpts) {
 	if strings.IndexRune(c_opts.ReplaceRoot, filepath.Separator) != 0 {
 		c_opts.ReplaceRoot = filepath.Join(c_opts.BaseRoot, c_opts.ReplaceRoot)
 	}
-	mkdir(c_opts.FileRoot, logger)
-	mkdir(c_opts.ReplaceRoot, logger)
-	mkdir(c_opts.PluginRoot, logger)
-	mkdir(c_opts.DataRoot, logger)
-	mkdir(c_opts.LogRoot, logger)
-	mkdir(c_opts.SaasContentRoot, logger)
+	mkdir(c_opts.FileRoot, localLogger)
+	mkdir(c_opts.ReplaceRoot, localLogger)
+	mkdir(c_opts.PluginRoot, localLogger)
+	mkdir(c_opts.DataRoot, localLogger)
+	mkdir(c_opts.LogRoot, localLogger)
+	mkdir(c_opts.SaasContentRoot, localLogger)
 	if EmbeddedAssetsExtractFunc != nil {
-		logger.Printf("Extracting Default Assets\n")
+		localLogger.Printf("Extracting Default Assets\n")
 		if err := EmbeddedAssetsExtractFunc(c_opts.ReplaceRoot, c_opts.FileRoot); err != nil {
-			logger.Fatalf("Unable to extract assets: %v", err)
+			localLogger.Fatalf("Unable to extract assets: %v", err)
 		}
 	}
 
@@ -152,12 +153,18 @@ func Server(c_opts *ProgOpts) {
 	dtStore, err := midlayer.DefaultDataStack(c_opts.DataRoot, c_opts.BackEndType,
 		c_opts.LocalContent, c_opts.DefaultContent, c_opts.SaasContentRoot)
 	if err != nil {
-		logger.Fatalf("Unable to create DataStack: %v", err)
+		localLogger.Fatalf("Unable to create DataStack: %v", err)
+	}
+	logLevel, err := logger.ParseLevel(c_opts.DefaultLogLevel)
+	if err != nil {
+		localLogger.Printf("Invalid log level %s", c_opts.DefaultLogLevel)
+		localLogger.Fatalf("Try one of `trace`,`debug`,`info`,`warn`,`error`,`fatal`,`panic")
 	}
 
 	// We have a backend, now get default assets
+	buf := logger.New(localLogger).SetDefaultLevel(logLevel)
 	services := make([]midlayer.Service, 0, 0)
-	publishers := backend.NewPublishers(logger)
+	publishers := backend.NewPublishers(localLogger)
 
 	dt := backend.NewDataTracker(dtStore,
 		c_opts.FileRoot,
@@ -166,14 +173,15 @@ func Server(c_opts *ProgOpts) {
 		c_opts.ForceStatic,
 		c_opts.StaticPort,
 		c_opts.ApiPort,
-		logger,
+		buf.Log("backend"),
 		map[string]string{
-			"debugBootEnv":        fmt.Sprintf("%d", c_opts.DebugBootEnv),
-			"debugDhcp":           fmt.Sprintf("%d", c_opts.DebugDhcp),
-			"debugRenderer":       fmt.Sprintf("%d", c_opts.DebugRenderer),
-			"debugFrontend":       fmt.Sprintf("%d", c_opts.DebugFrontend),
-			"debugPlugins":        fmt.Sprintf("%d", c_opts.DebugPlugins),
+			"debugBootEnv":        c_opts.DebugBootEnv,
+			"debugDhcp":           c_opts.DebugDhcp,
+			"debugRenderer":       c_opts.DebugRenderer,
+			"debugFrontend":       c_opts.DebugFrontend,
+			"debugPlugins":        c_opts.DebugPlugins,
 			"defaultStage":        c_opts.DefaultStage,
+			"logLevel":            c_opts.DefaultLogLevel,
 			"defaultBootEnv":      c_opts.DefaultBootEnv,
 			"unknownBootEnv":      c_opts.UnknownBootEnv,
 			"knownTokenTimeout":   fmt.Sprintf("%d", c_opts.KnownTokenTimeout),
@@ -187,7 +195,7 @@ func Server(c_opts *ProgOpts) {
 	if c_opts.DrpId == "" {
 		intfs, err := net.Interfaces()
 		if err != nil {
-			logger.Fatalf("Error getting interfaces for DrpId: %v", err)
+			localLogger.Fatalf("Error getting interfaces for DrpId: %v", err)
 		}
 
 		for _, intf := range intfs {
@@ -207,12 +215,12 @@ func Server(c_opts *ProgOpts) {
 
 	pc, err := midlayer.InitPluginController(c_opts.PluginRoot, dt, publishers, c_opts.ApiPort)
 	if err != nil {
-		logger.Fatalf("Error starting plugin service: %v", err)
+		localLogger.Fatalf("Error starting plugin service: %v", err)
 	} else {
 		services = append(services, pc)
 	}
 
-	fe := frontend.NewFrontend(dt, logger,
+	fe := frontend.NewFrontend(dt, buf.Log("frontend"),
 		c_opts.OurAddress,
 		c_opts.ApiPort, c_opts.StaticPort, c_opts.DhcpPort, c_opts.BinlPort,
 		c_opts.FileRoot,
@@ -228,35 +236,35 @@ func Server(c_opts *ProgOpts) {
 	}
 
 	if !c_opts.DisableTftpServer {
-		logger.Printf("Starting TFTP server")
-		if svc, err := midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), dt.FS.TftpResponder(), logger, publishers); err != nil {
-			logger.Fatalf("Error starting TFTP server: %v", err)
+		localLogger.Printf("Starting TFTP server")
+		if svc, err := midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), dt.FS.TftpResponder(), buf.Log("static"), publishers); err != nil {
+			localLogger.Fatalf("Error starting TFTP server: %v", err)
 		} else {
 			services = append(services, svc)
 		}
 	}
 
 	if !c_opts.DisableProvisioner {
-		logger.Printf("Starting static file server")
-		if svc, err := midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), dt.FS, logger, publishers); err != nil {
-			logger.Fatalf("Error starting static file server: %v", err)
+		localLogger.Printf("Starting static file server")
+		if svc, err := midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), dt.FS, buf.Log("static"), publishers); err != nil {
+			localLogger.Fatalf("Error starting static file server: %v", err)
 		} else {
 			services = append(services, svc)
 		}
 	}
 
 	if !c_opts.DisableDHCP {
-		logger.Printf("Starting DHCP server")
-		if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.DhcpPort, publishers, false, c_opts.FakePinger); err != nil {
-			logger.Fatalf("Error starting DHCP server: %v", err)
+		localLogger.Printf("Starting DHCP server")
+		if svc, err := midlayer.StartDhcpHandler(dt, buf.Log("dhcp"), c_opts.DhcpInterfaces, c_opts.DhcpPort, publishers, false, c_opts.FakePinger); err != nil {
+			localLogger.Fatalf("Error starting DHCP server: %v", err)
 		} else {
 			services = append(services, svc)
 		}
 
 		if !c_opts.DisableBINL {
-			logger.Printf("Starting PXE/BINL server")
-			if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.BinlPort, publishers, true, c_opts.FakePinger); err != nil {
-				logger.Fatalf("Error starting PXE/BINL server: %v", err)
+			localLogger.Printf("Starting PXE/BINL server")
+			if svc, err := midlayer.StartDhcpHandler(dt, buf.Log("dhcp"), c_opts.DhcpInterfaces, c_opts.BinlPort, publishers, true, c_opts.FakePinger); err != nil {
+				localLogger.Fatalf("Error starting PXE/BINL server: %v", err)
 			} else {
 				services = append(services, svc)
 			}
@@ -314,26 +322,26 @@ func Server(c_opts *ProgOpts) {
 
 			switch s {
 			case syscall.SIGHUP:
-				logger.Println("Reloading data stores...")
+				localLogger.Println("Reloading data stores...")
 				// Make data store - THIS IS BAD if datastore is memory.
 				dtStore, err := midlayer.DefaultDataStack(c_opts.DataRoot, c_opts.BackEndType,
 					c_opts.LocalContent, c_opts.DefaultContent, c_opts.SaasContentRoot)
 				if err != nil {
-					logger.Printf("Unable to create new DataStack on SIGHUP: %v", err)
+					localLogger.Printf("Unable to create new DataStack on SIGHUP: %v", err)
 				} else {
 					func() {
 						_, unlocker := dt.LockAll()
 						defer unlocker()
 						dt.ReplaceBackend(dtStore)
 					}()
-					logger.Println("Reload Complete")
+					localLogger.Println("Reload Complete")
 				}
 			case syscall.SIGTERM, syscall.SIGINT:
 				// Stop the service gracefully.
 				for _, svc := range services {
-					logger.Println("Shutting down server...")
+					localLogger.Println("Shutting down server...")
 					if err := svc.Shutdown(context.Background()); err != nil {
-						logger.Printf("could not shutdown: %v", err)
+						localLogger.Printf("could not shutdown: %v", err)
 					}
 				}
 				break
@@ -341,15 +349,15 @@ func Server(c_opts *ProgOpts) {
 		}
 	}()
 
-	logger.Printf("Starting API server")
+	localLogger.Printf("Starting API server")
 	if err = srv.ListenAndServeTLS(c_opts.TlsCertFile, c_opts.TlsKeyFile); err != http.ErrServerClosed {
 		// Stop the service gracefully.
 		for _, svc := range services {
-			logger.Println("Shutting down server...")
+			localLogger.Println("Shutting down server...")
 			if err := svc.Shutdown(context.Background()); err != http.ErrServerClosed {
-				logger.Printf("could not shutdown: %v", err)
+				localLogger.Printf("could not shutdown: %v", err)
 			}
 		}
-		logger.Fatalf("Error running API service: %v\n", err)
+		localLogger.Fatalf("Error running API service: %v\n", err)
 	}
 }

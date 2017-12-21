@@ -319,11 +319,10 @@ func (f *Frontend) InitMachineApi() {
 			}
 			var res models.Model
 			var err error
-			func() {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("create")...)
-				defer unlocker()
-				_, err = f.dt.Create(d, b)
-			}()
+			rt := f.rt(c, b.Locks("create")...)
+			rt.Do(func(d backend.Stores) {
+				_, err = rt.Create(b)
+			})
 			if err != nil {
 				be, ok := err.(*models.Error)
 				if ok {
@@ -535,30 +534,28 @@ func (f *Frontend) InitMachineApi() {
 			}
 			uuid := c.Param(`uuid`)
 			b := &backend.Machine{}
-			var ref models.Model
-			actions, err := func() ([]models.AvailableAction, *models.Error) {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
-				defer unlocker()
-				ref = d("machines").Find(uuid)
+			actions := []models.AvailableAction{}
+			var err *models.Error
+			rt := f.rt(c, b.Locks("actions")...)
+			rt.Do(func(d backend.Stores) {
+				ref := rt.Find("machines", uuid)
 				if ref == nil {
-					err := &models.Error{
+					err = &models.Error{
 						Code:  http.StatusNotFound,
 						Type:  c.Request.Method,
 						Model: "machines",
 						Key:   uuid,
 					}
 					err.Errorf("Not Found")
-					return nil, err
+					return
 				}
-				list := make([]models.AvailableAction, 0, 0)
 				m := backend.AsMachine(ref)
 				for _, aa := range f.pc.MachineActions.List() {
-					if _, err := validateMachineAction(f, d, aa.Command, m, make(map[string]interface{}, 0)); err == nil {
-						list = append(list, *aa)
+					if _, err := validateMachineAction(f, rt, aa.Command, m, make(map[string]interface{}, 0)); err == nil {
+						actions = append(actions, *aa)
 					}
 				}
-				return list, nil
-			}()
+			})
 			if err != nil {
 				c.JSON(err.Code, err)
 			} else {
@@ -585,25 +582,24 @@ func (f *Frontend) InitMachineApi() {
 			}
 			uuid := c.Param(`uuid`)
 			b := &backend.Machine{}
-			var ref models.Model
-			action, err := func() (models.AvailableAction, *models.Error) {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
-				defer unlocker()
-				res := models.AvailableAction{}
-				ref = d("machines").Find(uuid)
+			rt := f.rt(c, b.Locks("actions")...)
+			var action models.AvailableAction
+			var err *models.Error
+			rt.Do(func(d backend.Stores) {
+				ref := rt.Find("machines", uuid)
 				if ref == nil {
-					err := &models.Error{
+					err = &models.Error{
 						Code:  http.StatusNotFound,
 						Type:  c.Request.Method,
 						Model: "machines",
 						Key:   uuid,
 					}
 					err.Errorf("Action Get: '%s': Not Found", c.Param(`name`))
-					return res, err
+					return
 				}
 				m := backend.AsMachine(ref)
-				return validateMachineAction(f, d, c.Param(`name`), m, make(map[string]interface{}, 0))
-			}()
+				action, err = validateMachineAction(f, rt, c.Param(`name`), m, make(map[string]interface{}, 0))
+			})
 			if err != nil {
 				c.JSON(err.Code, err)
 			} else {
@@ -637,38 +633,37 @@ func (f *Frontend) InitMachineApi() {
 
 			b := &backend.Machine{}
 			var ref models.Model
-			ma, err := func() (*models.MachineAction, *models.Error) {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("actions")...)
-				defer unlocker()
-				ref = d("machines").Find(uuid)
+			var err *models.Error
+			var ma *models.MachineAction
+			rt := f.rt(c, b.Locks("actions")...)
+			rt.Do(func(d backend.Stores) {
+				ref = rt.Find("machines", uuid)
 				if ref == nil {
-					err := &models.Error{
+					err = &models.Error{
 						Code:  http.StatusNotFound,
 						Type:  "INVOKE",
 						Model: "machines",
 						Key:   uuid,
 					}
 					err.Errorf("Not Found")
-					return nil, err
+					return
 				}
 				res := &models.MachineAction{Command: name, Params: val}
 				m := backend.AsMachine(ref)
-
 				res.Name = m.Name
 				res.Uuid = m.Uuid
 				res.Address = m.Address
 				res.BootEnv = m.BootEnv
-				if _, err := validateMachineAction(f, d, name, m, val); err != nil {
+				if _, err = validateMachineAction(f, rt, name, m, val); err != nil {
 					err.Type = "INVOKE"
-					return nil, err
+					return
 				}
-				return res, nil
-			}()
+				ma = res
+			})
 			if err != nil {
 				c.JSON(err.Code, err)
 				return
 			}
-
 			f.pubs.Publish("machines", name, uuid, ma)
 			runErr := f.pc.MachineActions.Run(ma)
 			if runErr != nil {
@@ -685,7 +680,11 @@ func (f *Frontend) InitMachineApi() {
 
 }
 
-func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backend.Machine, val map[string]interface{}) (models.AvailableAction, *models.Error) {
+func validateMachineAction(f *Frontend,
+	rt *backend.RequestTracker,
+	name string,
+	m *backend.Machine,
+	val map[string]interface{}) (models.AvailableAction, *models.Error) {
 	aa := models.AvailableAction{}
 	err := &models.Error{
 		Code:  http.StatusBadRequest,
@@ -705,9 +704,9 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 		var obj interface{} = nil
 		obj, ok := val[param]
 		if !ok {
-			obj, ok = m.GetParam(d, param, true)
+			obj, ok = rt.GetParam(m, param, true)
 			if !ok {
-				if o := d("profiles").Find(f.dt.GlobalProfileName); o != nil {
+				if o := rt.Find("profiles", f.dt.GlobalProfileName); o != nil {
 					p := backend.AsProfile(o)
 					if tobj, ok := p.Params[param]; ok {
 						obj = tobj
@@ -723,7 +722,7 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 		if obj == nil {
 			err.Errorf("Action %s Missing Parameter %s", name, param)
 		} else {
-			pobj := d("params").Find(param)
+			pobj := rt.Find("params", param)
 			if pobj != nil {
 				rp := backend.AsParam(pobj)
 
@@ -737,9 +736,9 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 		var obj interface{} = nil
 		obj, ok := val[param]
 		if !ok {
-			obj, ok = m.GetParam(d, param, true)
+			obj, ok = rt.GetParam(m, param, true)
 			if !ok {
-				if o := d("profiles").Find(f.dt.GlobalProfileName); o != nil {
+				if o := rt.Find("profiles", f.dt.GlobalProfileName); o != nil {
 					p := backend.AsProfile(o)
 					if tobj, ok := p.Params[param]; ok {
 						obj = tobj
@@ -753,7 +752,7 @@ func validateMachineAction(f *Frontend, d backend.Stores, name string, m *backen
 			}
 		}
 		if obj != nil {
-			pobj := d("params").Find(param)
+			pobj := rt.Find("params", param)
 			if pobj != nil {
 				rp := backend.AsParam(pobj)
 

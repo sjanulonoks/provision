@@ -17,7 +17,6 @@ import (
 type Template struct {
 	*models.Template
 	validate
-	p        *DataTracker
 	toUpdate *tmplUpdater
 }
 
@@ -28,7 +27,7 @@ func (obj *Template) SetReadOnly(b bool) {
 func (obj *Template) SaveClean() store.KeySaver {
 	mod := *obj.Template
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 
 func (p *Template) Indexes() map[string]index.Maker {
@@ -55,21 +54,13 @@ func (p *Template) Indexes() map[string]index.Maker {
 	return res
 }
 
-func (t *Template) Backend() store.Store {
-	return t.p.getBackend(t)
-}
-
 func (t *Template) New() store.KeySaver {
 	res := &Template{Template: &models.Template{}}
 	if t.Template != nil && t.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = t.p
+	res.rt = t.rt
 	return res
-}
-
-func (t *Template) setDT(p *DataTracker) {
-	t.p = p
 }
 
 func (t *Template) parse(root *template.Template) error {
@@ -87,13 +78,13 @@ type tmplUpdater struct {
 
 func (t *Template) checkSubs(root *template.Template, e models.ErrorAdder) {
 	t.toUpdate = &tmplUpdater{root: root, tasks: []*Task{}, bootenvs: []*BootEnv{}}
-	if foo := t.stores("tasks"); foo != nil {
+	if foo := t.rt.stores("tasks"); foo != nil {
 		t.toUpdate.tasks = AsTasks(foo.Items())
 	}
-	if foo := t.stores("bootenvs"); foo != nil {
+	if foo := t.rt.stores("bootenvs"); foo != nil {
 		t.toUpdate.bootenvs = AsBootEnvs(foo.Items())
 	}
-	if foo := t.stores("stages"); foo != nil {
+	if foo := t.rt.stores("stages"); foo != nil {
 		t.toUpdate.stages = AsStages(foo.Items())
 	}
 	t.toUpdate.taskTmpls = make([]*template.Template, len(t.toUpdate.tasks))
@@ -113,14 +104,14 @@ func (t *Template) checkSubs(root *template.Template, e models.ErrorAdder) {
 func (t *Template) Validate() {
 	t.Template.Validate()
 	var err error
-	t.p.tmplMux.Lock()
-	root := t.p.rootTemplate
+	t.rt.dt.tmplMux.Lock()
+	root := t.rt.dt.rootTemplate
 	if root == nil {
 		root = template.New("")
 	} else {
 		root, err = root.Clone()
 	}
-	t.p.tmplMux.Unlock()
+	t.rt.dt.tmplMux.Unlock()
 	if err != nil {
 		t.Errorf("Error cloning shared template namespace: %v", err)
 		return
@@ -129,7 +120,7 @@ func (t *Template) Validate() {
 		t.Errorf("Parse error for template %s: %v", t.ID, err)
 		return
 	}
-	t.AddError(index.CheckUnique(t, t.stores("templates").Items()))
+	t.AddError(index.CheckUnique(t, t.rt.stores("templates").Items()))
 	if t.HasError() != nil {
 		return
 	}
@@ -153,9 +144,9 @@ func (t *Template) OnLoad() error {
 }
 
 func (t *Template) updateOthers() {
-	t.p.tmplMux.Lock()
-	t.p.rootTemplate = t.toUpdate.root
-	t.p.tmplMux.Unlock()
+	t.rt.dt.tmplMux.Lock()
+	t.rt.dt.rootTemplate = t.toUpdate.root
+	t.rt.dt.tmplMux.Unlock()
 	for i, task := range t.toUpdate.tasks {
 		task.tmplMux.Lock()
 		task.rootTemplate = t.toUpdate.taskTmpls[i]
@@ -176,7 +167,7 @@ func (t *Template) AfterSave() {
 func (t *Template) BeforeDelete() error {
 	e := &models.Error{Code: 409, Type: StillInUseError, Model: t.Prefix(), Key: t.Key()}
 	buf := &bytes.Buffer{}
-	for _, i := range t.stores("templates").Items() {
+	for _, i := range t.rt.stores("templates").Items() {
 		tmpl := AsTemplate(i)
 		if tmpl.ID == t.ID {
 			continue

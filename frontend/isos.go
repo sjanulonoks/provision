@@ -196,19 +196,17 @@ func (f *Frontend) InitIsoApi() {
 		})
 }
 
-func reloadBootenvsForIso(dt *backend.DataTracker, name string) {
-	ref := &backend.BootEnv{}
-	d, unloader := dt.LockEnts(ref.Locks("update")...)
-	defer unloader()
-
-	for _, blob := range d("bootenvs").Items() {
-		env := backend.AsBootEnv(blob)
-		if env.Available || env.OS.IsoFile != name {
-			continue
+func reloadBootenvsForIso(rt *backend.RequestTracker, name string) {
+	rt.Do(func(d backend.Stores) {
+		for _, blob := range d("bootenvs").Items() {
+			env := backend.AsBootEnv(blob)
+			if env.Available || env.OS.IsoFile != name {
+				continue
+			}
+			env.Available = true
+			rt.Update(env)
 		}
-		env.Available = true
-		dt.Update(d, env)
-	}
+	})
 }
 
 func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
@@ -306,6 +304,8 @@ func uploadIso(c *gin.Context, fileRoot, name string, dt *backend.DataTracker) {
 
 	os.Remove(isoName)
 	os.Rename(isoTmpName, isoName)
-	go reloadBootenvsForIso(dt, name)
+	ref := &backend.BootEnv{}
+	rt := dt.Request(dt.Logger.Fork().Switch("bootenv"), ref.Locks("update")...)
+	go reloadBootenvsForIso(rt, name)
 	c.JSON(http.StatusCreated, &models.BlobInfo{Path: name, Size: copied})
 }

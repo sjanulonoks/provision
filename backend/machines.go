@@ -23,7 +23,6 @@ import (
 type Machine struct {
 	*models.Machine
 	validate
-	p *DataTracker
 	// used during AfterSave() and AfterRemove() to handle boot environment changes.
 	oldBootEnv string
 	// used during AfterSave() and AfterRemove() to handle boot environment changes.
@@ -37,7 +36,7 @@ func (obj *Machine) SetReadOnly(b bool) {
 func (obj *Machine) SaveClean() store.KeySaver {
 	mod := *obj.Machine
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 
 func (n *Machine) HasTask(s string) bool {
@@ -173,9 +172,9 @@ func (n *Machine) Indexes() map[string]index.Maker {
 	return res
 }
 
-func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error) {
+func (n *Machine) ParameterMaker(rt *RequestTracker, parameter string) (index.Maker, error) {
 	fix := AsMachine
-	pobj := d("params").Find(parameter)
+	pobj := rt.Find("params", parameter)
 	if pobj == nil {
 		return index.Maker{}, fmt.Errorf("Filter not found: %s", parameter)
 	}
@@ -185,8 +184,8 @@ func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error
 		false,
 		"parameter",
 		func(i, j models.Model) bool {
-			ip, _ := fix(i).GetParam(d, parameter, true)
-			jp, _ := fix(j).GetParam(d, parameter, true)
+			ip, _ := rt.GetParam(fix(i), parameter, true)
+			jp, _ := rt.GetParam(fix(j), parameter, true)
 
 			// If both are nil, the Less is i < j == false
 			if ip == nil && jp == nil {
@@ -217,9 +216,9 @@ func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error
 			return false
 		},
 		func(ref models.Model) (gte, gt index.Test) {
-			jp, _ := fix(ref).GetParam(d, parameter, true)
+			jp, _ := rt.GetParam(fix(ref), parameter, true)
 			return func(s models.Model) bool {
-					ip, _ := fix(s).GetParam(d, parameter, true)
+					ip, _ := rt.GetParam(fix(ref), parameter, true)
 
 					// If both are nil, the Less is i >= j == true
 					if ip == nil && jp == nil {
@@ -249,7 +248,7 @@ func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error
 					return false
 				},
 				func(s models.Model) bool {
-					ip, _ := fix(s).GetParam(d, parameter, true)
+					ip, _ := rt.GetParam(fix(s), parameter, true)
 
 					// If both are nil, the Less is i > j == false
 					if ip == nil && jp == nil {
@@ -297,10 +296,6 @@ func (n *Machine) ParameterMaker(d Stores, parameter string) (index.Maker, error
 
 }
 
-func (n *Machine) Backend() store.Store {
-	return n.p.getBackend(n)
-}
-
 // HexAddress returns Address in raw hexadecimal format, suitable for
 // pxelinux and elilo usage.
 func (n *Machine) HexAddress() string {
@@ -328,123 +323,6 @@ func (n *Machine) HasProfile(name string) bool {
 	return false
 }
 
-func (n *Machine) getProfile(d Stores, key string) *Profile {
-	p := d("profiles").Find(key)
-	if p != nil {
-		return AsProfile(p)
-	}
-	return nil
-}
-
-func (n *Machine) getStage(d Stores) *Stage {
-	if n.Stage == "" {
-		return nil
-	}
-	s := d("stages").Find(n.Stage)
-	if s != nil {
-		return AsStage(s)
-	}
-	return nil
-}
-
-func (n *Machine) GetParams(d Stores, aggregate bool) map[string]interface{} {
-	m := map[string]interface{}{}
-	if aggregate {
-		// Check the global profile.
-		if gp := n.getProfile(d, n.p.GlobalProfileName); gp != nil && gp.Params != nil {
-			for k, v := range gp.Params {
-				m[k] = v
-			}
-		}
-		// Check the stage's profiles if it exists
-		stage := n.getStage(d)
-		if stage != nil {
-			for _, pn := range stage.Profiles {
-				if p := n.getProfile(d, pn); p != nil && p.Params != nil {
-					for k, v := range p.Params {
-						m[k] = v
-					}
-				}
-			}
-		}
-		// Check profiles for params
-		for _, e := range n.Profiles {
-			if p := n.getProfile(d, e); p != nil && p.Params != nil {
-				for k, v := range p.Params {
-					m[k] = v
-				}
-			}
-		}
-		// The machine's Params
-		if n.Params != nil {
-			for k, v := range n.Params {
-				m[k] = v
-			}
-		}
-	} else {
-		if n.Params != nil {
-			m = n.Params
-		}
-	}
-	return m
-}
-
-func (n *Machine) SetParams(d Stores, values map[string]interface{}) error {
-	n.Params = values
-	e := &models.Error{Code: 422, Type: ValidationError, Model: n.Prefix(), Key: n.Key()}
-	_, e2 := n.p.Save(d, n)
-	e.AddError(e2)
-	return e.HasError()
-}
-
-func (n *Machine) GetParam(d Stores, key string, aggregate bool) (interface{}, bool) {
-	mm := n.GetParams(d, false)
-	if v, found := mm[key]; found {
-		return v, true
-	}
-	if aggregate {
-		// Check profiles for params
-		for _, e := range n.Profiles {
-			if p := n.getProfile(d, e); p != nil {
-				if v, ok := p.GetParam(d, key, false); ok {
-					return v, true
-				}
-			}
-		}
-		// Check the stage's profiles if it exists
-		stage := n.getStage(d)
-		if stage != nil {
-			for _, pn := range stage.Profiles {
-				if p := n.getProfile(d, pn); p != nil {
-					if v, ok := p.GetParam(d, key, false); ok {
-						return v, true
-					}
-				}
-			}
-		}
-		// Check the global profile.
-		if gp := n.getProfile(d, n.p.GlobalProfileName); gp != nil {
-			if v, ok := gp.Params[key]; ok {
-				return v, true
-			}
-		}
-		// Check the param itself
-		if p := d("params").Find(key); p != nil {
-			param := p.(*Param)
-			return param.DefaultValue()
-		}
-	}
-	return nil, false
-}
-
-func (n *Machine) SetParam(d Stores, key string, val interface{}) error {
-	n.Params[key] = val
-	e := &models.Error{Code: 422, Type: ValidationError, Model: n.Prefix(), Key: n.Key()}
-	_, e2 := n.p.Save(d, n)
-	e.AddError(e2)
-	return e.HasError()
-}
-
 func (n *Machine) New() store.KeySaver {
 	res := &Machine{Machine: &models.Machine{}}
 	if n.Machine != nil && n.ChangeForced() {
@@ -452,22 +330,18 @@ func (n *Machine) New() store.KeySaver {
 	}
 	res.Tasks = []string{}
 	res.Profiles = []string{}
-	res.p = n.p
+	res.rt = n.rt
 	return res
-}
-
-func (n *Machine) setDT(p *DataTracker) {
-	n.p = p
 }
 
 func (n *Machine) OnCreate() error {
 	n.oldStage = "none"
 	n.oldBootEnv = "local"
 	if n.Stage == "" {
-		n.Stage = n.p.pref("defaultStage")
+		n.Stage = n.rt.dt.pref("defaultStage")
 	}
 	if n.BootEnv == "" {
-		n.BootEnv = n.p.pref("defaultBootEnv")
+		n.BootEnv = n.rt.dt.pref("defaultBootEnv")
 	}
 	if n.Tasks == nil {
 		n.Tasks = []string{}
@@ -492,9 +366,9 @@ func (n *Machine) Validate() {
 	}
 	n.Machine.Validate()
 	validateMaybeZeroIP4(n, n.Address)
-	n.AddError(index.CheckUnique(n, n.stores("machines").Items()))
+	n.AddError(index.CheckUnique(n, n.rt.stores("machines").Items()))
 	n.SetValid()
-	objs := n.stores
+	objs := n.rt.stores
 	tasks := objs("tasks")
 	profiles := objs("profiles")
 	bootenvs := objs("bootenvs")
@@ -537,7 +411,7 @@ func (n *Machine) Validate() {
 			} else if n.oldStage != n.Stage {
 				if obFound := stages.Find(n.oldStage); obFound != nil {
 					oldStage := AsStage(obFound)
-					oldStage.Render(objs, n, n).deregister(n.p.FS)
+					oldStage.Render(n.rt, n, n).deregister(n.rt.dt.FS)
 				}
 				// Only change bootenv if specified
 				if stage.BootEnv != "" {
@@ -557,7 +431,7 @@ func (n *Machine) Validate() {
 				} else {
 					n.CurrentTask = 0
 				}
-				stage.Render(objs, n, n).register(n.p.FS)
+				stage.Render(n.rt, n, n).register(n.rt.dt.FS)
 			}
 		}
 	}
@@ -576,9 +450,9 @@ func (n *Machine) Validate() {
 			} else {
 				if obFound := bootenvs.Find(n.oldBootEnv); obFound != nil {
 					oldEnv := AsBootEnv(obFound)
-					oldEnv.Render(objs, n, n).deregister(n.p.FS)
+					oldEnv.Render(n.rt, n, n).deregister(n.rt.dt.FS)
 				}
-				env.Render(objs, n, n).register(n.p.FS)
+				env.Render(n.rt, n, n).register(n.rt.dt.FS)
 			}
 		}
 	}
@@ -613,7 +487,7 @@ func (n *Machine) BeforeSave() error {
 
 	// Set the features meta tag.
 	n.ClearFeatures()
-	env := n.stores("bootenvs").Find(n.BootEnv)
+	env := n.rt.stores("bootenvs").Find(n.BootEnv)
 	if env != nil {
 		// Glean OS
 		if n.oldBootEnv != n.BootEnv &&
@@ -622,7 +496,7 @@ func (n *Machine) BeforeSave() error {
 		}
 		n.MergeFeatures(env.(*BootEnv).Features())
 	}
-	stage := n.stores("stages").Find(n.Stage)
+	stage := n.rt.stores("stages").Find(n.Stage)
 	if stage != nil {
 		n.MergeFeatures(stage.(*Stage).Features())
 	}
@@ -640,13 +514,10 @@ func (n *Machine) AfterSave() {
 }
 
 func (n *Machine) OnLoad() error {
-	n.stores = func(ref string) *Store {
-		return n.p.objs[ref]
-	}
 	if n.Stage == "" {
 		n.Stage = "none"
 	}
-	defer func() { n.stores = nil }()
+	defer func() { n.rt = nil }()
 
 	// This mustSave part is just to keep us from resaving all the machines on startup.
 	mustSave := false
@@ -665,7 +536,7 @@ func (n *Machine) OnLoad() error {
 	if err == nil && mustSave {
 		v := n.SaveValidation()
 		n.ClearValidation()
-		err = n.stores("machines").backingStore.Save(n.Key(), n)
+		err = n.rt.stores("machines").backingStore.Save(n.Key(), n)
 		n.RestoreValidation(v)
 	}
 	return err
@@ -718,16 +589,16 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 
 func (n *Machine) AfterDelete() {
 	e := &models.Error{}
-	if b := n.stores("bootenvs").Find(n.BootEnv); b != nil {
-		AsBootEnv(b).Render(n.stores, n, e).deregister(n.p.FS)
+	if b := n.rt.stores("bootenvs").Find(n.BootEnv); b != nil {
+		AsBootEnv(b).Render(n.rt, n, e).deregister(n.rt.dt.FS)
 	}
-	if s := n.stores("stages").Find(n.Stage); s != nil {
-		AsStage(s).Render(n.stores, n, e).deregister(n.p.FS)
+	if s := n.rt.stores("stages").Find(n.Stage); s != nil {
+		AsStage(s).Render(n.rt, n, e).deregister(n.rt.dt.FS)
 	}
-	if j := n.stores("jobs").Find(n.CurrentJob.String()); j != nil {
+	if j := n.rt.stores("jobs").Find(n.CurrentJob.String()); j != nil {
 		job := AsJob(j)
 		job.Current = false
-		n.p.Save(n.stores, job)
+		n.rt.Save(job)
 	}
 }
 

@@ -51,7 +51,7 @@ func (f *Frontend) filterFunction(emap []string, claim interface{}, e *models.Ev
 
 	// Make sure we are authorized to see this event.
 	if matched {
-		matched = f.assureAuthWithClaim(claim, e.Type, e.Action, e.Key)
+		matched = f.assureAuthWithClaim(nil, claim, e.Type, e.Action, e.Key)
 	}
 	return matched
 }
@@ -96,12 +96,12 @@ func (f *Frontend) Unload()  {}
 func (f *Frontend) websocketHandler(s *melody.Session, buf []byte) {
 	splitMsg := bytes.SplitN(bytes.TrimSpace(buf), []byte(" "), 2)
 	if len(splitMsg) != 2 {
-		f.Logger.Printf("WS: Unknown: Received message: %s\n", string(buf))
+		f.Logger.Warnf("WS: Unknown: Received message: %s\n", string(buf))
 		return
 	}
 	prefix, msg := string(splitMsg[0]), string(splitMsg[1])
 	if !(prefix == "register" || prefix == "deregister") {
-		f.Logger.Printf("WS: Invalid msg prefix %s", prefix)
+		f.Logger.Warnf("WS: Invalid msg prefix %s", prefix)
 		return
 	}
 	wsLock.Lock()

@@ -2,7 +2,6 @@ package backend
 
 import (
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/digitalrebar/logger"
 )
 
 // FileSystem provides the routines to allow the static HTTP and TFTP services to render
@@ -17,7 +18,7 @@ import (
 type FileSystem struct {
 	sync.Mutex
 	lower        string
-	logger       *log.Logger
+	logger       logger.Logger
 	dynamicFiles map[string]func(net.IP) (io.Reader, error)
 	dynamicTrees map[string]func(string) (io.Reader, error)
 }
@@ -25,7 +26,7 @@ type FileSystem struct {
 // NewFS creates a new initialized filesystem that will fall back to
 // serving files from backingFSPath if there is not a template to be
 // rendered.
-func NewFS(backingFSPath string, logger *log.Logger) *FileSystem {
+func NewFS(backingFSPath string, logger logger.Logger) *FileSystem {
 	return &FileSystem{
 		lower:        backingFSPath,
 		logger:       logger,
@@ -80,13 +81,13 @@ func (fs *FileSystem) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var raddr net.IP
 	raddrStr, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		fs.logger.Printf("Static FS: Failed to resolve %s: %v", r.RemoteAddr, err)
+		fs.logger.Errorf("Static FS: Failed to resolve %s: %v", r.RemoteAddr, err)
 	} else {
 		raddr = net.ParseIP(raddrStr)
 	}
 	out, err := fs.Open(p, raddr)
 	if err != nil {
-		fs.logger.Printf("Static FS: Dynamic file error for %s: %v", p, err)
+		fs.logger.Errorf("Static FS: Dynamic file error for %s: %v", p, err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if out != nil {
 		if sz, ok := out.(Sizer); ok {
@@ -105,7 +106,7 @@ func (fs *FileSystem) TftpResponder() func(string, net.IP) (io.Reader, error) {
 		p := path.Clean("/" + toSend)
 		out, err := fs.Open(p, remoteIP)
 		if err != nil {
-			fs.logger.Printf("Static FS: Dynamic file error for %s: %v", p, err)
+			fs.logger.Errorf("Static FS: Dynamic file error for %s: %v", p, err)
 			return nil, err
 		}
 		if out != nil {

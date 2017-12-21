@@ -1,5 +1,5 @@
-hash: ad2591c8c9253d589addf3b93d5c93ab9b83c2c63be57f1a819204e6c1ce039d
-updated: 2017-12-11T13:26:44.153061063-06:00
+hash: e5158e4f5d9b79afe806f75dcd1798869ac7665113daae66d466ce0793c83bc2
+updated: 2017-12-21T14:02:19.838751114-06:00
 imports:
 - name: github.com/boltdb/bolt
   version: 2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8
@@ -9,6 +9,8 @@ imports:
   - md2man
 - name: github.com/dgrijalva/jwt-go
   version: a539ee1a749a2b895533f979515ac7e6e0f5b650
+- name: github.com/digitalrebar/logger
+  version: 5104f2ec922a2d1051b5cef1d5bd0def244577c4
 - name: github.com/digitalrebar/pinger
   version: 4b06d02345cad02a772ff21f13e1ef3551c943d4
 - name: github.com/digitalrebar/store

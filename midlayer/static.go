@@ -1,14 +1,14 @@
 package midlayer
 
 import (
-	"log"
 	"net"
 	"net/http"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
 )
 
-func ServeStatic(listenAt string, responder http.Handler, logger *log.Logger, pubs *backend.Publishers) (*http.Server, error) {
+func ServeStatic(listenAt string, responder http.Handler, logger logger.Logger, pubs *backend.Publishers) (*http.Server, error) {
 	conn, err := net.Listen("tcp", listenAt)
 	if err != nil {
 		return nil, err

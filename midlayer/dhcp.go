@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/net/ipv4"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/pinger"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
@@ -34,6 +35,7 @@ func MacStrategy(p dhcp.Packet, options dhcp.Options) string {
 }
 
 type DhcpHandler struct {
+	logger.Logger
 	waitGroup  *sync.WaitGroup
 	closing    bool
 	proxyOnly  bool
@@ -44,6 +46,10 @@ type DhcpHandler struct {
 	pinger     pinger.Pinger
 	strats     []*Strategy
 	publishers *backend.Publishers
+}
+
+func (h *DhcpHandler) Request(locks ...string) *backend.RequestTracker {
+	return h.bk.Request(h.Logger.Fork(), locks...)
 }
 
 func (h *DhcpHandler) buildOptions(p dhcp.Packet,
@@ -94,12 +100,12 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 	if s != nil {
 		for _, opt := range s.Options {
 			if opt.Value == "" {
-				h.Printf("Ignoring DHCP option %d with zero-length value", opt.Code)
+				h.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
 				continue
 			}
 			c, v, err := opt.RenderToDHCP(srcOpts)
 			if err != nil {
-				h.Printf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
+				h.Errorf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
 				continue
 			}
 			opts[dhcp.OptionCode(c)] = v
@@ -111,12 +117,12 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 	if r != nil {
 		for _, opt := range r.Options {
 			if opt.Value == "" {
-				h.Printf("Ignoring DHCP option %d with zero-length value", opt.Code)
+				h.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
 				continue
 			}
 			c, v, err := opt.RenderToDHCP(srcOpts)
 			if err != nil {
-				h.Printf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
+				h.Errorf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
 				continue
 			}
 			opts[dhcp.OptionCode(c)] = v
@@ -135,16 +141,6 @@ func (h *DhcpHandler) Strategy(name string) StrategyFunc {
 		}
 	}
 	return nil
-}
-
-func (h *DhcpHandler) Printf(f string, args ...interface{}) {
-	h.bk.Printf(f, args...)
-}
-func (h *DhcpHandler) Infof(f string, args ...interface{}) {
-	h.bk.Infof("debugDhcp", f, args...)
-}
-func (h *DhcpHandler) Debugf(f string, args ...interface{}) {
-	h.bk.Debugf("debugDhcp", f, args...)
 }
 
 func (h *DhcpHandler) nak(p dhcp.Packet, addr net.IP) dhcp.Packet {
@@ -186,7 +182,7 @@ func (h *DhcpHandler) intf(cm *ipv4.ControlMessage) *net.Interface {
 	}
 	iface, err := net.InterfaceByIndex(cm.IfIndex)
 	if err != nil {
-		h.Printf("Error looking up interface index %d: %v", cm.IfIndex, err)
+		h.Errorf("Error looking up interface index %d: %v", cm.IfIndex, err)
 	}
 	return iface
 }
@@ -199,7 +195,7 @@ func (h *DhcpHandler) listenAddrs(cm *ipv4.ControlMessage) []*net.IPNet {
 	}
 	addrs, err := iface.Addrs()
 	if err != nil {
-		h.Printf("Error getting addrs for interface %s: %v", iface.Name, err)
+		h.Errorf("Error getting addrs for interface %s: %v", iface.Name, err)
 		return res
 	}
 	for _, addr := range addrs {
@@ -343,7 +339,8 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 	msgType dhcp.MessageType,
 	options dhcp.Options,
 	cm *ipv4.ControlMessage) (res dhcp.Packet) {
-	h.Infof("Received DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s server %s chaddr %s",
+	rt := h.Request("leases", "reservations", "subnets")
+	rt.Infof("Received DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s server %s chaddr %s",
 		msgType.String(),
 		xid(p),
 		p.CIAddr(),
@@ -359,74 +356,70 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
 		if ok && !h.isOneOfMyAddrs(server) {
-			h.Printf("WARNING: %s: Competing DHCP server on network: %s", xid(p), server)
+			rt.Warnf("WARNING: %s: Competing DHCP server on network: %s", xid(p), server)
 		}
 		if !h.isOneOfMyAddrs(cm.Src) {
-			h.Printf("WARNING: %s: Competing DHCP server on network: %s", xid(p), cm.Src)
+			rt.Warnf("WARNING: %s: Competing DHCP server on network: %s", xid(p), cm.Src)
 		}
-
-		return nil
 	case dhcp.Decline:
 		if h.proxyOnly {
-			return nil
+			return
 		}
-		d, unlocker := h.bk.LockEnts("leases", "reservations", "subnets")
-		defer unlocker()
-		leaseThing := d("leases").Find(models.Hexaddr(req))
-		if leaseThing == nil {
-			h.Infof("%s: Asked to decline a lease we didn't issue by %s, ignoring", xid(p), req)
-			return nil
-		}
-		lease := backend.AsLease(leaseThing)
-		stratfn := h.Strategy(lease.Strategy)
-		if stratfn != nil && stratfn(p, options) == lease.Token {
-			h.Infof("%s: Lease for %s declined, invalidating.", xid(p), lease.Addr)
-			lease.Invalidate()
-			h.bk.Save(d, lease)
-		} else {
-			h.Infof("%s: Received spoofed decline for %s, ignoring", xid(p), lease.Addr)
-		}
-		return nil
+		rt.Do(func(d backend.Stores) {
+			leaseThing := rt.Find("leases", models.Hexaddr(req))
+			if leaseThing == nil {
+				rt.Infof("%s: Asked to decline a lease we didn't issue by %s, ignoring", xid(p), req)
+				return
+			}
+			lease := backend.AsLease(leaseThing)
+			stratfn := h.Strategy(lease.Strategy)
+			if stratfn != nil && stratfn(p, options) == lease.Token {
+				h.Infof("%s: Lease for %s declined, invalidating.", xid(p), lease.Addr)
+				lease.Invalidate()
+				rt.Save(lease)
+			} else {
+				h.Infof("%s: Received spoofed decline for %s, ignoring", xid(p), lease.Addr)
+			}
+		})
 	case dhcp.Release:
 		if h.proxyOnly {
-			return nil
+			return
 		}
-		d, unlocker := h.bk.LockEnts("leases", "reservations", "subnets")
-		defer unlocker()
-		leaseThing := d("leases").Find(models.Hexaddr(req))
-		if leaseThing == nil {
-			h.Infof("%s: Asked to release a lease we didn't issue by %s, ignoring", xid(p), req)
-			return nil
-		}
-		lease := backend.AsLease(leaseThing)
-		stratfn := h.Strategy(lease.Strategy)
-		if stratfn != nil && stratfn(p, options) == lease.Token {
-			h.Infof("%s: Lease for %s released, expiring.", xid(p), lease.Addr)
-			lease.Expire()
-			h.bk.Save(d, lease)
-		} else {
-			h.Infof("%s: Received spoofed release for %s, ignoring", xid(p), lease.Addr)
-		}
-		return nil
+		rt.Do(func(d backend.Stores) {
+			leaseThing := rt.Find("leases", models.Hexaddr(req))
+			if leaseThing == nil {
+				rt.Infof("%s: Asked to release a lease we didn't issue by %s, ignoring", xid(p), req)
+				return
+			}
+			lease := backend.AsLease(leaseThing)
+			stratfn := h.Strategy(lease.Strategy)
+			if stratfn != nil && stratfn(p, options) == lease.Token {
+				rt.Infof("%s: Lease for %s released, expiring.", xid(p), lease.Addr)
+				lease.Expire()
+				rt.Save(lease)
+			} else {
+				rt.Infof("%s: Received spoofed release for %s, ignoring", xid(p), lease.Addr)
+			}
+		})
 	case dhcp.Request:
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
 		if ok && !h.listenOn(server, cm) {
-			h.Printf("WARNING: %s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
-			return nil
+			rt.Warnf("WARNING: %s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
+			return
 		}
 		if !req.IsGlobalUnicast() {
-			h.Infof("%s: NAK'ing invalid requested IP %s", xid(p), req)
+			rt.Infof("%s: NAK'ing invalid requested IP %s", xid(p), req)
 			return h.nak(p, h.respondFrom(req, cm))
 		}
 		if h.proxyOnly {
-			return nil
+			return
 		}
 		var lease *backend.Lease
 		var reservation *backend.Reservation
 		var subnet *backend.Subnet
 		for _, s := range h.strats {
-			lease, subnet, reservation, err = backend.FindLease(h.bk, s.Name, s.GenToken(p, options), req)
+			lease, subnet, reservation, err = backend.FindLease(rt, s.Name, s.GenToken(p, options), req)
 			if lease == nil &&
 				subnet == nil &&
 				reservation == nil &&
@@ -435,15 +428,15 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 			}
 			if err != nil {
 				if lease != nil {
-					h.Infof("%s: %s already leased to %s:%s: %s",
+					rt.Infof("%s: %s already leased to %s:%s: %s",
 						xid(p),
 						req,
 						lease.Strategy,
 						lease.Token,
 						err)
 				} else {
-					h.Printf("WARNING: %s: Another DHCP server may be on the network: %s", xid(p), net.IP(server))
-					h.Infof("%s: %s is no longer able to be leased: %s",
+					rt.Warnf("WARNING: %s: Another DHCP server may be on the network: %s", xid(p), net.IP(server))
+					rt.Infof("%s: %s is no longer able to be leased: %s",
 						xid(p),
 						req,
 						err)
@@ -456,19 +449,19 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		}
 		if lease == nil {
 			if subnet != nil && subnet.Proxy {
-				h.Infof("%s: Proxy Subnet should not respond to %s.", xid(p), req)
+				rt.Infof("%s: Proxy Subnet should not respond to %s.", xid(p), req)
 				return nil
 			}
 			if reqState == reqInitReboot {
-				h.Infof("%s: No lease for %s in database, client in INIT-REBOOT.  Ignoring request.", xid(p), req)
+				rt.Infof("%s: No lease for %s in database, client in INIT-REBOOT.  Ignoring request.", xid(p), req)
 				return nil
 			}
 			if subnet != nil || reservation != nil {
-				h.Infof("%s: No lease for %s in database, NAK'ing", xid(p), req)
+				rt.Infof("%s: No lease for %s in database, NAK'ing", xid(p), req)
 				return h.nak(p, h.respondFrom(req, cm))
 			}
 
-			h.Infof("%s: No lease in database, and no subnet or reservation covers %s. Ignoring request", xid(p), req)
+			rt.Infof("%s: No lease in database, and no subnet or reservation covers %s. Ignoring request", xid(p), req)
 			return nil
 		}
 		opts, duration, nextServer := h.buildOptions(p, lease, subnet, reservation, cm)
@@ -480,7 +473,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		if nextServer.IsGlobalUnicast() {
 			reply.SetSIAddr(nextServer)
 		}
-		h.Infof("%s: Request handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
+		rt.Infof("%s: Request handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
 		return reply
 	case dhcp.Discover:
 		for _, s := range h.strats {
@@ -497,46 +490,40 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 			)
 			for {
 				var fresh bool
-				lease, subnet, reservation, fresh = backend.FindOrCreateLease(h.bk, strat, token, req, via)
+				lease, subnet, reservation, fresh = backend.FindOrCreateLease(rt, strat, token, req, via)
 				if lease == nil {
 					break
 				}
 				if lease.State == "PROBE" {
 					if !fresh {
 						// Someone other goroutine is already working this lease.
-						h.Debugf("%s: Ignoring DISCOVER from %s, its request is being processed by another goroutine", xid(p), token)
+						rt.Debugf("%s: Ignoring DISCOVER from %s, its request is being processed by another goroutine", xid(p), token)
 						return nil
 					}
-					h.Debugf("%s: Testing to see if %s is in use", xid(p), lease.Addr)
+					rt.Debugf("%s: Testing to see if %s is in use", xid(p), lease.Addr)
 					addrUsed, valid := <-h.pinger.InUse(lease.Addr.String(), 3*time.Second)
 					if !valid {
-						func() {
-							h.Debugf("%s: System shutting down, deleting lease for %s", xid(p), lease.Addr)
-							d, unlocker := h.bk.LockEnts("leases")
-							defer unlocker()
-							h.bk.Remove(d, lease)
-						}()
+						rt.Do(func(d backend.Stores) {
+							rt.Debugf("%s: System shutting down, deleting lease for %s", xid(p), lease.Addr)
+							rt.Remove(lease)
+						})
 						return nil
 					}
 					if addrUsed {
-						func() {
-							h.Debugf("%s: IP address %s in use by something else, marking it as unusable for an hour.", xid(p), lease.Addr)
-							d, unlocker := h.bk.LockEnts("leases")
-							defer unlocker()
+						rt.Do(func(d backend.Stores) {
+							rt.Debugf("%s: IP address %s in use by something else, marking it as unusable for an hour.", xid(p), lease.Addr)
 							lease.Invalidate()
-							h.bk.Save(d, lease)
-						}()
+							rt.Save(lease)
+						})
 						continue
 					}
-					func() {
-						h.Debugf("%s: IP address %s appears to be free", xid(p), lease.Addr)
-						d, unlocker := h.bk.LockEnts("leases")
-						defer unlocker()
+					rt.Do(func(d backend.Stores) {
+						rt.Debugf("%s: IP address %s appears to be free", xid(p), lease.Addr)
 						lease.State = "OFFER"
-						h.bk.Save(d, lease)
-					}()
+						rt.Save(lease)
+					})
 				} else {
-					h.Debugf("%s: Resusing lease for %s", xid(p), lease.Addr)
+					rt.Debugf("%s: Resusing lease for %s", xid(p), lease.Addr)
 				}
 				opts, duration, nextServer := h.buildOptions(p, lease, subnet, reservation, cm)
 				repType := dhcp.Offer
@@ -570,7 +557,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 						reply.SetSIAddr(nextServer)
 					}
 				}
-				h.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
+				rt.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
 				return reply
 			}
 		}
@@ -579,14 +566,14 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 }
 
 func (h *DhcpHandler) Shutdown(ctx context.Context) error {
-	h.Printf("Shutting down DHCP handler")
+	h.Infof("Shutting down DHCP handler")
 	h.closing = true
 	h.conn.Close()
 	if h.pinger != nil {
 		h.pinger.Close()
 	}
 	h.waitGroup.Wait()
-	h.Printf("DHCP handler shut down")
+	h.Infof("DHCP handler shut down")
 	return nil
 }
 
@@ -595,6 +582,7 @@ type Service interface {
 }
 
 func StartDhcpHandler(dhcpInfo *backend.DataTracker,
+	log logger.Logger,
 	dhcpIfs string,
 	dhcpPort int,
 	pubs *backend.Publishers,
@@ -606,6 +594,7 @@ func StartDhcpHandler(dhcpInfo *backend.DataTracker,
 		ifs = strings.Split(dhcpIfs, ",")
 	}
 	handler := &DhcpHandler{
+		Logger:     log,
 		waitGroup:  &sync.WaitGroup{},
 		ifs:        ifs,
 		bk:         dhcpInfo,
@@ -628,18 +617,16 @@ func StartDhcpHandler(dhcpInfo *backend.DataTracker,
 				handler.pinger = pinger
 			}
 		}
-
-		func() {
-			d, unlocker := dhcpInfo.LockEnts("leases")
-			defer unlocker()
+		rt := handler.Request("leases")
+		rt.Do(func(d backend.Stores) {
 			for _, leaseThing := range d("leases").Items() {
 				lease := backend.AsLease(leaseThing)
 				if lease.State != "PROBE" {
 					continue
 				}
-				dhcpInfo.Remove(d, lease)
+				rt.Remove(lease)
 			}
-		}()
+		})
 	}
 
 	l, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", handler.port))
@@ -655,7 +642,7 @@ func StartDhcpHandler(dhcpInfo *backend.DataTracker,
 	go func() {
 		err := handler.Serve()
 		if !handler.closing {
-			dhcpInfo.Logger.Fatalf("DHCP(%s) handler died: %v", proxyOnly, err)
+			handler.Fatalf("DHCP(%v) handler died: %v", proxyOnly, err)
 		}
 	}()
 	return handler, nil

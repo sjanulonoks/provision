@@ -162,8 +162,7 @@ func (f *Frontend) InitBootEnvApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/bootenvs",
 		func(c *gin.Context) {
-			b := &backend.BootEnv{}
-			f.Create(c, b)
+			f.Create(c, &backend.BootEnv{})
 		})
 	// swagger:route GET /bootenvs/{name} BootEnvs getBootEnv
 	//

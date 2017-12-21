@@ -6,15 +6,14 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"text/template"
 
-	"github.com/VictorLowther/jsonpatch2"
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
@@ -174,33 +173,61 @@ type dtSetter interface {
 func Fill(t store.KeySaver) {
 	switch obj := t.(type) {
 	case *Stage:
-		obj.Stage = &models.Stage{}
+		if obj.Stage == nil {
+			obj.Stage = &models.Stage{}
+		}
 	case *BootEnv:
-		obj.BootEnv = &models.BootEnv{}
+		if obj.BootEnv == nil {
+			obj.BootEnv = &models.BootEnv{}
+		}
 	case *Job:
-		obj.Job = &models.Job{}
+		if obj.Job == nil {
+			obj.Job = &models.Job{}
+		}
 	case *Lease:
-		obj.Lease = &models.Lease{}
+		if obj.Lease == nil {
+			obj.Lease = &models.Lease{}
+		}
 	case *Machine:
-		obj.Machine = &models.Machine{}
+		if obj.Machine == nil {
+			obj.Machine = &models.Machine{}
+		}
 	case *Param:
-		obj.Param = &models.Param{}
+		if obj.Param == nil {
+			obj.Param = &models.Param{}
+		}
 	case *Plugin:
-		obj.Plugin = &models.Plugin{}
+		if obj.Plugin == nil {
+			obj.Plugin = &models.Plugin{}
+		}
 	case *Pref:
-		obj.Pref = &models.Pref{}
+		if obj.Pref == nil {
+			obj.Pref = &models.Pref{}
+		}
 	case *Profile:
-		obj.Profile = &models.Profile{}
+		if obj.Profile == nil {
+			obj.Profile = &models.Profile{}
+		}
 	case *Reservation:
-		obj.Reservation = &models.Reservation{}
+		if obj.Reservation == nil {
+			obj.Reservation = &models.Reservation{}
+		}
 	case *Subnet:
-		obj.Subnet = &models.Subnet{}
+		if obj.Subnet == nil {
+			obj.Subnet = &models.Subnet{}
+		}
 	case *Task:
-		obj.Task = &models.Task{}
+		if obj.Task == nil {
+			obj.Task = &models.Task{}
+		}
 	case *Template:
-		obj.Template = &models.Template{}
+		if obj.Template == nil {
+			obj.Template = &models.Template{}
+		}
 	case *User:
-		obj.User = &models.User{}
+		if obj.User == nil {
+			obj.User = &models.User{}
+		}
 	default:
 		panic(fmt.Sprintf("Unknown backend model %T", t))
 	}
@@ -243,16 +270,18 @@ func ModelToBackend(m models.Model) store.KeySaver {
 	}
 }
 
-func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
+func toBackend(m models.Model, rt *RequestTracker) store.KeySaver {
 	if res, ok := m.(store.KeySaver); ok {
-		p.setDT(res)
+		if v, ok := res.(validator); ok {
+			v.setRT(rt)
+		}
 		return res
 	}
 	var ours store.KeySaver
-	if s != nil {
-		backend := s(m.Prefix())
+	if rt != nil {
+		backend := rt.stores(m.Prefix())
 		if backend == nil {
-			p.Logger.Panicf("No store for %T", m)
+			rt.Panicf("No store for %T", m)
 		}
 		if this := backend.Find(m.Key()); this != nil {
 			ours = this.(store.KeySaver)
@@ -268,7 +297,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Stage{}
 		}
 		res.Stage = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.BootEnv:
 		var res BootEnv
@@ -278,7 +307,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = BootEnv{}
 		}
 		res.BootEnv = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Job:
 		var res Job
@@ -288,7 +317,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Job{}
 		}
 		res.Job = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Lease:
 		var res Lease
@@ -298,7 +327,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Lease{}
 		}
 		res.Lease = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Machine:
 		var res Machine
@@ -308,7 +337,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Machine{}
 		}
 		res.Machine = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Param:
 		var res Param
@@ -318,7 +347,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Param{}
 		}
 		res.Param = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Plugin:
 		var res Plugin
@@ -328,7 +357,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Plugin{}
 		}
 		res.Plugin = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Pref:
 		var res Pref
@@ -338,7 +367,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Pref{}
 		}
 		res.Pref = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Profile:
 		var res Profile
@@ -348,7 +377,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Profile{}
 		}
 		res.Profile = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Reservation:
 		var res Reservation
@@ -358,7 +387,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Reservation{}
 		}
 		res.Reservation = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Subnet:
 		var res Subnet
@@ -368,7 +397,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Subnet{}
 		}
 		res.Subnet = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Task:
 		var res Task
@@ -378,7 +407,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Task{}
 		}
 		res.Task = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 	case *models.Template:
 		var res Template
@@ -388,7 +417,7 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = Template{}
 		}
 		res.Template = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 
 	case *models.User:
@@ -399,24 +428,67 @@ func toBackend(p *DataTracker, s Stores, m models.Model) store.KeySaver {
 			res = User{}
 		}
 		res.User = obj
-		p.setDT(&res)
+		res.rt = rt
 		return &res
 
 	default:
-		p.Logger.Panicf("Unknown model %T", m)
+		log.Panicf("Unknown model %T", m)
 	}
 	return nil
+}
+
+func (p *DataTracker) logCheck(prefName, prefVal string) (logName, logTarget string, lvl logger.Level, err error) {
+	logName = "default"
+	logTarget = "warn"
+	lvl = logger.Warn
+
+	switch prefVal {
+	case "trace", "debug", "info", "warn", "error", "panic", "fatal":
+		logTarget = prefVal
+	case "0":
+		logTarget = "warn"
+	case "1":
+		logTarget = "info"
+	case "2":
+		logTarget = "debug"
+	default:
+		err = fmt.Errorf("Invalid log value %s for %s,  Ignoring change", prefVal, prefName)
+		return
+	}
+	if logTarget != prefVal {
+		p.Logger.Errorf("Pref %s log level %s is obsolete.  Please migrate to using %s",
+			prefName, prefVal, logTarget)
+	}
+	switch prefName {
+	case "debugDhcp":
+		logName = "dhcp"
+	case "debugRenderer":
+		logName = "render"
+	case "debugBootEnv":
+		logName = "bootenv"
+	case "debugFrontend":
+		logName = "frontend"
+	case "debugPlugins":
+		logName = "plugin"
+	case "logLevel":
+		logName = "default"
+	default:
+		err = fmt.Errorf("Invalid logging preference %s, ignoring change", prefName)
+		return
+	}
+	lvl, err = logger.ParseLevel(logTarget)
+	return
 }
 
 // DataTracker represents everything there is to know about acting as
 // a dataTracker.
 type DataTracker struct {
+	logger.Logger
 	FileRoot            string
 	LogRoot             string
 	OurAddress          string
 	ForceOurAddress     bool
 	StaticPort, ApiPort int
-	Logger              *log.Logger
 	FS                  *FileSystem
 	Backend             store.Store
 	objs                map[string]*Store
@@ -433,35 +505,45 @@ type DataTracker struct {
 	publishers          *Publishers
 }
 
+func (p *DataTracker) LogFor(s string) logger.Logger {
+	return p.Logger.Buffer().Log(s)
+}
+
+func (p *DataTracker) Publish(prefix, action, key string, ref interface{}) {
+	if p.publishers != nil {
+		p.publishers.Publish(prefix, action, key, ref)
+	}
+}
+
 func (dt *DataTracker) reportPath(s string) string {
 	return strings.TrimPrefix(s, dt.FileRoot)
 }
 
 type Stores func(string) *Store
 
-func allKeySavers(res *DataTracker) []models.Model {
+func allKeySavers() []models.Model {
 	return []models.Model{
-		&Pref{p: res},
-		&Param{p: res},
-		&User{p: res},
-		&Template{p: res},
-		&Task{p: res},
-		&Profile{p: res},
-		&BootEnv{p: res},
-		&Stage{p: res},
-		&Machine{p: res},
-		&Subnet{p: res},
-		&Reservation{p: res},
-		&Lease{p: res},
-		&Plugin{p: res},
-		&Job{p: res},
+		&Pref{},
+		&Param{},
+		&User{},
+		&Template{},
+		&Task{},
+		&Profile{},
+		&BootEnv{},
+		&Stage{},
+		&Machine{},
+		&Subnet{},
+		&Reservation{},
+		&Lease{},
+		&Plugin{},
+		&Job{},
 	}
 }
 
 // LockEnts grabs the requested Store locks a consistent order.
 // It returns a function to get an Index that was requested, and
 // a function that unlocks the taken locks in the right order.
-func (p *DataTracker) LockEnts(ents ...string) (stores Stores, unlocker func()) {
+func (p *DataTracker) lockEnts(ents ...string) (stores Stores, unlocker func()) {
 	p.allMux.RLock()
 	sortedEnts := make([]string, len(ents))
 	copy(sortedEnts, ents)
@@ -526,38 +608,27 @@ func (p *DataTracker) LocalIP(remote net.IP) string {
 	}
 	gwIp := DefaultIP()
 	if gwIp == nil {
-		p.Printf("Failed to find appropriate local IP to use for %s", remote)
-		p.Printf("No --static-ip and no default gateway to use in its place")
-		p.Printf("Please set --static-ip ")
+		p.Warnf("Failed to find appropriate local IP to use for %s", remote)
+		p.Warnf("No --static-ip and no default gateway to use in its place")
+		p.Warnf("Please set --static-ip ")
 		return ""
 	}
-	p.Printf("Falling back to local address %s as default target for remote %s", gwIp, remote)
+	p.Infof("Falling back to local address %s as default target for remote %s", gwIp, remote)
 	AddToCache(gwIp, remote)
 	return gwIp.String()
-}
-
-func (p *DataTracker) urlFor(scheme string, remoteIP net.IP, port int) string {
-	return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(p.LocalIP(remoteIP), strconv.Itoa(port)))
-}
-
-func (p *DataTracker) FileURL(remoteIP net.IP) string {
-	return p.urlFor("http", remoteIP, p.StaticPort)
-}
-
-func (p *DataTracker) ApiURL(remoteIP net.IP) string {
-	return p.urlFor("https", remoteIP, p.ApiPort)
 }
 
 func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 	hard = &models.Error{Code: 500, Type: "Failed to load backing objects from cache"}
 	soft = &models.Error{Code: 422, Type: ValidationError}
 	p.objs = map[string]*Store{}
-	objs := allKeySavers(p)
+	objs := allKeySavers()
+	loadRT := p.Request(p.Logger).withFake()
 	for _, obj := range objs {
 		prefix := obj.Prefix()
 		bk := p.Backend.GetSub(prefix)
 		p.objs[prefix] = &Store{backingStore: bk}
-		storeObjs, err := store.List(bk, toBackend(p, nil, obj))
+		storeObjs, err := store.List(bk, toBackend(obj, loadRT))
 		if err != nil {
 			// Make fake index to keep others from failing and exploding.
 			res := make([]models.Model, 0)
@@ -624,7 +695,7 @@ func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
 }
 
 // This must be locked with ALL locks on the source datatracker from the caller.
-func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, soft error) {
+func ValidateDataTrackerStore(backend store.Store, logger logger.Logger) (hard, soft error) {
 	res := &DataTracker{
 		Backend:           backend,
 		FileRoot:          "baddir",
@@ -656,7 +727,7 @@ func ValidateDataTrackerStore(backend store.Store, logger *log.Logger) (hard, so
 func NewDataTracker(backend store.Store,
 	fileRoot, logRoot, addr string, forceAddr bool,
 	staticPort, apiPort int,
-	logger *log.Logger,
+	logger logger.Logger,
 	defaultPrefs map[string]string,
 	publishers *Publishers) *DataTracker {
 	res := &DataTracker{
@@ -683,7 +754,7 @@ func NewDataTracker(backend store.Store,
 
 	// Make sure incoming writable backend has all stores created
 	_, ul := res.LockAll()
-	objs := allKeySavers(res)
+	objs := allKeySavers()
 	for _, obj := range objs {
 		prefix := obj.Prefix()
 		_, err := backend.MakeSub(prefix)
@@ -700,69 +771,90 @@ func NewDataTracker(backend store.Store,
 	ul()
 
 	// Create minimal content.
-	d, unlocker := res.LockEnts("stages", "bootenvs", "preferences", "users", "machines", "profiles", "params")
-	defer unlocker()
+	rt := res.Request(res.Logger, "stages", "bootenvs", "preferences", "users", "machines", "profiles", "params")
+	rt.Do(func(d Stores) {
+		// Load the prefs - overriding defaults.
+		savePrefs := false
+		for _, prefIsh := range d("preferences").Items() {
+			pref := AsPref(prefIsh)
+			res.runningPrefs[pref.Name] = pref.Val
+		}
 
-	// Load the prefs - overriding defaults.
-	for _, prefIsh := range d("preferences").Items() {
-		pref := AsPref(prefIsh)
-		res.runningPrefs[pref.Name] = pref.Val
-	}
+		// Set systemGrantorSecret and baseTokenSecret if unset and save it to backing store.
+		prefs := res.Prefs()
+		for _, pref := range []string{"systemGrantorSecret", "baseTokenSecret"} {
+			if val, ok := prefs[pref]; !ok || val == "" {
+				prefs[pref] = randString(32)
+				savePrefs = true
+			}
+		}
+		for _, name := range []string{"debugDhcp",
+			"debugRenderer",
+			"debugBootEnv",
+			"debugFrontend",
+			"debugPlugins",
+			"logLevel",
+		} {
+			val := prefs[name]
+			if val == "" {
+				val = "warn"
+			}
+			logName, logTarget, logLevel, lErr := res.logCheck(name, val)
+			if lErr != nil {
+				res.Logger.Fatalf("dataTracker: Invalid log level %v", lErr)
+			}
+			if val != logTarget {
+				savePrefs = true
+			}
+			prefs[name] = logTarget
+			res.LogFor(logName).SetLevel(logLevel)
+		}
+		if savePrefs {
+			res.SetPrefs(rt, prefs)
+		}
+		res.tokenManager.updateKey([]byte(res.pref("baseTokenSecret")))
 
-	// Set systemGrantorSecret and baseTokenSecret if unset and save it to backing store.
-	prefs := res.Prefs()
-	savePrefs := false
-	for _, pref := range []string{"systemGrantorSecret", "baseTokenSecret"} {
-		if val, ok := prefs[pref]; !ok || val == "" {
-			prefs[pref] = randString(32)
-			savePrefs = true
+		if d("profiles").Find(res.GlobalProfileName) == nil {
+			res.Infof("Creating %s profile", res.GlobalProfileName)
+			rt.Create(&models.Profile{
+				Name:        res.GlobalProfileName,
+				Description: "Global profile attached automatically to all machines.",
+				Params:      map[string]interface{}{},
+				Meta: map[string]string{
+					"icon":  "world",
+					"color": "blue",
+					"title": "Digital Rebar Provision",
+				},
+			})
 		}
-	}
-	if savePrefs {
-		res.SetPrefs(d, prefs)
-	}
-	res.tokenManager.updateKey([]byte(res.pref("baseTokenSecret")))
-
-	if d("profiles").Find(res.GlobalProfileName) == nil {
-		res.Create(d, &models.Profile{
-			Name:        res.GlobalProfileName,
-			Description: "Global profile attached automatically to all machines.",
-			Params:      map[string]interface{}{},
-			Meta: map[string]string{
-				"icon":  "world",
-				"color": "blue",
-				"title": "Digital Rebar Provision",
-			},
-		})
-	}
-	users := d("users")
-	if users.Count() == 0 {
-		res.Infof("debugBootEnv", "Creating rocketskates user")
-		user := &User{}
-		Fill(user)
-		user.Name = "rocketskates"
-		if err := user.ChangePassword(d, "r0cketsk8ts"); err != nil {
-			logger.Fatalf("Failed to create rocketskates user: %v", err)
+		users := d("users")
+		if users.Count() == 0 {
+			res.Infof("Creating rocketskates user")
+			user := &User{}
+			Fill(user)
+			user.Name = "rocketskates"
+			if err := user.ChangePassword(rt, "r0cketsk8ts"); err != nil {
+				logger.Fatalf("Failed to create rocketskates user: %v", err)
+			}
+			rt.Create(user)
 		}
-		res.Create(d, user)
-	}
-	machines := d("machines")
-	for _, obj := range machines.Items() {
-		machine := AsMachine(obj)
-		bootEnv := d("bootenvs").Find(machine.BootEnv)
-		if bootEnv == nil {
-			continue
+		machines := d("machines")
+		for _, obj := range machines.Items() {
+			machine := AsMachine(obj)
+			bootEnv := d("bootenvs").Find(machine.BootEnv)
+			if bootEnv == nil {
+				continue
+			}
+			err := &models.Error{}
+			AsBootEnv(bootEnv).Render(rt, machine, err).register(res.FS)
+			if err.ContainsError() {
+				logger.Errorf("Error rendering machine %s at startup: %v", machine.UUID(), err)
+			}
 		}
-		err := &models.Error{}
-		AsBootEnv(bootEnv).Render(d, machine, err).register(res.FS)
-		if err.ContainsError() {
-			logger.Printf("Error rendering machine %s at startup:", machine.UUID())
-			logger.Println(err.Error())
+		if err := res.RenderUnknown(rt); err != nil {
+			logger.Fatalf("Failed to render unknown bootenv: %v", err)
 		}
-	}
-	if err := res.RenderUnknown(d); err != nil {
-		logger.Fatalf("Failed to render unknown bootenv: %v", err)
-	}
+	})
 	return res
 }
 
@@ -791,10 +883,10 @@ func (p *DataTracker) pref(name string) string {
 	return p.Prefs()[name]
 }
 
-func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
+func (p *DataTracker) SetPrefs(rt *RequestTracker, prefs map[string]string) error {
 	err := &models.Error{}
-	bootenvs := d("bootenvs")
-	stages := d("stages")
+	bootenvs := rt.d("bootenvs")
+	stages := rt.d("stages")
 	lenCheck := func(name, val string) bool {
 		if len(val) != 32 {
 			err.Errorf("%s: Must be a string of length 32: %s", name, val)
@@ -826,13 +918,14 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 		err.Errorf("%s: %s", name, e.Error())
 		return false
 	}
+
 	savePref := func(name, val string) bool {
 		p.prefMux.Lock()
 		defer p.prefMux.Unlock()
 		pref := &models.Pref{}
 		pref.Name = name
 		pref.Val = val
-		if _, saveErr := p.Save(d, pref); saveErr != nil {
+		if _, saveErr := rt.Save(pref); saveErr != nil {
 			err.Errorf("%s: Failed to save %s: %v", name, val, saveErr)
 			return false
 		}
@@ -858,17 +951,25 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 			}
 		case "unknownBootEnv":
 			if benvCheck(name, val) != nil && savePref(name, val) {
-				err.AddError(p.RenderUnknown(d))
+				err.AddError(p.RenderUnknown(rt))
 			}
 		case "unknownTokenTimeout",
-			"knownTokenTimeout",
-			"debugDhcp",
+			"knownTokenTimeout":
+			if intCheck(name, val) {
+				savePref(name, val)
+			}
+		case "debugDhcp",
 			"debugRenderer",
 			"debugBootEnv",
 			"debugFrontend",
-			"debugPlugins":
-			if intCheck(name, val) {
-				savePref(name, val)
+			"debugPlugins",
+			"logLevel":
+			logName, logTarget, logLevel, lErr := p.logCheck(name, val)
+			if lErr != nil {
+				err.AddError(lErr)
+			} else {
+				savePref(name, logTarget)
+				p.LogFor(logName).SetLevel(logLevel)
 			}
 		default:
 			err.Errorf("Unknown preference %s", name)
@@ -877,12 +978,18 @@ func (p *DataTracker) SetPrefs(d Stores, prefs map[string]string) error {
 	return err.HasError()
 }
 
-func (p *DataTracker) RenderUnknown(d Stores) error {
+func (p *DataTracker) setDT(s models.Model) {
+	if tgt, ok := s.(dtSetter); ok {
+		tgt.setDT(p)
+	}
+}
+
+func (p *DataTracker) RenderUnknown(rt *RequestTracker) error {
 	pref, e := p.Pref("unknownBootEnv")
 	if e != nil {
 		return e
 	}
-	envIsh := d("bootenvs").Find(pref)
+	envIsh := rt.d("bootenvs").Find(pref)
 	if envIsh == nil {
 		return fmt.Errorf("No such BootEnv: %s", pref)
 	}
@@ -896,7 +1003,7 @@ func (p *DataTracker) RenderUnknown(d Stores) error {
 		err.Errorf("BootEnv %s cannot be used for the unknownBootEnv", env.Name)
 		return err
 	}
-	env.Render(d, nil, err).register(p.FS)
+	env.Render(rt, nil, err).register(p.FS)
 	return err.HasError()
 }
 
@@ -906,192 +1013,6 @@ func (p *DataTracker) getBackend(t models.Model) store.Store {
 		p.Logger.Fatalf("%s: No registered storage backend!", t.Prefix())
 	}
 	return res.backingStore
-}
-
-func (p *DataTracker) setDT(s models.Model) {
-	if tgt, ok := s.(dtSetter); ok {
-		tgt.setDT(p)
-	}
-}
-
-func (p *DataTracker) Create(d Stores, obj models.Model) (saved bool, err error) {
-	if ms, ok := obj.(models.Filler); ok {
-		ms.Fill()
-	}
-	ref := toBackend(p, d, obj)
-	prefix := ref.Prefix()
-	key := ref.Key()
-	backend := d(prefix).backingStore
-	if key == "" {
-		return false, &models.Error{
-			Type:     "CREATE",
-			Model:    prefix,
-			Messages: []string{"Empty key not allowed"},
-			Code:     http.StatusBadRequest,
-		}
-	}
-	if d(prefix).Find(key) != nil {
-		return false, &models.Error{
-			Type:     "CREATE",
-			Model:    prefix,
-			Key:      key,
-			Messages: []string{"already exists"},
-			Code:     http.StatusConflict,
-		}
-	}
-	ref.(validator).setStores(d)
-	checker, checkOK := ref.(models.Validator)
-	if checkOK {
-		checker.ClearValidation()
-	}
-	saved, err = store.Create(backend, ref)
-	if saved {
-		ref.(validator).clearStores()
-		d(prefix).Add(ref)
-
-		p.publishers.Publish(prefix, "create", key, ref)
-	}
-
-	return saved, err
-}
-
-func (p *DataTracker) Remove(d Stores, obj models.Model) (removed bool, err error) {
-	ref := toBackend(p, d, obj)
-	prefix := ref.Prefix()
-	key := ref.Key()
-	backend := d(prefix).backingStore
-	item := d(prefix).Find(key)
-	if item == nil {
-		return false, &models.Error{
-			Type:     "DELETE",
-			Code:     http.StatusNotFound,
-			Key:      key,
-			Model:    prefix,
-			Messages: []string{"Not Found"},
-		}
-	}
-	item.(validator).setStores(d)
-	removed, err = store.Remove(backend, item.(store.KeySaver))
-	if removed {
-		d(prefix).Remove(item)
-		p.publishers.Publish(prefix, "delete", key, item)
-	}
-	return removed, err
-}
-
-func (p *DataTracker) Patch(d Stores, obj models.Model, key string, patch jsonpatch2.Patch) (models.Model, error) {
-	ref := toBackend(p, d, obj)
-	prefix := ref.Prefix()
-	backend := d(prefix).backingStore
-	target := d(prefix).Find(key)
-	if target == nil {
-		return nil, &models.Error{
-			Type:     "PATCH",
-			Code:     http.StatusNotFound,
-			Key:      key,
-			Model:    prefix,
-			Messages: []string{"Not Found"},
-		}
-	}
-	buf, fatalErr := json.Marshal(target)
-	if fatalErr != nil {
-		p.Logger.Fatalf("Non-JSON encodable %v:%v stored in cache: %v", prefix, key, fatalErr)
-	}
-	resBuf, patchErr, loc := patch.Apply(buf)
-	if patchErr != nil {
-		err := &models.Error{
-			Code:  http.StatusConflict,
-			Key:   key,
-			Model: ref.Prefix(),
-			Type:  "PATCH",
-		}
-		err.Errorf("Patch error at line %d: %v", loc, patchErr)
-		buf, _ := json.Marshal(patch[loc])
-		err.Errorf("Patch line: %v", string(buf))
-		return nil, err
-	}
-	toSave := ref.New()
-	if err := json.Unmarshal(resBuf, &toSave); err != nil {
-		retErr := &models.Error{
-			Code:  http.StatusNotAcceptable,
-			Key:   key,
-			Model: ref.Prefix(),
-			Type:  "PATCH",
-		}
-		retErr.AddError(err)
-		return nil, retErr
-	}
-	if ms, ok := toSave.(models.Filler); ok {
-		ms.Fill()
-	}
-	p.setDT(toSave)
-	toSave.(validator).setStores(d)
-	checker, checkOK := toSave.(models.Validator)
-	if checkOK {
-		checker.ClearValidation()
-	}
-	saved, err := store.Update(backend, toSave)
-	toSave.(validator).clearStores()
-	if !saved {
-		return toSave, err
-	}
-	d(prefix).Add(toSave)
-	p.publishers.Publish(prefix, "update", key, toSave)
-	return toSave, nil
-}
-
-func (p *DataTracker) Update(d Stores, obj models.Model) (saved bool, err error) {
-	ref := toBackend(p, d, obj)
-	prefix := ref.Prefix()
-	key := ref.Key()
-	backend := d(prefix).backingStore
-	if target := d(prefix).Find(key); target == nil {
-		return false, &models.Error{
-			Type:     "PUT",
-			Code:     http.StatusNotFound,
-			Key:      key,
-			Model:    prefix,
-			Messages: []string{"Not Found"},
-		}
-	}
-
-	p.setDT(ref)
-	ref.(validator).setStores(d)
-	if ms, ok := ref.(models.Filler); ok {
-		ms.Fill()
-	}
-	checker, checkOK := ref.(models.Validator)
-	if checkOK {
-		checker.ClearValidation()
-	}
-	saved, err = store.Update(backend, ref)
-	ref.(validator).clearStores()
-	if saved {
-		d(prefix).Add(ref)
-		p.publishers.Publish(prefix, "update", key, ref)
-	}
-	return saved, err
-}
-
-func (p *DataTracker) Save(d Stores, obj models.Model) (saved bool, err error) {
-	ref := toBackend(p, d, obj)
-	prefix := ref.Prefix()
-	backend := d(prefix).backingStore
-	ref.(validator).setStores(d)
-	if ms, ok := ref.(models.Filler); ok {
-		ms.Fill()
-	}
-	checker, checkOK := ref.(models.Validator)
-	if checkOK {
-		checker.ClearValidation()
-	}
-	saved, err = store.Save(backend, ref)
-	ref.(validator).clearStores()
-	if saved {
-		d(ref.Prefix()).Add(ref)
-		p.publishers.Publish(ref.Prefix(), "save", ref.Key(), ref)
-	}
-	return saved, err
 }
 
 func (p *DataTracker) GetToken(tokenString string) (*DrpCustomClaims, error) {
@@ -1107,7 +1028,7 @@ func (p *DataTracker) Backup() ([]byte, error) {
 	for k := range p.objs {
 		keys = append(keys, k)
 	}
-	_, unlocker := p.LockEnts(keys...)
+	_, unlocker := p.lockEnts(keys...)
 	defer unlocker()
 	res := map[string][]models.Model{}
 	for _, k := range keys {
@@ -1120,31 +1041,4 @@ func (p *DataTracker) Backup() ([]byte, error) {
 func (p *DataTracker) ReplaceBackend(st store.Store) (hard, soft error) {
 	p.Backend = st
 	return p.rebuildCache()
-}
-
-func (p *DataTracker) Printf(f string, args ...interface{}) {
-	p.Logger.Printf(f, args...)
-}
-
-func (p *DataTracker) DebugLevel(pref string) int {
-	debugLevel := 0
-	d2, e := strconv.Atoi(p.pref(pref))
-	if e == nil {
-		debugLevel = d2
-	}
-	return debugLevel
-}
-
-func (p *DataTracker) printlevelf(pref string, level int, f string, args ...interface{}) {
-	debugLevel := p.DebugLevel(pref)
-	if debugLevel >= level {
-		p.Logger.Printf(f, args...)
-	}
-}
-
-func (p *DataTracker) Infof(pref, f string, args ...interface{}) {
-	p.printlevelf(pref, 1, f, args...)
-}
-func (p *DataTracker) Debugf(pref, f string, args ...interface{}) {
-	p.printlevelf(pref, 2, f, args...)
 }

@@ -13,20 +13,20 @@ const (
 )
 
 type validator interface {
-	setStores(Stores)
-	clearStores()
+	setRT(*RequestTracker)
+	clearRT()
 }
 
 type validate struct {
-	stores Stores
+	rt *RequestTracker
 }
 
-func (v *validate) setStores(s Stores) {
-	v.stores = s
+func (v *validate) setRT(rt *RequestTracker) {
+	v.rt = rt
 }
 
-func (v *validate) clearStores() {
-	v.stores = nil
+func (v *validate) clearRT() {
+	v.rt = nil
 }
 
 func validateIP4(e models.ErrorAdder, a net.IP) {

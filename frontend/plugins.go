@@ -213,18 +213,19 @@ func (f *Frontend) InitPluginApi() {
 				return
 			}
 			var err error
-			res, err := func() (models.Model, error) {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("create")...)
-				defer unlocker()
-				if _, err := f.dt.Create(d, b); err != nil {
-					return nil, err
+			var res models.Model
+			rt := f.rt(c, b.Locks("create")...)
+			rt.Do(func(d backend.Stores) {
+				if _, err = rt.Create(b); err != nil {
+					return
 				}
 				s, ok := models.Model(b).(Sanitizable)
 				if ok {
-					return s.Sanitize(), nil
+					res = s.Sanitize()
+					return
 				}
-				return models.Clone(b), nil
-			}()
+				res = models.Clone(b)
+			})
 			if err != nil {
 				be, ok := err.(*models.Error)
 				if ok {
