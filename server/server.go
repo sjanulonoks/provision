@@ -51,12 +51,12 @@ type ProgOpts struct {
 	DisableTftpServer   bool   `long:"disable-tftp" description:"Disable TFTP server"`
 	DisableProvisioner  bool   `long:"disable-provisioner" description:"Disable provisioner"`
 	DisableDHCP         bool   `long:"disable-dhcp" description:"Disable DHCP server"`
-	DisablePXE          bool   `long:"disable-pxe" description:"Disable PXE/BINL server"`
+	DisableBINL         bool   `long:"disable-pxe" description:"Disable PXE/BINL server"`
 	StaticPort          int    `long:"static-port" description:"Port the static HTTP file server should listen on" default:"8091"`
 	TftpPort            int    `long:"tftp-port" description:"Port for the TFTP server to listen on" default:"69"`
 	ApiPort             int    `long:"api-port" description:"Port for the API server to listen on" default:"8092"`
 	DhcpPort            int    `long:"dhcp-port" description:"Port for the DHCP server to listen on" default:"67"`
-	PxePort             int    `long:"pxe-port" description:"Port for the PXE/BINL server to listen on" default:"4011"`
+	BinlPort            int    `long:"binl-port" description:"Port for the PXE/BINL server to listen on" default:"4011"`
 	UnknownTokenTimeout int    `long:"unknown-token-timeout" description:"The default timeout in seconds for the machine create authorization token" default:"600"`
 	KnownTokenTimeout   int    `long:"known-token-timeout" description:"The default timeout in seconds for the machine update authorization token" default:"3600"`
 	OurAddress          string `long:"static-ip" description:"IP address to advertise for the static HTTP file server" default:""`
@@ -214,14 +214,14 @@ func Server(c_opts *ProgOpts) {
 
 	fe := frontend.NewFrontend(dt, logger,
 		c_opts.OurAddress,
-		c_opts.ApiPort, c_opts.StaticPort, c_opts.DhcpPort, c_opts.PxePort,
+		c_opts.ApiPort, c_opts.StaticPort, c_opts.DhcpPort, c_opts.BinlPort,
 		c_opts.FileRoot,
 		c_opts.DevUI, c_opts.UIUrl, nil, publishers, c_opts.DrpId, pc,
-		c_opts.DisableDHCP, c_opts.DisableTftpServer, c_opts.DisableProvisioner, c_opts.DisablePXE,
+		c_opts.DisableDHCP, c_opts.DisableTftpServer, c_opts.DisableProvisioner, c_opts.DisableBINL,
 		c_opts.SaasContentRoot)
 	fe.TftpPort = c_opts.TftpPort
-	fe.PxePort = c_opts.PxePort
-	fe.NoPxe = c_opts.DisablePXE
+	fe.BinlPort = c_opts.BinlPort
+	fe.NoBinl = c_opts.DisableBINL
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)
@@ -253,9 +253,9 @@ func Server(c_opts *ProgOpts) {
 			services = append(services, svc)
 		}
 
-		if !c_opts.DisablePXE {
+		if !c_opts.DisableBINL {
 			logger.Printf("Starting PXE/BINL server")
-			if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.PxePort, publishers, true, c_opts.FakePinger); err != nil {
+			if svc, err := midlayer.StartDhcpHandler(dt, c_opts.DhcpInterfaces, c_opts.BinlPort, publishers, true, c_opts.FakePinger); err != nil {
 				logger.Fatalf("Error starting PXE/BINL server: %v", err)
 			} else {
 				services = append(services, svc)
