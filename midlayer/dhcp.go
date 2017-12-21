@@ -528,7 +528,13 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 						}()
 						continue
 					}
-					h.Debugf("%s: IP address %s appears to be free", xid(p), lease.Addr)
+					func() {
+						h.Debugf("%s: IP address %s appears to be free", xid(p), lease.Addr)
+						d, unlocker := h.bk.LockEnts("leases")
+						defer unlocker()
+						lease.State = "OFFER"
+						h.bk.Save(d, lease)
+					}()
 				} else {
 					h.Debugf("%s: Resusing lease for %s", xid(p), lease.Addr)
 				}

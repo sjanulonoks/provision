@@ -29,11 +29,11 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 		FilePort:           f.ProvPort,
 		TftpPort:           f.TftpPort,
 		DhcpPort:           f.DhcpPort,
-		PxePort:            f.PxePort,
+		BinlPort:           f.BinlPort,
 		TftpEnabled:        !f.NoTftp,
 		DhcpEnabled:        !f.NoDhcp,
 		ProvisionerEnabled: !f.NoProv,
-		PxeEnabled:         !f.NoPxe,
+		BinlEnabled:        !f.NoBinl,
 		Stats:              make([]*models.Stat, 0, 0),
 		Features: []string{
 			"api-v3",
