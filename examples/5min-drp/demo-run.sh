@@ -27,7 +27,7 @@ function xiterr() { [[ $1 =~ ^[0-9]+$ ]] && { local _xit=$1; shift; } || local _
 cloudia.sh
 
 CONFIRM=${CONFIRM:-"yes"}
-SKIP_LOCAL=${CONFIRM:-"no"}
+SKIP_LOCAL=${SKIP_LOCAL:-"no"}
 
 function sep() {
   local _sep="--------------------------------------------------------------------------------"
@@ -115,7 +115,7 @@ confirm exit_if_fail terraform apply -target=packet_device.drp-endpoint -auto-ap
 # do NOT get applied until after 'drp' endpoint is finished 
 confirm terraform plan                    
 
-if [[ SKIP_LOCAL == "no" ]] 
+if [[ $SKIP_LOCAL == "no" ]] 
 then
   # installs DRP locally for CLI commands
   confirm control.sh get-drp-local        
@@ -148,7 +148,7 @@ case $1 in
   local)
     echo "Installing content to DRP endpoint ('$DRP') from local system (push to endpoint)..."
     # runs get-drp-cc, get-drp-plugins, and drp-setup locally
-    confirm control.sh local-content $DRP
+    confirm control.sh local-content-5min $DRP
   ;;
   remote|*)
     echo "Installing content from DRP endpoint ('$DRP') (pull from endpoint)..."
@@ -158,7 +158,7 @@ case $1 in
     cprintf $bold "   Maybe launch UI to show empty content too ... ? \n"
     cprintf $bold "   https://rackn.github.io/provision-ux/#/e/${ADDR}:8092/system "
     echo ""
-    confirm control.sh remote-content $DRP  
+    confirm control.sh remote-content-5min $DRP  
     echo ""
     cprintf $cyan "NOTICE:"
     echo "  Errors may be 'normal' - ISOs, Kernel, and InitRDs are "

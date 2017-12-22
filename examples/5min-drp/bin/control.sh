@@ -67,7 +67,7 @@ CREDS=${CREDS:-"--username=rocketskates --password=r0cketsk8ts"}
 
 _machines=`grep '^variable "machines_os' vars.tf | cut -d '"' -f 4`
 case $_machines in
-  centos_7)     MACHINES_OS=${MACHINES_OS:-"centos-7.4.1708-install"}
+  centos_7)     MACHINES_OS=${MACHINES_OS:-"centos-7-install"}
     ;;
   ubuntu_16_04) MACHINES_OS=${MACHINES_OS:-"ubuntu-16.04-install"}
     ;;
@@ -75,13 +75,14 @@ case $_machines in
     ;;
 esac
 # do not use the CE based bootenvs for the Packet.net demo
-MACHINES_OS=${MACHINES_OS:-"centos-7.4.1708-install"}  # ubuntu-16.04-install
+MACHINES_OS=${MACHINES_OS:-"centos-7-install"}  # ubuntu-16.04-install
 
 CURL="curl -sfSL"
 DRPCLI="drpcli"
 
 # add HOME/bin to path if it's not there already
 [[ ":$PATH:" != *":$HOME/bin:"* ]] && PATH="$HOME/bin:${PATH}"
+# install `pwd`/bin in PATH for installed binaries (eg terraform, drpcli)
 [[ ":$PATH:" != *":`pwd`/bin:"* ]] && PATH="`pwd`/bin:${PATH}"
 
 function usage() {
@@ -336,24 +337,29 @@ case $1 in
     cd ..
     ;;
 
-  local-content)
+  ###
+  #  5min-drp default content - moved to *-content-5min to allow new
+  #  content calls for things like KRIB to be injected in to the 
+  #  framework
+  ###
+  local-content-5min)
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
 
-    for ACTION in get-drp-cc get-drp-plugins drp-setup; 
+    for ACTION in get-drp-cc get-drp-plugins drp-setup drp-setup-5min; 
     do 
       ./bin/control.sh $ACTION $2
     done
   ;;
 
-  remote-content)
+  remote-content-5min)
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
 
     # drp-community-content is  installed by default (unless '--nocontent' specified)
     # do not attempt to install it again
     # $0 ssh $2 "hostname; $0 get-drp-cc $2; $0 get-drp-plugins $2; bash -x $0 drp-setup $2"
-    CMD="hostname; ./bin/control.sh local-content $2"
+    CMD="hostname; ./bin/control.sh local-content-5min $2"
     my_ssh $2 "$CMD"
     xit $?
     ;;
@@ -513,8 +519,10 @@ case $1 in
         set +x
       fi
 
+      # old way of doing this changed in DRP v3.3.x-ish timeframe
+      # $DRPCLI $ENDPOINT plugin_providers upload $PLUGIN as $PLUG_NAME
       set -x
-      $DRPCLI $ENDPOINT plugin_providers upload $PLUGIN as $PLUG_NAME
+      $DRPCLI $ENDPOINT plugin_providers upload $PLUG_NAME from $PLUGIN
       set +x
     done
 
@@ -530,6 +538,10 @@ case $1 in
       }
 EOFPLUGIN
 
+      # add the global kernel-console param for the serial-over-ssh access
+      CONSOLE="console=ttyS1,115200"
+      $DRPCLI $ENDPOINT profiles set global param kernel-console to "$CONSOLE"
+
       if ( $DRPCLI $ENDPOINT plugins exists "packet-ipmi" > /dev/null 2>&1 )
       then
         $DRPCLI $ENDPOINT plugins destroy "packet-ipmi"
@@ -539,8 +551,44 @@ EOFPLUGIN
       echo "'plugin_providers packet-ipmi' DOES NOT EXIST - not installing plugin"
   fi
 
+    # drop in our ISOs and wire up our prefs
+    UPLOADS="sledgehammer $MACHINES_OS"
+    for UPLOAD in $UPLOADS
+    do
+    $DRPCLI $ENDPOINT bootenvs exists $UPLOAD \
+      && { set -x; $DRPCLI $ENDPOINT bootenvs uploadiso $UPLOAD; set +x; } \
+      || echo "bootenv '$UPLOAD' doesn't exist, not uploading ISO"
+    done
+
+    # verify we have our stages/bootenvs available before setting the defaults for them
+    ( $DRPCLI $ENDPOINT stages exists discover > /dev/null 2>&1 ) || xiterr 9 "default stage ('discover') doesn't exist"
+    ( $DRPCLI $ENDPOINT bootenvs exists sledgehammer > /dev/null 2>&1 ) || xiterr 9 "default BootEnv ('sledgehammer') doesn't exist"
+    ( $DRPCLI $ENDPOINT bootenvs exists discovery > /dev/null 2>&1 ) || xiterr 9 "unknown BootEnv ('discovery') doesn't exist"
+
+    # set our default Stage, Default Boot Enviornment, and our Unknown Boot Environment
+    $DRPCLI $ENDPOINT prefs set defaultStage discover defaultBootEnv sledgehammer unknownBootEnv discovery
+  ;;
+
+  drp-setup-5min)
     # set up the packet stage map 
     # create stagemap JSON (MACHINES_OS:  ubuntu-16.04-install)
+
+    # sigh ... 'global' profile method changes in v3.5.x - but we also
+    # have to match v3.4.1-tip-29 for pre-release testing - yes, this 
+    # cold be a bit more sophisticated ... 
+    NEW="no"
+    vPATTERN=`$DRPCLI $ENDPOINT info get | jq -r '.version'`
+    nPATTERN=`echo "$vPATTERN" | sed 's/^\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)\.\(.*\)$/\1.\2.\3/g'`
+    REG1="v3.4.1-tip-29-"
+    REG2="3.5.0"
+
+    if [[ ${vPATTERN} == ${REG1}* ]] 
+    then
+      NEW="yes"
+    else 
+      ( `compver $nPATTERN '>' $REG2` ) && NEW="yes"
+    fi
+
 	  cat <<EOFSTAGE > private-content/stagemap-create.json
     {
       "Available": true,
@@ -557,34 +605,41 @@ EOFPLUGIN
     }
 EOFSTAGE
 
+    cat <<EOFPARAM > private-content/stagemap-param.json
+      {
+        "discover": "packet-discover:Success",
+        "packet-discover": "centos-7-install:Reboot",
+        "centos-7-install": "packet-ssh-keys:Success",
+        "packet-ssh-keys": "complete-nowait:Success"
+      }
+EOFPARAM
+
+
+  # old way - destroy/create
+  if [[ $NEW == "no" ]]
+  then
+    J=private-content/stagemap-create.json
+
     if ( $DRPCLI $ENDPOINT profiles exists global > /dev/null 2>&1 )
     then
       $DRPCLI $ENDPOINT profiles destroy global
     fi
-    $DRPCLI $ENDPOINT profiles create - < private-content/stagemap-create.json
+    $DRPCLI $ENDPOINT profiles create - < $J
+  elif [[ $NEW == "yes" ]]
+  then
+    J=private-content/stagemap-param.json
+    $DRPCLI $ENDPOINT profiles set global param change-stage/map to - < $J
+  fi
 
-    # upload our isos
-    UPLOADS="sledgehammer $MACHINES_OS"
-    for UPLOAD in $UPLOADS
-    do
-    $DRPCLI $ENDPOINT bootenvs exists $UPLOAD \
-      && { set -x; $DRPCLI $ENDPOINT bootenvs uploadiso $UPLOAD; set +x; } \
-      || echo "bootenv '$UPLOAD' doesn't exist, not uploading ISO"
-    done
-
-    # verify we have our stages/bootenvs available before setting the defaults for them
-    ( $DRPCLI $ENDPOINT stages exists discover > /dev/null 2>&1 ) || xiterr 9 "default stage ('discover') doesn't exist"
-    ( $DRPCLI $ENDPOINT bootenvs exists sledgehammer > /dev/null 2>&1 ) || xiterr 9 "default BootEnv ('sledgehammer') doesn't exist"
-    ( $DRPCLI $ENDPOINT bootenvs exists discovery > /dev/null 2>&1 ) || xiterr 9 "unknown BootEnv ('discovery') doesn't exist"
-
-    # set our default Stage, Default Boot Enviornment, and our Unknown Boot Environment
-    $DRPCLI $ENDPOINT prefs set defaultStage discover defaultBootEnv sledgehammer unknownBootEnv discovery
-    ;;
+  ;;
 
   ###
   #  add all stages for all BootEnv types - since it's a relatively lightweight
-  #  operationg to plumb in Profiles, we're going to just go ahead and 
+  #  operation to plumb in Profiles, we're going to just go ahead and 
   #  stage them all for use on the DRP endpoint
+  #  
+  #  this ultimately creates individual profiles/stages for each Machine OS
+  #  as "stagemap-MACHINE_OS"
   #  
   #     DRP ID       :: endpoint to operate against
   ###
@@ -635,16 +690,20 @@ EOFSTAGE
     ;;
 
   # run the setup process for each machine that is going to be given a unique
-  # stagemap - we require the following input
+  # stagemap - MACHINE_OS should be the BootEnv name (eg centos-7-install)
+  #
+  # we require the following input
   #
   #   MACHINE_OS     -- bootenv operating system 
-  #   MAcHINE_UUID   -- UUID of the machine we're going to build
+  #   MACHINE_UUID   -- UUID of the machine we're going to build
   drp-setup-machine-*)
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
 
     ENDPOINT="--endpoint=https://$ADDR:8092 $CREDS"
     MOS=${/drp-setup-machine-/}
+
+    # needs finished - set to "OS-install" bootenv name
     BOOTENV=${MOS//drp-setup-machine-/}
     MAP="stagemap-$BOOTENV"
 
@@ -664,6 +723,8 @@ EOFSTAGE
     echo ""
 
     set -x
+    terraform destroy -force
+
     rm -f ${SSH_DRP_KEY} ${SSH_DRP_KEY}.pub
     rm -f ${SSH_MACHINES_KEY} ${SSH_MACHINES_KEY}.pub
     rm -rf drpcli dr-provision-install
@@ -688,8 +749,6 @@ EOFSTAGE
     set +x
 
     [[ -n $ADDR ]] && ssh-keygen -R $ADDR
-
-    terraform destroy --force
 
     rm -rf *bak private-content/*bak terraform.tfstate* ./.terraform
 
