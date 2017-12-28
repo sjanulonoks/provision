@@ -13,17 +13,21 @@
 # limitations under the License.
 
 
-README file for 5min-drp
+README file for pkt-demo
+
+NOTE:  This example used to be called "5min-demo".  It has been renamed
+       to "pkt-demo" to more closely align with the use case, and 
+       expanded scope.
 
 
 OVERVIEW AND IMPORTANT REQUIREMENTS
 -----------------------------------
 
 You will need to perform the following requirements in preparation to
-using this demo 5min-drp process - details on these steps is provided
+using this demo pkt-demo process - details on these steps is provided
 further down in this README:
 
-  * get the 5min-drp code from the github repo
+  * get the pkt-demo code from the github repo
 
   * get your API and Username secrets - modify the "secrets" file
     * have a packet.net account, and your API KEY, and PROJECT ID
@@ -40,17 +44,17 @@ GIT CLONE
 ---------
 
 The following steps will clone this content from the digitalrebar/provision 
-github repo (we assume you will run this from $HOME/5min-drp - adjust yourself
+github repo (we assume you will run this from $HOME/pkt-demo - adjust yourself
 accordingly if you want to put it somewhere else):
 
     git clone -n https://github.com/digitalrebar/provision.git --depth=1
     cd provision
-    git checkout HEAD examples/5min-drp
-    cd examples/5min-drp
-    mv 5min-drp $HOME/
+    git checkout HEAD examples/pkt-demo
+    cd examples/pkt-demo
+    mv pkt-demo $HOME/
     cd ../..
     rm -rf provision
-    cd $HOME/5min-drp
+    cd $HOME/pkt-demo
 
 SECRETS INFORMATION
 -------------------
@@ -98,7 +102,7 @@ FINAL CHECK BEFORE RUNNING
 ----------------------------------------------
 
   * you may optionally make changes to the "vars.tf" file - specifically, you can 
-    set the "cluster_name" to something other than "5min" - if you instantiate
+    set the "cluster_name" to something other than "demo" - if you instantiate
     multiple DRP/Machines clusters, then the names will collide in the packet.net
     portal.  Changing the "cluster_name" will help in identifying which resources
     belong to which cluster. 
@@ -155,7 +159,7 @@ WHAT HAPPENS?
 CLEANUP:
 --------
 
-You can cleanup/reset the 5min-drp/ directory back to "factory
+You can cleanup/reset the pkt-demo/ directory back to "factory
 defaults" with the following:
 
   bin/terraform destroy --force # wipe the terraform resources

@@ -74,17 +74,17 @@ function confirm() {
 }
 
 ###
-#  we assume you've checked out the examples/5min-drp/ directory from the
+#  we assume you've checked out the examples/pkt-demo/ directory from the
 #  Digital Rebar Provision repo ... do something like:
 ###
 
 # echo "ACTION: Cloning GIT repo contents ... "
 # git clone -n https://github.com/digitalrebar/provision.git --depth=1
 # cd provision
-# git checkout HEAD examples/5min-drp
+# git checkout HEAD examples/pkt-demo
 # cd ..
-# mv examples/5min-drp $HOME/
-# cd $HOME/5min-drp
+# mv examples/pkt-demo $HOME/
+# cd $HOME/pkt-demo
 
 if [[ "$USER" == "shane" ]]
 then
@@ -148,7 +148,7 @@ case $1 in
   local)
     echo "Installing content to DRP endpoint ('$DRP') from local system (push to endpoint)..."
     # runs get-drp-cc, get-drp-plugins, and drp-setup locally
-    confirm control.sh local-content-5min $DRP
+    confirm control.sh local-content-demo $DRP
   ;;
   remote|*)
     echo "Installing content from DRP endpoint ('$DRP') (pull from endpoint)..."
@@ -158,7 +158,7 @@ case $1 in
     cprintf $bold "   Maybe launch UI to show empty content too ... ? \n"
     cprintf $bold "   https://rackn.github.io/provision-ux/#/e/${ADDR}:8092/system "
     echo ""
-    confirm control.sh remote-content-5min $DRP  
+    confirm control.sh remote-content-demo $DRP  
     echo ""
     cprintf $cyan "NOTICE:"
     echo "  Errors may be 'normal' - ISOs, Kernel, and InitRDs are "
