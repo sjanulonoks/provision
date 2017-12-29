@@ -16,25 +16,23 @@
 
 ###
 #  simple control script to build a DRP endpoint via CLI on a remote
-#  target platform ... 
+#  target platform ... developed for use in the packet.net environment
 #
 #  usage:   $0 --help
-#
-#   TODO:  * 'ssh-keys' check to packet.net via their api to determine
-#            if key names exist alread - they'll create successfully, but
-#            the duplicate key names can lead to operator confusion and
-#            possibly error
 ###
 
 XIT=${XIT:-"0"}
 # BASH_SOURCE[0] works with both executed script, and 'source'd script
-FUNCS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/functions.sh"
+WORKDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FUNCS="$WORKDIR/functions.sh"
+# source our FUNCS file if we haven't already done so
 ( type -t functions > /dev/null 2>&1 ) \
-  || { [[ -f "${FUNCS}" ]] && source ${FUNCS} || exit 99; }
+  || { [[ -f "${FUNCS}" ]] && source "${FUNCS}" || exit 99; }
 
 # get our API_KEY and PROJECT_ID secrets
 source ./private-content/secrets || xiterr 1 "unable to source './secrets' file "
 
+# validate our API key, Project ID, and RackN Auth credentials
 if [[ "$1" != "extra-cleanup" ]]
 then
   [[ -z "$API_KEY"        || "$API_KEY"        == "insert_api_key_here" ]]         \
@@ -63,7 +61,8 @@ MY_OS=${MY_OS:-"darwin"}
 MY_ARCH=${MY_ARCH:-"amd64"}
 DRP_OS=${DRP_OS:-"linux"}
 DRP_ARCH=${DRP_ARCH:-"amd64"}
-CREDS=${CREDS:-"--username=rocketskates --password=r0cketsk8ts"}
+#CREDS=${CREDS:-"--username=rocketskates --password=r0cketsk8ts"}
+export RS_KEY=${RS_KEY:-"rocketskates:r0cketsk8ts"}
 
 _machines=`grep '^variable "machines_os' vars.tf | cut -d '"' -f 4`
 case $_machines in
@@ -125,9 +124,11 @@ CLEANUP:  WARNING - cleanup will NUKE things - like private SSH KEY (and more)  
           * <ID> is the ID of the DRP endpoint that is created by terraform 
 
           * you can override built in defaults by setting the following variables:
-             SSH_DRP_KEY  SSH_MACHINES_KEY  MY_OS    MY_ARCH      DRP_OS      DRP_ARCH
-             CREDS        MACHINES_OS       VER_DRP  VER_CONTENT  VER_PLUGINS
+             SSH_DRP_KEY  SSH_MACHINES_KEY  MY_ARCH    DRP_OS       DRP_ARCH
+             MACHINES_OS  MY_OS             VER_DRP    VER_CONTENT  VER_PLUGINS
+             RS_KEY
 
+          RS_KEY overrides default username:password credentials for DRP Endpoint
 END_USAGE
 } # end usaage()
 
@@ -186,7 +187,7 @@ function prereqs() {
 
 prereqs 
 
-# we're going to stuff some binaries in the local bin/ path
+# we're going to stuff some binaries in the local ./bin path
 PATH=`pwd`/bin:$PATH
 
 case $1 in 
@@ -338,28 +339,28 @@ case $1 in
     ;;
 
   ###
-  #  5min-drp default content - moved to *-content-5min to allow new
+  #  pkt-demo default content - moved to *-content-demo to allow new
   #  content calls for things like KRIB to be injected in to the 
   #  framework
   ###
-  local-content-5min)
+  local-content-demo)
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
 
-    for ACTION in get-drp-cc get-drp-plugins drp-setup drp-setup-5min; 
+    for ACTION in get-drp-cc get-drp-plugins drp-setup drp-setup-demo; 
     do 
       ./bin/control.sh $ACTION $2
     done
   ;;
 
-  remote-content-5min)
+  remote-content-demo)
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
 
     # drp-community-content is  installed by default (unless '--nocontent' specified)
     # do not attempt to install it again
     # $0 ssh $2 "hostname; $0 get-drp-cc $2; $0 get-drp-plugins $2; bash -x $0 drp-setup $2"
-    CMD="hostname; ./bin/control.sh local-content-5min $2"
+    CMD="hostname; ./bin/control.sh local-content-demo $2"
     my_ssh $2 "$CMD"
     xit $?
     ;;
@@ -569,25 +570,20 @@ EOFPLUGIN
     $DRPCLI $ENDPOINT prefs set defaultStage discover defaultBootEnv sledgehammer unknownBootEnv discovery
   ;;
 
-  drp-setup-5min)
+  drp-setup-demo)
     # set up the packet stage map 
     # create stagemap JSON (MACHINES_OS:  ubuntu-16.04-install)
 
     # sigh ... 'global' profile method changes in v3.5.x - but we also
     # have to match v3.4.1-tip-29 for pre-release testing - yes, this 
-    # cold be a bit more sophisticated ... 
+    # could be a bit more sophisticated ... 
     NEW="no"
-    vPATTERN=`$DRPCLI $ENDPOINT info get | jq -r '.version'`
-    nPATTERN=`echo "$vPATTERN" | sed 's/^\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)\.\(.*\)$/\1.\2.\3/g'`
+    vPATTERN=`$DRPCLI $ENDPOINT info get | jq -r '.version | @text'`
     REG1="v3.4.1-tip-29-"
-    REG2="3.5.0"
+    REG2="v3.5.[0-9]"
 
-    if [[ ${vPATTERN} == ${REG1}* ]] 
-    then
-      NEW="yes"
-    else 
-      ( `compver $nPATTERN '>' $REG2` ) && NEW="yes"
-    fi
+    [[ ${vPATTERN} == ${REG1}* ]] && NEW="yes"
+    [[ ${vPATTERN} == ${REG2}* ]] && NEW="yes"
 
 	  cat <<EOFSTAGE > private-content/stagemap-create.json
     {
@@ -615,21 +611,21 @@ EOFSTAGE
 EOFPARAM
 
 
-  # old way - destroy/create
-  if [[ $NEW == "no" ]]
-  then
-    J=private-content/stagemap-create.json
-
-    if ( $DRPCLI $ENDPOINT profiles exists global > /dev/null 2>&1 )
+    # old way - destroy/create
+    if [[ $NEW == "no" ]]
     then
-      $DRPCLI $ENDPOINT profiles destroy global
+      J=private-content/stagemap-create.json
+
+      if ( $DRPCLI $ENDPOINT profiles exists global > /dev/null 2>&1 )
+      then
+        $DRPCLI $ENDPOINT profiles destroy global
+      fi
+      $DRPCLI $ENDPOINT profiles create - < $J
+    elif [[ $NEW == "yes" ]]
+    then
+      J=private-content/stagemap-param.json
+      $DRPCLI $ENDPOINT profiles set global param change-stage/map to - < $J
     fi
-    $DRPCLI $ENDPOINT profiles create - < $J
-  elif [[ $NEW == "yes" ]]
-  then
-    J=private-content/stagemap-param.json
-    $DRPCLI $ENDPOINT profiles set global param change-stage/map to - < $J
-  fi
 
   ;;
 
