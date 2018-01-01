@@ -788,6 +788,7 @@ func NewDataTracker(backend store.Store,
 				savePrefs = true
 			}
 		}
+		// Migrate any number-based logging preferences
 		for _, name := range []string{"debugDhcp",
 			"debugRenderer",
 			"debugBootEnv",
