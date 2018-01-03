@@ -405,7 +405,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
 		if ok && !h.listenOn(server, cm) {
-			rt.Warnf("WARNING: %s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
+			rt.Warnf("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
 			return
 		}
 		if !req.IsGlobalUnicast() {
@@ -435,7 +435,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 						lease.Token,
 						err)
 				} else {
-					rt.Warnf("WARNING: %s: Another DHCP server may be on the network: %s", xid(p), net.IP(server))
+					rt.Warnf("%s: Another DHCP server may be on the network: %s", xid(p), net.IP(server))
 					rt.Infof("%s: %s is no longer able to be leased: %s",
 						xid(p),
 						req,

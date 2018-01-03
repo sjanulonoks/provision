@@ -329,11 +329,10 @@ func Server(c_opts *ProgOpts) {
 				if err != nil {
 					localLogger.Printf("Unable to create new DataStack on SIGHUP: %v", err)
 				} else {
-					func() {
-						_, unlocker := dt.LockAll()
-						defer unlocker()
-						dt.ReplaceBackend(dtStore)
-					}()
+					rt := dt.Request(dt.Logger)
+					rt.AllLocked(func(d backend.Stores) {
+						dt.ReplaceBackend(rt, dtStore)
+					})
 					localLogger.Println("Reload Complete")
 				}
 			case syscall.SIGTERM, syscall.SIGINT:

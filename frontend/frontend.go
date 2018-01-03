@@ -629,15 +629,11 @@ func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope,
 //
 func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bool {
 	obj, ok := c.Get("DRP-CLAIM")
-	if !ok {
-		f.l(c).Warnf("Request with no claims\n")
+	if !ok || !f.assureAuthWithClaim(c, obj, scope, action, specific) {
 		c.AbortWithStatus(http.StatusForbidden)
 		return false
 	}
-	if !f.assureAuthWithClaim(c, obj, scope, action, specific) {
-		c.AbortWithStatus(http.StatusForbidden)
-		return false
-	}
+	f.rt(c).Auditf("Authenticated %s", obj.(*backend.DrpCustomClaims).Id)
 	return true
 }
 

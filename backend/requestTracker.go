@@ -44,6 +44,13 @@ func (rt *RequestTracker) With(s Stores) *RequestTracker {
 	return rt
 }
 
+func (rt *RequestTracker) AllLocked(thunk func(Stores)) {
+	d, unlocker := rt.dt.lockAll()
+	rt.d = d
+	defer unlocker()
+	thunk(d)
+}
+
 func (rt *RequestTracker) withFake() *RequestTracker {
 	rt.d = func(s string) *Store { return rt.dt.objs[s] }
 	return rt

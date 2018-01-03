@@ -581,7 +581,7 @@ func (p *DataTracker) lockEnts(ents ...string) (stores Stores, unlocker func()) 
 		}
 }
 
-func (p *DataTracker) LockAll() (stores Stores, unlocker func()) {
+func (p *DataTracker) lockAll() (stores Stores, unlocker func()) {
 	p.allMux.Lock()
 	return func(ref string) *Store {
 			return p.objs[ref]
@@ -618,12 +618,11 @@ func (p *DataTracker) LocalIP(remote net.IP) string {
 	return gwIp.String()
 }
 
-func (p *DataTracker) rebuildCache() (hard, soft *models.Error) {
+func (p *DataTracker) rebuildCache(loadRT *RequestTracker) (hard, soft *models.Error) {
 	hard = &models.Error{Code: 500, Type: "Failed to load backing objects from cache"}
 	soft = &models.Error{Code: 422, Type: ValidationError}
 	p.objs = map[string]*Store{}
 	objs := allKeySavers()
-	loadRT := p.Request(p.Logger).withFake()
 	for _, obj := range objs {
 		prefix := obj.Prefix()
 		bk := p.Backend.GetSub(prefix)
@@ -717,10 +716,12 @@ func ValidateDataTrackerStore(backend store.Store, logger logger.Logger) (hard, 
 	}
 
 	// Load stores.
-	_, ul := res.LockAll()
-	defer ul()
-	a, b := res.rebuildCache()
-	return a.HasError(), b.HasError()
+	rt := res.Request(logger)
+	rt.AllLocked(func(d Stores) {
+		a, b := res.rebuildCache(rt)
+		hard, soft = a.HasError(), b.HasError()
+	})
+	return
 }
 
 // Create a new DataTracker that will use passed store to save all operational data
@@ -753,23 +754,22 @@ func NewDataTracker(backend store.Store,
 	}
 
 	// Make sure incoming writable backend has all stores created
-	_, ul := res.LockAll()
-	objs := allKeySavers()
-	for _, obj := range objs {
-		prefix := obj.Prefix()
-		_, err := backend.MakeSub(prefix)
-		if err != nil {
-			res.Logger.Fatalf("dataTracker: Error creating substore %s: %v", prefix, err)
+	loadRT := res.Request(logger)
+	loadRT.AllLocked(func(d Stores) {
+		objs := allKeySavers()
+		for _, obj := range objs {
+			prefix := obj.Prefix()
+			_, err := backend.MakeSub(prefix)
+			if err != nil {
+				loadRT.Fatalf("dataTracker: Error creating substore %s: %v", prefix, err)
+			}
 		}
-	}
-
-	// Load stores.
-	hard, _ := res.rebuildCache()
-	if hard.HasError() != nil {
-		res.Logger.Fatalf("dataTracker: Error loading data: %v", hard.HasError())
-	}
-	ul()
-
+		// Load stores.
+		hard, _ := res.rebuildCache(loadRT)
+		if hard.HasError() != nil {
+			loadRT.Fatalf("dataTracker: Error loading data: %v", hard.HasError())
+		}
+	})
 	// Create minimal content.
 	rt := res.Request(res.Logger, "stages", "bootenvs", "preferences", "users", "machines", "profiles", "params")
 	rt.Do(func(d Stores) {
@@ -1039,7 +1039,7 @@ func (p *DataTracker) Backup() ([]byte, error) {
 }
 
 // Assumes that all locks are held
-func (p *DataTracker) ReplaceBackend(st store.Store) (hard, soft error) {
+func (p *DataTracker) ReplaceBackend(rt *RequestTracker, st store.Store) (hard, soft error) {
 	p.Backend = st
-	return p.rebuildCache()
+	return p.rebuildCache(rt)
 }
