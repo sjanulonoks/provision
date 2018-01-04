@@ -10,23 +10,27 @@ import (
 	"sync"
 	"time"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
 )
 
-type PluginClientRequestTracker chan *models.PluginClientReply
+type PluginClientRequestTracker struct {
+	c chan *models.PluginClientReply
+	l logger.Logger
+}
 
 type PluginClient struct {
+	logger.Logger
 	plugin   string
 	cmd      *exec.Cmd
 	stderr   io.ReadCloser
 	stdout   io.ReadCloser
 	stdin    io.WriteCloser
 	finished chan bool
-	dt       *backend.DataTracker
 	lock     sync.Mutex
 	nextId   int
-	pending  map[int]PluginClientRequestTracker
+	pending  map[int]*PluginClientRequestTracker
 
 	publock   sync.Mutex
 	inflight  int
@@ -37,10 +41,10 @@ func (pc *PluginClient) ReadLog() {
 	// read command's stderr line by line - for logging
 	in := bufio.NewScanner(pc.stderr)
 	for in.Scan() {
-		pc.dt.Infof("debugPlugins", "Plugin "+pc.plugin+": "+in.Text()) // write each line to your log, or anything you need
+		pc.Infof("Plugin %s: %s", pc.plugin, in.Text()) // write each line to your log, or anything you need
 	}
 	if err := in.Err(); err != nil {
-		pc.dt.Infof("debugPlugins", "Plugin %s: error: %s", pc.plugin, err)
+		pc.Errorf("Plugin %s: error: %s", pc.plugin, err)
 	}
 	pc.finished <- true
 }
@@ -54,32 +58,36 @@ func (pc *PluginClient) ReadReply() {
 		var resp models.PluginClientReply
 		err := json.Unmarshal([]byte(jsonString), &resp)
 		if err != nil {
-			pc.dt.Infof("debugPlugins", "Failed to process: %v\n", err)
+			pc.Errorf("Failed to process: %v\n", err)
 			continue
 		}
 
 		req, ok := pc.pending[resp.Id]
 		if !ok {
-			pc.dt.Infof("debugPlugins", "Failed to find request for: %v\n", resp.Id)
+			pc.Warnf("Failed to find request for: %v\n", resp.Id)
 			continue
 		}
-		req <- &resp
+		req.c <- &resp
+		req.l.Debugf("Action processed")
 
 		pc.lock.Lock()
 		delete(pc.pending, resp.Id)
 		pc.lock.Unlock()
 	}
 	if err := in.Err(); err != nil {
-		pc.dt.Infof("debugPlugins", "Reply %s: error: %s", pc.plugin, err)
+		pc.Warnf("Reply %s: error: %s", pc.plugin, err)
 	}
 	pc.finished <- true
 }
 
-func (pc *PluginClient) writeRequest(action string, data interface{}) (chan *models.PluginClientReply, error) {
+func (pc *PluginClient) writeRequest(l logger.Logger, action string, data interface{}) (chan *models.PluginClientReply, error) {
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
 
-	mychan := make(chan *models.PluginClientReply)
+	mychan := &PluginClientRequestTracker{
+		c: make(chan *models.PluginClientReply),
+		l: l,
+	}
 	id := pc.nextId
 	pc.pending[id] = mychan
 	pc.nextId += 1
@@ -88,33 +96,33 @@ func (pc *PluginClient) writeRequest(action string, data interface{}) (chan *mod
 
 	if dataBytes, err := json.Marshal(data); err != nil {
 		delete(pc.pending, id)
-		return mychan, err
+		return mychan.c, err
 	} else {
 		req.Data = dataBytes
 	}
 
 	if bytes, err := json.Marshal(req); err != nil {
 		delete(pc.pending, id)
-		return mychan, err
+		return mychan.c, err
 	} else {
 		n, err := pc.stdin.Write(bytes)
 		if err != nil {
-			return mychan, err
+			return mychan.c, err
 		}
 		if n != len(bytes) {
-			return mychan, fmt.Errorf("Failed to write all bytes: %d (%d)\n", len(bytes), n)
+			return mychan.c, fmt.Errorf("Failed to write all bytes: %d (%d)\n", len(bytes), n)
 		}
 		n, err = pc.stdin.Write([]byte("\n"))
 		if err != nil {
-			return mychan, err
+			return mychan.c, err
 		}
 	}
 
-	return mychan, nil
+	return mychan.c, nil
 }
 
 func (pc *PluginClient) Config(params map[string]interface{}) error {
-	if mychan, err := pc.writeRequest("Config", params); err != nil {
+	if mychan, err := pc.writeRequest(pc.Logger, "Config", params); err != nil {
 		return err
 	} else {
 		s := <-mychan
@@ -155,7 +163,7 @@ func (pc *PluginClient) Unload() {
 }
 
 func (pc *PluginClient) Publish(e *models.Event) error {
-	if mychan, err := pc.writeRequest("Publish", e); err != nil {
+	if mychan, err := pc.writeRequest(pc.Logger, "Publish", e); err != nil {
 		return err
 	} else {
 		s := <-mychan
@@ -167,8 +175,8 @@ func (pc *PluginClient) Publish(e *models.Event) error {
 	return nil
 }
 
-func (pc *PluginClient) Action(a *models.MachineAction) error {
-	if mychan, err := pc.writeRequest("Action", a); err != nil {
+func (pc *PluginClient) Action(rt *backend.RequestTracker, a *models.MachineAction) error {
+	if mychan, err := pc.writeRequest(rt.Logger, "Action", a); err != nil {
 		return err
 	} else {
 		s := <-mychan
@@ -192,8 +200,8 @@ func (pc *PluginClient) Stop() error {
 	return nil
 }
 
-func NewPluginClient(plugin string, dt *backend.DataTracker, apiPort int, path string, params map[string]interface{}) (answer *PluginClient, theErr error) {
-	answer = &PluginClient{plugin: plugin, dt: dt, pending: make(map[int]PluginClientRequestTracker, 0)}
+func NewPluginClient(plugin string, l logger.Logger, apiPort int, path string, params map[string]interface{}) (answer *PluginClient, theErr error) {
+	answer = &PluginClient{plugin: plugin, Logger: l, pending: make(map[int]*PluginClientRequestTracker, 0)}
 
 	answer.cmd = exec.Command(path, "listen")
 	// Setup env vars to run drpcli - auth should be parameters.

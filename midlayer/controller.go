@@ -120,7 +120,7 @@ func (pc *PluginController) WalkPluginDir() error {
 func (pc *PluginController) walkPlugins(provider string) (err error) {
 	// Walk all plugin objects from dt.
 	ref := &backend.Plugin{}
-	rt := pc.dt.Request(pc.dt.Logger, ref.Locks("get")...)
+	rt := pc.dt.Request(pc.Logger, ref.Locks("get")...)
 	rt.Do(func(d backend.Stores) {
 		var idx *index.Index
 		idx, err = index.All([]index.Filter{index.Native()}...)(&d(ref.Prefix()).Index)
@@ -228,7 +228,7 @@ func (pc *PluginController) startPlugin(rt *backend.RequestTracker, plugin *back
 
 		if len(errors) == 0 {
 			ppath := pc.pluginDir + "/" + pp.Name
-			thingee, err := NewPluginClient(plugin.Name, pc.dt, pc.apiPort, ppath, plugin.Params)
+			thingee, err := NewPluginClient(plugin.Name, pc.Logger.Fork(), pc.apiPort, ppath, plugin.Params)
 			if err == nil {
 				rp := &RunningPlugin{Plugin: plugin, Client: thingee, Provider: pp}
 				if pp.HasPublish {
@@ -281,10 +281,10 @@ func (pc *PluginController) stopPlugin(plugin *backend.Plugin) {
 }
 
 func (pc *PluginController) restartPlugin(rt *backend.RequestTracker, plugin *backend.Plugin) {
-	rt.Infof("debugPlugins", "Restarting plugin: %s(%s)\n", plugin.Name, plugin.Provider)
+	rt.Infof("Restarting plugin: %s(%s)\n", plugin.Name, plugin.Provider)
 	pc.stopPlugin(plugin)
 	pc.startPlugin(rt, plugin)
-	rt.Infof("debugPlugins", "Restarting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
+	rt.Infof("Restarting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
 }
 
 func (pc *PluginController) buildNewStore(content *models.Content) (newStore store.Store, err error) {

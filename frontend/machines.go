@@ -665,7 +665,7 @@ func (f *Frontend) InitMachineApi() {
 				return
 			}
 			f.pubs.Publish("machines", name, uuid, ma)
-			runErr := f.pc.MachineActions.Run(ma)
+			runErr := f.pc.MachineActions.Run(rt, ma)
 			if runErr != nil {
 				be, ok := runErr.(*models.Error)
 				if !ok {

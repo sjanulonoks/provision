@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
 )
 
@@ -93,7 +94,7 @@ func (ma *MachineActions) Get(name string) (*models.AvailableAction, bool) {
 	return nil, false
 }
 
-func (ma *MachineActions) Run(maa *models.MachineAction) error {
+func (ma *MachineActions) Run(rt *backend.RequestTracker, maa *models.MachineAction) error {
 	var aa *AvailableAction
 	var ok bool
 	ma.lock.Lock()
@@ -108,7 +109,7 @@ func (ma *MachineActions) Run(maa *models.MachineAction) error {
 	}
 	defer aa.Release()
 
-	return aa.plugin.Client.Action(maa)
+	return aa.plugin.Client.Action(rt, maa)
 }
 
 func (aa *AvailableAction) Reserve() error {
