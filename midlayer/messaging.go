@@ -96,6 +96,7 @@ func (pc *PluginClient) writeRequest(l logger.Logger, action string, data interf
 
 	if dataBytes, err := json.Marshal(data); err != nil {
 		delete(pc.pending, id)
+		l.Errorf("%s:%s: Error marshalling request data: %v", pc.plugin, action, err)
 		return mychan.c, err
 	} else {
 		req.Data = dataBytes
@@ -103,21 +104,21 @@ func (pc *PluginClient) writeRequest(l logger.Logger, action string, data interf
 
 	if bytes, err := json.Marshal(req); err != nil {
 		delete(pc.pending, id)
+		l.Errorf("%s:%s Error marshalling request: %v", pc.plugin, action, err)
 		return mychan.c, err
 	} else {
+		bytes = append(bytes, "\n"...)
 		n, err := pc.stdin.Write(bytes)
 		if err != nil {
+			l.Errorf("%s:%s: Error sending request to plugin: %v", pc.plugin, action, err)
 			return mychan.c, err
 		}
 		if n != len(bytes) {
+			l.Errorf("%s:%s: Only sent %d out of %d bytes to plugin", pc.plugin, action, n, len(bytes))
 			return mychan.c, fmt.Errorf("Failed to write all bytes: %d (%d)\n", len(bytes), n)
 		}
-		n, err = pc.stdin.Write([]byte("\n"))
-		if err != nil {
-			return mychan.c, err
-		}
 	}
-
+	l.Infof("%s:%s: Request sent", pc.plugin, action)
 	return mychan.c, nil
 }
 
