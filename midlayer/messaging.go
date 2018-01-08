@@ -201,13 +201,14 @@ func (pc *PluginClient) Stop() error {
 	return nil
 }
 
-func NewPluginClient(plugin string, l logger.Logger, apiPort int, path string, params map[string]interface{}) (answer *PluginClient, theErr error) {
+func NewPluginClient(plugin string, l logger.Logger, apiURL, staticURL, path string, params map[string]interface{}) (answer *PluginClient, theErr error) {
 	answer = &PluginClient{plugin: plugin, Logger: l, pending: make(map[int]*PluginClientRequestTracker, 0)}
 
 	answer.cmd = exec.Command(path, "listen")
 	// Setup env vars to run drpcli - auth should be parameters.
 	env := os.Environ()
-	env = append(env, fmt.Sprintf("RS_ENDPOINT=https://127.0.0.1:%d", apiPort))
+	env = append(env, fmt.Sprintf("RS_ENDPOINT=%s", apiURL))
+	env = append(env, fmt.Sprintf("RS_FILESERVER=%s", staticURL))
 	answer.cmd.Env = env
 
 	var err2 error

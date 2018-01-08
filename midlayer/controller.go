@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -40,17 +41,15 @@ type PluginController struct {
 	events             chan *models.Event
 	publishers         *backend.Publishers
 	MachineActions     *MachineActions
-	apiPort            int
 }
 
-func InitPluginController(pluginDir string, dt *backend.DataTracker, pubs *backend.Publishers, apiPort int) (pc *PluginController, err error) {
+func InitPluginController(pluginDir string, dt *backend.DataTracker, pubs *backend.Publishers) (pc *PluginController, err error) {
 	pc = &PluginController{
 		Logger:             dt.Logger.Switch("plugins"),
 		pluginDir:          pluginDir,
 		dt:                 dt,
 		publishers:         pubs,
 		AvailableProviders: make(map[string]*models.PluginProvider, 0),
-		apiPort:            apiPort,
 		runningPlugins:     make(map[string]*RunningPlugin, 0)}
 
 	pc.MachineActions = NewMachineActions()
@@ -228,7 +227,7 @@ func (pc *PluginController) startPlugin(rt *backend.RequestTracker, plugin *back
 
 		if len(errors) == 0 {
 			ppath := pc.pluginDir + "/" + pp.Name
-			thingee, err := NewPluginClient(plugin.Name, pc.Logger.Fork(), pc.apiPort, ppath, plugin.Params)
+			thingee, err := NewPluginClient(plugin.Name, pc.Logger.Fork(), rt.ApiURL(net.ParseIP("0.0.0.0")), rt.FileURL(net.ParseIP("0.0.0.0")), ppath, plugin.Params)
 			if err == nil {
 				rp := &RunningPlugin{Plugin: plugin, Client: thingee, Provider: pp}
 				if pp.HasPublish {

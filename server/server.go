@@ -213,7 +213,7 @@ func Server(c_opts *ProgOpts) {
 		}
 	}
 
-	pc, err := midlayer.InitPluginController(c_opts.PluginRoot, dt, publishers, c_opts.ApiPort)
+	pc, err := midlayer.InitPluginController(c_opts.PluginRoot, dt, publishers)
 	if err != nil {
 		localLogger.Fatalf("Error starting plugin service: %v", err)
 	} else {

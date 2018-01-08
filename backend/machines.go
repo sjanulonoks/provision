@@ -408,28 +408,32 @@ func (n *Machine) Validate() {
 				n.CurrentTask = 0
 				n.Tasks = []string{}
 				n.Errorf("Machine %s wants Stage %s, which is not available", n.UUID(), n.Stage)
-			} else if n.oldStage != n.Stage {
+			} else {
+				// Always update stage rendering to handle value changes
 				if obFound := stages.Find(n.oldStage); obFound != nil {
 					oldStage := AsStage(obFound)
 					oldStage.Render(n.rt, n, n).deregister(n.rt.dt.FS)
 				}
-				// Only change bootenv if specified
-				if stage.BootEnv != "" {
-					// BootEnv should still be valid because Stage is valid.
-					n.BootEnv = stage.BootEnv
-					// If the bootenv changes, force the machine to not Runnable.
-					// This keeps the task list from advancing in the wrong
-					// BootEnv.
-					if n.oldBootEnv != n.BootEnv {
-						n.Runnable = false
+				// Only if the stage changes should play with bootenvs and tasks
+				if n.oldStage != n.Stage {
+					// Only change bootenv if specified
+					if stage.BootEnv != "" {
+						// BootEnv should still be valid because Stage is valid.
+						n.BootEnv = stage.BootEnv
+						// If the bootenv changes, force the machine to not Runnable.
+						// This keeps the task list from advancing in the wrong
+						// BootEnv.
+						if n.oldBootEnv != n.BootEnv {
+							n.Runnable = false
+						}
 					}
-				}
-				n.Tasks = make([]string, len(stage.Tasks))
-				copy(n.Tasks, stage.Tasks)
-				if len(n.Tasks) > 0 {
-					n.CurrentTask = -1
-				} else {
-					n.CurrentTask = 0
+					n.Tasks = make([]string, len(stage.Tasks))
+					copy(n.Tasks, stage.Tasks)
+					if len(n.Tasks) > 0 {
+						n.CurrentTask = -1
+					} else {
+						n.CurrentTask = 0
+					}
 				}
 				stage.Render(n.rt, n, n).register(n.rt.dt.FS)
 			}
