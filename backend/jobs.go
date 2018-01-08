@@ -55,7 +55,6 @@ import (
 type Job struct {
 	*models.Job
 	validate
-	p        *DataTracker
 	oldState string
 }
 
@@ -64,13 +63,13 @@ func (obj *Job) SetReadOnly(b bool) {
 }
 
 func (j *Job) LogPath() string {
-	return filepath.Join(j.p.LogRoot, j.Uuid.String())
+	return filepath.Join(j.rt.dt.LogRoot, j.Uuid.String())
 }
 
 func (obj *Job) SaveClean() store.KeySaver {
 	mod := *obj.Job
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 func AsJob(o models.Model) *Job {
 	return o.(*Job)
@@ -84,21 +83,13 @@ func AsJobs(o []models.Model) []*Job {
 	return res
 }
 
-func (j *Job) Backend() store.Store {
-	return j.p.getBackend(j)
-}
-
 func (j *Job) New() store.KeySaver {
 	res := &Job{Job: &models.Job{}}
 	if j.Job != nil && j.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = j.p
+	res.rt = j.rt
 	return res
-}
-
-func (j *Job) setDT(dp *DataTracker) {
-	j.p = dp
 }
 
 func (j *Job) UUID() string {
@@ -348,16 +339,13 @@ func (j *Job) OnCreate() error {
 		}
 		buf := &bytes.Buffer{}
 		fmt.Fprintf(buf, "Log for Job: %s\n", j.Uuid.String())
-		j.AddError(j.Log(buf))
+		j.AddError(j.Log(j.rt, buf))
 	}
 	return j.HasError()
 }
 
 func (j *Job) OnLoad() error {
-	j.stores = func(ref string) *Store {
-		return j.p.objs[ref]
-	}
-	defer func() { j.stores = nil }()
+	defer func() { j.rt = nil }()
 	j.oldState = j.State
 	j.SetValid()
 	j.Validate()
@@ -390,7 +378,7 @@ func (j *Job) Validate() {
 		return
 	}
 	j.Job.Validate()
-	objs := j.stores
+	objs := j.rt.d
 	tasks := objs("tasks")
 	stages := objs("stages")
 	machines := objs("machines")
@@ -402,7 +390,7 @@ func (j *Job) Validate() {
 		m = AsMachine(om)
 		if j.oldState != j.State && j.State == "failed" {
 			m.Runnable = false
-			_, e2 := j.p.Save(objs, m)
+			_, e2 := j.rt.Save(m)
 			j.AddError(e2)
 		}
 	}
@@ -442,13 +430,13 @@ func (j *Job) AfterSave() {
 	if !j.Current {
 		return
 	}
-	oldJ := j.stores("jobs").Find(j.Previous.String())
+	oldJ := j.rt.d("jobs").Find(j.Previous.String())
 	if oldJ == nil {
 		return
 	}
 	oj := oldJ.(*Job)
 	oj.Current = false
-	oj.p.Save(j.stores, oj)
+	j.rt.Save(oj)
 }
 
 func (j *Job) BeforeDelete() error {
@@ -456,12 +444,12 @@ func (j *Job) BeforeDelete() error {
 	if j.State == "finished" || j.State == "failed" {
 		return nil
 	}
-	machines := j.stores("machines")
+	machines := j.rt.stores("machines")
 	if machines == nil || machines.Find(j.Machine.String()) == nil {
 		// Machine has vanished.  We can delete this job
 		return nil
 	}
-	jobs := j.stores("jobs")
+	jobs := j.rt.stores("jobs")
 	// Test to see if there is a job that follows this one.  If there is, we can delete this one.
 	if jobs != nil {
 		prevMaker := j.Indexes()["Previous"]
@@ -475,46 +463,45 @@ func (j *Job) BeforeDelete() error {
 	return e.HasError()
 }
 
-func (j *Job) RenderActions() ([]*models.JobAction, error) {
-	renderers, addr, e := func() (renderers, net.IP, error) {
-		d, unlocker := j.p.LockEnts(j.Locks("actions")...)
-		defer unlocker()
+func (j *Job) RenderActions(rt *RequestTracker) ([]*models.JobAction, error) {
+	var rds renderers
+	var addr net.IP
+	var err *models.Error
+	rt.Do(func(d Stores) {
 		machines := d("machines")
 		tasks := d("tasks")
 
 		// This should not happen, but we treat task in the job as soft.
 		var to models.Model
 		if to = tasks.Find(j.Task); to == nil {
-			err := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
+			err = &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
 				Messages: []string{fmt.Sprintf("Task %s does not exist", j.Task)}}
-			return nil, nil, err
+			return
 		}
 		t := AsTask(to)
 
 		// This should not happen, but we treat machine in the job as soft.
 		var mo models.Model
 		if mo = machines.Find(j.Machine.String()); mo == nil {
-			err := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
+			err = &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError,
 				Messages: []string{fmt.Sprintf("Machine %s does not exist", j.Machine.String())}}
-			return nil, nil, err
+			return
 		}
 		m := AsMachine(mo)
 
-		err := &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
-		renderers := t.Render(d, m, err)
+		err = &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
+		renderers := t.Render(rt, m, err)
 		if err.HasError() != nil {
-			return nil, nil, err
+			return
 		}
-
-		return renderers, m.Address, nil
-	}()
-	if e != nil {
-		return nil, e
+		rds, addr, err = renderers, m.Address, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	err := &models.Error{}
+	err = &models.Error{}
 	actions := []*models.JobAction{}
-	for _, r := range renderers {
+	for _, r := range rds {
 		rr, err1 := r.write(addr)
 		if err1 != nil {
 			err.AddError(err1)
@@ -532,7 +519,11 @@ func (j *Job) RenderActions() ([]*models.JobAction, error) {
 	return actions, err.HasError()
 }
 
-func (j *Job) Log(src io.Reader) error {
+func (j *Job) Log(rt *RequestTracker, src io.Reader) error {
+	if j.rt == nil {
+		j.setRT(rt)
+		defer j.clearRT()
+	}
 	f, err := os.OpenFile(j.LogPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		fmt.Printf("Umm err: %v\n", err)

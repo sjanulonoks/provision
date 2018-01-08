@@ -251,25 +251,28 @@ func (f *Frontend) InitUserApi(drpid string) {
 	f.ApiGroup.GET("/users/:name/token",
 		func(c *gin.Context) {
 			ref := &backend.User{}
-			userName, grantorName, userSecret, grantorSecret, err := func() (string, string, string, string, *models.Error) {
-				err := &models.Error{
+			var userName, grantorName, userSecret, grantorSecret string
+			var err *models.Error
+			rt := f.rt(c, ref.Locks("get")...)
+			rt.Do(func(d backend.Stores) {
+				err = &models.Error{
 					Type:  c.Request.Method,
 					Code:  http.StatusNotFound,
 					Model: "users",
 					Key:   c.Param("name"),
 				}
-				d, unlocker := f.dt.LockEnts(ref.Locks("get")...)
-				defer unlocker()
-				u := d("users").Find(c.Param("name"))
-				g := d("users").Find(f.getAuthUser(c))
+				u := rt.Find("users", c.Param("name"))
+				g := rt.Find("users", f.getAuthUser(c))
 				if u == nil || g == nil {
 					err.Errorf("Not Found")
-					return "", "", "", "", err
+					return
 				}
 				uobj := backend.AsUser(u)
 				gobj := backend.AsUser(g)
-				return uobj.Name, gobj.Name, uobj.Secret, gobj.Secret, nil
-			}()
+				userName, userSecret = uobj.Name, uobj.Secret
+				grantorName, grantorSecret = gobj.Name, gobj.Secret
+				err = nil
+			})
 			if err != nil {
 				c.JSON(err.Code, err)
 				return
@@ -321,7 +324,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 			} else {
 				// Error is only if stats are not filled in.  User
 				// Token should work regardless of that.
-				info, _ := f.GetInfo(drpid)
+				info, _ := f.GetInfo(c, drpid)
 				if info != nil {
 					if a, _, e := net.SplitHostPort(c.Request.RemoteAddr); e == nil {
 						info.Address = backend.LocalFor(net.ParseIP(a))
@@ -393,30 +396,32 @@ func (f *Frontend) InitUserApi(drpid string) {
 			if !assureDecode(c, &userPassword) {
 				return
 			}
-			user, err := func() (*models.User, *models.Error) {
+			var user *models.User
+			var err *models.Error
+			ref := &backend.User{}
+			rt := f.rt(c, ref.Locks("update")...)
+			rt.Do(func(d backend.Stores) {
 				res := &models.Error{
 					Type:  c.Request.Method,
 					Model: "users",
 					Key:   c.Param(`name`),
 					Code:  http.StatusNotFound,
 				}
-				ref := &backend.User{}
-				d, unlocker := f.dt.LockEnts(ref.Locks("update")...)
-				defer unlocker()
-				obj := d("users").Find(c.Param("name"))
+				obj := rt.Find("users", c.Param("name"))
 				if obj == nil {
 					res.Errorf("Not Found")
-					return nil, res
+					err = res
+					return
 				}
-				user := backend.AsUser(obj)
-				if err := user.ChangePassword(d, userPassword.Password); err != nil {
+				rUser := backend.AsUser(obj)
+				if uErr := rUser.ChangePassword(rt, userPassword.Password); uErr != nil {
 					res.Code = http.StatusBadRequest
-					res.AddError(err)
-					return nil, res
+					res.AddError(uErr)
+					err = res
+					return
 				}
-				ret := models.Clone(user.User)
-				return ret.(*models.User), nil
-			}()
+				user = models.Clone(rUser.User).(*models.User)
+			})
 			if err != nil {
 				c.JSON(err.Code, err)
 			} else {

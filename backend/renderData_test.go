@@ -66,88 +66,86 @@ BootParams = default`
 
 func TestRenderData(t *testing.T) {
 	dt := mkDT(nil)
+	rt := dt.Request(dt.Logger, "stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks", "preferences")
 	var machine *Machine
-	paramWithDefault := AsParam(toBackend(dt,
-		nil,
-		&models.Param{
+	var paramWithDefault *Param
+	var defaultBootEnv, nothingBootEnv, badBootEnv *BootEnv
+	rt.Do(func(d Stores) {
+		paramWithDefault = AsParam(toBackend(&models.Param{
 			Name: "withDefault",
 			Schema: map[string]interface{}{
 				"type":    "string",
 				"default": "default",
 			},
-		}))
-	defaultBootEnv := AsBootEnv(toBackend(dt,
-		nil,
-		&models.BootEnv{
-			Name: "default",
+		}, rt))
+		defaultBootEnv = AsBootEnv(toBackend(
+			&models.BootEnv{
+				Name: "default",
+				Templates: []models.TemplateInfo{
+					{
+						Name: "ipxe",
+						Path: "machines/{{.Machine.UUID}}/file",
+						ID:   "default",
+					},
+				},
+				BootParams: "{{.Env.Name}}",
+			},
+			rt))
+		nothingBootEnv = AsBootEnv(toBackend(&models.BootEnv{
+			Name: "nothing",
 			Templates: []models.TemplateInfo{
 				{
 					Name: "ipxe",
 					Path: "machines/{{.Machine.UUID}}/file",
-					ID:   "default",
+					ID:   "nothing",
 				},
 			},
 			BootParams: "{{.Env.Name}}",
-		}))
-	nothingBootEnv := AsBootEnv(toBackend(dt, nil, &models.BootEnv{
-		Name: "nothing",
-		Templates: []models.TemplateInfo{
-			{
-				Name: "ipxe",
-				Path: "machines/{{.Machine.UUID}}/file",
-				ID:   "nothing",
-			},
 		},
-		BootParams: "{{.Env.Name}}",
-	}))
-	badBootEnv := AsBootEnv(toBackend(dt, nil, &models.BootEnv{
-		Name: "bad",
-		Templates: []models.TemplateInfo{
-			{
-				Name: "ipxe",
-				Path: "machines/{{.Machine.UUID}}/file",
-				ID:   "nothing",
+			rt))
+		badBootEnv = AsBootEnv(toBackend(&models.BootEnv{
+			Name: "bad",
+			Templates: []models.TemplateInfo{
+				{
+					Name: "ipxe",
+					Path: "machines/{{.Machine.UUID}}/file",
+					ID:   "nothing",
+				},
 			},
-		},
-		BootParams: "{{.Param \"cow\"}}",
-	}))
-	func() {
-		d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks")
-		defer unlocker()
+			BootParams: "{{.Param \"cow\"}}",
+		}, rt))
+	})
+	objs := []crudTest{
+		{"Update global profile to have test with a value", rt.Update, &models.Profile{Name: "global", Params: map[string]interface{}{"test": "foreal"}}, true},
+		{"create test profile to have test with a value", rt.Create, &models.Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true},
 
-		objs := []crudTest{
-			{"Update global profile to have test with a value", dt.Update, &models.Profile{Name: "global", Params: map[string]interface{}{"test": "foreal"}}, true},
-			{"create test profile to have test with a value", dt.Create, &models.Profile{Name: "test", Params: map[string]interface{}{"test": "fred"}}, true},
-
-			{"Create included template", dt.Create, &models.Template{ID: "included", Contents: tmplIncluded}, true},
-			{"Create default template", dt.Create, &models.Template{ID: "default", Contents: tmplDefault}, true},
-			{"Create nothing template", dt.Create, &models.Template{ID: "nothing", Contents: tmplNothing}, true},
-			{"Create default bootenv", dt.Create, defaultBootEnv, true},
-			{"Create nothing bootenv", dt.Create, nothingBootEnv, true},
-			{"Create bad bootenv", dt.Create, badBootEnv, true},
-			{"Create param with default", dt.Create, paramWithDefault, true},
-		}
-		for _, obj := range objs {
-			obj.Test(t, d)
-		}
-		machine = &Machine{}
-		Fill(machine)
-		machine.Uuid = uuid.NewRandom()
-		machine.Name = "Test Name"
-		machine.Address = net.ParseIP("192.168.124.11")
-		machine.BootEnv = "default"
-		machine.p = dt
-		created, err := dt.Create(d, machine)
+		{"Create included template", rt.Create, &models.Template{ID: "included", Contents: tmplIncluded}, true},
+		{"Create default template", rt.Create, &models.Template{ID: "default", Contents: tmplDefault}, true},
+		{"Create nothing template", rt.Create, &models.Template{ID: "nothing", Contents: tmplNothing}, true},
+		{"Create default bootenv", rt.Create, defaultBootEnv, true},
+		{"Create nothing bootenv", rt.Create, nothingBootEnv, true},
+		{"Create bad bootenv", rt.Create, badBootEnv, true},
+		{"Create param with default", rt.Create, paramWithDefault, true},
+	}
+	for _, obj := range objs {
+		obj.Test(t, rt)
+	}
+	machine = &Machine{}
+	Fill(machine)
+	machine.Uuid = uuid.NewRandom()
+	machine.Name = "Test Name"
+	machine.Address = net.ParseIP("192.168.124.11")
+	machine.BootEnv = "default"
+	rt.Do(func(d Stores) {
+		created, err := rt.Create(machine)
 		if !created {
 			t.Errorf("Failed to create new test machine: %v", err)
 			return
 		} else {
 			t.Logf("Created new test machine")
 		}
-		pp := machine.GetParams(d, false)
-		pp["foo"] = "bar"
-		machine.SetParams(d, pp)
-	}()
+		rt.SetParam(machine, "foo", "bar")
+	})
 	genLoc := path.Join("/", "machines", machine.UUID(), "file")
 	out, err := dt.FS.Open(genLoc, nil)
 	if err != nil || out == nil {
@@ -162,13 +160,9 @@ func TestRenderData(t *testing.T) {
 	} else {
 		t.Logf("BootEnv default without fred rendered properly for test machine")
 	}
-	func() {
-		d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks")
-		defer unlocker()
-		pp := machine.GetParams(d, false)
-		pp["fred"] = "fred = fred"
-		machine.SetParams(d, pp)
-	}()
+	rt.Do(func(d Stores) {
+		rt.SetParam(machine, "fred", "fred = fred")
+	})
 	out, err = dt.FS.Open(genLoc, nil)
 	if err != nil {
 		t.Errorf("Failed to get tmeplate for %s: %v", genLoc, err)
@@ -181,15 +175,13 @@ func TestRenderData(t *testing.T) {
 	} else {
 		t.Logf("BootEnv default with fred rendered properly for test machine")
 	}
-	func() {
-		d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks")
-		defer unlocker()
+	rt.Do(func(d Stores) {
 		machine.BootEnv = "nothing"
-		saved, err := dt.Save(d, machine)
+		saved, err := rt.Save(machine)
 		if !saved {
 			t.Errorf("Failed to save test machine with new bootenv: %v", err)
 		}
-	}()
+	})
 	out, err = dt.FS.Open(genLoc, nil)
 	if err != nil {
 		t.Errorf("Failed to get tmeplate for %s: %v", genLoc, err)
@@ -202,12 +194,9 @@ func TestRenderData(t *testing.T) {
 	} else {
 		t.Logf("BootEnv nothing rendered properly for test machine")
 	}
-	var rd *RenderData
-	func() {
-		d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks", "preferences")
-		defer unlocker()
+	rt.Do(func(d Stores) {
 		// Test the render functions directly.
-		rd = newRenderData(d, dt, nil, nil)
+		rd := newRenderData(rt, nil, nil)
 		// Test ParseUrl - independent of Machine and Env
 		s, e := rd.ParseUrl("scheme", "http://192.168.0.%31:8080/")
 		if e == nil {
@@ -318,7 +307,7 @@ func TestRenderData(t *testing.T) {
 			t.Errorf("Secrets validate should not validate correctly: %s %s",
 				grantorSecret+"1", claim.GrantorClaims.GrantorSecret)
 		}
-		e = dt.SetPrefs(d, map[string]string{"unknownTokenTimeout": "50"})
+		e = dt.SetPrefs(rt, map[string]string{"unknownTokenTimeout": "50"})
 		if e != nil {
 			t.Errorf("SetPrefs should not return an error: %v\n", e)
 		}
@@ -360,13 +349,10 @@ func TestRenderData(t *testing.T) {
 		if s != "UnknownMachineTokenNotAllowed" {
 			t.Errorf("GenerateProfileToken should not generate a valid token for non-machines.\n")
 		}
-	}()
-
-	func() {
-		d, unlocker := dt.LockEnts("stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks", "preferences")
-		defer unlocker()
+	})
+	rt.Do(func(d Stores) {
 		// Tests with machine and bootenv (has bad BootParams)
-		rd = newRenderData(d, dt, machine, badBootEnv)
+		rd := newRenderData(rt, machine, badBootEnv)
 		_, e := rd.Param("bogus")
 		if e == nil {
 			t.Errorf("Param should return an error when machine is not defined in RenderData\n")
@@ -424,18 +410,22 @@ func TestRenderData(t *testing.T) {
 		} else if s != "default" {
 			t.Errorf("Parameter test with default should have been `default`m not `%v`", s)
 		}
-
+	})
+	rt.Do(func(d Stores) {
 		// Test a machine profile parameter
 		machine.Profiles = []string{"test"}
-		saved, err := dt.Save(d, machine)
+		saved, err := rt.Save(machine)
 		if !saved {
 			t.Errorf("Failed to save test machine with new profile list: %v", err)
 		}
-		p, e = rd.Param("test")
+	})
+	rt.Do(func(d Stores) {
+		rd := newRenderData(rt, machine, badBootEnv)
+		p, e := rd.Param("test")
 		if e != nil {
 			t.Errorf("Param test should NOT return an error: %v\n", e)
 		}
-		s, ok = p.(string)
+		s, ok := p.(string)
 		if !ok {
 			t.Errorf("Parameter test should have been a string\n")
 		} else {
@@ -507,7 +497,7 @@ func TestRenderData(t *testing.T) {
 				grantorSecret+"1", claim.GrantorClaims.GrantorSecret,
 				machineSecret+"1", claim.GrantorClaims.MachineSecret)
 		}
-		e = dt.SetPrefs(d, map[string]string{"knownTokenTimeout": "50"})
+		e = dt.SetPrefs(rt, map[string]string{"knownTokenTimeout": "50"})
 		if e != nil {
 			t.Errorf("SetPrefs should not return an error: %v\n", e)
 		}
@@ -694,6 +684,6 @@ func TestRenderData(t *testing.T) {
 				machineSecret+"1", claim.GrantorClaims.MachineSecret)
 		}
 
-	}()
+	})
 
 }

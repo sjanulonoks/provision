@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
@@ -75,7 +76,7 @@ func (d *DataStack) Clone() *DataStack {
 // undo after FixerUpper returns.
 type FixerUpper func(*DataStack, store.Store) error
 
-func (d *DataStack) rebuild(oldStore store.Store, logger *log.Logger, fixup FixerUpper, newStore store.Store) (*DataStack, error, error) {
+func (d *DataStack) rebuild(oldStore store.Store, logger logger.Logger, fixup FixerUpper, newStore store.Store) (*DataStack, error, error) {
 	if err := d.buildStack(fixup, newStore); err != nil {
 		if m, ok := err.(*models.Error); ok {
 			return nil, m, nil
@@ -91,7 +92,7 @@ func (d *DataStack) rebuild(oldStore store.Store, logger *log.Logger, fixup Fixe
 	return d, hard, soft
 }
 
-func (d *DataStack) RemoveSAAS(name string, logger *log.Logger) (*DataStack, error, error) {
+func (d *DataStack) RemoveSAAS(name string, logger logger.Logger) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	delete(dtStore.saasContents, name)
@@ -101,7 +102,7 @@ func (d *DataStack) RemoveSAAS(name string, logger *log.Logger) (*DataStack, err
 func (d *DataStack) AddReplaceSAAS(
 	name string,
 	newStore store.Store,
-	logger *log.Logger,
+	logger logger.Logger,
 	fixup FixerUpper) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
@@ -109,7 +110,7 @@ func (d *DataStack) AddReplaceSAAS(
 	return dtStore.rebuild(oldStore, logger, fixup, newStore)
 }
 
-func (d *DataStack) RemovePlugin(name string, logger *log.Logger) (*DataStack, error, error) {
+func (d *DataStack) RemovePlugin(name string, logger logger.Logger) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.pluginContents[name]
 	delete(dtStore.pluginContents, name)
@@ -119,7 +120,7 @@ func (d *DataStack) RemovePlugin(name string, logger *log.Logger) (*DataStack, e
 func (d *DataStack) AddReplacePlugin(
 	name string,
 	newStore store.Store,
-	logger *log.Logger,
+	logger logger.Logger,
 	fixup FixerUpper) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.pluginContents[name]

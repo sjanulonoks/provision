@@ -36,7 +36,6 @@ type BootEnv struct {
 	installRepo    *Repo
 	kernelVerified bool
 	bootParamsTmpl *template.Template
-	p              *DataTracker
 	rootTemplate   *template.Template
 	tmplMux        sync.Mutex
 }
@@ -48,7 +47,7 @@ func (obj *BootEnv) SetReadOnly(b bool) {
 func (obj *BootEnv) SaveClean() store.KeySaver {
 	mod := *obj.BootEnv
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return ModelToBackend(&mod)
 }
 
 func (b *BootEnv) Indexes() map[string]index.Maker {
@@ -126,7 +125,7 @@ func (b *BootEnv) Indexes() map[string]index.Maker {
 }
 
 func (b *BootEnv) Backend() store.Store {
-	return b.p.getBackend(b)
+	return b.rt.backend(b)
 }
 
 func (b *BootEnv) pathFor(f string) string {
@@ -150,33 +149,36 @@ func (b *BootEnv) fillInstallRepo() {
 	if b.Kernel == "" {
 		return
 	}
-	o := b.stores("profiles").Find(b.p.GlobalProfileName)
+	b.rt.Tracef("fillInstallRepo: Looking for global profile")
+	o := b.rt.Find("profiles", b.rt.dt.GlobalProfileName)
 	if o == nil {
 		return
 	}
 	p := AsProfile(o)
 	repos := []*Repo{}
-	r, ok := p.Params["package-repositories"]
+	r, ok := b.rt.GetParam(p, "package-repositories", true)
 	if !ok || utils.Remarshal(r, &repos) != nil {
-		b.p.Infof("debugBootEnv", "BootEnv %s: No package repositories to use", b.Name)
+		b.rt.Infof("BootEnv %s: No package repositories to use", b.Name)
 		return
 	}
 	for _, r := range repos {
-		b.p.Debugf("debugBootEnv", "BootEnv %s: Considering repo %s", b.Name, r.Tag)
+		b.rt.Debugf("BootEnv %s: Considering repo %s", b.Name, r.Tag)
 		if !r.InstallSource || len(r.OS) != 1 || r.OS[0] != b.OS.Name {
 			continue
 		}
-		b.p.Infof("debugBootEnv", "BootEnv %s: Using repo %s as an install source", b.Name, r.Tag)
+		b.rt.Infof("BootEnv %s: Using repo %s as an install source", b.Name, r.Tag)
 		b.kernelVerified = true
 		b.installRepo = r
 		pf := b.pathFor("")
+		fileRoot := b.rt.dt.FileRoot
+		l := b.rt.Logger
 		b.pathLookaside = func(p string) (io.Reader, error) {
 			// Always use local copy if available
-			if _, err := os.Stat(path.Join(b.p.FileRoot, p)); err == nil || b.installRepo == nil {
+			if _, err := os.Stat(path.Join(fileRoot, p)); err == nil || b.installRepo == nil {
 				return nil, nil
 			}
 			tgtUri := strings.TrimSuffix(b.installRepo.URL, "/") + strings.TrimPrefix(p, pf)
-			b.p.Debugf("debugBootEnv", "Proxying %s to %s", p, tgtUri)
+			l.Debugf("Proxying %s to %s", p, tgtUri)
 			resp, err := http.Get(tgtUri)
 			if err != nil {
 				return nil, err
@@ -192,12 +194,12 @@ func (b *BootEnv) fillInstallRepo() {
 
 func (b *BootEnv) AddDynamicTree() {
 	if b.pathLookaside != nil {
-		b.p.FS.AddDynamicTree(b.pathFor(""), b.pathLookaside)
+		b.rt.dt.FS.AddDynamicTree(b.pathFor(""), b.pathLookaside)
 	}
 }
 
 func (b *BootEnv) localPathFor(f string) string {
-	return path.Join(b.p.FileRoot, b.pathFor(f))
+	return path.Join(b.rt.dt.FileRoot, b.pathFor(f))
 }
 
 func (b *BootEnv) genRoot(commonRoot *template.Template, e models.ErrorAdder) *template.Template {
@@ -259,30 +261,31 @@ func explodeISO(p *DataTracker, envName, osName, fileRoot, isoFile, dest, shaSum
 		}
 	}
 	ref := &BootEnv{}
-	d, unlocker := p.LockEnts(ref.Locks("update")...)
-	defer unlocker()
-	b := d("bootenvs").Find(envName)
-	if b == nil {
-		// Bootenv vanished
-		return
-	}
-	ref = AsBootEnv(b)
-	if ref.Available {
-		// Bootenv must have vanished
-		return
-	}
-	if res.ContainsError() {
-		ref.AddError(res)
-	} else {
-		ref.Available = true
-		p.Save(d, ref)
-	}
+	rt := p.Request(p.Logger, ref.Locks("update")...)
+	rt.Do(func(d Stores) {
+		b := d("bootenvs").Find(envName)
+		if b == nil {
+			// Bootenv vanished
+			return
+		}
+		ref = AsBootEnv(b)
+		if ref.Available {
+			// Bootenv must have vanished
+			return
+		}
+		if res.ContainsError() {
+			ref.AddError(res)
+		} else {
+			ref.Available = true
+			rt.Save(ref)
+		}
+	})
 }
 
 func (b *BootEnv) explodeIso() {
 	// Only work on things that are requested.
 	if b.OS.IsoFile == "" {
-		b.p.Infof("debugBootEnv", "Explode ISO: Skipping %s becausing no iso image specified\n", b.Name)
+		b.rt.Infof("Explode ISO: Skipping %s becausing no iso image specified\n", b.Name)
 		return
 	}
 	b.kernelVerified = false
@@ -290,36 +293,36 @@ func (b *BootEnv) explodeIso() {
 	canaryPath := b.localPathFor("." + strings.Replace(b.OS.Name, "/", "_", -1) + ".rebar_canary")
 	buf, err := ioutil.ReadFile(canaryPath)
 	if err == nil && string(bytes.TrimSpace(buf)) == b.OS.IsoSha256 {
-		b.p.Infof("debugBootEnv", "Explode ISO: canary file %s, in place and has proper SHA256\n", b.p.reportPath(canaryPath))
+		b.rt.Infof("Explode ISO: canary file %s, in place and has proper SHA256\n", b.rt.dt.reportPath(canaryPath))
 		return
 	}
-	isoPath := filepath.Join(b.p.FileRoot, "isos", b.OS.IsoFile)
+	isoPath := filepath.Join(b.rt.dt.FileRoot, "isos", b.OS.IsoFile)
 	if _, err := os.Stat(isoPath); os.IsNotExist(err) {
 		if b.installRepo != nil {
-			b.p.Infof("debugBootEnv", "BootEnv: Explode ISO: ISO does not exist, falling back to install repo at %s", b.installRepo.URL)
+			b.rt.Infof("BootEnv: Explode ISO: ISO does not exist, falling back to install repo at %s", b.installRepo.URL)
 			b.kernelVerified = true
 			return
 		}
-		b.Errorf("Explode ISO: iso does not exist: %s\n", b.p.reportPath(isoPath))
+		b.Errorf("Explode ISO: iso does not exist: %s\n", b.rt.dt.reportPath(isoPath))
 		if b.OS.IsoUrl != "" {
 			b.Errorf("You can download the required ISO from %s", b.OS.IsoUrl)
 		}
 		return
 	}
-	b.Errorf("Exploding ISO: %s", b.p.reportPath(isoPath))
-	go explodeISO(b.p, b.Name, b.OS.Name, b.p.FileRoot, isoPath, b.localPathFor(""), b.OS.IsoSha256)
+	b.Errorf("Exploding ISO: %s", b.rt.dt.reportPath(isoPath))
+	go explodeISO(b.rt.dt, b.Name, b.OS.Name, b.rt.dt.FileRoot, isoPath, b.localPathFor(""), b.OS.IsoSha256)
 }
 
 func (b *BootEnv) Validate() {
 	b.renderers = renderers{}
 	b.BootEnv.Validate()
 	// First, the stuff that must be correct in order for
-	b.AddError(index.CheckUnique(b, b.stores("bootenvs").Items()))
+	b.AddError(index.CheckUnique(b, b.rt.stores("bootenvs").Items()))
 	// If our basic templates do not parse, it is game over for us
-	b.p.tmplMux.Lock()
+	b.rt.dt.tmplMux.Lock()
 	b.tmplMux.Lock()
-	root := b.genRoot(b.p.rootTemplate, b)
-	b.p.tmplMux.Unlock()
+	root := b.genRoot(b.rt.dt.rootTemplate, b)
+	b.rt.dt.tmplMux.Unlock()
 	if root != nil {
 		b.rootTemplate = root
 	}
@@ -361,12 +364,12 @@ func (b *BootEnv) Validate() {
 				b.Errorf("bootenv: %s: missing kernel %s (%s)",
 					b.Name,
 					b.Kernel,
-					b.p.reportPath(kPath))
+					b.rt.dt.reportPath(kPath))
 			} else if !kernelStat.Mode().IsRegular() {
 				b.Errorf("bootenv: %s: invalid kernel %s (%s)",
 					b.Name,
 					b.Kernel,
-					b.p.reportPath(kPath))
+					b.rt.dt.reportPath(kPath))
 			}
 		}
 		// Ditto for all the initrds.
@@ -378,34 +381,34 @@ func (b *BootEnv) Validate() {
 					b.Errorf("bootenv: %s: missing initrd %s (%s)",
 						b.Name,
 						initrd,
-						b.p.reportPath(iPath))
+						b.rt.dt.reportPath(iPath))
 					continue
 				}
 				if !initrdStat.Mode().IsRegular() {
 					b.Errorf("bootenv: %s: invalid initrd %s (%s)",
 						b.Name,
 						initrd,
-						b.p.reportPath(iPath))
+						b.rt.dt.reportPath(iPath))
 				}
 			}
 		}
 	}
 	if b.OnlyUnknown {
-		b.renderers = append(b.renderers, b.Render(b.stores, nil, b)...)
+		b.renderers = append(b.renderers, b.Render(b.rt, nil, b)...)
 	} else {
-		machines := b.stores("machines")
+		machines := b.rt.stores("machines")
 		if machines != nil {
 			for _, i := range machines.Items() {
 				machine := AsMachine(i)
 				if machine.BootEnv != b.Name {
 					continue
 				}
-				b.renderers = append(b.renderers, b.Render(b.stores, machine, b)...)
+				b.renderers = append(b.renderers, b.Render(b.rt, machine, b)...)
 			}
 		}
 	}
 	b.SetAvailable()
-	stages := b.stores("stages")
+	stages := b.rt.stores("stages")
 	if stages != nil {
 		for _, i := range stages.Items() {
 			stage := AsStage(i)
@@ -413,8 +416,8 @@ func (b *BootEnv) Validate() {
 				continue
 			}
 			func() {
-				stage.stores = b.stores
-				defer func() { stage.stores = nil }()
+				stage.rt = b.rt
+				defer func() { stage.rt = nil }()
 				stage.ClearValidation()
 				stage.Validate()
 			}()
@@ -423,10 +426,7 @@ func (b *BootEnv) Validate() {
 }
 
 func (b *BootEnv) OnLoad() error {
-	b.stores = func(ref string) *Store {
-		return b.p.objs[ref]
-	}
-	defer func() { b.stores = nil }()
+	defer func() { b.rt = nil }()
 	return b.BeforeSave()
 }
 
@@ -435,12 +435,8 @@ func (b *BootEnv) New() store.KeySaver {
 	if b.BootEnv != nil && b.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = b.p
+	res.rt = b.rt
 	return res
-}
-
-func (b *BootEnv) setDT(p *DataTracker) {
-	b.p = p
 }
 
 func (b *BootEnv) BeforeSave() error {
@@ -453,15 +449,15 @@ func (b *BootEnv) BeforeSave() error {
 
 func (b *BootEnv) BeforeDelete() error {
 	e := &models.Error{Code: 409, Type: StillInUseError, Model: b.Prefix(), Key: b.Key()}
-	machines := b.stores("machines")
-	stages := b.stores("stages")
+	machines := b.rt.stores("machines")
+	stages := b.rt.stores("stages")
 	prefToFind := ""
 	if b.OnlyUnknown {
 		prefToFind = "unknownBootEnv"
 	} else {
 		prefToFind = "defaultBootEnv"
 	}
-	if b.p.pref(prefToFind) == b.Name {
+	if b.rt.dt.pref(prefToFind) == b.Name {
 		e.Errorf("BootEnv %s is the active %s, cannot remove it", b.Name, prefToFind)
 	}
 	if !b.OnlyUnknown {
@@ -486,17 +482,17 @@ func (b *BootEnv) BeforeDelete() error {
 func (b *BootEnv) AfterDelete() {
 	if b.OnlyUnknown {
 		err := &models.Error{Object: b}
-		rts := b.Render(b.stores, nil, err)
+		rts := b.Render(b.rt, nil, err)
 		if err.ContainsError() {
 			b.Errors = err.Messages
 		} else {
-			rts.deregister(b.p.FS)
+			rts.deregister(b.rt.dt.FS)
 		}
 		idx, idxerr := index.All(
 			index.Sort(b.Indexes()["OsName"]),
-			index.Eq(b.OS.Name))(&(b.stores("bootenvs").Index))
+			index.Eq(b.OS.Name))(&(b.rt.stores("bootenvs").Index))
 		if idxerr == nil && idx.Count() == 0 {
-			b.p.FS.DelDynamicTree(b.pathFor(""))
+			b.rt.dt.FS.DelDynamicTree(b.pathFor(""))
 		}
 	}
 }
@@ -521,18 +517,18 @@ func (b *BootEnv) templates() *template.Template {
 	return b.rootTemplate
 }
 
-func (b *BootEnv) Render(d Stores, m *Machine, e models.ErrorAdder) renderers {
+func (b *BootEnv) Render(rt *RequestTracker, m *Machine, e models.ErrorAdder) renderers {
 	if len(b.RequiredParams) > 0 && m == nil {
 		e.Errorf("Machine is nil or does not have params")
 		return nil
 	}
-	r := newRenderData(d, b.p, m, b)
+	r := newRenderData(rt, m, b)
 	return r.makeRenderers(e)
 }
 
 func (b *BootEnv) AfterSave() {
 	if b.Available && b.renderers != nil {
-		b.renderers.register(b.p.FS)
+		b.renderers.register(b.rt.dt.FS)
 	}
 	b.AddDynamicTree()
 	b.renderers = nil
@@ -540,10 +536,10 @@ func (b *BootEnv) AfterSave() {
 
 var bootEnvLockMap = map[string][]string{
 	"get":    []string{"bootenvs"},
-	"create": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles"},
-	"update": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles"},
-	"patch":  []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles"},
-	"delete": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles"},
+	"create": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params"},
+	"update": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params"},
+	"patch":  []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params"},
+	"delete": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params"},
 }
 
 func (b *BootEnv) Locks(action string) []string {

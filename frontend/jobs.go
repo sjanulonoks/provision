@@ -259,20 +259,15 @@ func (f *Frontend) InitJobApi() {
 			}
 			var res models.Model
 			var err error
-			code := func() int {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("create")...)
-				defer unlocker()
-
-				// See the backend.Job comments for what is going on.
-				machines := d("machines")
-				jobs := d("jobs")
-
-				var mo models.Model
-				// XXX?? Should find return a live object.
-				if mo = machines.Find(b.Machine.String()); mo == nil {
+			rt := f.rt(c, b.Locks("create")...)
+			var code int
+			rt.Do(func(d backend.Stores) {
+				mo := rt.Find("machines", b.Machine.String())
+				if mo == nil {
 					err = &models.Error{Code: http.StatusUnprocessableEntity, Type: backend.ValidationError,
 						Messages: []string{fmt.Sprintf("Machine %s does not exist", b.Machine.String())}}
-					return http.StatusUnprocessableEntity
+					code = http.StatusUnprocessableEntity
+					return
 				}
 				m := backend.AsMachine(mo)
 
@@ -280,13 +275,14 @@ func (f *Frontend) InitJobApi() {
 				if !m.Runnable {
 					err = &models.Error{Code: http.StatusConflict, Type: "Conflict",
 						Messages: []string{fmt.Sprintf("Machine %s is not runnable", b.Machine.String())}}
-					return http.StatusConflict
+					code = http.StatusConflict
+					return
 				}
 
 				// Are we running a job or not on list yet, do some checking.
 				newCT := m.CurrentTask
 				if newCT < len(m.Tasks) {
-					if jo := jobs.Find(m.CurrentJob.String()); jo != nil && newCT != -1 {
+					if jo := rt.Find("jobs", m.CurrentJob.String()); jo != nil && newCT != -1 {
 						cj := jo.(*backend.Job)
 						if cj.State == "failed" {
 							// We are re-running the current task
@@ -295,12 +291,14 @@ func (f *Frontend) InitJobApi() {
 							newCT += 1
 						} else if cj.State == "incomplete" {
 							b = cj
-							return http.StatusAccepted
+							code = http.StatusAccepted
+							return
 						} else {
 							// Need to error - running job already running or just created.
 							err = &models.Error{Code: http.StatusConflict, Type: "Conflict",
 								Messages: []string{fmt.Sprintf("Machine %s already has running or created job", b.Machine.String())}}
-							return http.StatusConflict
+							code = http.StatusConflict
+							return
 						}
 					} else if jo != nil {
 						// At this point, newCT == -1 (we are starting over on a list)
@@ -311,8 +309,9 @@ func (f *Frontend) InitJobApi() {
 						cj := jo.(*backend.Job)
 						if cj.State == "running" || cj.State == "created" || cj.State == "incomplete" {
 							cj.State = "failed"
-							if _, err = f.dt.Update(d, cj); err != nil {
-								return http.StatusBadRequest
+							if _, err = rt.Update(cj); err != nil {
+								code = http.StatusBadRequest
+								return
 							}
 							m.Runnable = true
 						}
@@ -328,13 +327,15 @@ func (f *Frontend) InitJobApi() {
 					// Nothing to do.
 					if newCT != m.CurrentTask {
 						m.CurrentTask = newCT
-						_, err = f.dt.Save(d, m)
+						_, err = rt.Save(m)
 						if err != nil {
-							return http.StatusInternalServerError
+							code = http.StatusInternalServerError
+							return
 						}
 
 					}
-					return http.StatusNoContent
+					code = http.StatusNoContent
+					return
 				}
 
 				// Fill in new job.
@@ -346,22 +347,20 @@ func (f *Frontend) InitJobApi() {
 				}
 				b.Stage = m.Stage
 				b.Task = m.Tasks[newCT]
-
 				// Create the job, and then update the machine
-				_, err = f.dt.Create(d, b)
+				_, err = rt.Create(b)
 				if err == nil {
 					m.CurrentTask = newCT
 					m.CurrentJob = b.Uuid
-					_, err = f.dt.Save(d, m)
+					_, err = rt.Save(m)
 					if err != nil {
-						f.dt.Remove(d, b)
-						return http.StatusBadRequest
+						rt.Remove(b)
+						code = http.StatusBadRequest
+						return
 					}
 				}
-
-				return http.StatusCreated
-
-			}()
+				code = http.StatusCreated
+			})
 			if err != nil {
 				be, ok := err.(*models.Error)
 				if ok {
@@ -486,31 +485,28 @@ func (f *Frontend) InitJobApi() {
 		func(c *gin.Context) {
 			uuid := c.Param(`uuid`)
 			j := &backend.Job{}
-			bad := func() bool {
-				d, unlocker := f.dt.LockEnts(models.Model(j).(Lockable).Locks("actions")...)
-				defer unlocker()
-
+			var bad bool
+			var err error
+			rt := f.rt(c, j.Locks("actions")...)
+			rt.Do(func(d backend.Stores) {
 				var jo models.Model
-				if jo = d("jobs").Find(uuid); jo == nil {
-					err := &models.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
+				if jo = rt.Find("jobs", uuid); jo == nil {
+					err = &models.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
 						Messages: []string{fmt.Sprintf("Job %s does not exist", uuid)}}
-					c.JSON(err.Code, err)
-					return true
+					bad = true
+					return
 				}
 				j = backend.AsJob(jo)
-
-				return false
-			}()
+			})
 			if bad {
+				c.JSON(err.(*models.Error).Code, err)
 				return
 			}
 
 			if !f.assureAuth(c, "jobs", "actions", j.AuthKey()) {
 				return
 			}
-
-			var err error
-			actions, err := j.RenderActions()
+			actions, err := j.RenderActions(rt)
 			if err != nil {
 				be, ok := err.(*models.Error)
 				if ok {
@@ -543,22 +539,21 @@ func (f *Frontend) InitJobApi() {
 		func(c *gin.Context) {
 			uuid := c.Param(`uuid`)
 			j := &backend.Job{}
-			bad := func() bool {
-				d, unlocker := f.dt.LockEnts(models.Model(j).(Lockable).Locks("get")...)
-				defer unlocker()
-
+			var bad bool
+			var err *models.Error
+			rt := f.rt(c, j.Locks("get")...)
+			rt.Do(func(d backend.Stores) {
 				var jo models.Model
-				if jo = d("jobs").Find(uuid); jo == nil {
-					err := &models.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
+				if jo = rt.Find("jobs", uuid); jo == nil {
+					err = &models.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
 						Messages: []string{fmt.Sprintf("Job %s does not exist", uuid)}}
-					c.JSON(err.Code, err)
-					return true
+					bad = true
+					return
 				}
 				j = backend.AsJob(jo)
-
-				return false
-			}()
+			})
 			if bad {
+				c.JSON(err.Code, err)
 				return
 			}
 
@@ -603,22 +598,21 @@ func (f *Frontend) InitJobApi() {
 			}
 			uuid := c.Param(`uuid`)
 			j := &backend.Job{}
-			bad := func() bool {
-				d, unlocker := f.dt.LockEnts(models.Model(j).(Lockable).Locks("get")...)
-				defer unlocker()
-
+			var bad bool
+			var err *models.Error
+			rt := f.rt(c, j.Locks("get")...)
+			rt.Do(func(d backend.Stores) {
 				var jo models.Model
 				if jo = d("jobs").Find(uuid); jo == nil {
-					err := &models.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
+					err = &models.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
 						Messages: []string{fmt.Sprintf("Job %s does not exist", uuid)}}
-					c.JSON(err.Code, err)
-					return true
+					bad = true
+					return
 				}
 				j = backend.AsJob(jo)
-
-				return false
-			}()
+			})
 			if bad {
+				c.JSON(err.Code, err)
 				return
 			}
 
@@ -626,7 +620,7 @@ func (f *Frontend) InitJobApi() {
 				return
 			}
 
-			if err := j.Log(c.Request.Body); err != nil {
+			if err := j.Log(rt, c.Request.Body); err != nil {
 				err2 := &models.Error{Code: http.StatusInternalServerError, Type: "Server ERROR",
 					Messages: []string{err.Error()}}
 				c.JSON(err2.Code, err2)

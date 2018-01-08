@@ -135,7 +135,6 @@ func init() {
 type Subnet struct {
 	*models.Subnet
 	validate
-	p              *DataTracker
 	nextLeasableIP net.IP
 	sn             *net.IPNet
 }
@@ -147,7 +146,7 @@ func (obj *Subnet) SetReadOnly(b bool) {
 func (obj *Subnet) SaveClean() store.KeySaver {
 	mod := *obj.Subnet
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 
 func (s *Subnet) Indexes() map[string]index.Maker {
@@ -228,7 +227,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 			a, _, errA := net.ParseCIDR(fix(i).Subnet.Subnet)
 			b, _, errB := net.ParseCIDR(fix(j).Subnet.Subnet)
 			if errA != nil || errB != nil {
-				fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
+				fix(i).rt.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
 			}
 			n, o := big.Int{}, big.Int{}
 			n.SetBytes(a.To16())
@@ -238,14 +237,14 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 		func(ref models.Model) (gte, gt index.Test) {
 			cidr, _, err := net.ParseCIDR(fix(ref).Subnet.Subnet)
 			if err != nil {
-				fix(ref).p.Logger.Panicf("Illegal subnet %s: %v", fix(ref).Subnet.Subnet, err)
+				fix(ref).rt.Panicf("Illegal subnet %s: %v", fix(ref).Subnet.Subnet, err)
 			}
 			addr := &big.Int{}
 			addr.SetBytes(cidr.To16())
 			return func(s models.Model) bool {
 					cidr, _, err := net.ParseCIDR(fix(s).Subnet.Subnet)
 					if err != nil {
-						fix(s).p.Logger.Panicf("Illegal subnet %s: %v", fix(s).Subnet.Subnet, err)
+						fix(s).rt.Panicf("Illegal subnet %s: %v", fix(s).Subnet.Subnet, err)
 					}
 					o := big.Int{}
 					o.SetBytes(cidr.To16())
@@ -254,7 +253,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 				func(s models.Model) bool {
 					cidr, _, err := net.ParseCIDR(fix(s).Subnet.Subnet)
 					if err != nil {
-						fix(s).p.Logger.Panicf("Illegal subnet %s: %v", fix(s).Subnet.Subnet, err)
+						fix(s).rt.Panicf("Illegal subnet %s: %v", fix(s).Subnet.Subnet, err)
 					}
 					o := big.Int{}
 					o.SetBytes(cidr.To16())
@@ -276,7 +275,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 			a, _, errA := net.ParseCIDR(fix(i).Subnet.Subnet)
 			b, _, errB := net.ParseCIDR(fix(j).Subnet.Subnet)
 			if errA != nil || errB != nil {
-				fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
+				fix(i).rt.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
 			}
 			n, o := big.Int{}, big.Int{}
 			n.SetBytes(a.To16())
@@ -286,7 +285,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 		func(ref models.Model) (gte, gt index.Test) {
 			addr := fix(ref).Subnet.Subnet
 			if net.ParseIP(addr) == nil {
-				fix(ref).p.Logger.Panicf("Illegal IP Address: %s", addr)
+				fix(ref).rt.Panicf("Illegal IP Address: %s", addr)
 			}
 			return func(s models.Model) bool {
 					l, _ := fix(s).sBounds()
@@ -313,7 +312,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 			a, _, errA := net.ParseCIDR(fix(i).Subnet.Subnet)
 			b, _, errB := net.ParseCIDR(fix(j).Subnet.Subnet)
 			if errA != nil || errB != nil {
-				fix(i).p.Logger.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
+				fix(i).rt.Panicf("Illegal Subnets '%s', '%s'", fix(i).Subnet.Subnet, fix(j).Subnet.Subnet)
 			}
 			n, o := big.Int{}, big.Int{}
 			n.SetBytes(a.To16())
@@ -323,7 +322,7 @@ func (s *Subnet) Indexes() map[string]index.Maker {
 		func(ref models.Model) (gte, gt index.Test) {
 			addr := fix(ref).Subnet.Subnet
 			if net.ParseIP(addr) == nil {
-				fix(ref).p.Logger.Panicf("Illegal IP Address: %s", addr)
+				fix(ref).rt.Panicf("Illegal IP Address: %s", addr)
 			}
 			return func(s models.Model) bool {
 					l, _ := fix(s).aBounds()
@@ -414,20 +413,12 @@ func (s *Subnet) subnet() *net.IPNet {
 	return res
 }
 
-func (s *Subnet) Backend() store.Store {
-	return s.p.getBackend(s)
-}
-
-func (s *Subnet) setDT(p *DataTracker) {
-	s.p = p
-}
-
 func (s *Subnet) New() store.KeySaver {
 	res := &Subnet{Subnet: &models.Subnet{}}
 	if s.Subnet != nil && s.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = s.p
+	res.rt = s.rt
 	return res
 }
 
@@ -583,12 +574,12 @@ func (s *Subnet) Validate() {
 	if s.ReservedLeaseTime < 7200 {
 		s.Errorf("ReservedLeaseTime must be greater than or equal to 7200 seconds, not %d", s.ReservedLeaseTime)
 	}
-	s.AddError(index.CheckUnique(s, s.stores("subnets").Items()))
+	s.AddError(index.CheckUnique(s, s.rt.stores("subnets").Items()))
 	s.SetValid()
 	if !s.Useable() {
 		return
 	}
-	subnets := AsSubnets(s.stores("subnets").Items())
+	subnets := AsSubnets(s.rt.stores("subnets").Items())
 	for i := range subnets {
 		if subnets[i].Name == s.Name {
 			continue
@@ -609,10 +600,7 @@ func (s *Subnet) BeforeSave() error {
 }
 
 func (s *Subnet) OnLoad() error {
-	s.stores = func(ref string) *Store {
-		return s.p.objs[ref]
-	}
-	defer func() { s.stores = nil }()
+	defer func() { s.rt = nil }()
 	return s.BeforeSave()
 }
 

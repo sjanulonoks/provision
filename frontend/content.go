@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/midlayer"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
@@ -253,10 +254,8 @@ func (f *Frontend) InitContentApi() {
 			}
 
 			contents := []*models.ContentSummary{}
-			func() {
-				_, unlocker := f.dt.LockAll()
-				defer unlocker()
-
+			rt := f.rt(c)
+			rt.AllLocked(func(d backend.Stores) {
 				if stack, ok := f.dt.Backend.(*midlayer.DataStack); !ok {
 					cs := buildSummary(f.dt.Backend)
 					if cs != nil {
@@ -270,8 +269,7 @@ func (f *Frontend) InitContentApi() {
 						}
 					}
 				}
-			}()
-
+			})
 			c.JSON(http.StatusOK, contents)
 		})
 
@@ -296,11 +294,8 @@ func (f *Frontend) InitContentApi() {
 			if !f.assureAuth(c, "contents", "get", name) {
 				return
 			}
-
-			func() {
-				_, unlocker := f.dt.LockAll()
-				defer unlocker()
-
+			rt := f.rt(c)
+			rt.AllLocked(func(d backend.Stores) {
 				if cst := f.findContent(name); cst == nil {
 					res := &models.Error{
 						Model: "contents",
@@ -318,7 +313,7 @@ func (f *Frontend) InitContentApi() {
 						c.JSON(http.StatusOK, content)
 					}
 				}
-			}()
+			})
 		})
 
 	// swagger:route POST /contents Contents createContent
@@ -348,45 +343,45 @@ func (f *Frontend) InitContentApi() {
 			}
 
 			name := content.Meta.Name
-			func() {
-				_, unlocker := f.dt.LockAll()
-				defer unlocker()
-
+			rt := f.rt(c)
+			res := &models.Error{
+				Model: "contents",
+				Key:   name,
+				Type:  c.Request.Method,
+				Code:  http.StatusInternalServerError,
+			}
+			var cs *models.ContentSummary
+			rt.AllLocked(func(d backend.Stores) {
 				if cst := f.findContent(name); cst != nil {
-					res := &models.Error{
-						Model: "contents",
-						Key:   name,
-						Type:  c.Request.Method,
-						Code:  http.StatusConflict,
-					}
+					res.Code = http.StatusConflict
 					res.Errorf("Content %s already exists", name)
-					c.JSON(http.StatusConflict, res)
 					return
 				}
-
-				if newStore, err := f.buildNewStore(content); err != nil {
-					jsonError(c, err, http.StatusInternalServerError,
-						fmt.Sprintf("failed to build content: %s: ", name))
+				newStore, err := f.buildNewStore(content)
+				if err != nil {
+					res.AddError(err)
 					return
-				} else {
-					cs := buildSummary(newStore)
-
-					ds := f.dt.Backend.(*midlayer.DataStack)
-					if nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger, nil); hard != nil {
-						midlayer.CleanUpStore(newStore)
-						jsonError(c, hard, http.StatusInternalServerError,
-							fmt.Sprintf("failed to add content: %s: ", name))
-					} else {
-						if soft != nil {
-							if berr, ok := soft.(*models.Error); ok {
-								cs.Warnings = berr.Messages
-							}
-						}
-						f.dt.ReplaceBackend(nbs)
-						c.JSON(http.StatusCreated, cs)
+				}
+				cs = buildSummary(newStore)
+				ds := f.dt.Backend.(*midlayer.DataStack)
+				nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger, nil)
+				if hard != nil {
+					midlayer.CleanUpStore(newStore)
+					res = hard.(*models.Error)
+					return
+				}
+				if soft != nil {
+					if berr, ok := soft.(*models.Error); ok {
+						cs.Warnings = berr.Messages
 					}
 				}
-			}()
+				f.dt.ReplaceBackend(rt, nbs)
+			})
+			if res.ContainsError() {
+				c.JSON(res.Code, res)
+			} else {
+				c.JSON(http.StatusCreated, cs)
+			}
 		})
 
 	// swagger:route PUT /contents/{name} Contents uploadContent
@@ -414,75 +409,56 @@ func (f *Frontend) InitContentApi() {
 			if !assureDecode(c, content) {
 				return
 			}
-
 			name := c.Param(`name`)
+			res := &models.Error{
+				Model: "contents",
+				Key:   name,
+				Type:  c.Request.Method,
+				Code:  http.StatusBadRequest,
+			}
+			var cs *models.ContentSummary
 			if name != content.Meta.Name {
-				res := &models.Error{
-					Model: "contents",
-					Key:   name,
-					Type:  c.Request.Method,
-					Code:  http.StatusBadRequest,
-				}
 				res.Errorf("Cannot change name from %s to %s", name, content.Meta.Name)
 				c.JSON(http.StatusBadRequest, res)
 				return
-
 			}
-
-			func() {
-				_, unlocker := f.dt.LockAll()
-				defer unlocker()
-
+			rt := f.rt(c)
+			rt.AllLocked(func(d backend.Stores) {
 				if cst := f.findContent(name); cst == nil {
-					res := &models.Error{
-						Model: "contents",
-						Key:   name,
-						Type:  c.Request.Method,
-						Code:  http.StatusNotFound,
-					}
+					res.Code = http.StatusNotFound
 					res.Errorf("Cannot find %s", name)
-					c.JSON(http.StatusNotFound, res)
 					return
 				}
 
-				if newStore, err := f.buildNewStore(content); err != nil {
-					res := &models.Error{
-						Model: "contents",
-						Key:   name,
-						Type:  c.Request.Method,
-						Code:  http.StatusInternalServerError,
-					}
+				newStore, err := f.buildNewStore(content)
+				if err != nil {
+					res.Code = http.StatusInternalServerError
 					res.Errorf("Failed to build content")
 					res.AddError(err)
-					c.JSON(res.Code, res)
 					return
-				} else {
-					cs := buildSummary(newStore)
-
-					ds := f.dt.Backend.(*midlayer.DataStack)
-					if nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger, nil); hard != nil {
-						midlayer.CleanUpStore(newStore)
-						res := &models.Error{
-							Model: "contents",
-							Key:   name,
-							Type:  c.Request.Method,
-							Code:  http.StatusInternalServerError,
-						}
-						res.AddError(hard)
-						res.AddError(soft)
-						c.JSON(res.Code, res)
-						return
-					} else {
-						if soft != nil {
-							if berr, ok := soft.(*models.Error); ok {
-								cs.Warnings = berr.Messages
-							}
-						}
-						f.dt.ReplaceBackend(nbs)
-						c.JSON(http.StatusOK, cs)
+				}
+				cs = buildSummary(newStore)
+				ds := f.dt.Backend.(*midlayer.DataStack)
+				nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger, nil)
+				if hard != nil {
+					midlayer.CleanUpStore(newStore)
+					res.Code = http.StatusInternalServerError
+					res.AddError(hard)
+					res.AddError(soft)
+					return
+				}
+				if soft != nil {
+					if berr, ok := soft.(*models.Error); ok {
+						cs.Warnings = berr.Messages
 					}
 				}
-			}()
+				f.dt.ReplaceBackend(rt, nbs)
+			})
+			if res.ContainsError() {
+				c.JSON(res.Code, res)
+			} else {
+				c.JSON(http.StatusOK, cs)
+			}
 		})
 
 	// swagger:route DELETE /contents/{name} Contents deleteContent
@@ -502,32 +478,33 @@ func (f *Frontend) InitContentApi() {
 			if !f.assureAuth(c, "contents", "delete", name) {
 				return
 			}
+			res := &models.Error{
+				Model: "contents",
+				Key:   name,
+				Type:  c.Request.Method,
+				Code:  http.StatusNotFound,
+			}
 
-			func() {
-				_, unlocker := f.dt.LockAll()
-				defer unlocker()
-
+			rt := f.rt(c)
+			rt.AllLocked(func(d backend.Stores) {
 				cst := f.findContent(name)
 				if cst == nil {
-					res := &models.Error{
-						Model:    "contents",
-						Key:      name,
-						Type:     c.Request.Method,
-						Messages: []string{"No such content store"},
-						Code:     http.StatusNotFound,
-					}
-					c.JSON(http.StatusNotFound, res)
+					res.Code = http.StatusNotFound
+					res.Errorf("No such content store")
 					return
 				}
-
 				ds := f.dt.Backend.(*midlayer.DataStack)
-				if nbs, hard, _ := ds.RemoveSAAS(name, f.Logger); hard != nil {
-					jsonError(c, hard, http.StatusInternalServerError,
-						fmt.Sprintf("failed to remove content: %s: ", name))
-				} else {
-					f.dt.ReplaceBackend(nbs)
-					c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
+				nbs, hard, _ := ds.RemoveSAAS(name, f.Logger)
+				if hard != nil {
+					res.AddError(hard)
+					return
 				}
-			}()
+				f.dt.ReplaceBackend(rt, nbs)
+			})
+			if res.ContainsError() {
+				c.JSON(res.Code, res)
+			} else {
+				c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
+			}
 		})
 }

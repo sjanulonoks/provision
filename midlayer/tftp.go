@@ -3,10 +3,10 @@ package midlayer
 import (
 	"context"
 	"io"
-	"log"
 	"net"
 	"os"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/pin/tftp"
 )
@@ -21,7 +21,7 @@ func (h *TftpHandler) Shutdown(ctx context.Context) error {
 }
 
 func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
-	logger *log.Logger, pubs *backend.Publishers) (Service, error) {
+	log logger.Logger, pubs *backend.Publishers) (Service, error) {
 	a, err := net.ResolveUDPAddr("udp", listen)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 		}
 		_, err = rf.ReadFrom(source)
 		if err != nil {
-			logger.Println(err)
+			log.Errorf("TFTP transfer error: %v", err)
 			return err
 		}
 		return nil

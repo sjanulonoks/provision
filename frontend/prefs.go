@@ -75,11 +75,12 @@ func (f *Frontend) InitPrefApi() {
 					if len(prefs[k]) != 32 {
 						err.Errorf("%s: Must be 32 bytes long", k)
 					}
-				case "defaultBootEnv", "unknownBootEnv", "defaultStage", "systemGrantorSecret":
+				case "defaultBootEnv", "unknownBootEnv", "defaultStage", "systemGrantorSecret",
+					"debugRenderer", "debugDhcp", "debugBootEnv", "debugFrontend", "debugPlugins", "logLevel":
 					if !f.assureAuth(c, "prefs", "post", k) {
 						return
 					}
-				case "knownTokenTimeout", "unknownTokenTimeout", "debugRenderer", "debugDhcp", "debugBootEnv", "debugFrontend", "debugPlugins":
+				case "knownTokenTimeout", "unknownTokenTimeout":
 					if !f.assureAuth(c, "prefs", "post", k) {
 						return
 					}
@@ -91,11 +92,11 @@ func (f *Frontend) InitPrefApi() {
 				}
 			}
 			if !err.ContainsError() {
-				func() {
-					d, unlocker := f.dt.LockEnts(models.Model(&backend.Pref{}).(Lockable).Locks("update")...)
-					defer unlocker()
-					err.AddError(f.dt.SetPrefs(d, prefs))
-				}()
+				obj := &backend.Pref{}
+				rt := f.rt(c, obj.Locks("update")...)
+				rt.Do(func(d backend.Stores) {
+					err.AddError(f.dt.SetPrefs(rt, prefs))
+				})
 			}
 			if err.ContainsError() {
 				c.JSON(err.Code, err)

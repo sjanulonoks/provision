@@ -186,11 +186,10 @@ func (f *Frontend) InitTaskApi() {
 			}
 			var res models.Model
 			var err error
-			func() {
-				d, unlocker := f.dt.LockEnts(models.Model(b).(Lockable).Locks("create")...)
-				defer unlocker()
-				_, err = f.dt.Create(d, b)
-			}()
+			rt := f.rt(c, b.Locks("create")...)
+			rt.Do(func(d backend.Stores) {
+				_, err = rt.Create(b)
+			})
 			if err != nil {
 				be, ok := err.(*models.Error)
 				if ok {

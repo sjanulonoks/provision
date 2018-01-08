@@ -18,7 +18,6 @@ type Stage struct {
 	validate
 	renderers       renderers
 	stageParamsTmpl *template.Template
-	p               *DataTracker
 	rootTemplate    *template.Template
 	tmplMux         sync.Mutex
 }
@@ -30,7 +29,7 @@ func (obj *Stage) SetReadOnly(b bool) {
 func (obj *Stage) SaveClean() store.KeySaver {
 	mod := *obj.Stage
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 
 func (s *Stage) HasTask(ts string) bool {
@@ -125,10 +124,6 @@ func (s *Stage) Indexes() map[string]index.Maker {
 	return res
 }
 
-func (s *Stage) Backend() store.Store {
-	return s.p.getBackend(s)
-}
-
 func (s *Stage) genRoot(commonRoot *template.Template, e models.ErrorAdder) *template.Template {
 	res := models.MergeTemplates(commonRoot, s.Templates, e)
 	for i, tmpl := range s.Templates {
@@ -147,7 +142,7 @@ func (s *Stage) Validate() {
 	for idx, ti := range s.Templates {
 		ti.SanityCheck(idx, s, false)
 	}
-	s.AddError(index.CheckUnique(s, s.stores("stages").Items()))
+	s.AddError(index.CheckUnique(s, s.rt.stores("stages").Items()))
 	if !s.SetValid() {
 		// If we have not been validated at this point, return.
 		return
@@ -156,17 +151,17 @@ func (s *Stage) Validate() {
 	s.renderers = renderers{}
 	// First, the stuff that must be correct in order for
 	for _, taskName := range s.Tasks {
-		if s.stores("tasks").Find(taskName) == nil {
+		if s.rt.Find("tasks", taskName) == nil {
 			s.Errorf("Task %s does not exist", taskName)
 		}
 	}
 	for _, profileName := range s.Profiles {
-		if s.stores("profiles").Find(profileName) == nil {
+		if s.rt.Find("profiles", profileName) == nil {
 			s.Errorf("Profile %s does not exist", profileName)
 		}
 	}
 	if s.BootEnv != "" {
-		if nbFound := s.stores("bootenvs").Find(s.BootEnv); nbFound == nil {
+		if nbFound := s.rt.Find("bootenvs", s.BootEnv); nbFound == nil {
 			s.Errorf("BootEnv %s does not exist", s.BootEnv)
 		} else {
 			env := AsBootEnv(nbFound)
@@ -185,33 +180,30 @@ func (s *Stage) Validate() {
 		}
 	}
 	// If our basic templates do not parse, it is game over for us
-	s.p.tmplMux.Lock()
+	s.rt.dt.tmplMux.Lock()
 	s.tmplMux.Lock()
-	root := s.genRoot(s.p.rootTemplate, s)
-	s.p.tmplMux.Unlock()
+	root := s.genRoot(s.rt.dt.rootTemplate, s)
+	s.rt.dt.tmplMux.Unlock()
 	if root != nil {
 		s.rootTemplate = root
 	}
 	s.tmplMux.Unlock()
 	// Update renderers on machines
-	machines := s.stores("machines")
+	machines := s.rt.stores("machines")
 	if machines != nil && root != nil {
 		for _, i := range machines.Items() {
 			machine := AsMachine(i)
 			if machine.Stage != s.Name {
 				continue
 			}
-			s.renderers = append(s.renderers, s.Render(s.stores, machine, s)...)
+			s.renderers = append(s.renderers, s.Render(s.rt, machine, s)...)
 		}
 	}
 	s.SetAvailable()
 }
 
 func (s *Stage) OnLoad() error {
-	s.stores = func(ref string) *Store {
-		return s.p.objs[ref]
-	}
-	defer func() { s.stores = nil }()
+	defer func() { s.rt = nil }()
 	return s.BeforeSave()
 }
 
@@ -220,15 +212,11 @@ func (s *Stage) New() store.KeySaver {
 	if s.Stage != nil && s.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = s.p
+	res.rt = s.rt
 	res.Profiles = []string{}
 	res.Tasks = []string{}
 	res.Templates = []models.TemplateInfo{}
 	return res
-}
-
-func (s *Stage) setDT(p *DataTracker) {
-	s.p = p
 }
 
 func (s *Stage) BeforeSave() error {
@@ -250,7 +238,7 @@ func (s *Stage) BeforeSave() error {
 
 func (s *Stage) BeforeDelete() error {
 	e := &models.Error{Code: 409, Type: StillInUseError, Model: s.Prefix(), Key: s.Key()}
-	machines := s.stores("machines")
+	machines := s.rt.stores("machines")
 	for _, i := range machines.Items() {
 		machine := AsMachine(i)
 		if machine.Stage != s.Name {
@@ -281,18 +269,18 @@ func (s *Stage) templates() *template.Template {
 	return s.rootTemplate
 }
 
-func (s *Stage) Render(d Stores, m *Machine, e models.ErrorAdder) renderers {
+func (s *Stage) Render(rt *RequestTracker, m *Machine, e models.ErrorAdder) renderers {
 	if len(s.RequiredParams) > 0 && m == nil {
 		e.Errorf("Machine is nil or does not have params")
 		return nil
 	}
-	r := newRenderData(d, s.p, m, s)
+	r := newRenderData(rt, m, s)
 	return r.makeRenderers(e)
 }
 
 func (s *Stage) AfterSave() {
 	if s.Available && s.renderers != nil {
-		s.renderers.register(s.p.FS)
+		s.renderers.register(s.rt.dt.FS)
 	}
 	s.renderers = nil
 }

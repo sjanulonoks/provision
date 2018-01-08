@@ -164,9 +164,11 @@ func (f *Frontend) InitIndexApi() {
 				return
 			}
 			param := &backend.Param{}
-			d, unlocker := f.dt.LockEnts(param.Locks("get")...)
-			defer unlocker()
-			dynIndex, err := dpm.ParameterMaker(d, paramName)
+			rt := f.rt(c, param.Locks("get")...)
+			var dynIndex index.Maker
+			rt.Do(func(d backend.Stores) {
+				dynIndex, err = dpm.ParameterMaker(d, paramName)
+			})
 			if err != nil {
 				c.JSON(http.StatusNotFound,
 					models.NewError(c.Request.Method, http.StatusNotFound,

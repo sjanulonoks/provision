@@ -15,7 +15,6 @@ type Plugin struct {
 	// available here.
 	// read only: true
 	validate
-	p *DataTracker
 }
 
 func (obj *Plugin) SetReadOnly(b bool) {
@@ -25,7 +24,7 @@ func (obj *Plugin) SetReadOnly(b bool) {
 func (obj *Plugin) SaveClean() store.KeySaver {
 	mod := *obj.Plugin
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 
 func (n *Plugin) Indexes() map[string]index.Maker {
@@ -70,10 +69,6 @@ func (n *Plugin) Indexes() map[string]index.Maker {
 	return res
 }
 
-func (n *Plugin) Backend() store.Store {
-	return n.p.getBackend(n)
-}
-
 func (n *Plugin) Prefix() string {
 	return "plugins"
 }
@@ -82,59 +77,18 @@ func (n *Plugin) Key() string {
 	return n.Name
 }
 
-func (n *Plugin) GetParams(d Stores, _ bool) map[string]interface{} {
-	m := n.Params
-	if m == nil {
-		m = map[string]interface{}{}
-	}
-	return m
-}
-
-func (n *Plugin) SetParams(d Stores, values map[string]interface{}) error {
-	n.Params = values
-	e := &models.Error{Code: 422, Type: ValidationError, Model: n.Prefix(), Key: n.Key()}
-	_, e2 := n.p.Save(d, n)
-	e.AddError(e2)
-	return e.HasError()
-}
-
-func (n *Plugin) GetParam(d Stores, key string, aggregate bool) (interface{}, bool) {
-	mm := n.GetParams(d, aggregate)
-	if v, found := mm[key]; found {
-		return v, true
-	}
-	// Check the param itself
-	if p := d("params").Find(key); p != nil && aggregate {
-		param := p.(*Param)
-		return param.DefaultValue()
-	}
-	return nil, false
-}
-
-func (n *Plugin) SetParam(d Stores, key string, val interface{}) error {
-	n.Params[key] = val
-	e := &models.Error{Code: 422, Type: ValidationError, Model: n.Prefix(), Key: n.Key()}
-	_, e2 := n.p.Save(d, n)
-	e.AddError(e2)
-	return e.HasError()
-}
-
 func (n *Plugin) New() store.KeySaver {
 	res := &Plugin{Plugin: &models.Plugin{}}
 	if n.Plugin != nil && n.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = n.p
+	res.rt = n.rt
 	return res
-}
-
-func (n *Plugin) setDT(p *DataTracker) {
-	n.p = p
 }
 
 func (n *Plugin) Validate() {
 	n.Plugin.Validate()
-	n.AddError(index.CheckUnique(n, n.stores("plugins").Items()))
+	n.AddError(index.CheckUnique(n, n.rt.stores("plugins").Items()))
 	n.SetValid()
 	n.SetAvailable()
 }
@@ -148,10 +102,7 @@ func (n *Plugin) BeforeSave() error {
 }
 
 func (n *Plugin) OnLoad() error {
-	n.stores = func(ref string) *Store {
-		return n.p.objs[ref]
-	}
-	defer func() { n.stores = nil }()
+	defer func() { n.rt = nil }()
 	return n.BeforeSave()
 }
 

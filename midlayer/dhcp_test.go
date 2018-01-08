@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/store"
 	dhcp "github.com/krolaw/dhcp4"
@@ -35,13 +36,16 @@ func TestDhcpHelpers(t *testing.T) {
 }
 
 func TestDhcpHandler(t *testing.T) {
+	locallogger := log.New(os.Stdout, "dt", 0)
+	l := logger.New(locallogger).Log("dhcp")
 	handler := &DhcpHandler{
+		Logger: l,
 		ifs:    []string{},
 		port:   20000,
 		bk:     dataTracker,
 		strats: []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
 	}
-	handler.Printf("Fred rules")
+	handler.Errorf("Fred rules")
 }
 
 func TestMain(m *testing.M) {
@@ -59,7 +63,8 @@ func TestMain(m *testing.M) {
 	}
 	s.(*store.StackedStore).Push(bs, false, true)
 	s.(*store.StackedStore).Push(backend.BasicContent(), false, false)
-	logger := log.New(os.Stdout, "dt", 0)
+	locallogger := log.New(os.Stdout, "dt", 0)
+	l := logger.New(locallogger).Log("dhcp")
 	dataTracker = backend.NewDataTracker(s,
 		tmpDir,
 		tmpDir,
@@ -67,9 +72,9 @@ func TestMain(m *testing.M) {
 		false,
 		8091,
 		8092,
-		logger,
+		l,
 		map[string]string{"defaultBootEnv": "default", "unknownBootEnv": "ignore"},
-		backend.NewPublishers(logger))
+		backend.NewPublishers(locallogger))
 
 	ret := m.Run()
 	err = os.RemoveAll(tmpDir)

@@ -16,7 +16,6 @@ import (
 type Reservation struct {
 	*models.Reservation
 	validate
-	p *DataTracker
 }
 
 func (obj *Reservation) SetReadOnly(b bool) {
@@ -26,7 +25,7 @@ func (obj *Reservation) SetReadOnly(b bool) {
 func (obj *Reservation) SaveClean() store.KeySaver {
 	mod := *obj.Reservation
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 
 func (l *Reservation) Indexes() map[string]index.Maker {
@@ -135,21 +134,13 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 	return res
 }
 
-func (r *Reservation) Backend() store.Store {
-	return r.p.getBackend(r)
-}
-
 func (r *Reservation) New() store.KeySaver {
 	res := &Reservation{Reservation: &models.Reservation{}}
 	if r.Reservation != nil && r.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = r.p
+	res.rt = r.rt
 	return res
-}
-
-func (r *Reservation) setDT(p *DataTracker) {
-	r.p = p
 }
 
 func AsReservation(o models.Model) *Reservation {
@@ -176,7 +167,7 @@ func (r *Reservation) OnChange(oldThing store.KeySaver) error {
 }
 
 func (r *Reservation) OnCreate() error {
-	subnets := AsSubnets(r.stores("subnets").Items())
+	subnets := AsSubnets(r.rt.stores("subnets").Items())
 	for i := range subnets {
 		if !subnets[i].subnet().Contains(r.Addr) {
 			continue
@@ -201,7 +192,7 @@ func (r *Reservation) Validate() {
 	if r.Strategy == "" {
 		r.Errorf("Reservation Strategy cannot be empty!")
 	}
-	reservations := AsReservations(r.stores("reservations").Items())
+	reservations := AsReservations(r.rt.stores("reservations").Items())
 	for i := range reservations {
 		if reservations[i].Addr.Equal(r.Addr) {
 			continue
@@ -212,7 +203,7 @@ func (r *Reservation) Validate() {
 			break
 		}
 	}
-	r.AddError(index.CheckUnique(r, r.stores("reservations").Items()))
+	r.AddError(index.CheckUnique(r, r.rt.stores("reservations").Items()))
 	r.SetValid()
 	r.SetAvailable()
 }
@@ -226,10 +217,7 @@ func (r *Reservation) BeforeSave() error {
 }
 
 func (r *Reservation) OnLoad() error {
-	r.stores = func(ref string) *Store {
-		return r.p.objs[ref]
-	}
-	defer func() { r.stores = nil }()
+	defer func() { r.rt = nil }()
 	return r.BeforeSave()
 }
 

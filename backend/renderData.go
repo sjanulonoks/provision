@@ -68,7 +68,6 @@ func (r renderers) deregister(fs *FileSystem) {
 func newRenderedTemplate(r *RenderData,
 	tmplKey,
 	path string) renderer {
-	p := r.p
 	var prefixes, keys []string
 	if r.Task != nil {
 		prefixes = append(prefixes, "tasks")
@@ -87,30 +86,44 @@ func newRenderedTemplate(r *RenderData,
 		keys = append(keys, r.Machine.Key())
 	}
 	targetPrefix := r.target.Prefix()
+	dt := r.rt.dt
 	return renderer{
 		path: path,
 		name: tmplKey,
 		write: func(remoteIP net.IP) (io.Reader, error) {
-			objs, unlocker := p.LockEnts("stages", "tasks", "machines", "bootenvs", "profiles", "params")
-			defer unlocker()
-			rd := &RenderData{d: objs, p: p}
-			for i, prefix := range prefixes {
-				item := objs(prefix).Find(keys[i])
-				if item == nil {
-					return nil, fmt.Errorf("%s:%s has vanished", prefix, keys[i])
+			var err error
+			rt := dt.Request(r.rt.Logger.Switch("bootenv"),
+				"templates",
+				"tasks",
+				"stages",
+				"bootenvs",
+				"machines",
+				"profiles",
+				"params",
+				"preferences")
+			rd := &RenderData{rt: rt}
+			rd.rt.Do(func(d Stores) {
+				for i, prefix := range prefixes {
+					item := rd.rt.Find(prefix, keys[i])
+					if item == nil {
+						err = fmt.Errorf("%s:%s has vanished", prefix, keys[i])
+					}
+					switch obj := item.(type) {
+					case *Task:
+						rd.Task = &rTask{Task: obj, renderData: rd}
+					case *Stage:
+						rd.Stage = &rStage{Stage: obj, renderData: rd}
+					case *BootEnv:
+						rd.Env = &rBootEnv{BootEnv: obj, renderData: rd}
+					case *Machine:
+						rd.Machine = &rMachine{Machine: obj, renderData: rd}
+					default:
+						rd.rt.Panicf("%s:%s is neither Renderable nor a machine", item.Prefix(), item.Key())
+					}
 				}
-				switch obj := item.(type) {
-				case *Task:
-					rd.Task = &rTask{Task: obj, renderData: rd}
-				case *Stage:
-					rd.Stage = &rStage{Stage: obj, renderData: rd}
-				case *BootEnv:
-					rd.Env = &rBootEnv{BootEnv: obj, renderData: rd}
-				case *Machine:
-					rd.Machine = &rMachine{Machine: obj, renderData: rd}
-				default:
-					p.Logger.Panicf("%s:%s is neither Renderable nor a machine", item.Prefix(), item.Key())
-				}
+			})
+			if err != nil {
+				return nil, err
 			}
 			switch targetPrefix {
 			case "tasks":
@@ -123,10 +136,13 @@ func newRenderedTemplate(r *RenderData,
 			rd.remoteIP = remoteIP
 			buf := bytes.Buffer{}
 			tmpl := rd.target.templates().Lookup(tmplKey)
-			if err := tmpl.Execute(&buf, rd); err != nil {
+			rd.rt.Do(func(d Stores) {
+				err = tmpl.Execute(&buf, rd)
+			})
+			if err != nil {
 				return nil, err
 			}
-			p.Debugf("debugRenderer", "Content:\n%s\n", string(buf.Bytes()))
+			rd.rt.Debugf("Content:\n%s\n", string(buf.Bytes()))
 			return bytes.NewReader(buf.Bytes()), nil
 		},
 	}
@@ -138,7 +154,7 @@ type rMachine struct {
 }
 
 func (n *rMachine) Url() string {
-	return n.p.FileURL(n.renderData.remoteIP) + "/" + n.Path()
+	return n.renderData.rt.FileURL(n.renderData.remoteIP) + "/" + n.Path()
 }
 
 type rBootEnv struct {
@@ -169,9 +185,9 @@ func (b *rBootEnv) PathFor(proto, f string) string {
 	case "tftp":
 		return strings.TrimPrefix(tail, "/")
 	case "http":
-		return b.p.FileURL(b.renderData.remoteIP) + tail
+		return b.renderData.rt.FileURL(b.renderData.remoteIP) + tail
 	default:
-		b.p.Logger.Fatalf("Unknown protocol %v", proto)
+		b.renderData.rt.Fatalf("Unknown protocol %v", proto)
 	}
 	return ""
 }
@@ -334,9 +350,8 @@ type RenderData struct {
 	Env      *rBootEnv // The boot environment that provided the template.
 	Task     *rTask
 	Stage    *rStage
-	d        Stores
+	rt       *RequestTracker
 	target   renderable
-	p        *DataTracker
 	remoteIP net.IP
 }
 
@@ -383,16 +398,16 @@ func (r *RenderData) MachineRepos() []*Repo {
 	})
 	if len(found) == 0 {
 		// See if we have something locally available
-		for _, obj := range r.d("bootenvs").Items() {
+		for _, obj := range r.rt.d("bootenvs").Items() {
 			env := obj.(*BootEnv)
 			if env.OS.Name == r.Machine.OS {
-				fi, err := os.Stat(path.Join(r.p.FileRoot, r.Machine.OS, "install", env.Kernel))
+				fi, err := os.Stat(path.Join(r.rt.dt.FileRoot, r.Machine.OS, "install", env.Kernel))
 				if err == nil && fi.Mode().IsRegular() {
 					found = append(found, &Repo{
 						Tag:           env.Name,
 						InstallSource: true,
 						OS:            []string{r.Machine.OS},
-						URL:           r.p.FileURL(r.remoteIP) + "/" + path.Join(r.Machine.OS, "install"),
+						URL:           r.rt.FileURL(r.remoteIP) + "/" + path.Join(r.Machine.OS, "install"),
 						r:             r,
 						targetOS:      r.Machine.OS,
 					})
@@ -423,8 +438,8 @@ func (r *RenderData) InstallRepos() []*Repo {
 	return res
 }
 
-func newRenderData(d Stores, p *DataTracker, m *Machine, r renderable) *RenderData {
-	res := &RenderData{d: d, p: p}
+func newRenderData(rt *RequestTracker, m *Machine, r renderable) *RenderData {
+	res := &RenderData{rt: rt}
 	res.target = r
 	if m != nil {
 		res.Machine = &rMachine{Machine: m, renderData: res}
@@ -439,13 +454,13 @@ func newRenderData(d Stores, p *DataTracker, m *Machine, r renderable) *RenderDa
 	}
 	if m != nil {
 		if res.Env == nil {
-			obj := d("bootenvs").Find(m.BootEnv)
+			obj := rt.Find("bootenvs", m.BootEnv)
 			if obj != nil {
 				res.Env = &rBootEnv{BootEnv: obj.(*BootEnv), renderData: res}
 			}
 		}
 		if res.Stage == nil {
-			obj := d("stages").Find(m.Stage)
+			obj := rt.Find("stages", m.Stage)
 			if obj != nil {
 				res.Stage = &rStage{Stage: obj.(*Stage), renderData: res}
 			}
@@ -455,15 +470,15 @@ func newRenderData(d Stores, p *DataTracker, m *Machine, r renderable) *RenderDa
 }
 
 func (r *RenderData) ProvisionerAddress() string {
-	return r.p.LocalIP(r.remoteIP)
+	return r.rt.dt.LocalIP(r.remoteIP)
 }
 
 func (r *RenderData) ProvisionerURL() string {
-	return r.p.FileURL(r.remoteIP)
+	return r.rt.FileURL(r.remoteIP)
 }
 
 func (r *RenderData) ApiURL() string {
-	return r.p.ApiURL(r.remoteIP)
+	return r.rt.ApiURL(r.remoteIP)
 }
 
 func (r *RenderData) GenerateToken() string {
@@ -471,13 +486,13 @@ func (r *RenderData) GenerateToken() string {
 
 	grantor := "system"
 	grantorSecret := ""
-	if ss := r.p.pref("systemGrantorSecret"); ss != "" {
+	if ss := r.rt.dt.pref("systemGrantorSecret"); ss != "" {
 		grantorSecret = ss
 	}
 
 	if r.Machine == nil {
 		ttl := time.Minute * 10
-		if sttl := r.p.pref("unknownTokenTimeout"); sttl != "" {
+		if sttl := r.rt.dt.pref("unknownTokenTimeout"); sttl != "" {
 			mttl, _ := strconv.Atoi(sttl)
 			ttl = time.Second * time.Duration(mttl)
 		}
@@ -485,10 +500,10 @@ func (r *RenderData) GenerateToken() string {
 			Add("machines", "post", "*").
 			Add("machines", "get", "*").
 			AddSecrets("", grantorSecret, "").
-			Seal(r.p.tokenManager)
+			Seal(r.rt.dt.tokenManager)
 	} else {
 		ttl := time.Hour
-		if sttl := r.p.pref("knownTokenTimeout"); sttl != "" {
+		if sttl := r.rt.dt.pref("knownTokenTimeout"); sttl != "" {
 			mttl, _ := strconv.Atoi(sttl)
 			ttl = time.Second * time.Duration(mttl)
 		}
@@ -507,7 +522,7 @@ func (r *RenderData) GenerateToken() string {
 			Add("reservations", "create", "*").
 			AddMachine(r.Machine.Key()).
 			AddSecrets("", grantorSecret, r.Machine.Secret).
-			Seal(r.p.tokenManager)
+			Seal(r.rt.dt.tokenManager)
 	}
 	return t
 }
@@ -520,7 +535,7 @@ func (r *RenderData) GenerateInfiniteToken() string {
 
 	grantor := "system"
 	grantorSecret := ""
-	if ss := r.p.pref("systemGrantorSecret"); ss != "" {
+	if ss := r.rt.dt.pref("systemGrantorSecret"); ss != "" {
 		grantorSecret = ss
 	}
 
@@ -540,7 +555,7 @@ func (r *RenderData) GenerateInfiniteToken() string {
 		Add("reservations", "create", "*").
 		AddMachine(r.Machine.Key()).
 		AddSecrets("", grantorSecret, r.Machine.Secret).
-		Seal(r.p.tokenManager)
+		Seal(r.rt.dt.tokenManager)
 	return t
 }
 
@@ -555,14 +570,14 @@ func (r *RenderData) GenerateProfileToken(profile string, duration int) string {
 		return "InvalidTokenNotAllowedNotOnMachine"
 	}
 
-	if p := r.Machine.getProfile(r.d, profile); p == nil {
+	if p := r.rt.Find("profiles", profile); p == nil {
 		// Don't allow profile tokens.
 		return "InvalidTokenNotAllowedNoProfile"
 	}
 
 	grantor := "system"
 	grantorSecret := ""
-	if ss := r.p.pref("systemGrantorSecret"); ss != "" {
+	if ss := r.rt.dt.pref("systemGrantorSecret"); ss != "" {
 		grantorSecret = ss
 	}
 
@@ -577,7 +592,7 @@ func (r *RenderData) GenerateProfileToken(profile string, duration int) string {
 		Add("profiles", "patch", profile).
 		AddMachine(r.Machine.Key()).
 		AddSecrets("", grantorSecret, r.Machine.Secret).
-		Seal(r.p.tokenManager)
+		Seal(r.rt.dt.tokenManager)
 	return t
 }
 
@@ -616,14 +631,14 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 // Param is a helper function for extracting a parameter from Machine.Params
 func (r *RenderData) Param(key string) (interface{}, error) {
 	if r.Machine != nil {
-		v, ok := r.Machine.GetParam(r.d, key, true)
+		v, ok := r.rt.GetParam(r.Machine, key, true)
 		if ok {
 			return v, nil
 		}
 	}
-	if o := r.d("profiles").Find(r.p.GlobalProfileName); o != nil {
+	if o := r.rt.Find("profiles", r.rt.dt.GlobalProfileName); o != nil {
 		p := AsProfile(o)
-		if v, ok := p.GetParam(r.d, key, true); ok {
+		if v, ok := r.rt.GetParam(p, key, true); ok {
 			return v, nil
 		}
 	}

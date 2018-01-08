@@ -14,11 +14,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/frontend"
 	"github.com/digitalrebar/provision/server"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
@@ -30,7 +30,7 @@ func init() {
 	server.EmbeddedAssetsExtractFunc = extractAssets
 }
 
-func easf(mgmtApi *gin.Engine, logger *log.Logger) error {
+func easf(mgmtApi *gin.Engine, logger logger.Logger) error {
 	// Swagger.json serve
 	buf, err := Asset("swagger.json")
 	if err != nil {

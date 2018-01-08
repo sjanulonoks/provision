@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/olahol/melody.v1"
@@ -18,13 +19,15 @@ func (fe *Frontend) InitWebSocket() {
 
 	fe.ApiGroup.GET("/ws", func(c *gin.Context) {
 		claim, _ := c.Get("DRP-CLAIM")
+		l, _ := c.Get("logger")
 		keys := map[string]interface{}{
 			"DRP-CLAIM": claim,
+			"logger":    l,
 		}
 		fe.melody.HandleRequestWithKeys(c.Writer, c.Request, keys)
 	})
 
-	fe.melody.HandleMessage(fe.websocketHandler)
+	fe.melody.HandleMessage(websocketHandler)
 }
 
 // Callers register or deregister values.
@@ -51,7 +54,7 @@ func (f *Frontend) filterFunction(emap []string, claim interface{}, e *models.Ev
 
 	// Make sure we are authorized to see this event.
 	if matched {
-		matched = f.assureAuthWithClaim(claim, e.Type, e.Action, e.Key)
+		matched = f.assureAuthWithClaim(nil, claim, e.Type, e.Action, e.Key)
 	}
 	return matched
 }
@@ -93,15 +96,16 @@ func (f *Frontend) Reserve() error {
 func (f *Frontend) Release() {}
 func (f *Frontend) Unload()  {}
 
-func (f *Frontend) websocketHandler(s *melody.Session, buf []byte) {
+func websocketHandler(s *melody.Session, buf []byte) {
+	l := s.MustGet("logger").(logger.Logger)
 	splitMsg := bytes.SplitN(bytes.TrimSpace(buf), []byte(" "), 2)
 	if len(splitMsg) != 2 {
-		f.Logger.Printf("WS: Unknown: Received message: %s\n", string(buf))
+		l.Warnf("WS: Unknown: Received message: %s\n", string(buf))
 		return
 	}
 	prefix, msg := string(splitMsg[0]), string(splitMsg[1])
 	if !(prefix == "register" || prefix == "deregister") {
-		f.Logger.Printf("WS: Invalid msg prefix %s", prefix)
+		l.Warnf("WS: Invalid msg prefix %s", prefix)
 		return
 	}
 	wsLock.Lock()
@@ -118,11 +122,13 @@ func (f *Frontend) websocketHandler(s *melody.Session, buf []byte) {
 				return
 			}
 		}
+		l.Debugf("Registering for %s", msg)
 		emap = append(emap, msg)
 	case "deregister":
 		res := make([]string, 0, len(emap))
 		for _, test := range emap {
 			if test == msg {
+				l.Debugf("Deregistering %s", msg)
 				continue
 			}
 		}

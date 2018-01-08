@@ -17,7 +17,6 @@ import (
 type Lease struct {
 	*models.Lease
 	validate
-	p *DataTracker
 }
 
 func (obj *Lease) SetReadOnly(b bool) {
@@ -27,7 +26,7 @@ func (obj *Lease) SetReadOnly(b bool) {
 func (obj *Lease) SaveClean() store.KeySaver {
 	mod := *obj.Lease
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 
 func (l *Lease) Indexes() map[string]index.Maker {
@@ -145,8 +144,8 @@ func (l *Lease) Indexes() map[string]index.Maker {
 	return res
 }
 
-func (l *Lease) Subnet(d Stores) *Subnet {
-	subnets := d("subnets")
+func (l *Lease) Subnet(rt *RequestTracker) *Subnet {
+	subnets := rt.stores("subnets")
 	for _, i := range subnets.Items() {
 		subnet := AsSubnet(i)
 		if subnet.subnet().Contains(l.Addr) {
@@ -156,16 +155,12 @@ func (l *Lease) Subnet(d Stores) *Subnet {
 	return nil
 }
 
-func (l *Lease) Reservation(d Stores) *Reservation {
-	r := d("reservations").Find(models.Hexaddr(l.Addr))
+func (l *Lease) Reservation(rt *RequestTracker) *Reservation {
+	r := rt.stores("reservations").Find(models.Hexaddr(l.Addr))
 	if r == nil {
 		return nil
 	}
 	return AsReservation(r)
-}
-
-func (l *Lease) Backend() store.Store {
-	return l.p.getBackend(l)
 }
 
 func (l *Lease) New() store.KeySaver {
@@ -173,12 +168,8 @@ func (l *Lease) New() store.KeySaver {
 	if l.Lease != nil && l.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = l.p
+	res.rt = l.rt
 	return res
-}
-
-func (l *Lease) setDT(p *DataTracker) {
-	l.p = p
 }
 
 func AsLease(o models.Model) *Lease {
@@ -194,10 +185,10 @@ func AsLeases(o []models.Model) []*Lease {
 }
 
 func (l *Lease) OnCreate() error {
-	if r := l.Reservation(l.stores); r != nil {
+	if r := l.Reservation(l.rt); r != nil {
 		return nil
 	}
-	if s := l.Subnet(l.stores); s == nil {
+	if s := l.Subnet(l.rt); s == nil {
 		l.Errorf("Cannot create Lease without a reservation or a subnet")
 	} else if !s.InSubnetRange(l.Addr) {
 		l.Errorf("Address %s is a network or broadcast address for subnet %s", l.Addr.String(), s.Name)
@@ -224,7 +215,9 @@ func (l *Lease) Expired() bool {
 }
 
 func (l *Lease) Validate() {
-	l.AddError(index.CheckUnique(l, l.stores("leases").Items()))
+	idx := l.rt.stores("leases").Items()
+	l.AddError(index.CheckUnique(l, idx))
+	leases := AsLeases(idx)
 	validateIP4(l, l.Addr)
 	if l.Token == "" {
 		l.Errorf("Lease Token cannot be empty!")
@@ -232,7 +225,6 @@ func (l *Lease) Validate() {
 	if l.Strategy == "" {
 		l.Errorf("Lease Strategy cannot be empty!")
 	}
-	leases := AsLeases(l.stores("leases").Items())
 	for i := range leases {
 		if leases[i].Addr.Equal(l.Addr) {
 			continue
@@ -256,10 +248,7 @@ func (l *Lease) BeforeSave() error {
 }
 
 func (l *Lease) OnLoad() error {
-	l.stores = func(ref string) *Store {
-		return l.p.objs[ref]
-	}
-	defer func() { l.stores = nil }()
+	defer func() { l.rt = nil }()
 	return l.BeforeSave()
 }
 

@@ -13,7 +13,6 @@ import (
 type Pref struct {
 	*models.Pref
 	validate
-	p *DataTracker
 }
 
 func (p *Pref) Indexes() map[string]index.Maker {
@@ -40,18 +39,10 @@ func (p *Pref) Indexes() map[string]index.Maker {
 	return res
 }
 
-func (p *Pref) Backend() store.Store {
-	return p.p.getBackend(p)
-}
-
 func (p *Pref) New() store.KeySaver {
 	res := &Pref{Pref: &models.Pref{}}
-	res.p = p.p
+	res.rt = p.rt
 	return res
-}
-
-func (p *Pref) setDT(dt *DataTracker) {
-	p.p = dt
 }
 
 func AsPref(v models.Model) *Pref {

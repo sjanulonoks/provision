@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
@@ -19,14 +20,18 @@ var (
 
 type crudTest struct {
 	name string
-	op   func(Stores, models.Model) (bool, error)
+	op   func(models.Model) (bool, error)
 	t    models.Model
 	pass bool
 }
 
-func (test crudTest) Test(t *testing.T, d Stores) {
+func (test crudTest) Test(t *testing.T, rt *RequestTracker) {
 	t.Helper()
-	passed, err := test.op(d, test.t)
+	var passed bool
+	var err error
+	rt.Do(func(d Stores) {
+		passed, err = test.op(test.t)
+	})
 	msg := fmt.Sprintf("%s: wanted to pass: %v, passed: %v", test.name, test.pass, passed)
 	if passed == test.pass {
 		t.Log(msg)
@@ -34,20 +39,18 @@ func (test crudTest) Test(t *testing.T, d Stores) {
 			t.Logf("   err: %#v", err)
 		}
 	} else {
-		t.Error(msg)
+		t.Errorf("ERROR: %s, ", msg)
 		t.Errorf("   err: %#v", err)
 		t.Errorf("   obj: %#v", test.t)
 	}
 }
 
-func loadExample(dt *DataTracker, kind, p string) (bool, error) {
+func loadExample(rt *RequestTracker, kind, p string) (ok bool, err error) {
 	buf, err := os.Open(p)
 	if err != nil {
 		return false, err
 	}
 	defer buf.Close()
-	d, unlocker := dt.LockEnts(kind)
-	defer unlocker()
 	res, err := models.New(kind)
 	if err != nil {
 		log.Panicf("Unknown models %s: %v", kind, err)
@@ -57,7 +60,10 @@ func loadExample(dt *DataTracker, kind, p string) (bool, error) {
 	if err := dec.Decode(&res); err != nil {
 		return false, err
 	}
-	return dt.Create(d, res)
+	rt.Do(func(d Stores) {
+		ok, err = rt.Create(res)
+	})
+	return
 }
 
 func mkDT(bs store.Store) *DataTracker {
@@ -67,7 +73,8 @@ func mkDT(bs store.Store) *DataTracker {
 	}
 	s.(*store.StackedStore).Push(bs, false, true)
 	s.(*store.StackedStore).Push(BasicContent(), false, false)
-	logger := log.New(os.Stdout, "dt", 0)
+	baseLog := log.New(os.Stdout, "dt", 0)
+	l := logger.New(baseLog).Log("backend")
 	dt := NewDataTracker(s,
 		tmpDir,
 		tmpDir,
@@ -75,9 +82,9 @@ func mkDT(bs store.Store) *DataTracker {
 		false,
 		8091,
 		8092,
-		logger,
+		l,
 		map[string]string{"systemGrantorSecret": "itisfred", "defaultStage": "none", "defaultBootEnv": "local", "unknownBootEnv": "ignore"},
-		NewPublishers(logger))
+		NewPublishers(baseLog))
 	return dt
 }
 

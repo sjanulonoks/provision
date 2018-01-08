@@ -19,7 +19,7 @@ type InfoResponse struct {
 	Body *models.Info
 }
 
-func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
+func (f *Frontend) GetInfo(c *gin.Context, drpid string) (*models.Info, *models.Error) {
 	i := &models.Info{
 		Arch:               runtime.GOARCH,
 		Os:                 runtime.GOOS,
@@ -43,6 +43,7 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 			"job-exit-states",
 			"package-repository-handling",
 			"profileless-machine",
+			"threaded-log-levels",
 		},
 	}
 
@@ -51,11 +52,8 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 		Type:  "API_ERROR",
 		Model: "info",
 	}
-
-	func() {
-		d, unlocker := f.dt.LockEnts("machines", "subnets")
-		defer unlocker()
-
+	rt := f.rt(c, "machines", "subnets")
+	rt.Do(func(d backend.Stores) {
 		if idx, err := index.All(index.Native())(&d("machines").Index); err != nil {
 			res.AddError(err)
 		} else {
@@ -67,7 +65,7 @@ func (f *Frontend) GetInfo(drpid string) (*models.Info, *models.Error) {
 		} else {
 			i.Stats = append(i.Stats, &models.Stat{"subnets.count", idx.Count()})
 		}
-	}()
+	})
 
 	if res.HasError() == nil {
 		res = nil
@@ -94,7 +92,7 @@ func (f *Frontend) InitInfoApi(drpid string) {
 			if !f.assureAuth(c, "info", "get", "") {
 				return
 			}
-			info, err := f.GetInfo(drpid)
+			info, err := f.GetInfo(c, drpid)
 			if err != nil {
 				c.JSON(err.Code, err)
 				return

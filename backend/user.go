@@ -12,7 +12,6 @@ import (
 type User struct {
 	*models.User
 	validate
-	p *DataTracker
 }
 
 func (obj *User) SetReadOnly(b bool) {
@@ -22,7 +21,7 @@ func (obj *User) SetReadOnly(b bool) {
 func (obj *User) SaveClean() store.KeySaver {
 	mod := *obj.User
 	mod.ClearValidation()
-	return toBackend(obj.p, nil, &mod)
+	return toBackend(&mod, obj.rt)
 }
 
 func (p *User) Indexes() map[string]index.Maker {
@@ -49,21 +48,13 @@ func (p *User) Indexes() map[string]index.Maker {
 	return res
 }
 
-func (u *User) Backend() store.Store {
-	return u.p.getBackend(u)
-}
-
 func (u *User) New() store.KeySaver {
 	res := &User{User: &models.User{}}
 	if u.User != nil && u.ChangeForced() {
 		res.ForceChange()
 	}
-	res.p = u.p
+	res.rt = u.rt
 	return res
-}
-
-func (u *User) setDT(p *DataTracker) {
-	u.p = p
 }
 
 func AsUser(o models.Model) *User {
@@ -78,21 +69,21 @@ func AsUsers(o []models.Model) []*User {
 	return res
 }
 
-func (u *User) ChangePassword(d Stores, newPass string) error {
+func (u *User) ChangePassword(rt *RequestTracker, newPass string) error {
 	ph, err := sc.GenerateFromPassword([]byte(newPass), sc.DefaultParams)
 	if err != nil {
 		return err
 	}
 	u.PasswordHash = ph
-	if u.p != nil {
-		_, err = u.p.Save(d, u)
+	if u.rt != nil {
+		_, err = rt.Save(u)
 	}
 	return err
 }
 
 func (u *User) Validate() {
 	u.User.Validate()
-	u.AddError(index.CheckUnique(u, u.stores("users").Items()))
+	u.AddError(index.CheckUnique(u, u.rt.stores("users").Items()))
 	u.SetValid()
 	u.SetAvailable()
 }
@@ -109,10 +100,7 @@ func (u *User) BeforeSave() error {
 }
 
 func (u *User) OnLoad() error {
-	u.stores = func(ref string) *Store {
-		return u.p.objs[ref]
-	}
-	defer func() { u.stores = nil }()
+	defer func() { u.rt = nil }()
 
 	// This mustSave part is just to keep us from resaving all the users on startup.
 	mustSave := false
@@ -123,7 +111,7 @@ func (u *User) OnLoad() error {
 	if err == nil && mustSave {
 		v := u.SaveValidation()
 		u.ClearValidation()
-		err = u.stores("users").backingStore.Save(u.Key(), u)
+		err = u.rt.stores("users").backingStore.Save(u.Key(), u)
 		u.RestoreValidation(v)
 	}
 	return err

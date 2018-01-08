@@ -15,8 +15,8 @@ import (
 // midlayer must NAK the request.
 type LeaseNAK error
 
-func findLease(d Stores, dt *DataTracker, strat, token string, req net.IP) (lease *Lease, err error) {
-	reservations, leases := d("reservations"), d("leases")
+func findLease(rt *RequestTracker, strat, token string, req net.IP) (lease *Lease, err error) {
+	reservations, leases := rt.d("reservations"), rt.d("leases")
 	hexreq := models.Hexaddr(req.To4())
 	found := leases.Find(hexreq)
 	if found == nil {
@@ -38,7 +38,7 @@ func findLease(d Stores, dt *DataTracker, strat, token string, req net.IP) (leas
 		if reservation.Strategy != lease.Strategy ||
 			reservation.Token != lease.Token {
 			lease.Invalidate()
-			dt.Save(d, lease)
+			rt.Save(lease)
 			err = LeaseNAK(fmt.Errorf("Reservation %s (%s:%s conflicts with %s:%s",
 				reservation.Addr,
 				reservation.Strategy,
@@ -52,7 +52,7 @@ func findLease(d Stores, dt *DataTracker, strat, token string, req net.IP) (leas
 	lease.Strategy = strat
 	lease.Token = token
 	lease.ExpireTime = time.Now().Add(2 * time.Second)
-	lease.p.Infof("debugDhcp", "Found our lease for strat: %s token %s, will use it", strat, token)
+	rt.Switch("dhcp").Infof("Found our lease for strat: %s token %s, will use it", strat, token)
 	return
 }
 
@@ -62,51 +62,52 @@ func findLease(d Stores, dt *DataTracker, strat, token string, req net.IP) (leas
 // Otherwise, the lease will be returned with its ExpireTime updated and the Lease saved.
 //
 // This function should be called in response to a DHCPREQUEST.
-func FindLease(dt *DataTracker,
+func FindLease(rt *RequestTracker,
 	strat, token string,
 	req net.IP) (lease *Lease, subnet *Subnet, reservation *Reservation, err error) {
-	d, unlocker := dt.LockEnts("leases", "reservations", "subnets")
-	defer unlocker()
-	lease, err = findLease(d, dt, strat, token, req)
-	if err != nil {
-		return
-	}
-	if lease == nil {
-		fake := &Lease{Lease: &models.Lease{Addr: req}}
-		reservation = fake.Reservation(d)
-		subnet = fake.Subnet(d)
-		if reservation != nil {
-			err = LeaseNAK(fmt.Errorf("No lease for %s, convered by reservation %s", req, reservation.Addr))
-		}
-		if subnet != nil {
-			err = LeaseNAK(fmt.Errorf("No lease for %s, covered by subnet %s", req, subnet.subnet().IP))
-		}
-		return
-	}
-	subnet = lease.Subnet(d)
-	reservation = lease.Reservation(d)
-	if reservation == nil && subnet == nil {
-		dt.Remove(d, lease)
-		err = LeaseNAK(fmt.Errorf("Lease %s has no reservation or subnet, it is dead to us.", lease.Addr))
-		return
-	}
-	if reservation != nil {
-		lease.ExpireTime = time.Now().Add(2 * time.Hour)
-	}
-	if subnet != nil {
-		lease.ExpireTime = time.Now().Add(subnet.LeaseTimeFor(lease.Addr))
-		if !subnet.Enabled && reservation == nil {
-			// We aren't enabled, so act like we are silent.
-			lease = nil
+	rt.Do(func(d Stores) {
+		lease, err = findLease(rt, strat, token, req)
+		if err != nil {
 			return
 		}
-	}
-	lease.State = "ACK"
-	dt.Save(d, lease)
+		if lease == nil {
+			fake := &Lease{Lease: &models.Lease{Addr: req}}
+			reservation = fake.Reservation(rt)
+			subnet = fake.Subnet(rt)
+			if reservation != nil {
+				err = LeaseNAK(fmt.Errorf("No lease for %s, convered by reservation %s", req, reservation.Addr))
+			}
+			if subnet != nil {
+				err = LeaseNAK(fmt.Errorf("No lease for %s, covered by subnet %s", req, subnet.subnet().IP))
+			}
+			return
+		}
+		subnet = lease.Subnet(rt)
+		reservation = lease.Reservation(rt)
+		if reservation == nil && subnet == nil {
+			rt.Remove(lease)
+			err = LeaseNAK(fmt.Errorf("Lease %s has no reservation or subnet, it is dead to us.", lease.Addr))
+			return
+		}
+		if reservation != nil {
+			lease.ExpireTime = time.Now().Add(2 * time.Hour)
+		}
+		if subnet != nil {
+			lease.ExpireTime = time.Now().Add(subnet.LeaseTimeFor(lease.Addr))
+			if !subnet.Enabled && reservation == nil {
+				// We aren't enabled, so act like we are silent.
+				lease = nil
+				return
+			}
+		}
+		lease.State = "ACK"
+		rt.Save(lease)
+	})
 	return
 }
 
-func findViaReservation(leases, reservations *Store, strat, token string, req net.IP) (lease *Lease, reservation *Reservation, ok bool) {
+func findViaReservation(rt *RequestTracker, strat, token string, req net.IP) (lease *Lease, reservation *Reservation, ok bool) {
+	leases, reservations := rt.d("leases"), rt.d("reservations")
 	if req != nil && req.IsGlobalUnicast() {
 		hex := models.Hexaddr(req)
 		ok := reservations.Find(hex)
@@ -138,12 +139,12 @@ func findViaReservation(leases, reservations *Store, strat, token string, req ne
 		if lease.Token == reservation.Token &&
 			lease.Strategy == reservation.Strategy {
 			// This is our lease.  Renew it.
-			lease.p.Infof("debugDhcp", "Reservation for %s has a lease, using it.", lease.Addr.String())
+			rt.Switch("dhcp").Infof("Reservation for %s has a lease, using it.", lease.Addr.String())
 			return
 		}
 		if lease.Expired() {
 			// The lease has expired.  Take it over
-			lease.p.Infof("debugDhcp", "Reservation for %s is taking over an expired lease", lease.Addr.String())
+			rt.Switch("dhcp").Infof("Reservation for %s is taking over an expired lease", lease.Addr.String())
 			lease.Token = token
 			lease.Strategy = strat
 			return
@@ -151,7 +152,12 @@ func findViaReservation(leases, reservations *Store, strat, token string, req ne
 		// The lease has not expired, and it is not ours.
 		// We have no choice but to fall through to subnet code until
 		// the current lease has expired.
-		reservation.p.Infof("debugDhcp", "Reservation %s (%s:%s): A lease exists for that address, has been handed out to %s:%s", reservation.Addr, reservation.Strategy, reservation.Token, lease.Strategy, lease.Token)
+		rt.Switch("dhcp").Infof("Reservation %s (%s:%s): A lease exists for that address, has been handed out to %s:%s",
+			reservation.Addr,
+			reservation.Strategy,
+			reservation.Token,
+			lease.Strategy,
+			lease.Token)
 		lease = nil
 		return
 	}
@@ -167,7 +173,8 @@ func findViaReservation(leases, reservations *Store, strat, token string, req ne
 	return
 }
 
-func findViaSubnet(leases, subnets, reservations *Store, strat, token string, req net.IP, vias []net.IP) (lease *Lease, subnet *Subnet, fresh bool) {
+func findViaSubnet(rt *RequestTracker, strat, token string, req net.IP, vias []net.IP) (lease *Lease, subnet *Subnet, fresh bool) {
+	leases, subnets, reservations := rt.d("leases"), rt.d("subnets"), rt.d("reservations")
 	for _, idx := range subnets.Items() {
 		candidate := AsSubnet(idx)
 		for _, via := range vias {
@@ -230,10 +237,10 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 		usedAddrs[currRes.Key()] = currRes
 	}
 	if lease != nil {
-		subnet.p.Infof("debugDhcp", "Subnet %s: handing out existing lease for %s to %s:%s", subnet.Name, lease.Addr, strat, token)
+		rt.Switch("dhcp").Infof("Subnet %s: handing out existing lease for %s to %s:%s", subnet.Name, lease.Addr, strat, token)
 		return
 	}
-	subnet.p.Infof("debugDhcp", "Subnet %s: %s:%s is in my range, attempting lease creation.", subnet.Name, strat, token)
+	rt.Switch("dhcp").Infof("Subnet %s: %s:%s is in my range, attempting lease creation.", subnet.Name, strat, token)
 	lease, _ = subnet.next(usedAddrs, token, req)
 	if lease != nil {
 		lease.State = "PROBE"
@@ -243,7 +250,7 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 		fresh = true
 		return
 	}
-	subnet.p.Infof("debugDhcp", "Subnet %s: No lease for %s:%s, it gets no IP from us", subnet.Name, strat, token)
+	rt.Switch("dhcp").Infof("Subnet %s: No lease for %s:%s, it gets no IP from us", subnet.Name, strat, token)
 	return nil, nil, false
 }
 
@@ -252,44 +259,43 @@ func findViaSubnet(leases, subnets, reservations *Store, strat, token string, re
 // If the returned lease is nil, then the DHCP system should not respond.
 //
 // This function should be called for DHCPDISCOVER.
-func FindOrCreateLease(dt *DataTracker,
+func FindOrCreateLease(rt *RequestTracker,
 	strat, token string,
 	req net.IP,
 	via []net.IP) (lease *Lease, subnet *Subnet, reservation *Reservation, fresh bool) {
-	d, unlocker := dt.LockEnts("subnets", "reservations", "leases")
-	defer unlocker()
-	leases, reservations, subnets := d("leases"), d("reservations"), d("subnets")
-	var ok bool
-	lease, reservation, ok = findViaReservation(leases, reservations, strat, token, req)
-	if lease == nil {
-		lease, subnet, fresh = findViaSubnet(leases, subnets, reservations, strat, token, req, via)
-	} else {
-		subnet = lease.Subnet(d)
-	}
-	if lease != nil {
-		// Clean up any other leases that have this strategy and token lying around.
-		toRemove := []models.Model{}
-		for _, dup := range leases.Items() {
-			candidate := AsLease(dup)
-			if candidate.Strategy == strat &&
-				candidate.Token == token &&
-				!candidate.Addr.Equal(lease.Addr) {
-				toRemove = append(toRemove, candidate)
+	rt.Do(func(d Stores) {
+		leases := d("leases")
+		var ok bool
+		lease, reservation, ok = findViaReservation(rt, strat, token, req)
+		if lease == nil {
+			lease, subnet, fresh = findViaSubnet(rt, strat, token, req, via)
+		} else {
+			subnet = lease.Subnet(rt)
+		}
+		if lease != nil {
+			// Clean up any other leases that have this strategy and token lying around.
+			toRemove := []models.Model{}
+			for _, dup := range leases.Items() {
+				candidate := AsLease(dup)
+				if candidate.Strategy == strat &&
+					candidate.Token == token &&
+					!candidate.Addr.Equal(lease.Addr) {
+					toRemove = append(toRemove, candidate)
+				}
+			}
+			leases.Remove(toRemove...)
+
+			// If ViaReservation created it, then add it
+			if !ok && (subnet == nil || !subnet.Proxy) {
+				leases.Add(lease)
+			}
+			lease.ExpireTime = time.Now().Add(time.Minute)
+
+			// If we are proxy, we don't save leases.  The address is empty.
+			if subnet == nil || !subnet.Proxy {
+				rt.Save(lease)
 			}
 		}
-		leases.Remove(toRemove...)
-
-		// If ViaReservation created it, then add it
-		if !ok && (subnet == nil || !subnet.Proxy) {
-			leases.Add(lease)
-		}
-		lease.ExpireTime = time.Now().Add(time.Minute)
-
-		// If we are proxy, we don't save leases.  The address is empty.
-		if subnet == nil || !subnet.Proxy {
-			lease.p = dt
-			dt.Save(d, lease)
-		}
-	}
+	})
 	return
 }
