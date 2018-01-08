@@ -229,14 +229,26 @@ case $1 in
   install-terraform)
     mkdir -p bin
 
-    # make a reasonable attempt at getting the latest version of Terraform
-    TF_VER=`curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_version'`
-    GET_TF_CMD="curl -s -o tf.zip https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_${MY_OS}_${MY_ARCH}.zip "
-    # if locally installed all ready - get current version 
-    TF_INSTALL_VER=`( which -s terraform ) && terraform version | head -1 | cut -d "v" -f 2`
+    TF_VER=""
+    UPGRADE=0
+    INSTALL=0
+    [[ -n "$2" ]] && TF_VER=$2
 
-    ( `compver $TF_VER '>' $TF_INSTALL_VER` ) && UPGRADE=1 || UPGRADE=0
-    [[ -z "$TF_INSTALL_VER" ]] && INSTALL=1 || INSTALL=0 
+    if [[ -z $TF_VER ]]
+    then
+      # make a reasonable attempt at getting the latest version of Terraform
+      TF_VER=`curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_version'`
+
+      # if locally installed all ready - get current version 
+      TF_INSTALL_VER=`( which -s terraform ) && terraform version | head -1 | cut -d "v" -f 2`
+
+      ( `compver $TF_VER '>' $TF_INSTALL_VER` ) && UPGRADE=1 || UPGRADE=0
+      [[ -z "$TF_INSTALL_VER" ]] && INSTALL=1 || INSTALL=0 
+    else
+      INSTALL=1
+    fi
+
+    GET_TF_CMD="curl -s -o tf.zip https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_${MY_OS}_${MY_ARCH}.zip "
 
     if (( $UPGRADE || $INSTALL ))
     then
@@ -269,20 +281,23 @@ case $1 in
 
   get-drp-cc)
     # community content is installed via install.sh of DRP - unless "--nocontent" is specified
+    # we prefix with "000-" because we want to force it to sort first in the directory for 
+    # applying multiple content blobs - CC needs to be first
     echo ""
-    rm -rf dr-provision-install/drp-community-content.*
+    rm -rf dr-provision-install/000-drp-community-content.*
     mkdir -p dr-provision-install
     cd dr-provision-install
 
     # community contents
     $CURL \
       https://github.com/digitalrebar/provision-content/releases/download/${VER_CONTENT}/drp-community-content.yaml \
-      -o drp-community-content.yaml
+      -o 000-drp-community-content.yaml
     $CURL \
       https://github.com/digitalrebar/provision-content/releases/download/${VER_CONTENT}/drp-community-content.sha256 \
-      -o drp-community-content.sha256
+      -o 000-drp-community-content.sha256
+    sed -i 's/ \(drp-community-content.yaml\)$/ 000-\1/' 000-drp-community-content.sha256
 
-    check_sum drp-community-content.sha256
+    check_sum 000-drp-community-content.sha256
     cd ..
 
     ;;
@@ -349,6 +364,7 @@ case $1 in
 
     for ACTION in get-drp-cc get-drp-plugins drp-setup drp-setup-demo; 
     do 
+      echo "running ACTION:  $ACTION"
       ./bin/control.sh $ACTION $2
     done
   ;;
@@ -357,12 +373,46 @@ case $1 in
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
 
-    # drp-community-content is  installed by default (unless '--nocontent' specified)
+    # 000-drp-community-content is  installed by default (unless '--nocontent' specified)
     # do not attempt to install it again
     # $0 ssh $2 "hostname; $0 get-drp-cc $2; $0 get-drp-plugins $2; bash -x $0 drp-setup $2"
     CMD="hostname; ./bin/control.sh local-content-demo $2"
     my_ssh $2 "$CMD"
     xit $?
+    ;;
+
+  local-content-krib)
+    [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
+    ADDR=`$0 get-address $2`
+
+    # drp-setup drp-setup-demo; 
+    for ACTION in get-drp-cc get-drp-krib-content get-drp-plugins drp-setup drp-setup-krib-live
+    do 
+      echo "running ACTION:  $ACTION"
+      ./bin/control.sh $ACTION $2
+    done
+
+  ;;
+
+  remote-content-krib)
+    [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
+    ADDR=`$0 get-address $2`
+
+    # 000-drp-community-content is  installed by default (unless '--nocontent' specified)
+    # do not attempt to install it again
+    # $0 ssh $2 "hostname; $0 get-drp-cc $2; $0 get-drp-plugins $2; bash -x $0 drp-setup $2"
+    CMD="hostname; ./bin/control.sh local-content-krib $2"
+    my_ssh $2 "$CMD"
+    xit $?
+
+    ;;
+
+  # simply get the KRIB contents - and stage it to dr-provision-install/content-krib.json
+  # where drp-setup will pick it up and install it for us
+  get-drp-krib-content)
+
+    curl -s https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/krib \
+      -o dr-provision-install/drp-krib-content.json
     ;;
 
   ssh|scp|copy)
@@ -552,8 +602,11 @@ EOFPLUGIN
       echo "'plugin_providers packet-ipmi' DOES NOT EXIST - not installing plugin"
   fi
 
-    # drop in our ISOs and wire up our prefs
-    UPLOADS="sledgehammer $MACHINES_OS"
+    # drop in our ISOs and wire up our prefs - we no longer do
+    # MACHINE_OS here - we do that in individual drp-setup-*
+    # case statements - as in some we don't care to have it (eg KRIB)
+    #UPLOADS="sledgehammer $MACHINES_OS"
+    UPLOADS="sledgehammer"
     for UPLOAD in $UPLOADS
     do
     $DRPCLI $ENDPOINT bootenvs exists $UPLOAD \
@@ -571,8 +624,21 @@ EOFPLUGIN
   ;;
 
   drp-setup-demo)
+    [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
+    ADDR=`$0 get-address $2`
+
+    ENDPOINT="--endpoint=https://$ADDR:8092 $CREDS"
+
     # set up the packet stage map 
     # create stagemap JSON (MACHINES_OS:  ubuntu-16.04-install)
+
+    UPLOADS="$MACHINES_OS"
+    for UPLOAD in $UPLOADS
+    do
+    $DRPCLI $ENDPOINT bootenvs exists $UPLOAD \
+      && { set -x; $DRPCLI $ENDPOINT bootenvs uploadiso $UPLOAD; set +x; } \
+      || echo "bootenv '$UPLOAD' doesn't exist, not uploading ISO"
+    done
 
     # sigh ... 'global' profile method changes in v3.5.x - but we also
     # have to match v3.4.1-tip-29 for pre-release testing - yes, this 
@@ -629,6 +695,67 @@ EOFPARAM
 
   ;;
 
+  ###
+  # set up the KRIB kubernetes with Live Boot (immutable) mode deployment
+  #
+  # require  $2 as DRP endpoint ID
+  # optional $3 defines profile name for KRIB cluster
+  ###
+  drp-setup-krib-live)
+    [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
+    ADDR=`$0 get-address $2`
+
+    ENDPOINT="--endpoint=https://$ADDR:8092 $CREDS"
+
+    # currently we can't orchestrate a complete bring up of a KRIB
+    # cluster via a separate Profile - as that profile has to be
+    # attached to a given machine(s) - if they don't exist yet, we
+    # can't attach them ... we could use a Discvoery (ready-state)
+    # pattern, then provide a post-provisioning script to finish 
+    # the install, once ready-state has been reached ... but for now
+    # we're going to use a simple "global" profile setup to blast
+    # machines all the way through to full cluster build
+
+    # potential steps to fix with a 2-step "ready-state"
+    # set Global to do dicsovery to Sledgehammer-wait
+    # create below stand alone profile - go in to wait loop
+    # once machines become ready - add profile and make stage change
+
+    #_krib=${3:-"krib-cluster-live"}
+    _krib=${3:-"global"}
+
+    # below profile is for future Profile based usage (see note above)
+    #
+    # set workflow to start from discover and move completely
+    # through KRIB install process
+    cat <<EOFKRIB > private-content/krib-stagemap.yaml
+---
+Name: "$_krib"
+Description: "Kubernetes Live Boot (immutable) cluster"
+Params:
+  krib/cluster-profile: "$_krib"
+  change-stage/map:
+    discover: packet-discover:Success
+    docker-install: krib-install:Success
+    krib-install: sledgehammer-wait:Success
+    mount-local-disks: docker-install:Success
+    packet-discover: mount-local-disks:Success
+Meta:
+  color: "orange"
+  icon: "ship"
+  title: "My Immutable Kubernetes Cluster"
+EOFKRIB
+   
+    MAP='{ "discover": "packet-discover:Success", "docker-install": "krib-install:Success", "krib-install": "sledgehammer-wait:Success", "mount-local-disks": "docker-install:Success", "packet-discover": "mount-local-disks:Success" }'
+    $DRPCLI $ENDPOINT profiles add global param krib/cluster-profile to $_krib
+    $DRPCLI $ENDPOINT profiles add global param change-stage/map to "$MAP"
+
+    #drpcli profiles create - < private-content/krib-stagemap.yaml
+    #export UUIDS=`drpcli machines list | jq -r '.[].Uuid'`
+    #my_machines addprofile $_krib
+    #my_machines stage mount-local-disks
+
+  ;;
   ###
   #  add all stages for all BootEnv types - since it's a relatively lightweight
   #  operation to plumb in Profiles, we're going to just go ahead and 

@@ -146,7 +146,7 @@ case $1 in
   local)
     echo "Installing content to DRP endpoint ('$DRP') from local system (push to endpoint)..."
     # runs get-drp-cc, get-drp-plugins, and drp-setup locally
-    confirm control.sh local-content-demo $DRP
+    confirm control.sh local-content-krib $DRP
   ;;
   remote|*)
     echo "Installing content from DRP endpoint ('$DRP') (pull from endpoint)..."
@@ -156,7 +156,7 @@ case $1 in
     cprintf $bold "   Maybe launch UI to show empty content too ... ? \n"
     cprintf $bold "   https://rackn.github.io/provision-ux/#/e/${ADDR}:8092/system "
     echo ""
-    confirm control.sh remote-content-demo $DRP  
+    confirm control.sh remote-content-krib $DRP  
     echo ""
     cprintf $cyan "NOTICE:"
     echo "  Errors may be 'normal' - ISOs, Kernel, and InitRDs are "
@@ -168,11 +168,6 @@ esac
 
 # inject our DRP endpoint address in to the drp-machines.tf terraform file
 confirm control.sh set-drp-endpoint $DRP
-
-# bug in Stages causes stage "discover" to be marked bad
-# the simplest fix is to HUP the dr-provision service
-#confirm echo "Restart DRP Endpoint to fix stages bug ?" \
-#  && control.sh ssh $DRP 'kill -HUP `pidof dr-provision`'
 
 # bring up our DRP target machines:
 confirm terraform apply -target=packet_device.drp-machines -auto-approve
