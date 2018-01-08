@@ -59,6 +59,26 @@ function os_info() {
 } # end os_family()
 
 ###
+#  simple helper loop functions, expects:
+#
+#   UUIDS = global var with space separated list of UUIDS to operate on
+#   $1    = `machines` sub-command to run
+#   $2    = action/argument to sub-commnand
+#
+#  example:
+#
+#     export UUIDS="uuid_1 uuid_2 ... uuid_N"
+#     my_machines addprofile krib-cluster-live
+#
+#  which runs:
+#
+#     drpcli machines addprofile <UUID> krib-cluster-live
+#
+#  $2 can be empty if it doesnot apply (eg 'my_machines show')
+###
+function my_machines() { local _u; for _u in $UUIDS; do set -x; drpcli machines $1 $_u $2; set +x; done; }
+
+###
 #  accept as ARGv1 a sha256 check sum file to test - files will be tested
 #  relative to the path/filename found in the SHA256 sum file
 ###
