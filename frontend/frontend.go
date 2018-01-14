@@ -497,6 +497,7 @@ func NewFrontend(
 	me.InitPrefApi()
 	me.InitParamApi()
 	me.InitInfoApi(drpid)
+	me.InitLogApi()
 	me.InitPluginApi()
 	me.InitPluginProviderApi()
 	me.InitTaskApi()
