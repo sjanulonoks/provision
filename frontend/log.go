@@ -23,7 +23,7 @@ func (f *Frontend) InitLogApi() {
 	//       application/json
 	//
 	//     Responses:
-	//       200: InfoResponse
+	//       200: LogResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       500: ErrorResponse
