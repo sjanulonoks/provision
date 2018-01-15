@@ -134,6 +134,8 @@ func newRenderedTemplate(r *RenderData,
 				rd.target = renderable(rd.Env.BootEnv)
 			}
 			rd.remoteIP = remoteIP
+			rd.tmplKey = tmplKey
+			rd.tmplPath = path
 			buf := bytes.Buffer{}
 			tmpl := rd.target.templates().Lookup(tmplKey)
 			rd.rt.Do(func(d Stores) {
@@ -346,13 +348,14 @@ func (b *rBootEnv) JoinInitrds(proto string) string {
 // RenderData is the struct that is passed to templates as a source of
 // parameters and useful methods.
 type RenderData struct {
-	Machine  *rMachine // The Machine that the template is being rendered for.
-	Env      *rBootEnv // The boot environment that provided the template.
-	Task     *rTask
-	Stage    *rStage
-	rt       *RequestTracker
-	target   renderable
-	remoteIP net.IP
+	Machine           *rMachine // The Machine that the template is being rendered for.
+	Env               *rBootEnv // The boot environment that provided the template.
+	Task              *rTask
+	Stage             *rStage
+	rt                *RequestTracker
+	target            renderable
+	tmplKey, tmplPath string
+	remoteIP          net.IP
 }
 
 func (r *RenderData) fetchRepos(test func(*Repo) bool) (res []*Repo) {
@@ -609,7 +612,13 @@ func (r *RenderData) BootParams() (string, error) {
 	if err := r.Env.bootParamsTmpl.Execute(res, r); err != nil {
 		return "", err
 	}
-	return res.String(), nil
+	str := res.String()
+	// ipxe in uefi mode requires an initrd stanza in the boot params.
+	// I have no idea why.
+	if strings.HasSuffix(r.tmplPath, ".ipxe") && len(r.Env.Initrds) > 0 {
+		str = fmt.Sprintf("initrd=%s %s", path.Base(r.Env.Initrds[0]), str)
+	}
+	return str, nil
 }
 
 func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {

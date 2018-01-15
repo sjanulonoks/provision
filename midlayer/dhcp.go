@@ -82,18 +82,6 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 		opts[dhcp.OptionRebindingTimeValue] = rbt
 	} else {
 		dur = 0
-
-		// Build PXEClient reply parts to get the client booting.
-		if srcOpts[int(dhcp.OptionClientArchitecture)] == "0" {
-			// Option encoded byte array: option 6: len: 1 value: 8, 255 (end of options)
-			opts[dhcp.OptionVendorSpecificInformation] = []byte{6, 1, 8, 255}
-		}
-		opts[dhcp.OptionVendorClassIdentifier] = []byte("PXEClient")
-
-		// Send back the GUID if we got a guid
-		if options[97] != nil {
-			opts[97] = options[97]
-		}
 	}
 
 	nextServer := h.respondFrom(l.Addr, cm)
@@ -129,6 +117,22 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 		}
 		if r.NextServer.IsGlobalUnicast() {
 			nextServer = r.NextServer
+		}
+	}
+	if pxeClient, ok := srcOpts[int(dhcp.OptionVendorClassIdentifier)]; ok && strings.HasPrefix(pxeClient, "PXEClient:") {
+		// A single menu entry named PXE, and a 0 second timeout to automatically boot to it.
+		// This is what dnsmasq does when there is only one option it will return.
+		opts[dhcp.OptionVendorSpecificInformation] = []byte{0x06, 0x01, 0x08, 0x0a, 0x04, 0x00, 0x50, 0x58, 0x45, 0xff}
+		// The PXE server must identify itself as "PXEClient"
+		opts[dhcp.OptionVendorClassIdentifier] = []byte("PXEClient")
+		// If we did not already have a TFTP server name set, set it to
+		// our address.
+		if opts[dhcp.OptionTFTPServerName] == nil {
+			opts[dhcp.OptionTFTPServerName] = []byte(nextServer.String())
+		}
+		// Send back the GUID if we got a guid
+		if options[97] != nil {
+			opts[97] = options[97]
 		}
 	}
 	return opts, dur, nextServer
@@ -340,14 +344,16 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 	options dhcp.Options,
 	cm *ipv4.ControlMessage) (res dhcp.Packet) {
 	rt := h.Request("leases", "reservations", "subnets")
-	rt.Infof("Received DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s server %s chaddr %s",
+	rt.Infof("Received DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s server %s chaddr %s on %s",
 		msgType.String(),
 		xid(p),
 		p.CIAddr(),
 		p.YIAddr(),
 		p.GIAddr(),
 		p.SIAddr(),
-		p.CHAddr().String())
+		p.CHAddr().String(),
+		cm.Dst.String())
+	rt.Debugf("Packet recieved on interface %s, subnet candidates are %v", h.intf(cm).Name, h.listenIPs(cm))
 	// need code to figure out which interface or relay it came from
 	req, reqState := reqAddr(p, msgType, options)
 	var err error
@@ -470,6 +476,10 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 			lease.Addr,
 			duration,
 			opts.SelectOrderOrAll(opts[dhcp.OptionParameterRequestList]))
+		// We should never need this, but...
+		if fName, ok := opts[dhcp.OptionBootFileName]; ok {
+			reply.SetFile(fName)
+		}
 		if nextServer.IsGlobalUnicast() {
 			reply.SetSIAddr(nextServer)
 		}
@@ -547,6 +557,10 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 					addr,
 					duration,
 					opts.SelectOrderOrAll(opts[dhcp.OptionParameterRequestList]))
+				// We should never need this, but...
+				if fName, ok := opts[dhcp.OptionBootFileName]; ok {
+					reply.SetFile(fName)
+				}
 				if (subnet != nil && subnet.Proxy) || h.proxyOnly {
 					// If we are a true proxy (NOT BINL/PXE), then broadcast
 					if !h.proxyOnly {
