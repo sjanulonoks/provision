@@ -97,7 +97,7 @@ func (f *Frontend) Release() {}
 func (f *Frontend) Unload()  {}
 
 func websocketHandler(s *melody.Session, buf []byte) {
-	l := s.MustGet("logger").(logger.Logger)
+	l := s.MustGet("logger").(logger.Logger).NoPublish()
 	splitMsg := bytes.SplitN(bytes.TrimSpace(buf), []byte(" "), 2)
 	if len(splitMsg) != 2 {
 		l.Warnf("WS: Unknown: Received message: %s\n", string(buf))
