@@ -521,21 +521,21 @@ func (s *Subnet) Validate() {
 	// Make sure that options have the correct netmask and broadcast options enabled
 	needMask := true
 	needBCast := true
-	for _, opt := range s.Options {
+	for i, opt := range s.Options {
 		if opt.Code == byte(dhcp.OptionBroadcastAddress) {
-			opt.Value = net.IP(buf).String()
+			s.Options[i].Value = net.IP(buf).String()
 			needBCast = false
 		}
 		if opt.Code == byte(dhcp.OptionSubnetMask) {
-			opt.Value = mask.String()
+			s.Options[i].Value = mask.String()
 			needMask = false
 		}
 	}
 	if needMask {
-		s.Options = append(s.Options, &models.DhcpOption{byte(dhcp.OptionSubnetMask), mask.String()})
+		s.Options = append(s.Options, models.DhcpOption{byte(dhcp.OptionSubnetMask), mask.String()})
 	}
 	if needBCast {
-		s.Options = append(s.Options, &models.DhcpOption{byte(dhcp.OptionBroadcastAddress), net.IP(buf).String()})
+		s.Options = append(s.Options, models.DhcpOption{byte(dhcp.OptionBroadcastAddress), net.IP(buf).String()})
 	}
 
 	if !s.OnlyReservations {

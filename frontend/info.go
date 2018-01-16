@@ -34,7 +34,7 @@ func (f *Frontend) GetInfo(c *gin.Context, drpid string) (*models.Info, *models.
 		DhcpEnabled:        !f.NoDhcp,
 		ProvisionerEnabled: !f.NoProv,
 		BinlEnabled:        !f.NoBinl,
-		Stats:              make([]*models.Stat, 0, 0),
+		Stats:              make([]models.Stat, 0, 0),
 		Features: []string{
 			"api-v3",
 			"sane-exit-codes",
@@ -57,13 +57,13 @@ func (f *Frontend) GetInfo(c *gin.Context, drpid string) (*models.Info, *models.
 		if idx, err := index.All(index.Native())(&d("machines").Index); err != nil {
 			res.AddError(err)
 		} else {
-			i.Stats = append(i.Stats, &models.Stat{"machines.count", idx.Count()})
+			i.Stats = append(i.Stats, models.Stat{"machines.count", idx.Count()})
 		}
 
 		if idx, err := index.All(index.Native())(&d("subnets").Index); err != nil {
 			res.AddError(err)
 		} else {
-			i.Stats = append(i.Stats, &models.Stat{"subnets.count", idx.Count()})
+			i.Stats = append(i.Stats, models.Stat{"subnets.count", idx.Count()})
 		}
 	})
 

@@ -45,9 +45,9 @@ func NewActions() *Actions {
 	return &Actions{actions: make(ObjectsCommands, 0)}
 }
 
-func (ma *Actions) Add(model_aa *models.AvailableAction, plugin *RunningPlugin) error {
+func (ma *Actions) Add(model_aa models.AvailableAction, plugin *RunningPlugin) error {
 	aa := &AvailableAction{}
-	aa.AvailableAction = *model_aa
+	aa.AvailableAction = model_aa
 	aa.Plugin = plugin
 	aa.ma = ma
 
@@ -87,7 +87,7 @@ func (ma *Actions) Add(model_aa *models.AvailableAction, plugin *RunningPlugin) 
 	return nil
 }
 
-func (ma *Actions) Remove(aa *models.AvailableAction, plugin *RunningPlugin) error {
+func (ma *Actions) Remove(aa models.AvailableAction, plugin *RunningPlugin) error {
 	var err error
 	var the_aa *AvailableAction
 	ma.lock.Lock()

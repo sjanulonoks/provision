@@ -300,9 +300,10 @@ func (pc *PluginController) startPlugin(rt *backend.RequestTracker, plugin *back
 				if pp.HasPublish {
 					pc.publishers.Add(thingee)
 				}
-				for _, aa := range pp.AvailableActions {
-					aa.Provider = pp.Name
-					pc.Actions.Add(aa, rp)
+				for i, _ := range pp.AvailableActions {
+					pp.AvailableActions[i].Fill()
+					pp.AvailableActions[i].Provider = pp.Name
+					pc.Actions.Add(pp.AvailableActions[i], rp)
 				}
 				pc.runningPlugins[plugin.Name] = rp
 			} else {
@@ -462,15 +463,6 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 				content.Meta.Source = "FromPluginProvider"
 			}
 			content.Meta.Type = "plugin"
-
-			// Merge in parameters if old plugin.
-			if _, ok := content.Sections["params"]; !ok {
-				content.Sections["params"] = models.Section{}
-			}
-			for _, p := range pp.Parameters {
-				p.Fill()
-				content.Sections["params"][p.Name] = p
-			}
 
 			if !skip {
 				pc.Tracef("Building new datastore for: %s\n", provider)
