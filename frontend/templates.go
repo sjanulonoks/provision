@@ -37,12 +37,12 @@ type TemplatePatchBodyParameter struct {
 	Body jsonpatch2.Patch
 }
 
-// TemplatePathParameter used to name a Template in the path
+// TemplatePathParameter used to id a Template in the path
 // swagger:parameters putTemplates getTemplate putTemplate patchTemplate deleteTemplate headTemplate
 type TemplatePathParameter struct {
 	// in: path
 	// required: true
-	Name string `json:"name"`
+	Id string `json:"id"`
 }
 
 // TemplateListPathParameter used to limit lists of Template by path options
@@ -60,6 +60,45 @@ type TemplateListPathParameter struct {
 	ReadOnly string
 	// in: query
 	ID string
+}
+
+// TemplateActionsPathParameter used to find a Template / Actions in the path
+// swagger:parameters getTemplateActions
+type TemplateActionsPathParameter struct {
+	// in: path
+	// required: true
+	Id string `json:"id"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// TemplateActionPathParameter used to find a Template / Action in the path
+// swagger:parameters getTemplateAction
+type TemplateActionPathParameter struct {
+	// in: path
+	// required: true
+	Id string `json:"id"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// TemplateActionBodyParameter used to post a Template / Action in the path
+// swagger:parameters postTemplateAction
+type TemplateActionBodyParameter struct {
+	// in: path
+	// required: true
+	Id string `json:"id"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
 }
 
 func (f *Frontend) InitTemplateApi() {
@@ -160,11 +199,11 @@ func (f *Frontend) InitTemplateApi() {
 			f.Create(c, b)
 		})
 
-	// swagger:route GET /templates/{name} Templates getTemplate
+	// swagger:route GET /templates/{id} Templates getTemplate
 	//
 	// Get a Template
 	//
-	// Get the Template specified by {name} or return NotFound.
+	// Get the Template specified by {id} or return NotFound.
 	//
 	//     Responses:
 	//       200: TemplateResponse
@@ -176,27 +215,27 @@ func (f *Frontend) InitTemplateApi() {
 			f.Fetch(c, &backend.Template{}, c.Param(`id`))
 		})
 
-	// swagger:route HEAD /templates/{name} Templates headTemplate
+	// swagger:route HEAD /templates/{id} Templates headTemplate
 	//
 	// See if a Template exists
 	//
-	// Return 200 if the Template specifiec by {name} exists, or return NotFound.
+	// Return 200 if the Template specifiec by {id} exists, or return NotFound.
 	//
 	//     Responses:
 	//       200: NoContentResponse
 	//       401: NoContentResponse
 	//       403: NoContentResponse
 	//       404: NoContentResponse
-	f.ApiGroup.HEAD("/templates/:name",
+	f.ApiGroup.HEAD("/templates/:id",
 		func(c *gin.Context) {
-			f.Exists(c, &backend.Template{}, c.Param(`name`))
+			f.Exists(c, &backend.Template{}, c.Param(`id`))
 		})
 
-	// swagger:route PATCH /templates/{name} Templates patchTemplate
+	// swagger:route PATCH /templates/{id} Templates patchTemplate
 	//
 	// Patch a Template
 	//
-	// Update a Template specified by {name} using a RFC6902 Patch structure
+	// Update a Template specified by {id} using a RFC6902 Patch structure
 	//
 	//     Responses:
 	//       200: TemplateResponse
@@ -212,11 +251,11 @@ func (f *Frontend) InitTemplateApi() {
 			f.Patch(c, &backend.Template{}, c.Param(`id`))
 		})
 
-	// swagger:route PUT /templates/{name} Templates putTemplate
+	// swagger:route PUT /templates/{id} Templates putTemplate
 	//
 	// Put a Template
 	//
-	// Update a Template specified by {name} using a JSON Template
+	// Update a Template specified by {id} using a JSON Template
 	//
 	//     Responses:
 	//       200: TemplateResponse
@@ -231,11 +270,11 @@ func (f *Frontend) InitTemplateApi() {
 			f.Update(c, &backend.Template{}, c.Param(`id`))
 		})
 
-	// swagger:route DELETE /templates/{name} Templates deleteTemplate
+	// swagger:route DELETE /templates/{id} Templates deleteTemplate
 	//
 	// Delete a Template
 	//
-	// Delete a Template specified by {name}
+	// Delete a Template specified by {id}
 	//
 	//     Responses:
 	//       200: TemplateResponse
@@ -248,4 +287,56 @@ func (f *Frontend) InitTemplateApi() {
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Template{}, c.Param(`id`))
 		})
+
+	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Template{}, "id")
+
+	// swagger:route GET /templates/{id}/actions Templates getTemplateActions
+	//
+	// List template actions Template
+	//
+	// List Template actions for a Template specified by {id}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoTemplateResponse
+	//       403: NoTemplateResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/templates/:id/actions", pActions)
+
+	// swagger:route GET /templates/{id}/actions/{cmd} Templates getTemplateAction
+	//
+	// List specific action for a template Template
+	//
+	// List specific {cmd} action for a Template specified by {id}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoTemplateResponse
+	//       403: NoTemplateResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/templates/:id/actions/:cmd", pAction)
+
+	// swagger:route POST /templates/{id}/actions/{cmd} Templates postTemplateAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoTemplateResponse
+	//       403: NoTemplateResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/templates/:id/actions/:cmd", pRun)
 }

@@ -72,6 +72,45 @@ type SubnetListPathParameter struct {
 	Proxy string
 }
 
+// SubnetActionsPathParameter used to find a Subnet / Actions in the path
+// swagger:parameters getSubnetActions
+type SubnetActionsPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// SubnetActionPathParameter used to find a Subnet / Action in the path
+// swagger:parameters getSubnetAction
+type SubnetActionPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// SubnetActionBodyParameter used to post a Subnet / Action in the path
+// swagger:parameters postSubnetAction
+type SubnetActionBodyParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 func (f *Frontend) InitSubnetApi() {
 	// swagger:route GET /subnets Subnets listSubnets
 	//
@@ -269,4 +308,56 @@ func (f *Frontend) InitSubnetApi() {
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Subnet{}, c.Param(`name`))
 		})
+
+	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Subnet{}, "name")
+
+	// swagger:route GET /subnets/{name}/actions Subnets getSubnetActions
+	//
+	// List subnet actions Subnet
+	//
+	// List Subnet actions for a Subnet specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoSubnetResponse
+	//       403: NoSubnetResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/subnets/:name/actions", pActions)
+
+	// swagger:route GET /subnets/{name}/actions/{cmd} Subnets getSubnetAction
+	//
+	// List specific action for a subnet Subnet
+	//
+	// List specific {cmd} action for a Subnet specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoSubnetResponse
+	//       403: NoSubnetResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/subnets/:name/actions/:cmd", pAction)
+
+	// swagger:route POST /subnets/{name}/actions/{cmd} Subnets postSubnetAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoSubnetResponse
+	//       403: NoSubnetResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/subnets/:name/actions/:cmd", pRun)
 }

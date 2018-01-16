@@ -2,213 +2,109 @@ package midlayer
 
 import (
 	"bufio"
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"sync"
 	"time"
 
 	"github.com/digitalrebar/logger"
-	"github.com/digitalrebar/provision/backend"
-	"github.com/digitalrebar/provision/models"
 )
-
-type PluginClientRequestTracker struct {
-	c chan *models.PluginClientReply
-	l logger.Logger
-}
 
 type PluginClient struct {
 	logger.Logger
+	pc       *PluginController
 	plugin   string
 	cmd      *exec.Cmd
 	stderr   io.ReadCloser
-	stdout   io.ReadCloser
-	stdin    io.WriteCloser
 	finished chan bool
 	lock     sync.Mutex
-	nextId   int
-	pending  map[int]*PluginClientRequestTracker
 
 	publock   sync.Mutex
 	inflight  int
 	unloading bool
+
+	client *http.Client
 }
 
-func (pc *PluginClient) ReadLog() {
-	// read command's stderr line by line - for logging
-	in := bufio.NewScanner(pc.stderr)
+func (pc *PluginClient) readLog(name string, com io.ReadCloser) {
+	pc.Tracef("readLog: Starting log reader %s(%s)\n", pc.plugin, name)
+	// read command's com line by line - for logging
+	in := bufio.NewScanner(com)
 	for in.Scan() {
-		pc.Infof("Plugin %s: %s", pc.plugin, in.Text()) // write each line to your log, or anything you need
+		// XXX: NoPublish these until we get json logging setup.
+		// The problem is that publish calls generate logging that generate Publish calls
+		// This loops (but doesn't hang).  So, don't event these, but log them.
+		pc.NoPublish().Infof("Plugin %s(%s): %s", pc.plugin, name, in.Text())
 	}
 	if err := in.Err(); err != nil {
-		pc.Errorf("Plugin %s: error: %s", pc.plugin, err)
+		pc.Errorf("Plugin %s(%s): error: %s", pc.plugin, name, err)
 	}
 	pc.finished <- true
-}
-
-func (pc *PluginClient) ReadReply() {
-	// read command's stdout line by line - for replies
-	in := bufio.NewScanner(pc.stdout)
-	for in.Scan() {
-		jsonString := in.Text()
-
-		var resp models.PluginClientReply
-		err := json.Unmarshal([]byte(jsonString), &resp)
-		if err != nil {
-			pc.Errorf("Failed to process: %v\n", err)
-			continue
-		}
-
-		req, ok := pc.pending[resp.Id]
-		if !ok {
-			pc.Warnf("Failed to find request for: %v\n", resp.Id)
-			continue
-		}
-		req.c <- &resp
-		req.l.Debugf("Action processed")
-
-		pc.lock.Lock()
-		delete(pc.pending, resp.Id)
-		pc.lock.Unlock()
-	}
-	if err := in.Err(); err != nil {
-		pc.Warnf("Reply %s: error: %s", pc.plugin, err)
-	}
-	pc.finished <- true
-}
-
-func (pc *PluginClient) writeRequest(l logger.Logger, action string, data interface{}) (chan *models.PluginClientReply, error) {
-	pc.lock.Lock()
-	defer pc.lock.Unlock()
-
-	mychan := &PluginClientRequestTracker{
-		c: make(chan *models.PluginClientReply),
-		l: l,
-	}
-	id := pc.nextId
-	pc.pending[id] = mychan
-	pc.nextId += 1
-
-	req := &models.PluginClientRequest{Id: id, Action: action}
-
-	if dataBytes, err := json.Marshal(data); err != nil {
-		delete(pc.pending, id)
-		l.Errorf("%s:%s: Error marshalling request data: %v", pc.plugin, action, err)
-		return mychan.c, err
-	} else {
-		req.Data = dataBytes
-	}
-
-	if bytes, err := json.Marshal(req); err != nil {
-		delete(pc.pending, id)
-		l.Errorf("%s:%s Error marshalling request: %v", pc.plugin, action, err)
-		return mychan.c, err
-	} else {
-		bytes = append(bytes, "\n"...)
-		n, err := pc.stdin.Write(bytes)
-		if err != nil {
-			l.Errorf("%s:%s: Error sending request to plugin: %v", pc.plugin, action, err)
-			return mychan.c, err
-		}
-		if n != len(bytes) {
-			l.Errorf("%s:%s: Only sent %d out of %d bytes to plugin", pc.plugin, action, n, len(bytes))
-			return mychan.c, fmt.Errorf("Failed to write all bytes: %d (%d)\n", len(bytes), n)
-		}
-	}
-	l.Infof("%s:%s: Request sent", pc.plugin, action)
-	return mychan.c, nil
-}
-
-func (pc *PluginClient) Config(params map[string]interface{}) error {
-	if mychan, err := pc.writeRequest(pc.Logger, "Config", params); err != nil {
-		return err
-	} else {
-		s := <-mychan
-		if s.HasError() {
-			return s.Error()
-		}
-	}
-	return nil
+	pc.Tracef("readLog: Finished log reader %s(%s)\n", pc.plugin, name)
 }
 
 func (pc *PluginClient) Reserve() error {
+	pc.NoPublish().Tracef("Reserve: started\n")
 	pc.publock.Lock()
 	defer pc.publock.Unlock()
 
 	if pc.unloading {
-		return fmt.Errorf("Publish not available %s: unloading\n", pc.plugin)
+		err := fmt.Errorf("Publish not available %s: unloading\n", pc.plugin)
+		pc.NoPublish().Tracef("Reserve: finished: %v\n", err)
+		return err
 	}
 	pc.inflight += 1
+	pc.NoPublish().Tracef("Reserve: finished: %d\n", pc.inflight)
 	return nil
 }
 
 func (pc *PluginClient) Release() {
+	pc.NoPublish().Tracef("Release: started\n")
 	pc.publock.Lock()
 	defer pc.publock.Unlock()
 	pc.inflight -= 1
+	pc.NoPublish().Tracef("Release: finished: %d\n", pc.inflight)
 }
 
 func (pc *PluginClient) Unload() {
+	pc.Tracef("Unload: started\n")
 	pc.publock.Lock()
 	pc.unloading = true
+	count := 0
 	for pc.inflight != 0 {
+		if count%100 == 0 {
+			pc.Tracef("Unload: waiting - %d\n", pc.inflight)
+		}
 		pc.publock.Unlock()
+		count += 1
 		time.Sleep(time.Millisecond * 15)
 		pc.publock.Lock()
 	}
 	pc.publock.Unlock()
+	pc.Tracef("Unload: finished\n")
 	return
 }
 
-func (pc *PluginClient) Publish(e *models.Event) error {
-	if mychan, err := pc.writeRequest(pc.Logger, "Publish", e); err != nil {
-		return err
-	} else {
-		s := <-mychan
+func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logger.Logger, apiURL, staticURL, token, path string, params map[string]interface{}) (answer *PluginClient, theErr error) {
+	answer = &PluginClient{pc: pc, plugin: plugin, Logger: l}
+	answer.Debugf("Initialzing Plugin: %s\n", plugin)
 
-		if s.HasError() {
-			return s.Error()
-		}
-	}
-	return nil
-}
+	retSocketPath := fmt.Sprintf("%s/%s.fromPlugin", pluginCommDir, plugin)
+	answer.pluginServer(retSocketPath)
 
-func (pc *PluginClient) Action(rt *backend.RequestTracker, a *models.MachineAction) error {
-	if mychan, err := pc.writeRequest(rt.Logger, "Action", a); err != nil {
-		return err
-	} else {
-		s := <-mychan
-		if s.HasError() {
-			return s.Error()
-		}
-	}
-	return nil
-}
+	socketPath := fmt.Sprintf("%s/%s.toPlugin", pluginCommDir, plugin)
+	answer.cmd = exec.Command(path, "listen", socketPath, retSocketPath)
 
-func (pc *PluginClient) Stop() error {
-	// Close stdin / writer.  To close, the program.
-	pc.stdin.Close()
-
-	// Wait for reader to exit
-	<-pc.finished
-	<-pc.finished
-
-	// Wait for exit
-	pc.cmd.Wait()
-	return nil
-}
-
-func NewPluginClient(plugin string, l logger.Logger, apiURL, staticURL, path string, params map[string]interface{}) (answer *PluginClient, theErr error) {
-	answer = &PluginClient{plugin: plugin, Logger: l, pending: make(map[int]*PluginClientRequestTracker, 0)}
-
-	answer.cmd = exec.Command(path, "listen")
-	// Setup env vars to run drpcli - auth should be parameters.
+	// Setup env vars to run plugin - auth should be parameters.
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("RS_ENDPOINT=%s", apiURL))
 	env = append(env, fmt.Sprintf("RS_FILESERVER=%s", staticURL))
+	env = append(env, fmt.Sprintf("RS_TOKEN=%s", token))
 	answer.cmd.Env = env
 
 	var err2 error
@@ -216,26 +112,71 @@ func NewPluginClient(plugin string, l logger.Logger, apiURL, staticURL, path str
 	if err2 != nil {
 		return nil, err2
 	}
-	answer.stdout, err2 = answer.cmd.StdoutPipe()
-	if err2 != nil {
-		return nil, err2
-	}
-	answer.stdin, err2 = answer.cmd.StdinPipe()
+
+	// We need so for the ready call.
+	so, err2 := answer.cmd.StdoutPipe()
 	if err2 != nil {
 		return nil, err2
 	}
 
+	// Close stdin, we don't need it.
+	if si, err2 := answer.cmd.StdinPipe(); err2 != nil {
+		return nil, err2
+	} else {
+		si.Close()
+	}
+
+	// Start the err reader.
 	answer.finished = make(chan bool, 2)
-	go answer.ReadLog()
-	go answer.ReadReply()
+	go answer.readLog("se", answer.stderr)
 
+	// Start the plugin
+	answer.Debugf("Start Plugin: %s\n", plugin)
 	answer.cmd.Start()
 
-	terr := answer.Config(params)
-	if terr != nil {
+	// Wait for plugin to be listening
+	answer.Debugf("Wait for ready\n")
+	failed := false
+	in := bufio.NewScanner(so)
+	for in.Scan() {
+		s := in.Text()
+		if s == "READY!" {
+			break
+		}
+		if s == "Failed" {
+			failed = true
+			break
+		}
+		// Log each line until ready or fail
+		l.Infof("Plugin %s: start-up: %s", answer.plugin, s)
+	}
+	if err := in.Err(); err != nil {
+		l.Errorf("Plugin %s: start-up error: %s", answer.plugin, err)
+	}
+	if failed {
+		err := fmt.Errorf("Failed to start plugin - didn't respond cleanly")
+		l.Errorf("%v\n", err)
+		return nil, err
+	}
+	// Start so reader to make sure nothing else gets stashed in the pipe
+	go answer.readLog("so", so)
+
+	// Get HTTP2 client on our socket.
+	answer.client = &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", socketPath)
+			},
+		},
+	}
+
+	// Configure the plugin
+	answer.Debugf("Config Plugin: %s\n", plugin)
+	if terr := answer.Config(params); terr != nil {
+		answer.Debugf("Stop Plugin: %s Error: %v\n", plugin, terr)
 		answer.Stop()
 		theErr = terr
-		return
 	}
+	answer.Debugf("Initialzing Plugin: complete %s\n", plugin)
 	return
 }

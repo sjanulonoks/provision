@@ -376,3 +376,7 @@ func (rt *RequestTracker) ApiURL(remoteIP net.IP) string {
 func (rt *RequestTracker) FileURL(remoteIP net.IP) string {
 	return rt.urlFor("http", remoteIP, rt.dt.StaticPort)
 }
+
+func (rt *RequestTracker) SealClaims(claims *DrpCustomClaims) (string, error) {
+	return rt.dt.SealClaims(claims)
+}

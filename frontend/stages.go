@@ -66,6 +66,45 @@ type StageListPathParameter struct {
 	BootEnv string
 }
 
+// StageActionsPathParameter used to find a Stage / Actions in the path
+// swagger:parameters getStageActions
+type StageActionsPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// StageActionPathParameter used to find a Stage / Action in the path
+// swagger:parameters getStageAction
+type StageActionPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// StageActionBodyParameter used to post a Stage / Action in the path
+// swagger:parameters postStageAction
+type StageActionBodyParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 func (f *Frontend) InitStageApi() {
 	// swagger:route GET /stages Stages listStages
 	//
@@ -253,4 +292,56 @@ func (f *Frontend) InitStageApi() {
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Stage{}, c.Param(`name`))
 		})
+
+	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Stage{}, "name")
+
+	// swagger:route GET /stages/{name}/actions Stages getStageActions
+	//
+	// List stage actions Stage
+	//
+	// List Stage actions for a Stage specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoStageResponse
+	//       403: NoStageResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/stages/:name/actions", pActions)
+
+	// swagger:route GET /stages/{name}/actions/{cmd} Stages getStageAction
+	//
+	// List specific action for a stage Stage
+	//
+	// List specific {cmd} action for a Stage specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoStageResponse
+	//       403: NoStageResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/stages/:name/actions/:cmd", pAction)
+
+	// swagger:route POST /stages/{name}/actions/{cmd} Stages postStageAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoStageResponse
+	//       403: NoStageResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/stages/:name/actions/:cmd", pRun)
 }

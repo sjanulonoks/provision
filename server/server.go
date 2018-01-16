@@ -70,6 +70,7 @@ type ProgOpts struct {
 	BaseRoot        string `long:"base-root" description:"Base directory for other root dirs." default:"/var/lib/dr-provision"`
 	DataRoot        string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
 	PluginRoot      string `long:"plugin-root" description:"Directory for plugins" default:"plugins"`
+	PluginCommRoot  string `long:"plugin-comm-root" description:"Directory for the communications for plugins" default:"plugins-comms"`
 	LogRoot         string `long:"log-root" description:"Directory for job logs" default:"job-logs"`
 	SaasContentRoot string `long:"saas-content-root" description:"Directory for additional content" default:"saas-content"`
 	FileRoot        string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
@@ -124,6 +125,9 @@ func Server(c_opts *ProgOpts) {
 	if strings.IndexRune(c_opts.PluginRoot, filepath.Separator) != 0 {
 		c_opts.PluginRoot = filepath.Join(c_opts.BaseRoot, c_opts.PluginRoot)
 	}
+	if strings.IndexRune(c_opts.PluginCommRoot, filepath.Separator) != 0 {
+		c_opts.PluginCommRoot = filepath.Join(c_opts.BaseRoot, c_opts.PluginCommRoot)
+	}
 	if strings.IndexRune(c_opts.DataRoot, filepath.Separator) != 0 {
 		c_opts.DataRoot = filepath.Join(c_opts.BaseRoot, c_opts.DataRoot)
 	}
@@ -139,6 +143,7 @@ func Server(c_opts *ProgOpts) {
 	mkdir(c_opts.FileRoot, localLogger)
 	mkdir(c_opts.ReplaceRoot, localLogger)
 	mkdir(c_opts.PluginRoot, localLogger)
+	mkdir(c_opts.PluginCommRoot, localLogger)
 	mkdir(c_opts.DataRoot, localLogger)
 	mkdir(c_opts.LogRoot, localLogger)
 	mkdir(c_opts.SaasContentRoot, localLogger)
@@ -213,7 +218,7 @@ func Server(c_opts *ProgOpts) {
 		}
 	}
 
-	pc, err := midlayer.InitPluginController(c_opts.PluginRoot, dt, publishers)
+	pc, err := midlayer.InitPluginController(c_opts.PluginRoot, c_opts.PluginCommRoot, dt, publishers)
 	if err != nil {
 		localLogger.Fatalf("Error starting plugin service: %v", err)
 	} else {
@@ -230,6 +235,11 @@ func Server(c_opts *ProgOpts) {
 	fe.TftpPort = c_opts.TftpPort
 	fe.BinlPort = c_opts.BinlPort
 	fe.NoBinl = c_opts.DisableBINL
+
+	// Start the controller now that we have a frontend to front.
+	if err := pc.StartController(fe.ApiGroup); err != nil {
+		localLogger.Fatalf("Error starting plugin service: %v", err)
+	}
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)

@@ -810,6 +810,7 @@ func NewDataTracker(backend store.Store,
 				savePrefs = true
 			}
 			prefs[name] = logTarget
+			// GREG: SetLevel in the logger codebase should track forks and update appropriately.
 			res.LogFor(logName).SetLevel(logLevel)
 		}
 		if savePrefs {

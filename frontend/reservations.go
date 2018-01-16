@@ -80,6 +80,45 @@ type ReservationListPathParameter struct {
 	NextServer string
 }
 
+// ReservationActionsPathParameter used to find a Reservation / Actions in the path
+// swagger:parameters getReservationActions
+type ReservationActionsPathParameter struct {
+	// in: path
+	// required: true
+	Address string `json:"address"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// ReservationActionPathParameter used to find a Reservation / Action in the path
+// swagger:parameters getReservationAction
+type ReservationActionPathParameter struct {
+	// in: path
+	// required: true
+	Address string `json:"address"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// ReservationActionBodyParameter used to post a Reservation / Action in the path
+// swagger:parameters postReservationAction
+type ReservationActionBodyParameter struct {
+	// in: path
+	// required: true
+	Address string `json:"address"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 func (f *Frontend) InitReservationApi() {
 	// swagger:route GET /reservations Reservations listReservations
 	//
@@ -275,4 +314,56 @@ func (f *Frontend) InitReservationApi() {
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Reservation{}, ifIpConvertToHex(c.Param(`address`)))
 		})
+
+	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Reservation{}, "address")
+
+	// swagger:route GET /reservations/{address}/actions Reservations getReservationActions
+	//
+	// List reservation actions Reservation
+	//
+	// List Reservation actions for a Reservation specified by {address}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoReservationResponse
+	//       403: NoReservationResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/reservations/:address/actions", pActions)
+
+	// swagger:route GET /reservations/{address}/actions/{cmd} Reservations getReservationAction
+	//
+	// List specific action for a reservation Reservation
+	//
+	// List specific {cmd} action for a Reservation specified by {address}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoReservationResponse
+	//       403: NoReservationResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/reservations/:address/actions/:cmd", pAction)
+
+	// swagger:route POST /reservations/{address}/actions/{cmd} Reservations postReservationAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoReservationResponse
+	//       403: NoReservationResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/reservations/:address/actions/:cmd", pRun)
 }

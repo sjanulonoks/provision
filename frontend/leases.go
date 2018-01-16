@@ -69,6 +69,45 @@ type LeaseListPathParameter struct {
 	ExpireTime string
 }
 
+// LeaseActionsPathParameter used to find a Lease / Actions in the path
+// swagger:parameters getLeaseActions
+type LeaseActionsPathParameter struct {
+	// in: path
+	// required: true
+	Address string `json:"address"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// LeaseActionPathParameter used to find a Lease / Action in the path
+// swagger:parameters getLeaseAction
+type LeaseActionPathParameter struct {
+	// in: path
+	// required: true
+	Address string `json:"address"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// LeaseActionBodyParameter used to post a Lease / Action in the path
+// swagger:parameters postLeaseAction
+type LeaseActionBodyParameter struct {
+	// in: path
+	// required: true
+	Address string `json:"address"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 func (f *Frontend) InitLeaseApi() {
 	// swagger:route GET /leases Leases listLeases
 	//
@@ -207,4 +246,56 @@ func (f *Frontend) InitLeaseApi() {
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Lease{}, ifIpConvertToHex(c.Param(`address`)))
 		})
+
+	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Lease{}, "address")
+
+	// swagger:route GET /leases/{address}/actions Leases getLeaseActions
+	//
+	// List lease actions Lease
+	//
+	// List Lease actions for a Lease specified by {address}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoLeaseResponse
+	//       403: NoLeaseResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/leases/:address/actions", pActions)
+
+	// swagger:route GET /leases/{address}/actions/{cmd} Leases getLeaseAction
+	//
+	// List specific action for a lease Lease
+	//
+	// List specific {cmd} action for a Lease specified by {address}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoLeaseResponse
+	//       403: NoLeaseResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/leases/:address/actions/:cmd", pAction)
+
+	// swagger:route POST /leases/{address}/actions/{cmd} Leases postLeaseAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoLeaseResponse
+	//       403: NoLeaseResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/leases/:address/actions/:cmd", pRun)
 }
