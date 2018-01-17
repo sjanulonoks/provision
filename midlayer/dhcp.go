@@ -48,6 +48,52 @@ type DhcpHandler struct {
 	publishers *backend.Publishers
 }
 
+func (h *DhcpHandler) buildReply(p dhcp.Packet, mt dhcp.MessageType, serverID, yAddr net.IP, leaseDuration time.Duration, options dhcp.Options, order []byte) dhcp.Packet {
+	toAdd := []dhcp.Option{}
+	var fileName, sName []byte
+	// The DHCP spec implies that we should use the bootp sname and file
+	// fields for options 66 and 67 unless the packet size grows large
+	// enough that we should use them for storing DHCP options
+	// instead. (RFC2132 sections 9.4 and 9.5), respectively. For now,
+	// our DHCP packets are small enough that making that happen is not
+	// a concern, so if we have 66 or 67 then fill in file and sname and
+	// do not include those options directly.
+	//
+	// THis also appears to be required to make UEFI boot mode work properly on
+	// the Dell T320.
+	for _, opt := range options.SelectOrderOrAll(order) {
+		c, v := opt.Code, opt.Value
+		switch c {
+		case dhcp.OptionBootFileName:
+			fileName = v
+		case dhcp.OptionTFTPServerName:
+			sName = v
+		default:
+			toAdd = append(toAdd, opt)
+		}
+	}
+	if leaseDuration > 0 {
+		toAdd = append(toAdd,
+			dhcp.Option{
+				Code:  dhcp.OptionRenewalTimeValue,
+				Value: dhcp.OptionsLeaseTime(leaseDuration / 2),
+			},
+			dhcp.Option{
+				Code:  dhcp.OptionRebindingTimeValue,
+				Value: dhcp.OptionsLeaseTime(leaseDuration * 3 / 4),
+			},
+		)
+	}
+	res := dhcp.ReplyPacket(p, mt, serverID, yAddr, leaseDuration, toAdd)
+	if fileName != nil {
+		res.SetFile(fileName)
+	}
+	if sName != nil {
+		res.SetSName(sName)
+	}
+	return res
+}
+
 func (h *DhcpHandler) Request(locks ...string) *backend.RequestTracker {
 	return h.bk.Request(h.Logger.Fork(), locks...)
 }
@@ -73,16 +119,6 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 	// ProxyOnly replies don't include lease info.
 	// Subnets marked proxy only, don't include lease info
 	dur := time.Duration(leaseTime) * time.Second
-	if !h.proxyOnly && (s == nil || !s.Proxy) {
-		rt := make([]byte, 4)
-		binary.BigEndian.PutUint32(rt, leaseTime/2)
-		rbt := make([]byte, 4)
-		binary.BigEndian.PutUint32(rbt, leaseTime*3/4)
-		opts[dhcp.OptionRenewalTimeValue] = rt
-		opts[dhcp.OptionRebindingTimeValue] = rbt
-	} else {
-		dur = 0
-	}
 
 	nextServer := h.respondFrom(l.Addr, cm)
 	if s != nil {
@@ -119,21 +155,25 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 			nextServer = r.NextServer
 		}
 	}
-	if pxeClient, ok := srcOpts[int(dhcp.OptionVendorClassIdentifier)]; ok && strings.HasPrefix(pxeClient, "PXEClient:") {
-		// A single menu entry named PXE, and a 0 second timeout to automatically boot to it.
-		// This is what dnsmasq does when there is only one option it will return.
-		opts[dhcp.OptionVendorSpecificInformation] = []byte{0x06, 0x01, 0x08, 0x0a, 0x04, 0x00, 0x50, 0x58, 0x45, 0xff}
-		// The PXE server must identify itself as "PXEClient"
-		opts[dhcp.OptionVendorClassIdentifier] = []byte("PXEClient")
-		// If we did not already have a TFTP server name set, set it to
-		// our address.
-		if opts[dhcp.OptionTFTPServerName] == nil {
-			opts[dhcp.OptionTFTPServerName] = []byte(nextServer.String())
+	if opts[dhcp.OptionTFTPServerName] == nil && opts[dhcp.OptionBootFileName] != nil {
+		opts[dhcp.OptionTFTPServerName] = []byte(nextServer.String())
+	}
+	// If we got an incoming request with pxeclient options and the subnet responsible for this request
+	// says we should answer like we are a proxy request, add the proxy options.
+	if h.proxyOnly || (s != nil && s.Proxy) {
+		if pxeClient, ok := srcOpts[int(dhcp.OptionVendorClassIdentifier)]; ok && strings.HasPrefix(pxeClient, "PXEClient:") {
+			// A single menu entry named PXE, and a 0 second timeout to automatically boot to it.
+			// This is what dnsmasq does when there is only one option it will return.
+			opts[dhcp.OptionVendorSpecificInformation] = []byte{0x06, 0x01, 0x08, 0x0a, 0x04, 0x00, 0x50, 0x58, 0x45, 0xff}
+			// The PXE server must identify itself as "PXEClient"
+			opts[dhcp.OptionVendorClassIdentifier] = []byte("PXEClient")
+			// Send back the GUID if we got a guid
+			if options[97] != nil {
+				opts[97] = options[97]
+			}
 		}
-		// Send back the GUID if we got a guid
-		if options[97] != nil {
-			opts[97] = options[97]
-		}
+		// proxy replies have no duration
+		dur = 0
 	}
 	return opts, dur, nextServer
 }
@@ -471,15 +511,13 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 			return nil
 		}
 		opts, duration, nextServer := h.buildOptions(p, lease, subnet, reservation, cm)
-		reply := dhcp.ReplyPacket(p, dhcp.ACK,
+		reply := h.buildReply(p,
+			dhcp.ACK,
 			h.respondFrom(lease.Addr, cm),
 			lease.Addr,
 			duration,
-			opts.SelectOrderOrAll(opts[dhcp.OptionParameterRequestList]))
-		// We should never need this, but...
-		if fName, ok := opts[dhcp.OptionBootFileName]; ok {
-			reply.SetFile(fName)
-		}
+			opts,
+			options[dhcp.OptionParameterRequestList])
 		if nextServer.IsGlobalUnicast() {
 			reply.SetSIAddr(nextServer)
 		}
@@ -533,7 +571,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 						rt.Save(lease)
 					})
 				} else {
-					rt.Debugf("%s: Resusing lease for %s", xid(p), lease.Addr)
+					rt.Debugf("%s: Reusing lease for %s", xid(p), lease.Addr)
 				}
 				opts, duration, nextServer := h.buildOptions(p, lease, subnet, reservation, cm)
 				repType := dhcp.Offer
@@ -552,15 +590,13 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 					// Return the address if we are a proxy
 					addr = p.YIAddr()
 				}
-				reply := dhcp.ReplyPacket(p, repType,
+				reply := h.buildReply(p,
+					repType,
 					h.respondFrom(lease.Addr, cm),
 					addr,
 					duration,
-					opts.SelectOrderOrAll(opts[dhcp.OptionParameterRequestList]))
-				// We should never need this, but...
-				if fName, ok := opts[dhcp.OptionBootFileName]; ok {
-					reply.SetFile(fName)
-				}
+					opts,
+					options[dhcp.OptionParameterRequestList])
 				if (subnet != nil && subnet.Proxy) || h.proxyOnly {
 					// If we are a true proxy (NOT BINL/PXE), then broadcast
 					if !h.proxyOnly {
