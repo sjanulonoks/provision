@@ -43,6 +43,8 @@ NOTE: The terraform-provider-plugin has been updated in the public repo,
 GIT CLONE
 ---------
 
+*If you do not have the Repo Cloned already, do:*
+
 The following steps will clone this content from the digitalrebar/provision 
 github repo (we assume you will run this from $HOME/pkt-demo - adjust yourself
 accordingly if you want to put it somewhere else):
@@ -55,6 +57,15 @@ accordingly if you want to put it somewhere else):
     cd ../..
     rm -rf provision
     cd $HOME/pkt-demo
+
+*If you DO have the Repo Cloned already, do:*
+
+Simply copy the `digitalrebar/provision/examples/pkt-demo` directory to a new
+location.  For example: 
+
+    cp -r <path_to_github_clone>/digitalrebar/provision/examples/pkt-demo $HOME/mydemo
+    cd $HOME/mydemo
+
 
 SECRETS INFORMATION
 -------------------
