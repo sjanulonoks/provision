@@ -173,12 +173,12 @@ CLEANUP:
 You can cleanup/reset the pkt-demo/ directory back to "factory
 defaults" with the following:
 
-  bin/terraform destroy --force # wipe the terraform resources
-  bin/control.sh cleanup        # restores ~/.terraformrc backup
+  bin/control.sh cleanup        # runs `terraform destroy`
+                                # destroys SSH keys
+                                # cleansup local directory artifacts
 
 
-WARNING:  THIS NUKES things - including your SSH keys, which 
-          means you may lose access to your nodes !!!!!!!!!!
+WARNING:  THIS NUKES everything !!
 
 
 NOTES:
