@@ -485,7 +485,8 @@ func (f *Frontend) InitUserApi(drpid string) {
 			f.Remove(c, &backend.User{}, c.Param(`name`))
 		})
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.User{}, "name")
+	user := &backend.User{}
+	pActions, pAction, pRun := f.makeActionEndpoints(user.Prefix(), user, "name")
 
 	// swagger:route GET /users/{name}/actions Users getUserActions
 	//

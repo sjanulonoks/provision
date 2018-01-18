@@ -323,7 +323,7 @@ func (pc *PluginController) startPlugin(rt *backend.RequestTracker, plugin *back
 	} else {
 		pc.Errorf("Starting plugin: %s(%s) missing provider\n", plugin.Name, plugin.Provider)
 		if plugin.PluginErrors == nil || len(plugin.PluginErrors) == 0 {
-			plugin.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", plugin.Provider)}
+			plugin.PluginErrors = []string{fmt.Sprintf("Missing Plugin Provider: %s", plugin.Provider)}
 			rt.Update(plugin)
 		}
 	}

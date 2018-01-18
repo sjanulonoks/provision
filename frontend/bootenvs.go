@@ -292,7 +292,8 @@ func (f *Frontend) InitBootEnvApi() {
 			f.Remove(c, &backend.BootEnv{}, c.Param(`name`))
 		})
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.BootEnv{}, "name")
+	b := &backend.BootEnv{}
+	pActions, pAction, pRun := f.makeActionEndpoints(b.Prefix(), b, "name")
 
 	// swagger:route GET /bootenvs/{name}/actions BootEnvs getBootEnvActions
 	//

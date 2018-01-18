@@ -30,18 +30,18 @@ type ActionPostResponse struct {
 	Body interface{}
 }
 
-func (f *Frontend) makeActionEndpoints(obj models.Model, idKey string) (
+func (f *Frontend) makeActionEndpoints(cmdSet string, obj models.Model, idKey string) (
 	getActions, getAction, runAction func(c *gin.Context)) {
 	plugin := func(c *gin.Context) string {
 		return c.Query("plugin")
 	}
-	item404 := func(c *gin.Context, found bool, cmd, line string) bool {
+	item404 := func(c *gin.Context, found bool, id, line string) bool {
 		if !found {
 			err := &models.Error{
 				Code:  http.StatusNotFound,
 				Type:  c.Request.Method,
-				Model: obj.Prefix(),
-				Key:   cmd,
+				Model: cmdSet,
+				Key:   id,
 			}
 			err.Errorf("%s: Not Found", line)
 			c.JSON(err.Code, err)
@@ -53,10 +53,13 @@ func (f *Frontend) makeActionEndpoints(obj models.Model, idKey string) (
 			op = c.Param("cmd")
 		}
 		id := c.Param(idKey)
+		if id == "" {
+			id = "global"
+		}
 		return id,
 			f.rt(c, obj.(Lockable).Locks("actions")...),
 			c.Param("cmd"),
-			f.assureAuth(c, obj.Prefix(), op, id)
+			f.assureAuth(c, cmdSet, op, id)
 	}
 
 	return /* allActions */ func(c *gin.Context) {
@@ -71,7 +74,7 @@ func (f *Frontend) makeActionEndpoints(obj models.Model, idKey string) (
 				if ref != nil {
 					found = true
 					p := plugin(c)
-					for _, laa := range f.pc.Actions.List(obj.Prefix()) {
+					for _, laa := range f.pc.Actions.List(cmdSet) {
 						for _, aa := range laa {
 							if p != "" && p != aa.Plugin.Plugin.Name {
 								continue
@@ -82,7 +85,7 @@ func (f *Frontend) makeActionEndpoints(obj models.Model, idKey string) (
 								Plugin:  aa.Plugin.Plugin.Name,
 								Params:  map[string]interface{}{},
 							}
-							if _, err := validateAction(f, rt, ma); err == nil {
+							if _, err := validateAction(f, rt, cmdSet, id, ma); err == nil {
 								actions = append(actions, aa.AvailableAction)
 								break
 							}
@@ -106,7 +109,7 @@ func (f *Frontend) makeActionEndpoints(obj models.Model, idKey string) (
 			rt.Do(func(d backend.Stores) {
 				ref := rt.Find(obj.Prefix(), id)
 				if ref != nil {
-					laa, _ := f.pc.Actions.Get(obj.Prefix(), cmd)
+					laa, _ := f.pc.Actions.Get(cmdSet, cmd)
 					for _, aa := range laa {
 						if p != "" && p != aa.Plugin.Plugin.Name {
 							continue
@@ -117,7 +120,7 @@ func (f *Frontend) makeActionEndpoints(obj models.Model, idKey string) (
 							Plugin:  aa.Plugin.Plugin.Name,
 							Params:  map[string]interface{}{},
 						}
-						if _, err = validateAction(f, rt, ma); err == nil {
+						if _, err = validateAction(f, rt, cmdSet, id, ma); err == nil {
 							action = aa.AvailableAction
 							found = true
 							break
@@ -154,7 +157,7 @@ func (f *Frontend) makeActionEndpoints(obj models.Model, idKey string) (
 						Plugin:  plugin(c),
 						Command: cmd,
 						Params:  val}
-					if ma, err = validateAction(f, rt, res); err != nil {
+					if ma, err = validateAction(f, rt, cmdSet, id, res); err != nil {
 						err.Type = "INVOKE"
 						return
 					}
@@ -168,8 +171,8 @@ func (f *Frontend) makeActionEndpoints(obj models.Model, idKey string) (
 				return
 			}
 
-			f.pubs.Publish(obj.Prefix(), cmd, id, ma)
-			retval, runErr := f.pc.Actions.Run(rt, ma)
+			f.pubs.Publish(cmdSet, cmd, id, ma)
+			retval, runErr := f.pc.Actions.Run(rt, cmdSet, ma)
 			if runErr != nil {
 				be, ok := runErr.(*models.Error)
 				if !ok {
@@ -266,23 +269,16 @@ func validateActionParameters(f *Frontend,
 
 func validateAction(f *Frontend,
 	rt *backend.RequestTracker,
+	ob string,
+	id string,
 	ma *models.Action) (*models.Action, *models.Error) {
 
-	ob := "untyped"
 	cmd := ma.Command
-	key := "all"
-	if ma.Model != nil {
-		if mm, ok := ma.Model.(models.Model); ok {
-			ob = mm.Prefix()
-			key = mm.Key()
-		}
-	}
-
 	err := &models.Error{
 		Code:  http.StatusBadRequest,
 		Type:  "GET",
 		Model: ob,
-		Key:   key,
+		Key:   id,
 	}
 
 	lraa := midlayer.AvailableActions{}
@@ -306,7 +302,7 @@ func validateAction(f *Frontend,
 			Code:  http.StatusBadRequest,
 			Type:  "GET",
 			Model: ob,
-			Key:   key,
+			Key:   id,
 		}
 
 		validateActionParameters(f, rt, ma, aa, err)

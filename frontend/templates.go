@@ -288,7 +288,8 @@ func (f *Frontend) InitTemplateApi() {
 			f.Remove(c, &backend.Template{}, c.Param(`id`))
 		})
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Template{}, "id")
+	template := &backend.Template{}
+	pActions, pAction, pRun := f.makeActionEndpoints(template.Prefix(), template, "id")
 
 	// swagger:route GET /templates/{id}/actions Templates getTemplateActions
 	//

@@ -266,11 +266,12 @@ func (l *Lease) Invalidate() {
 }
 
 var leaseLockMap = map[string][]string{
-	"get":    []string{"leases"},
-	"create": []string{"leases", "subnets", "reservations"},
-	"update": []string{"leases"},
-	"patch":  []string{"leases"},
-	"delete": []string{"leases"},
+	"get":     []string{"leases"},
+	"create":  []string{"leases", "subnets", "reservations"},
+	"update":  []string{"leases"},
+	"patch":   []string{"leases"},
+	"delete":  []string{"leases"},
+	"actions": []string{"leases", "profiles", "params"},
 }
 
 func (l *Lease) Locks(action string) []string {

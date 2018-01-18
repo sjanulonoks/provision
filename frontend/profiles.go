@@ -404,7 +404,8 @@ func (f *Frontend) InitProfileApi() {
 	//       409: ErrorResponse
 	f.ApiGroup.POST("/profiles/:name/params/*key", pSetOne)
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Profile{}, "name")
+	profile := &backend.Profile{}
+	pActions, pAction, pRun := f.makeActionEndpoints(profile.Prefix(), profile, "name")
 
 	// swagger:route GET /profiles/{name}/actions Profiles getProfileActions
 	//

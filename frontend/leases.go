@@ -247,7 +247,8 @@ func (f *Frontend) InitLeaseApi() {
 			f.Remove(c, &backend.Lease{}, ifIpConvertToHex(c.Param(`address`)))
 		})
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Lease{}, "address")
+	lease := &backend.Lease{}
+	pActions, pAction, pRun := f.makeActionEndpoints(lease.Prefix(), lease, "address")
 
 	// swagger:route GET /leases/{address}/actions Leases getLeaseActions
 	//

@@ -688,7 +688,8 @@ func (f *Frontend) InitJobApi() {
 			}
 		})
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Job{}, "uuid")
+	job := &backend.Job{}
+	pActions, pAction, pRun := f.makeActionEndpoints(job.Prefix(), job, "uuid")
 
 	// swagger:route GET /jobs/{uuid}/plugin_actions Jobs getJobActions
 	//

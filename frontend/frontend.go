@@ -504,6 +504,7 @@ func NewFrontend(
 	me.InitJobApi()
 	me.InitEventApi()
 	me.InitContentApi()
+	me.InitSystemApi()
 
 	if EmbeddedAssetsServerFunc != nil {
 		EmbeddedAssetsServerFunc(mgmtApi, lgr)

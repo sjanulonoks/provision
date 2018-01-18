@@ -309,7 +309,8 @@ func (f *Frontend) InitSubnetApi() {
 			f.Remove(c, &backend.Subnet{}, c.Param(`name`))
 		})
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Subnet{}, "name")
+	subnet := &backend.Subnet{}
+	pActions, pAction, pRun := f.makeActionEndpoints(subnet.Prefix(), subnet, "name")
 
 	// swagger:route GET /subnets/{name}/actions Subnets getSubnetActions
 	//

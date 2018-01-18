@@ -315,7 +315,8 @@ func (f *Frontend) InitReservationApi() {
 			f.Remove(c, &backend.Reservation{}, ifIpConvertToHex(c.Param(`address`)))
 		})
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Reservation{}, "address")
+	reservation := &backend.Reservation{}
+	pActions, pAction, pRun := f.makeActionEndpoints(reservation.Prefix(), reservation, "address")
 
 	// swagger:route GET /reservations/{address}/actions Reservations getReservationActions
 	//

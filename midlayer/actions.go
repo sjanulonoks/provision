@@ -54,7 +54,7 @@ func (ma *Actions) Add(model_aa models.AvailableAction, plugin *RunningPlugin) e
 	ma.lock.Lock()
 	defer ma.lock.Unlock()
 
-	ob := "untyped"
+	ob := "system"
 	if aa.Model != "" {
 		ob = aa.Model
 	}
@@ -92,7 +92,7 @@ func (ma *Actions) Remove(aa models.AvailableAction, plugin *RunningPlugin) erro
 	var the_aa *AvailableAction
 	ma.lock.Lock()
 
-	ob := "untyped"
+	ob := "system"
 	if aa.Model != "" {
 		ob = aa.Model
 	}
@@ -182,13 +182,7 @@ func (ma *Actions) GetSpecific(ob, name, plugin string) (*AvailableAction, bool)
 	return nil, false
 }
 
-func (ma *Actions) Run(rt *backend.RequestTracker, maa *models.Action) (interface{}, error) {
-	ob := "untyped"
-	if maa.Model != nil {
-		mm, _ := maa.Model.(models.Model)
-		ob = mm.Prefix()
-	}
-
+func (ma *Actions) Run(rt *backend.RequestTracker, ob string, maa *models.Action) (interface{}, error) {
 	aa, ok := ma.GetSpecific(ob, maa.Command, maa.Plugin)
 	if !ok {
 		return nil, fmt.Errorf("Action no longer available: %s", aa.Command)

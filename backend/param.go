@@ -130,11 +130,12 @@ func (p *Param) ValidateValue(val interface{}) error {
 }
 
 var paramLockMap = map[string][]string{
-	"get":    []string{"params"},
-	"create": []string{"params", "profiles"},
-	"update": []string{"params", "profiles"},
-	"patch":  []string{"params", "profiles"},
-	"delete": []string{"params", "profiles"},
+	"get":     []string{"params"},
+	"create":  []string{"params", "profiles"},
+	"update":  []string{"params", "profiles"},
+	"patch":   []string{"params", "profiles"},
+	"delete":  []string{"params", "profiles"},
+	"actions": []string{"params", "profiles"},
 }
 
 func (p *Param) Locks(action string) []string {

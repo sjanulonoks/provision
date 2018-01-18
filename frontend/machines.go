@@ -510,7 +510,8 @@ func (f *Frontend) InitMachineApi() {
 	//       409: ErrorResponse
 	f.ApiGroup.POST("/machines/:uuid/params/*key", pSetOne)
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Machine{}, "uuid")
+	machine := &backend.Machine{}
+	pActions, pAction, pRun := f.makeActionEndpoints(machine.Prefix(), machine, "uuid")
 
 	// swagger:route GET /machines/{uuid}/actions Machines getMachineActions
 	//

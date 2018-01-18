@@ -335,7 +335,8 @@ func (f *Frontend) InitTaskApi() {
 			f.Remove(c, &backend.Task{}, c.Param(`name`))
 		})
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Task{}, "name")
+	task := &backend.Task{}
+	pActions, pAction, pRun := f.makeActionEndpoints(task.Prefix(), task, "name")
 
 	// swagger:route GET /tasks/{name}/actions Tasks getTaskActions
 	//

@@ -442,7 +442,8 @@ func (f *Frontend) InitPluginApi() {
 	//       409: ErrorResponse
 	f.ApiGroup.POST("/plugins/:name/params/*key", pSetOne)
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Plugin{}, "name")
+	plugin := &backend.Plugin{}
+	pActions, pAction, pRun := f.makeActionEndpoints(plugin.Prefix(), plugin, "name")
 
 	// swagger:route GET /plugins/{name}/actions Plugins getPluginActions
 	//

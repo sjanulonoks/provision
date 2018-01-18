@@ -293,7 +293,8 @@ func (f *Frontend) InitStageApi() {
 			f.Remove(c, &backend.Stage{}, c.Param(`name`))
 		})
 
-	pActions, pAction, pRun := f.makeActionEndpoints(&backend.Stage{}, "name")
+	stage := &backend.Stage{}
+	pActions, pAction, pRun := f.makeActionEndpoints(stage.Prefix(), stage, "name")
 
 	// swagger:route GET /stages/{name}/actions Stages getStageActions
 	//
