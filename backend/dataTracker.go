@@ -64,30 +64,7 @@ chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 				Name: "local",
 			},
 			OnlyUnknown: false,
-			Templates: []models.TemplateInfo{
-				{
-					Name: "pxelinux",
-					Path: "pxelinux.cfg/{{.Machine.HexAddress}}",
-					Contents: `DEFAULT local
-PROMPT 0
-TIMEOUT 10
-LABEL local
-localboot 0
-`,
-				},
-				{
-					Name:     "elilo",
-					Path:     "{{.Machine.HexAddress}}.conf",
-					Contents: "exit",
-				},
-				{
-					Name: "ipxe",
-					Path: "{{.Machine.Address}}.ipxe",
-					Contents: `#!ipxe
-exit
-`,
-				},
-			},
+			Templates:   []models.TemplateInfo{},
 			Meta: map[string]string{
 				"feature-flags": "change-stage-v2",
 			},
