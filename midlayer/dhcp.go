@@ -15,6 +15,7 @@ import (
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/pinger"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	dhcp "github.com/krolaw/dhcp4"
 )
@@ -46,6 +47,60 @@ type DhcpHandler struct {
 	pinger     pinger.Pinger
 	strats     []*Strategy
 	publishers *backend.Publishers
+}
+
+func (h *DhcpHandler) shouldOfferPXE(l logger.Logger, p dhcp.Packet, lease *backend.Lease) bool {
+	shouldOffer := true
+	rt := h.Request(l, "machines", "bootenvs")
+	var machine *backend.Machine
+	var bootEnv *backend.BootEnv
+	rt.Do(func(d backend.Stores) {
+		machine = rt.MachineForMac(p.CHAddr().String())
+		if machine == nil {
+			m2 := rt.FindByIndex("machines", machine.Indexes()["Address"], lease.Addr.String())
+			if m2 != nil {
+				machine = backend.AsMachine(m2)
+			}
+		}
+		if machine == nil {
+			// No machine known for this MAC address or IP address.
+			return
+		}
+		if bk := rt.Find("bootenvs", machine.BootEnv); bk != nil {
+			bootEnv = backend.AsBootEnv(bk)
+		} else {
+			// This should never happen, but if it does then Something Bad happened.
+			rt.Errorf("%s: Machine %s refers to missing BootEnv %s", xid(p), machine.UUID(), machine.BootEnv)
+			return
+		}
+		if !bootEnv.NetBoot() {
+			// If we are not going to offer a bootfile, then there is nothing to do.
+			shouldOffer = false
+			return
+		}
+		machineSave := !machine.Address.Equal(lease.Addr)
+		others, err := index.All(
+			index.Sort(machine.Indexes()["Address"]),
+			index.Eq(lease.Addr.String()))(rt.Index("machines"))
+		if err == nil && others.Count() > 0 {
+			for _, other := range others.Items() {
+				if other.Key() == machine.UUID() {
+					continue
+				}
+				oMachine := backend.AsMachine(other)
+				rt.Warnf("Machine %s also has address %s, which we are handing out to %s", oMachine.UUID(), lease.Addr, machine.UUID())
+				rt.Warnf("Setting machine %s address to all zeros", oMachine.UUID())
+				oMachine.Address = net.IPv4(0, 0, 0, 0)
+				rt.Save(oMachine)
+			}
+		}
+		if machineSave {
+			rt.Infof("%s: Updating machine %s address from %s to %s", machine.UUID(), machine.Address, lease.Addr)
+			machine.Address = lease.Addr
+			rt.Save(machine)
+		}
+	})
+	return shouldOffer
 }
 
 func (h *DhcpHandler) buildReply(p dhcp.Packet, mt dhcp.MessageType, serverID, yAddr net.IP, leaseDuration time.Duration, options dhcp.Options, order []byte) dhcp.Packet {
@@ -94,15 +149,17 @@ func (h *DhcpHandler) buildReply(p dhcp.Packet, mt dhcp.MessageType, serverID, y
 	return res
 }
 
-func (h *DhcpHandler) Request(locks ...string) *backend.RequestTracker {
-	return h.bk.Request(h.Logger.Fork(), locks...)
+func (h *DhcpHandler) Request(l logger.Logger, locks ...string) *backend.RequestTracker {
+	return h.bk.Request(l, locks...)
 }
 
-func (h *DhcpHandler) buildOptions(p dhcp.Packet,
+func (h *DhcpHandler) buildOptions(
+	log logger.Logger,
+	p dhcp.Packet,
 	l *backend.Lease,
 	s *backend.Subnet,
 	r *backend.Reservation,
-	cm *ipv4.ControlMessage) (dhcp.Options, time.Duration, net.IP) {
+	cm *ipv4.ControlMessage) (dhcp.Options, time.Duration, net.IP, bool) {
 	var leaseTime uint32 = 7200
 	if s != nil {
 		leaseTime = uint32(s.LeaseTimeFor(l.Addr) / time.Second)
@@ -120,17 +177,17 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 	// ProxyOnly replies don't include lease info.
 	// Subnets marked proxy only, don't include lease info
 	dur := time.Duration(leaseTime) * time.Second
-
+	shouldOfferPXE := h.shouldOfferPXE(log, p, l)
 	nextServer := h.respondFrom(l.Addr, cm)
 	if s != nil {
 		for _, opt := range s.Options {
 			if opt.Value == "" {
-				h.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
+				log.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
 				continue
 			}
 			c, v, err := opt.RenderToDHCP(srcOpts)
 			if err != nil {
-				h.Errorf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
+				log.Errorf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
 				continue
 			}
 			opts[dhcp.OptionCode(c)] = v
@@ -142,8 +199,12 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 	if r != nil {
 		for _, opt := range r.Options {
 			if opt.Value == "" {
-				h.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
-				continue
+				if dhcp.OptionCode(opt.Code) != dhcp.OptionBootFileName {
+					log.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
+					continue
+				} else {
+					shouldOfferPXE = false
+				}
 			}
 			c, v, err := opt.RenderToDHCP(srcOpts)
 			if err != nil {
@@ -156,12 +217,16 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 			nextServer = r.NextServer
 		}
 	}
-	if opts[dhcp.OptionTFTPServerName] == nil && opts[dhcp.OptionBootFileName] != nil {
+	if !shouldOfferPXE {
+		log.Debugf("Directed to not offer PXE options")
+		delete(opts, dhcp.OptionTFTPServerName)
+		delete(opts, dhcp.OptionBootFileName)
+	} else if opts[dhcp.OptionTFTPServerName] == nil && opts[dhcp.OptionBootFileName] != nil {
 		opts[dhcp.OptionTFTPServerName] = []byte(nextServer.String())
 	}
 	// If we got an incoming request with pxeclient options and the subnet responsible for this request
 	// says we should answer like we are a proxy request, add the proxy options.
-	if h.proxyOnly || (s != nil && s.Proxy) {
+	if shouldOfferPXE && (h.proxyOnly || (s != nil && s.Proxy)) {
 		if pxeClient, ok := srcOpts[int(dhcp.OptionVendorClassIdentifier)]; ok && strings.HasPrefix(pxeClient, "PXEClient:") {
 			// A single menu entry named PXE, and a 0 second timeout to automatically boot to it.
 			// This is what dnsmasq does when there is only one option it will return.
@@ -176,7 +241,7 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 		// proxy replies have no duration
 		dur = 0
 	}
-	return opts, dur, nextServer
+	return opts, dur, nextServer, shouldOfferPXE
 }
 
 func (h *DhcpHandler) Strategy(name string) StrategyFunc {
@@ -408,15 +473,16 @@ func (h *DhcpHandler) ServeDHCP(
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
 		if ok && !h.isOneOfMyAddrs(server) {
-			rt.Warnf("WARNING: %s: Competing DHCP server on network: %s", xid(p), server)
+			l.Warnf("WARNING: %s: Competing DHCP server on network: %s", xid(p), server)
 		}
 		if !h.isOneOfMyAddrs(cm.Src) {
-			rt.Warnf("WARNING: %s: Competing DHCP server on network: %s", xid(p), cm.Src)
+			l.Warnf("WARNING: %s: Competing DHCP server on network: %s", xid(p), cm.Src)
 		}
 	case dhcp.Decline:
 		if h.proxyOnly {
 			return nil
 		}
+		rt := h.Request(l, "leases")
 		rt.Do(func(d backend.Stores) {
 			leaseThing := rt.Find("leases", models.Hexaddr(req))
 			if leaseThing == nil {
@@ -426,17 +492,18 @@ func (h *DhcpHandler) ServeDHCP(
 			lease := backend.AsLease(leaseThing)
 			stratfn := h.Strategy(lease.Strategy)
 			if stratfn != nil && stratfn(p, options) == lease.Token {
-				h.Infof("%s: Lease for %s declined, invalidating.", xid(p), lease.Addr)
+				l.Infof("%s: Lease for %s declined, invalidating.", xid(p), lease.Addr)
 				lease.Invalidate()
 				rt.Save(lease)
 			} else {
-				h.Infof("%s: Received spoofed decline for %s, ignoring", xid(p), lease.Addr)
+				l.Infof("%s: Received spoofed decline for %s, ignoring", xid(p), lease.Addr)
 			}
 		})
 	case dhcp.Release:
 		if h.proxyOnly {
 			return nil
 		}
+		rt := h.Request(l, "leases")
 		rt.Do(func(d backend.Stores) {
 			leaseThing := rt.Find("leases", models.Hexaddr(req))
 			if leaseThing == nil {
@@ -457,11 +524,11 @@ func (h *DhcpHandler) ServeDHCP(
 		serverBytes, ok := options[dhcp.OptionServerIdentifier]
 		server := net.IP(serverBytes)
 		if ok && !h.listenOn(server, cm) {
-			rt.Warnf("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
-			return nil
+			l.Warnf("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
+			return
 		}
 		if !req.IsGlobalUnicast() {
-			rt.Infof("%s: NAK'ing invalid requested IP %s", xid(p), req)
+			l.Infof("%s: NAK'ing invalid requested IP %s", xid(p), req)
 			return h.nak(p, h.respondFrom(req, cm))
 		}
 		if h.proxyOnly {
@@ -470,6 +537,7 @@ func (h *DhcpHandler) ServeDHCP(
 		var lease *backend.Lease
 		var reservation *backend.Reservation
 		var subnet *backend.Subnet
+		rt := h.Request(l, "leases", "reservations", "subnets")
 		for _, s := range h.strats {
 			lease, subnet, reservation, err = backend.FindLease(rt, s.Name, s.GenToken(p, options), req)
 			if lease == nil &&
@@ -480,15 +548,15 @@ func (h *DhcpHandler) ServeDHCP(
 			}
 			if err != nil {
 				if lease != nil {
-					rt.Infof("%s: %s already leased to %s:%s: %s",
+					l.Infof("%s: %s already leased to %s:%s: %s",
 						xid(p),
 						req,
 						lease.Strategy,
 						lease.Token,
 						err)
 				} else {
-					rt.Warnf("%s: Another DHCP server may be on the network: %s", xid(p), net.IP(server))
-					rt.Infof("%s: %s is no longer able to be leased: %s",
+					l.Warnf("%s: Another DHCP server may be on the network: %s", xid(p), net.IP(server))
+					l.Infof("%s: %s is no longer able to be leased: %s",
 						xid(p),
 						req,
 						err)
@@ -501,22 +569,27 @@ func (h *DhcpHandler) ServeDHCP(
 		}
 		if lease == nil {
 			if subnet != nil && subnet.Proxy {
-				rt.Infof("%s: Proxy Subnet should not respond to %s.", xid(p), req)
+				l.Infof("%s: Proxy Subnet should not respond to %s.", xid(p), req)
 				return nil
 			}
 			if reqState == reqInitReboot {
-				rt.Infof("%s: No lease for %s in database, client in INIT-REBOOT.  Ignoring request.", xid(p), req)
+				l.Infof("%s: No lease for %s in database, client in INIT-REBOOT.  Ignoring request.", xid(p), req)
 				return nil
 			}
 			if subnet != nil || reservation != nil {
-				rt.Infof("%s: No lease for %s in database, NAK'ing", xid(p), req)
+				l.Infof("%s: No lease for %s in database, NAK'ing", xid(p), req)
 				return h.nak(p, h.respondFrom(req, cm))
 			}
 
-			rt.Infof("%s: No lease in database, and no subnet or reservation covers %s. Ignoring request", xid(p), req)
+			l.Infof("%s: No lease in database, and no subnet or reservation covers %s. Ignoring request", xid(p), req)
 			return nil
 		}
-		opts, duration, nextServer := h.buildOptions(p, lease, subnet, reservation, cm)
+		opts, duration, nextServer, _ := h.buildOptions(l,
+			p,
+			lease,
+			subnet,
+			reservation,
+			cm)
 		reply := h.buildReply(p,
 			dhcp.ACK,
 			h.respondFrom(lease.Addr, cm),
@@ -542,6 +615,7 @@ func (h *DhcpHandler) ServeDHCP(
 				subnet      *backend.Subnet
 				reservation *backend.Reservation
 			)
+			rt := h.Request(l, "leases", "reservations", "subnets")
 			for {
 				var fresh bool
 				lease, subnet, reservation, fresh = backend.FindOrCreateLease(rt, strat, token, req, via)
@@ -579,43 +653,50 @@ func (h *DhcpHandler) ServeDHCP(
 				} else {
 					rt.Debugf("%s: Reusing lease for %s", xid(p), lease.Addr)
 				}
-				opts, duration, nextServer := h.buildOptions(p, lease, subnet, reservation, cm)
-				repType := dhcp.Offer
-				addr := lease.Addr
-				// Depending upon proxy state, we'll do different things.
-				// If we are the proxy only (PXE/BINL port), we will Ack the discover with Boot options.
-				//    send the packet back to the IP that it has if present.
-				// If we are the proxy subnet, we will send an offer with boot options
-				//    send the packet back to the IP that it has in the discover.
-				// Otherwise, do the normal thing.
+				break
+			}
+			if lease == nil {
+				return nil
+			}
+			opts, duration, nextServer, shouldPXE := h.buildOptions(l, p, lease, subnet, reservation, cm)
+			repType := dhcp.Offer
+			addr := lease.Addr
+			// If we are responding as a Proxy DHCP server but we were directed to omit PXE options,
+			// then we should not respond to this request.
+			if !shouldPXE && (h.proxyOnly || (subnet != nil && subnet.Proxy)) {
+				return nil
+			}
+			// Depending upon proxy state, we'll do different things.
+			// If we are the proxy only (PXE/BINL port), we will Ack the discover with Boot options.
+			//    send the packet back to the IP that it has if present.
+			// If we are the proxy subnet, we will send an offer with boot options
+			//    send the packet back to the IP that it has in the discover.
+			// Otherwise, do the normal thing.
+			if h.proxyOnly || (subnet != nil && subnet.Proxy) {
+				addr = p.YIAddr()
 				if h.proxyOnly {
 					repType = dhcp.ACK
-					addr = p.YIAddr()
 				}
-				if (subnet != nil && subnet.Proxy) || h.proxyOnly {
-					// Return the address if we are a proxy
-					addr = p.YIAddr()
-				}
-				reply := h.buildReply(p,
-					repType,
-					h.respondFrom(lease.Addr, cm),
-					addr,
-					duration,
-					opts,
-					options[dhcp.OptionParameterRequestList])
-				if (subnet != nil && subnet.Proxy) || h.proxyOnly {
-					// If we are a true proxy (NOT BINL/PXE), then broadcast
-					if !h.proxyOnly {
-						reply.SetBroadcast(true)
-					}
-					// Say who we are.
-					if nextServer.IsGlobalUnicast() {
-						reply.SetSIAddr(nextServer)
-					}
-				}
-				rt.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
-				return reply
 			}
+			reply := h.buildReply(p,
+				repType,
+				h.respondFrom(lease.Addr, cm),
+				addr,
+				duration,
+				opts,
+				options[dhcp.OptionParameterRequestList])
+			if (subnet != nil && subnet.Proxy) || h.proxyOnly {
+				// If we are a true proxy (NOT BINL/PXE), then broadcast
+				if !h.proxyOnly {
+					reply.SetBroadcast(true)
+				}
+				// Say who we are.
+				if nextServer.IsGlobalUnicast() {
+					reply.SetSIAddr(nextServer)
+				}
+			}
+			l.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
+			return reply
 		}
 	}
 	return nil
@@ -673,7 +754,7 @@ func StartDhcpHandler(dhcpInfo *backend.DataTracker,
 				handler.pinger = pinger
 			}
 		}
-		rt := handler.Request("leases")
+		rt := handler.Request(log, "leases")
 		rt.Do(func(d backend.Stores) {
 			for _, leaseThing := range d("leases").Items() {
 				lease := backend.AsLease(leaseThing)
