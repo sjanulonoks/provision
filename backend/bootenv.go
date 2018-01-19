@@ -31,13 +31,17 @@ var explodeMux = &sync.Mutex{}
 type BootEnv struct {
 	*models.BootEnv
 	validate
-	renderers      renderers
-	pathLookaside  func(string) (io.Reader, error)
-	installRepo    *Repo
-	kernelVerified bool
-	bootParamsTmpl *template.Template
-	rootTemplate   *template.Template
-	tmplMux        sync.Mutex
+	renderers                 renderers
+	pathLookaside             func(string) (io.Reader, error)
+	installRepo               *Repo
+	kernelVerified, offerBoot bool
+	bootParamsTmpl            *template.Template
+	rootTemplate              *template.Template
+	tmplMux                   sync.Mutex
+}
+
+func (b *BootEnv) NetBoot() bool {
+	return b.offerBoot
 }
 
 func (obj *BootEnv) SetReadOnly(b bool) {
@@ -334,23 +338,18 @@ func (b *BootEnv) Validate() {
 	b.fillInstallRepo()
 	// OK, we are sane, if not useable.  Check to see if we are useable
 	seenPxeLinux := false
-	seenELilo := false
 	seenIPXE := false
 	for _, template := range b.Templates {
-		if template.Name == "pxelinux" {
+		if template.Name == "pxelinux" || template.Name == "pxelinux-mac" {
 			seenPxeLinux = true
 		}
-		if template.Name == "elilo" {
-			seenELilo = true
-		}
-		if template.Name == "ipxe" {
+		if template.Name == "ipxe" || template.Name == "ipxe-mac" {
 			seenIPXE = true
 		}
 	}
-	if !seenIPXE {
-		if !(seenPxeLinux && seenELilo) {
-			b.Errorf("bootenv: Missing elilo or pxelinux template")
-		}
+	b.offerBoot = seenPxeLinux || seenIPXE
+	if !b.offerBoot && b.Kernel != "" {
+		b.Errorf("bootenv: Missing elilo or pxelinux template")
 	}
 	// Make sure the ISO for this bootenv has been exploded locally so that
 	// the boot env can use its contents.
@@ -524,7 +523,23 @@ func (b *BootEnv) Render(rt *RequestTracker, m *Machine, e models.ErrorAdder) re
 		return nil
 	}
 	r := newRenderData(rt, m, b)
-	return r.makeRenderers(e)
+	if m == nil {
+		return r.makeRenderers(e)
+	}
+	res := renderers([]renderer{})
+	toRender := r.validateRequiredParams(e)
+	for i := range toRender {
+		switch toRender[i].Name {
+		case "ipxe-mac", "pxelinux-mac":
+			for _, mac := range m.HardwareAddrs {
+				r.Machine.currMac = mac
+				res = r.addRenderer(e, &toRender[i], res)
+			}
+		default:
+			res = r.addRenderer(e, &toRender[i], res)
+		}
+	}
+	return res
 }
 
 func (b *BootEnv) AfterSave() {
