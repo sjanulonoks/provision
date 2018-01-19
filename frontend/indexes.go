@@ -167,7 +167,7 @@ func (f *Frontend) InitIndexApi() {
 			rt := f.rt(c, param.Locks("get")...)
 			var dynIndex index.Maker
 			rt.Do(func(d backend.Stores) {
-				dynIndex, err = dpm.ParameterMaker(d, paramName)
+				dynIndex, err = dpm.ParameterMaker(rt, paramName)
 			})
 			if err != nil {
 				c.JSON(http.StatusNotFound,

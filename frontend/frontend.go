@@ -704,10 +704,10 @@ func convertValueToFilter(v string) (index.Filter, error) {
 }
 
 type dynParameter interface {
-	ParameterMaker(backend.Stores, string) (index.Maker, error)
+	ParameterMaker(*backend.RequestTracker, string) (index.Maker, error)
 }
 
-func (f *Frontend) processFilters(d backend.Stores, ref models.Model, params map[string][]string) ([]index.Filter, error) {
+func (f *Frontend) processFilters(rt *backend.RequestTracker, d backend.Stores, ref models.Model, params map[string][]string) ([]index.Filter, error) {
 	filters := []index.Filter{}
 	var err error
 	var indexes map[string]index.Maker
@@ -727,7 +727,7 @@ func (f *Frontend) processFilters(d backend.Stores, ref models.Model, params map
 			if !found {
 				return nil, fmt.Errorf("Filter not found: %s", k)
 			}
-			maker, err = pMaker.ParameterMaker(d, k)
+			maker, err = pMaker.ParameterMaker(rt, k)
 			if err != nil {
 				return nil, err
 			}
@@ -813,7 +813,7 @@ func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 	rt := f.rt(c, ref.(Lockable).Locks("get")...)
 	rt.Do(func(d backend.Stores) {
 		var filters []index.Filter
-		filters, err = f.processFilters(d, ref, c.Request.URL.Query())
+		filters, err = f.processFilters(rt, d, ref, c.Request.URL.Query())
 		if err != nil {
 			res.AddError(err)
 			return

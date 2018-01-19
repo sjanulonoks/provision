@@ -218,7 +218,7 @@ func (n *Machine) ParameterMaker(rt *RequestTracker, parameter string) (index.Ma
 		func(ref models.Model) (gte, gt index.Test) {
 			jp, _ := rt.GetParam(fix(ref), parameter, true)
 			return func(s models.Model) bool {
-					ip, _ := rt.GetParam(fix(ref), parameter, true)
+					ip, _ := rt.GetParam(fix(s), parameter, true)
 
 					// If both are nil, the Less is i >= j == true
 					if ip == nil && jp == nil {
