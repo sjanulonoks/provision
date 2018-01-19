@@ -382,6 +382,20 @@ func (n *Machine) Validate() {
 	n.Machine.Validate()
 	validateMaybeZeroIP4(n, n.Address)
 	n.AddError(index.CheckUnique(n, n.rt.stores("machines").Items()))
+	if !n.Address.IsUnspecified() {
+		others, err := index.All(
+			index.Sort(n.Indexes()["Address"]),
+			index.Eq(n.Address.String()))(n.rt.Index("machines"))
+		if err == nil {
+			for _, item := range others.Items() {
+				m2 := AsMachine(item)
+				if m2.Key() == n.Key() {
+					continue
+				}
+				n.Errorf("Machine %s already has IP address %s", m2.UUID(), m2.Address)
+			}
+		}
+	}
 	n.SetValid()
 	if n.Address != nil && !n.Address.IsUnspecified() {
 		others, err := index.All(
