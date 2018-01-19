@@ -503,6 +503,8 @@ type DataTracker struct {
 	thunks              []func()
 	thunkMux            *sync.Mutex
 	publishers          *Publishers
+	macAddrMap          map[string]string
+	macAddrMux          sync.RWMutex
 }
 
 func (p *DataTracker) LogFor(s string) logger.Logger {
