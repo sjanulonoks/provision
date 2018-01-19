@@ -336,12 +336,14 @@ func (n *Machine) HasProfile(name string) bool {
 
 func (n *Machine) New() store.KeySaver {
 	res := &Machine{Machine: &models.Machine{}}
-	if n.Machine != nil && n.ChangeForced() {
-		res.ForceChange()
-	}
 	res.Tasks = []string{}
 	res.Profiles = []string{}
-	res.rt = n.rt
+	if n != nil {
+		res.rt = n.rt
+		if n.Machine != nil && n.ChangeForced() {
+			res.ForceChange()
+		}
+	}
 	return res
 }
 
