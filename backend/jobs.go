@@ -62,7 +62,11 @@ func (obj *Job) SetReadOnly(b bool) {
 	obj.ReadOnly = b
 }
 
-func (j *Job) LogPath() string {
+func (j *Job) LogPath(rt *RequestTracker) string {
+	if j.rt == nil {
+		j.setRT(rt)
+		defer j.clearRT()
+	}
 	return filepath.Join(j.rt.dt.LogRoot, j.Uuid.String())
 }
 
@@ -331,8 +335,8 @@ func (j *Job) Indexes() map[string]index.Maker {
 
 func (j *Job) OnCreate() error {
 	j.Current = true
-	if _, err := os.Stat(j.LogPath()); err != nil {
-		if f, err := os.Create(j.LogPath()); err != nil {
+	if _, err := os.Stat(j.LogPath(j.rt)); err != nil {
+		if f, err := os.Create(j.LogPath(j.rt)); err != nil {
 			j.AddError(err)
 		} else {
 			f.Close()
@@ -524,7 +528,7 @@ func (j *Job) Log(rt *RequestTracker, src io.Reader) error {
 		j.setRT(rt)
 		defer j.clearRT()
 	}
-	f, err := os.OpenFile(j.LogPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(j.LogPath(rt), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		fmt.Printf("Umm err: %v\n", err)
 		return err
