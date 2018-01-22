@@ -247,6 +247,8 @@ func (h *DhcpHandler) listenAddrs(cm *ipv4.ControlMessage) []*net.IPNet {
 		if err == nil {
 			cidr.IP = ip
 			res = append(res, cidr)
+		} else {
+			h.Errorf("Error parsing address %s: %v", addr, err)
 		}
 	}
 	return res
@@ -285,18 +287,23 @@ func (h *DhcpHandler) respondFrom(testAddr net.IP, cm *ipv4.ControlMessage) net.
 	addrs := h.listenAddrs(cm)
 	for _, addr := range addrs {
 		if addr.Contains(testAddr) {
+			h.Debugf("Will respond to %s from %s", testAddr, addr.IP)
 			return addr.IP.To4()
 		}
 	}
 	// Well, this sucks.  Return the first address we listen on for this interface.
 	if len(addrs) > 0 {
+		h.Warnf("No matching subnet, will respond to %s from %s", testAddr, addrs[0].IP)
 		return addrs[0].IP.To4()
 	}
 	// Well, this really sucks.  Return our global listen-on address
 	if h.bk.OurAddress != "" {
+		h.Errorf("No address on interface index %d, using our static IP %s", cm.IfIndex, h.bk.OurAddress)
 		return net.ParseIP(h.bk.OurAddress).To4()
 	}
-	return backend.DefaultIP()
+	addr := backend.DefaultIP(h.Logger)
+	h.Errorf("No address on interface index %d, using IP with default route %v", cm.IfIndex, addr)
+	return addr
 }
 
 func (h *DhcpHandler) listenOn(testAddr net.IP, cm *ipv4.ControlMessage) bool {

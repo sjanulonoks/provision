@@ -33,6 +33,7 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 	readHandler := func(filename string, rf io.ReaderFrom) error {
 		var local net.IP
 		var remote net.UDPAddr
+		l := log.Fork()
 		t, outgoing := rf.(tftp.OutgoingTransfer)
 		rpi, haveRPI := rf.(tftp.RequestPacketInfo)
 		if outgoing && haveRPI {
@@ -42,9 +43,11 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 			remote = t.RemoteAddr()
 		}
 		if outgoing && haveRPI {
-			backend.AddToCache(local, remote.IP)
+			backend.AddToCache(l, local, remote.IP)
+		} else {
+			l.Errorf("TFTP: Failed to get remote and local IP address information")
 		}
-		log.Debugf("TFTP: attempting to send %s", filename)
+		l.Debugf("TFTP: attempting to send %s", filename)
 		source, err := responder(filename, remote.IP)
 		if err != nil {
 			return err
@@ -61,11 +64,11 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 				size = src.Size()
 			}
 			t.SetSize(size)
-			log.Debugf("TFTP: %s: size: %d", filename, size)
+			l.Debugf("TFTP: %s: size: %d", filename, size)
 		}
 		_, err = rf.ReadFrom(source)
 		if err != nil {
-			log.Errorf("TFTP: %s: transfer error: %v", filename, err)
+			l.Errorf("TFTP: %s: transfer error: %v", filename, err)
 			return err
 		}
 		return nil

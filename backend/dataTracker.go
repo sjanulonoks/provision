@@ -594,9 +594,10 @@ func (p *DataTracker) lockAll() (stores Stores, unlocker func()) {
 func (p *DataTracker) LocalIP(remote net.IP) string {
 	// If we are behind a NAT, always use Our Address
 	if p.ForceOurAddress && p.OurAddress != "" {
+		p.Debugf("addrCache: Forced to use static address %s", p.OurAddress)
 		return p.OurAddress
 	}
-	if localIP := LocalFor(remote); localIP != nil {
+	if localIP := LocalFor(p.Logger, remote); localIP != nil {
 		return localIP.String()
 	}
 	// Determining what this is needs to be made smarter, probably by
@@ -606,7 +607,7 @@ func (p *DataTracker) LocalIP(remote net.IP) string {
 	if p.OurAddress != "" {
 		return p.OurAddress
 	}
-	gwIp := DefaultIP()
+	gwIp := DefaultIP(p.Logger)
 	if gwIp == nil {
 		p.Warnf("Failed to find appropriate local IP to use for %s", remote)
 		p.Warnf("No --static-ip and no default gateway to use in its place")
@@ -614,7 +615,6 @@ func (p *DataTracker) LocalIP(remote net.IP) string {
 		return ""
 	}
 	p.Infof("Falling back to local address %s as default target for remote %s", gwIp, remote)
-	AddToCache(gwIp, remote)
 	return gwIp.String()
 }
 

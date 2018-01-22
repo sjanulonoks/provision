@@ -301,12 +301,14 @@ func Server(c_opts *ProgOpts) {
 		Addr:      fmt.Sprintf(":%d", c_opts.ApiPort),
 		Handler:   fe.MgmtApi,
 		ConnState: func(n net.Conn, cs http.ConnState) {
-			laddr, lok := n.LocalAddr().(*net.TCPAddr)
-			raddr, rok := n.RemoteAddr().(*net.TCPAddr)
-			if lok && rok && cs == http.StateActive {
-				backend.AddToCache(laddr.IP, raddr.IP)
+			if cs == http.StateActive {
+				l := fe.Logger.Fork()
+				laddr, lok := n.LocalAddr().(*net.TCPAddr)
+				raddr, rok := n.RemoteAddr().(*net.TCPAddr)
+				if lok && rok && cs == http.StateActive {
+					backend.AddToCache(l, laddr.IP, raddr.IP)
+				}
 			}
-			return
 		},
 	}
 	services = append(services, srv)

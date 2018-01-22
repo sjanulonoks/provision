@@ -17,12 +17,14 @@ func ServeStatic(listenAt string, responder http.Handler, logger logger.Logger, 
 		Addr:    listenAt,
 		Handler: responder,
 		ConnState: func(n net.Conn, cs http.ConnState) {
-			laddr, lok := n.LocalAddr().(*net.TCPAddr)
-			raddr, rok := n.RemoteAddr().(*net.TCPAddr)
-			if lok && rok && cs == http.StateActive {
-				backend.AddToCache(laddr.IP, raddr.IP)
+			if cs == http.StateActive {
+				laddr, lok := n.LocalAddr().(*net.TCPAddr)
+				raddr, rok := n.RemoteAddr().(*net.TCPAddr)
+				if lok && rok {
+					l := logger.Fork()
+					backend.AddToCache(l, laddr.IP, raddr.IP)
+				}
 			}
-			return
 		},
 	}
 	go func() {
