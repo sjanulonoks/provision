@@ -1,5 +1,5 @@
 hash: e5158e4f5d9b79afe806f75dcd1798869ac7665113daae66d466ce0793c83bc2
-updated: 2017-12-21T14:02:19.838751114-06:00
+updated: 2018-01-23T10:54:38.116322-06:00
 imports:
 - name: github.com/boltdb/bolt
   version: 2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8
@@ -73,6 +73,13 @@ imports:
   version: d715325c1fc1f1a22a8272a60dc6783a5ab093ba
   subpackages:
   - netascii
+- name: github.com/rackn/gohai
+  version: 66de14f340632bf22a0a1d81b10819a778c25954
+  subpackages:
+  - plugins/dmi
+  - plugins/net
+  - plugins/storage
+  - plugins/system
 - name: github.com/russross/blackfriday
   version: 4048872b16cc0fc2c5fd9eacf0ed2c2fedaa0c8c
 - name: github.com/spf13/cobra
@@ -87,6 +94,8 @@ imports:
   version: 8c0409fcbb70099c748d71f714529204975f6c3f
   subpackages:
   - codec
+- name: github.com/VictorLowther/godmi
+  version: e96629ef451766733662a029d6caebbc6f245a1b
 - name: github.com/VictorLowther/jsonpatch2
   version: 728f2fee2a186b5764d9c9a8fa904279a22b1960
   subpackages:
@@ -133,6 +142,6 @@ imports:
 - name: gopkg.in/olahol/melody.v1
   version: d521390733761fe1db13de575c253afd5c743085
 - name: gopkg.in/yaml.v2
-  version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
+  version: d670f9405373e636a5a2765eea47fac0c9bc91a4
   repo: https://github.com/go-yaml/yaml
 testImports: []
