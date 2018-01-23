@@ -285,7 +285,17 @@ func (n *Machine) ParameterMaker(rt *RequestTracker, parameter string) (index.Ma
 			var obj interface{}
 			err := json.Unmarshal([]byte(s), &obj)
 			if err != nil {
-				return nil, err
+				// If type is string, then just use the value
+				// we leave the json parsing so that we can test quoted strings.
+				if tv, ok := param.TypeValue(); ok {
+					if is, ok := tv.(string); ok && is == "string" {
+						obj = s
+					} else {
+						return nil, err
+					}
+				} else {
+					return nil, err
+				}
 			}
 			if err := param.ValidateValue(obj); err != nil {
 				return nil, err
