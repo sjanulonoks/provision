@@ -327,7 +327,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 				info, _ := f.GetInfo(c, drpid)
 				if info != nil {
 					if a, _, e := net.SplitHostPort(c.Request.RemoteAddr); e == nil {
-						info.Address = backend.LocalFor(net.ParseIP(a))
+						info.Address = backend.LocalFor(f.l(c), net.ParseIP(a))
 					}
 				}
 				c.JSON(http.StatusOK, models.UserToken{Token: t, Info: *info})
