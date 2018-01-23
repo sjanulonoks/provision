@@ -40,14 +40,11 @@ localboot 0
 `,
 				},
 				{
-					Name:     `elilo`,
-					Path:     `elilo.conf`,
-					Contents: `exit`,
-				},
-				{
 					Name: `ipxe`,
 					Path: `default.ipxe`,
 					Contents: `#!ipxe
+chain {{.ProvisionerURL}}/${netX/mac}.ipxe && exit || goto chainip
+:chainip
 chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 `,
 				},
@@ -481,7 +478,7 @@ type DataTracker struct {
 	thunkMux            *sync.Mutex
 	publishers          *Publishers
 	macAddrMap          map[string]string
-	macAddrMux          sync.RWMutex
+	macAddrMux          *sync.RWMutex
 }
 
 func (p *DataTracker) LogFor(s string) logger.Logger {
@@ -694,6 +691,8 @@ func ValidateDataTrackerStore(backend store.Store, logger logger.Logger) (hard, 
 		thunks:            make([]func(), 0),
 		thunkMux:          &sync.Mutex{},
 		publishers:        &Publishers{},
+		macAddrMap:        map[string]string{},
+		macAddrMux:        &sync.RWMutex{},
 	}
 
 	// Load stores.
@@ -732,6 +731,8 @@ func NewDataTracker(backend store.Store,
 		thunks:            make([]func(), 0),
 		thunkMux:          &sync.Mutex{},
 		publishers:        publishers,
+		macAddrMap:        map[string]string{},
+		macAddrMux:        &sync.RWMutex{},
 	}
 
 	// Make sure incoming writable backend has all stores created

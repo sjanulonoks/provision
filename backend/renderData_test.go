@@ -87,6 +87,11 @@ func TestRenderData(t *testing.T) {
 						Path: "machines/{{.Machine.UUID}}/file",
 						ID:   "default",
 					},
+					{
+						Name: "ipxe-mac",
+						Path: "machines/{{.Machine.UUID}}/{{.Machine.MacAddr \"ipxe\"}}",
+						ID:   "default",
+					},
 				},
 				BootParams: "{{.Env.Name}}",
 			},
@@ -136,6 +141,7 @@ func TestRenderData(t *testing.T) {
 	machine.Name = "Test Name"
 	machine.Address = net.ParseIP("192.168.124.11")
 	machine.BootEnv = "default"
+	machine.HardwareAddrs = []string{"3c:a9:f4:31:57:98", "f0:1f:af:17:f0:9a"}
 	rt.Do(func(d Stores) {
 		created, err := rt.Create(machine)
 		if !created {
@@ -146,28 +152,35 @@ func TestRenderData(t *testing.T) {
 		}
 		rt.SetParam(machine, "foo", "bar")
 	})
-	genLoc := path.Join("/", "machines", machine.UUID(), "file")
-	out, err := dt.FS.Open(genLoc, nil)
-	if err != nil || out == nil {
-		t.Errorf("Failed to get template for %s: %v\n%#v", genLoc, err, out)
-		return
+	genLocs := []string{
+		path.Join("/", "machines", machine.UUID(), "file"),
+		path.Join("/", "machines", machine.UUID(), machine.HardwareAddrs[0]),
+		path.Join("/", "machines", machine.UUID(), machine.HardwareAddrs[1]),
 	}
-	buf, err := ioutil.ReadAll(out)
-	if err != nil {
-		t.Errorf("Failed to read %s: %v", genLoc, err)
-	} else if string(buf) != tmplDefaultRenderedWithoutFred {
-		t.Errorf("Failed to render expected template!\nExpected:\n%s\n\nGot:\n%s", tmplDefaultRenderedWithoutFred, string(buf))
-	} else {
-		t.Logf("BootEnv default without fred rendered properly for test machine")
+	for _, genLoc := range genLocs {
+		out, err := dt.FS.Open(genLoc, nil)
+		if err != nil || out == nil {
+			t.Errorf("Failed to get template for %s: %v\n%#v", genLoc, err, out)
+			return
+		}
+		buf, err := ioutil.ReadAll(out)
+		if err != nil {
+			t.Errorf("Failed to read %s: %v", genLoc, err)
+		} else if string(buf) != tmplDefaultRenderedWithoutFred {
+			t.Errorf("Failed to render expected template!\nExpected:\n%s\n\nGot:\n%s", tmplDefaultRenderedWithoutFred, string(buf))
+		} else {
+			t.Logf("BootEnv default without fred rendered properly for test machine")
+		}
 	}
 	rt.Do(func(d Stores) {
 		rt.SetParam(machine, "fred", "fred = fred")
 	})
-	out, err = dt.FS.Open(genLoc, nil)
+	genLoc := path.Join("/", "machines", machine.UUID(), "file")
+	out, err := dt.FS.Open(genLoc, nil)
 	if err != nil {
 		t.Errorf("Failed to get tmeplate for %s: %v", genLoc, err)
 	}
-	buf, err = ioutil.ReadAll(out)
+	buf, err := ioutil.ReadAll(out)
 	if err != nil {
 		t.Errorf("Failed to read %s: %v", genLoc, err)
 	} else if string(buf) != tmplDefaultRenderedWithFred {
