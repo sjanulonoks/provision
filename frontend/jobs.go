@@ -541,6 +541,7 @@ func (f *Frontend) InitJobApi() {
 			j := &backend.Job{}
 			var bad bool
 			var err *models.Error
+			var path string
 			rt := f.rt(c, j.Locks("get")...)
 			rt.Do(func(d backend.Stores) {
 				var jo models.Model
@@ -551,6 +552,7 @@ func (f *Frontend) InitJobApi() {
 					return
 				}
 				j = backend.AsJob(jo)
+				path = j.LogPath(rt)
 			})
 			if bad {
 				c.JSON(err.Code, err)
@@ -562,7 +564,7 @@ func (f *Frontend) InitJobApi() {
 			}
 
 			c.Writer.Header().Set("Content-Type", "application/octet-stream")
-			c.File(j.LogPath(rt))
+			c.File(path)
 		})
 
 	// swagger:route PUT /jobs/{uuid}/log Jobs putJobLog
@@ -620,12 +622,27 @@ func (f *Frontend) InitJobApi() {
 				return
 			}
 
-			if err := j.Log(rt, c.Request.Body); err != nil {
-				err2 := &models.Error{Code: http.StatusInternalServerError, Type: "Server ERROR",
-					Messages: []string{err.Error()}}
-				c.JSON(err2.Code, err2)
-			} else {
-				c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
+			rt.Do(func(d backend.Stores) {
+				var jo models.Model
+				if jo = d("jobs").Find(uuid); jo == nil {
+					err = &models.Error{Code: http.StatusNotFound, Type: backend.ValidationError,
+						Messages: []string{fmt.Sprintf("Job %s does not exist", uuid)}}
+					bad = true
+					return
+				}
+				j = backend.AsJob(jo)
+
+				if err := j.Log(rt, c.Request.Body); err != nil {
+					err2 := &models.Error{Code: http.StatusInternalServerError, Type: "Server ERROR",
+						Messages: []string{err.Error()}}
+					c.JSON(err2.Code, err2)
+				} else {
+					c.Data(http.StatusNoContent, gin.MIMEJSON, nil)
+				}
+			})
+			if bad {
+				c.JSON(err.Code, err)
+				return
 			}
 		})
 
