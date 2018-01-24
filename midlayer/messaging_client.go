@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/digitalrebar/logger"
@@ -80,6 +81,12 @@ func (pc *PluginClient) Stop() error {
 	// Wait for exit
 	pc.Tracef("Stop: waiting for command exit\n")
 	pc.cmd.Wait()
+
+	// Make sure that the sockets are removed
+	retSocketPath := fmt.Sprintf("%s/%s.fromPlugin", pc.pc.pluginCommDir, pc.plugin)
+	socketPath := fmt.Sprintf("%s/%s.toPlugin", pc.pc.pluginCommDir, pc.plugin)
+	os.Remove(retSocketPath)
+	os.Remove(socketPath)
 
 	pc.Tracef("Stop: finished\n")
 	return nil

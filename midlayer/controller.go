@@ -90,7 +90,7 @@ func InitPluginController(pluginDir, pluginCommDir string, dt *backend.DataTrack
 						}
 					case "delete":
 						rt.Debugf("handling plugin delete:", event)
-						pc.stopPlugin(event.Object.(*backend.Plugin))
+						pc.stopPlugin(event.Object.(*backend.Plugin).Name)
 					default:
 						rt.Infof("internal event:", event)
 					}
@@ -181,6 +181,11 @@ func (pc *PluginController) walkPlugins(provider string) (err error) {
 
 func (pc *PluginController) Shutdown(ctx context.Context) error {
 	pc.Debugf("Stopping plugin controller\n")
+	for _, rp := range pc.runningPlugins {
+		pc.Debugf("Stopping plugin: %s\n", rp.Plugin.Name)
+		pc.stopPlugin(rp.Plugin.Name)
+	}
+	pc.Debugf("Stopping plugin gofuncs\n")
 	pc.done <- true
 	pc.Debugf("Waiting for gofuncs to finish\n")
 	<-pc.finished
@@ -329,9 +334,10 @@ func (pc *PluginController) startPlugin(rt *backend.RequestTracker, plugin *back
 	}
 }
 
-func (pc *PluginController) stopPlugin(plugin *backend.Plugin) {
-	rp, ok := pc.runningPlugins[plugin.Name]
+func (pc *PluginController) stopPlugin(pluginName string) {
+	rp, ok := pc.runningPlugins[pluginName]
 	if ok {
+		plugin := rp.Plugin
 		pc.Infof("Stopping plugin: %s(%s)\n", plugin.Name, plugin.Provider)
 		delete(pc.runningPlugins, plugin.Name)
 
@@ -343,6 +349,8 @@ func (pc *PluginController) stopPlugin(plugin *backend.Plugin) {
 			pc.Debugf("Remove actions: %s(%s,%s)\n", plugin.Name, plugin.Provider, aa.Command)
 			pc.Actions.Remove(aa, rp)
 		}
+		pc.Debugf("Drain executable: %s(%s)\n", plugin.Name, plugin.Provider)
+		rp.Client.Unload()
 		pc.Debugf("Stop executable: %s(%s)\n", plugin.Name, plugin.Provider)
 		rp.Client.Stop()
 		pc.Infof("Stopping plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
@@ -352,7 +360,7 @@ func (pc *PluginController) stopPlugin(plugin *backend.Plugin) {
 
 func (pc *PluginController) restartPlugin(rt *backend.RequestTracker, plugin *backend.Plugin) {
 	rt.Infof("Restarting plugin: %s(%s)\n", plugin.Name, plugin.Provider)
-	pc.stopPlugin(plugin)
+	pc.stopPlugin(plugin.Name)
 	pc.startPlugin(rt, plugin)
 	rt.Infof("Restarting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
 }
@@ -528,7 +536,7 @@ func (pc *PluginController) removePluginProvider(provider string) error {
 		rt := pc.dt.Request(pc.dt.Logger, ref.Locks("get")...)
 		rt.Do(func(d backend.Stores) {
 			for _, p := range remove {
-				pc.stopPlugin(p)
+				pc.stopPlugin(p.Name)
 				ref2 := rt.Find(ref.Prefix(), p.Name)
 				myPP := ref2.(*backend.Plugin)
 				myPP.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", provider)}

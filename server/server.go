@@ -70,7 +70,7 @@ type ProgOpts struct {
 	BaseRoot        string `long:"base-root" description:"Base directory for other root dirs." default:"/var/lib/dr-provision"`
 	DataRoot        string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
 	PluginRoot      string `long:"plugin-root" description:"Directory for plugins" default:"plugins"`
-	PluginCommRoot  string `long:"plugin-comm-root" description:"Directory for the communications for plugins" default:"plugins-comms"`
+	PluginCommRoot  string `long:"plugin-comm-root" description:"Directory for the communications for plugins" default:"/var/run"`
 	LogRoot         string `long:"log-root" description:"Directory for job logs" default:"job-logs"`
 	SaasContentRoot string `long:"saas-content-root" description:"Directory for additional content" default:"saas-content"`
 	FileRoot        string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`

@@ -95,9 +95,16 @@ func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logge
 	answer.Debugf("Initialzing Plugin: %s\n", plugin)
 
 	retSocketPath := fmt.Sprintf("%s/%s.fromPlugin", pluginCommDir, plugin)
+	socketPath := fmt.Sprintf("%s/%s.toPlugin", pluginCommDir, plugin)
+
+	// Make sure that the sockets are removed
+	os.Remove(retSocketPath)
+	os.Remove(socketPath)
+
+	// Start server side.
 	answer.pluginServer(retSocketPath)
 
-	socketPath := fmt.Sprintf("%s/%s.toPlugin", pluginCommDir, plugin)
+	// Setup client.
 	answer.cmd = exec.Command(path, "listen", socketPath, retSocketPath)
 
 	// Setup env vars to run plugin - auth should be parameters.
