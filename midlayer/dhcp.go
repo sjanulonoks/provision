@@ -112,8 +112,9 @@ func (h *DhcpHandler) buildOptions(p dhcp.Packet,
 	options := p.ParseOptions()
 	srcOpts := map[int]string{}
 	for c, v := range options {
-		srcOpts[int(c)] = convertByteToOptionValue(c, v)
-		h.Debugf("Received option: %v: %v", c, srcOpts[int(c)])
+		opt := &models.DhcpOption{Code: byte(c)}
+		opt.FillFromPacketOpt(v)
+		srcOpts[int(c)] = opt.Value
 	}
 
 	// ProxyOnly replies don't include lease info.
@@ -343,7 +344,11 @@ func (h *DhcpHandler) handleOnePacket(pktBytes []byte, cm *ipv4.ControlMessage, 
 			return
 		}
 	}
-	res := h.ServeDHCP(req, reqType, options, cm)
+	rt := h.Request("leases", "reservations", "subnets")
+	if rt.IsDebug() {
+		rt.Debugf("DHCP: Handling packet:\n%s", models.UnmarshalDHCP(req))
+	}
+	res := h.ServeDHCP(rt, req, reqType, options, cm)
 	if res == nil {
 		return
 	}
@@ -351,6 +356,9 @@ func (h *DhcpHandler) handleOnePacket(pktBytes []byte, cm *ipv4.ControlMessage, 
 	ipStr, portStr, err := net.SplitHostPort(srcAddr.String())
 	if err != nil {
 		return
+	}
+	if rt.IsDebug() {
+		rt.Debugf("DHCP: Sending packet:\n%s", models.UnmarshalDHCP(res))
 	}
 	port, _ := strconv.Atoi(portStr)
 	if req.GIAddr().Equal(net.IPv4zero) {
@@ -386,21 +394,12 @@ func (h *DhcpHandler) Serve() error {
 	}
 }
 
-func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
+func (h *DhcpHandler) ServeDHCP(
+	rt *backend.RequestTracker,
+	p dhcp.Packet,
 	msgType dhcp.MessageType,
 	options dhcp.Options,
-	cm *ipv4.ControlMessage) (res dhcp.Packet) {
-	rt := h.Request("leases", "reservations", "subnets")
-	rt.Infof("Received DHCP packet: type %s %s ciaddr %s yiaddr %s giaddr %s server %s chaddr %s on %s",
-		msgType.String(),
-		xid(p),
-		p.CIAddr(),
-		p.YIAddr(),
-		p.GIAddr(),
-		p.SIAddr(),
-		p.CHAddr().String(),
-		cm.Dst.String())
-	rt.Debugf("Packet recieved on interface %s, subnet candidates are %v", h.intf(cm).Name, h.listenIPs(cm))
+	cm *ipv4.ControlMessage) dhcp.Packet {
 	// need code to figure out which interface or relay it came from
 	req, reqState := reqAddr(p, msgType, options)
 	var err error
@@ -416,7 +415,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		}
 	case dhcp.Decline:
 		if h.proxyOnly {
-			return
+			return nil
 		}
 		rt.Do(func(d backend.Stores) {
 			leaseThing := rt.Find("leases", models.Hexaddr(req))
@@ -436,7 +435,7 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		})
 	case dhcp.Release:
 		if h.proxyOnly {
-			return
+			return nil
 		}
 		rt.Do(func(d backend.Stores) {
 			leaseThing := rt.Find("leases", models.Hexaddr(req))
@@ -459,14 +458,14 @@ func (h *DhcpHandler) ServeDHCP(p dhcp.Packet,
 		server := net.IP(serverBytes)
 		if ok && !h.listenOn(server, cm) {
 			rt.Warnf("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
-			return
+			return nil
 		}
 		if !req.IsGlobalUnicast() {
 			rt.Infof("%s: NAK'ing invalid requested IP %s", xid(p), req)
 			return h.nak(p, h.respondFrom(req, cm))
 		}
 		if h.proxyOnly {
-			return
+			return nil
 		}
 		var lease *backend.Lease
 		var reservation *backend.Reservation
