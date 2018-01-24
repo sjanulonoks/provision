@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
@@ -73,10 +75,20 @@ func (pc *PluginClient) Stop() error {
 	}
 
 	// Wait for log reader to exit
-	pc.Tracef("Stop: waiting for finished(1)\n")
-	<-pc.finished
-	pc.Tracef("Stop: waiting for finished(2)\n")
-	<-pc.finished
+	if se, err := pc.cmd.StderrPipe(); err == nil {
+		se.Close()
+	}
+	if so, err := pc.cmd.StdoutPipe(); err == nil {
+		so.Close()
+	}
+
+	pc.Tracef("Stop: waiting for readers to stop\n")
+	count := 0
+	for atomic.LoadInt64(&pc.done) > 0 && count < 60 {
+		pc.Tracef("Stop: waiting for readers to stop: %d\n", count)
+		count += 1
+		time.Sleep(1 * time.Second)
+	}
 
 	// Wait for exit
 	pc.Tracef("Stop: waiting for command exit\n")

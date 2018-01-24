@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/digitalrebar/logger"
@@ -17,12 +18,12 @@ import (
 
 type PluginClient struct {
 	logger.Logger
-	pc       *PluginController
-	plugin   string
-	cmd      *exec.Cmd
-	stderr   io.ReadCloser
-	finished chan bool
-	lock     sync.Mutex
+	pc     *PluginController
+	plugin string
+	cmd    *exec.Cmd
+	stderr io.ReadCloser
+	done   int64
+	lock   sync.Mutex
 
 	publock   sync.Mutex
 	inflight  int
@@ -32,6 +33,7 @@ type PluginClient struct {
 }
 
 func (pc *PluginClient) readLog(name string, com io.ReadCloser) {
+	atomic.AddInt64(&pc.done, 1)
 	pc.Tracef("readLog: Starting log reader %s(%s)\n", pc.plugin, name)
 	// read command's com line by line - for logging
 	in := bufio.NewScanner(com)
@@ -44,8 +46,8 @@ func (pc *PluginClient) readLog(name string, com io.ReadCloser) {
 	if err := in.Err(); err != nil {
 		pc.Errorf("Plugin %s(%s): error: %s", pc.plugin, name, err)
 	}
-	pc.finished <- true
 	pc.Tracef("readLog: Finished log reader %s(%s)\n", pc.plugin, name)
+	atomic.AddInt64(&pc.done, -1)
 }
 
 func (pc *PluginClient) Reserve() error {
@@ -134,12 +136,16 @@ func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logge
 	}
 
 	// Start the err reader.
-	answer.finished = make(chan bool, 2)
 	go answer.readLog("se", answer.stderr)
 
 	// Start the plugin
 	answer.Debugf("Start Plugin: %s\n", plugin)
-	answer.cmd.Start()
+	if err := answer.cmd.Start(); err != nil {
+		answer.Stop()
+		err := fmt.Errorf("Failed to start plugin - didn't start")
+		l.Errorf("%v\n", err)
+		return nil, err
+	}
 
 	// Wait for plugin to be listening
 	answer.Debugf("Wait for ready\n")
@@ -159,8 +165,10 @@ func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logge
 	}
 	if err := in.Err(); err != nil {
 		l.Errorf("Plugin %s: start-up error: %s", answer.plugin, err)
+		failed = true
 	}
 	if failed {
+		answer.Stop()
 		err := fmt.Errorf("Failed to start plugin - didn't respond cleanly")
 		l.Errorf("%v\n", err)
 		return nil, err

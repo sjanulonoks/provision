@@ -251,6 +251,9 @@ func (f *Frontend) InitPluginApi() {
 			if !assureDecode(c, b) {
 				return
 			}
+			if !f.assureAuth(c, b.Prefix(), "create", "") {
+				return
+			}
 			var err error
 			var res models.Model
 			rt := f.rt(c, b.Locks("create")...)

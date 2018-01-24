@@ -128,6 +128,9 @@ func Server(c_opts *ProgOpts) {
 	if strings.IndexRune(c_opts.PluginCommRoot, filepath.Separator) != 0 {
 		c_opts.PluginCommRoot = filepath.Join(c_opts.BaseRoot, c_opts.PluginCommRoot)
 	}
+	if len(c_opts.PluginCommRoot) > 70 {
+		localLogger.Fatalf("PluginCommRoot Must be less than 70 characters")
+	}
 	if strings.IndexRune(c_opts.DataRoot, filepath.Separator) != 0 {
 		c_opts.DataRoot = filepath.Join(c_opts.BaseRoot, c_opts.DataRoot)
 	}
