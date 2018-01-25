@@ -31,17 +31,17 @@ var explodeMux = &sync.Mutex{}
 type BootEnv struct {
 	*models.BootEnv
 	validate
-	renderers                 renderers
-	pathLookaside             func(string) (io.Reader, error)
-	installRepo               *Repo
-	kernelVerified, offerBoot bool
-	bootParamsTmpl            *template.Template
-	rootTemplate              *template.Template
-	tmplMux                   sync.Mutex
+	renderers      renderers
+	pathLookaside  func(string) (io.Reader, error)
+	installRepo    *Repo
+	kernelVerified bool
+	bootParamsTmpl *template.Template
+	rootTemplate   *template.Template
+	tmplMux        sync.Mutex
 }
 
 func (b *BootEnv) NetBoot() bool {
-	return b.offerBoot
+	return b.OnlyUnknown || b.Kernel != ""
 }
 
 func (obj *BootEnv) SetReadOnly(b bool) {
@@ -347,8 +347,7 @@ func (b *BootEnv) Validate() {
 			seenIPXE = true
 		}
 	}
-	b.offerBoot = seenPxeLinux || seenIPXE
-	if !b.offerBoot && b.Kernel != "" {
+	if !(seenPxeLinux || seenIPXE) && b.Kernel != "" {
 		b.Errorf("bootenv: Missing elilo or pxelinux template")
 	}
 	// Make sure the ISO for this bootenv has been exploded locally so that
