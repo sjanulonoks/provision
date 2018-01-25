@@ -103,7 +103,14 @@ func (h *DhcpHandler) shouldOfferPXE(l logger.Logger, p dhcp.Packet, lease *back
 	return shouldOffer
 }
 
-func (h *DhcpHandler) buildReply(p dhcp.Packet, mt dhcp.MessageType, serverID, yAddr net.IP, leaseDuration time.Duration, options dhcp.Options, order []byte) dhcp.Packet {
+func (h *DhcpHandler) buildReply(
+	p dhcp.Packet,
+	mt dhcp.MessageType,
+	serverID,
+	yAddr net.IP,
+	leaseDuration time.Duration,
+	options dhcp.Options,
+	order []byte) dhcp.Packet {
 	toAdd := []dhcp.Option{}
 	var fileName, sName []byte
 	// The DHCP spec implies that we should use the bootp sname and file
@@ -178,7 +185,7 @@ func (h *DhcpHandler) buildOptions(
 	// Subnets marked proxy only, don't include lease info
 	dur := time.Duration(leaseTime) * time.Second
 	shouldOfferPXE := h.shouldOfferPXE(log, p, l)
-	nextServer := h.respondFrom(l.Addr, cm)
+	nextServer := h.respondFrom(log, l.Addr, cm)
 	if s != nil {
 		for _, opt := range s.Options {
 			if opt.Value == "" {
@@ -349,7 +356,7 @@ func (h *DhcpHandler) listenIPs(cm *ipv4.ControlMessage) []net.IP {
 	return res
 }
 
-func (h *DhcpHandler) respondFrom(testAddr net.IP, cm *ipv4.ControlMessage) net.IP {
+func (h *DhcpHandler) respondFrom(l logger.Logger, testAddr net.IP, cm *ipv4.ControlMessage) net.IP {
 	addrs := h.listenAddrs(cm)
 	for _, addr := range addrs {
 		if addr.Contains(testAddr) {
@@ -409,11 +416,11 @@ func (h *DhcpHandler) handleOnePacket(pktBytes []byte, cm *ipv4.ControlMessage, 
 			return
 		}
 	}
-	rt := h.Request("leases", "reservations", "subnets")
-	if rt.IsDebug() {
-		rt.Debugf("DHCP: Handling packet:\n%s", models.UnmarshalDHCP(req))
+	l := h.Logger.Fork()
+	if l.IsDebug() {
+		l.Debugf("DHCP: Handling packet:\n%s", models.UnmarshalDHCP(req))
 	}
-	res := h.ServeDHCP(rt, req, reqType, options, cm)
+	res := ServeDHCP(h, l, req, reqType, options, cm)
 	if res == nil {
 		return
 	}
@@ -422,8 +429,8 @@ func (h *DhcpHandler) handleOnePacket(pktBytes []byte, cm *ipv4.ControlMessage, 
 	if err != nil {
 		return
 	}
-	if rt.IsDebug() {
-		rt.Debugf("DHCP: Sending packet:\n%s", models.UnmarshalDHCP(res))
+	if l.IsDebug() {
+		l.Debugf("DHCP: Sending packet:\n%s", models.UnmarshalDHCP(res))
 	}
 	port, _ := strconv.Atoi(portStr)
 	if req.GIAddr().Equal(net.IPv4zero) {
@@ -459,8 +466,9 @@ func (h *DhcpHandler) Serve() error {
 	}
 }
 
-func (h *DhcpHandler) ServeDHCP(
-	rt *backend.RequestTracker,
+func ServeDHCP(
+	h *DhcpHandler,
+	l logger.Logger,
 	p dhcp.Packet,
 	msgType dhcp.MessageType,
 	options dhcp.Options,
@@ -525,11 +533,11 @@ func (h *DhcpHandler) ServeDHCP(
 		server := net.IP(serverBytes)
 		if ok && !h.listenOn(server, cm) {
 			l.Warnf("%s: Ignoring request for DHCP server %s", xid(p), net.IP(server))
-			return
+			return nil
 		}
 		if !req.IsGlobalUnicast() {
 			l.Infof("%s: NAK'ing invalid requested IP %s", xid(p), req)
-			return h.nak(p, h.respondFrom(req, cm))
+			return h.nak(p, h.respondFrom(l, req, cm))
 		}
 		if h.proxyOnly {
 			return nil
@@ -561,7 +569,7 @@ func (h *DhcpHandler) ServeDHCP(
 						req,
 						err)
 				}
-				return h.nak(p, h.respondFrom(req, cm))
+				return h.nak(p, h.respondFrom(l, req, cm))
 			}
 			if lease != nil {
 				break
@@ -578,7 +586,7 @@ func (h *DhcpHandler) ServeDHCP(
 			}
 			if subnet != nil || reservation != nil {
 				l.Infof("%s: No lease for %s in database, NAK'ing", xid(p), req)
-				return h.nak(p, h.respondFrom(req, cm))
+				return h.nak(p, h.respondFrom(l, req, cm))
 			}
 
 			l.Infof("%s: No lease in database, and no subnet or reservation covers %s. Ignoring request", xid(p), req)
@@ -592,7 +600,7 @@ func (h *DhcpHandler) ServeDHCP(
 			cm)
 		reply := h.buildReply(p,
 			dhcp.ACK,
-			h.respondFrom(lease.Addr, cm),
+			nextServer,
 			lease.Addr,
 			duration,
 			opts,
@@ -600,7 +608,7 @@ func (h *DhcpHandler) ServeDHCP(
 		if nextServer.IsGlobalUnicast() {
 			reply.SetSIAddr(nextServer)
 		}
-		rt.Infof("%s: Request handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
+		rt.Infof("%s: Request handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), nextServer)
 		return reply
 	case dhcp.Discover:
 		for _, s := range h.strats {
@@ -680,7 +688,7 @@ func (h *DhcpHandler) ServeDHCP(
 			}
 			reply := h.buildReply(p,
 				repType,
-				h.respondFrom(lease.Addr, cm),
+				nextServer,
 				addr,
 				duration,
 				opts,
@@ -695,7 +703,7 @@ func (h *DhcpHandler) ServeDHCP(
 					reply.SetSIAddr(nextServer)
 				}
 			}
-			l.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), h.respondFrom(lease.Addr, cm))
+			l.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), nextServer)
 			return reply
 		}
 	}

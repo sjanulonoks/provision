@@ -81,7 +81,7 @@ exit
 				},
 				{
 					Name: "pxelinux-mac",
-					Path: "pxelinux.cfg/{{.Machine.MacAddress \"pxelinux\"}}",
+					Path: "pxelinux.cfg/{{.Machine.MacAddr \"pxelinux\"}}",
 					Contents: `DEFAULT local
 PROMPT 0
 TIMEOUT 10
@@ -91,7 +91,7 @@ localboot 0
 				},
 				{
 					Name: "ipxe-mac",
-					Path: "{{.Machine.MacAddress \"ipxe\"}}.ipxe",
+					Path: "{{.Machine.MacAddr \"ipxe\"}}.ipxe",
 					Contents: `#!ipxe
 exit
 `,
