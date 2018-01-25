@@ -1,6 +1,7 @@
 package midlayer
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -166,6 +167,7 @@ func (h *DhcpHandler) buildOptions(
 	l *backend.Lease,
 	s *backend.Subnet,
 	r *backend.Reservation,
+	serverID net.IP,
 	cm *ipv4.ControlMessage) (dhcp.Options, time.Duration, net.IP, bool) {
 	var leaseTime uint32 = 7200
 	if s != nil {
@@ -174,18 +176,20 @@ func (h *DhcpHandler) buildOptions(
 
 	opts := make(dhcp.Options)
 	options := p.ParseOptions()
+	shouldOfferPXE := false
+	if vals, ok := options[dhcp.OptionParameterRequestList]; ok {
+		shouldOfferPXE = bytes.IndexByte(vals, byte(dhcp.OptionBootFileName)) != -1
+	}
 	srcOpts := map[int]string{}
 	for c, v := range options {
 		opt := &models.DhcpOption{Code: byte(c)}
 		opt.FillFromPacketOpt(v)
 		srcOpts[int(c)] = opt.Value
 	}
-
+	nextServer := serverID
 	// ProxyOnly replies don't include lease info.
 	// Subnets marked proxy only, don't include lease info
 	dur := time.Duration(leaseTime) * time.Second
-	shouldOfferPXE := h.shouldOfferPXE(log, p, l)
-	nextServer := h.respondFrom(log, l.Addr, cm)
 	if s != nil {
 		for _, opt := range s.Options {
 			if opt.Value == "" {
@@ -210,7 +214,7 @@ func (h *DhcpHandler) buildOptions(
 					log.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
 					continue
 				} else {
-					shouldOfferPXE = false
+					delete(opts, dhcp.OptionBootFileName)
 				}
 			}
 			c, v, err := opt.RenderToDHCP(srcOpts)
@@ -225,15 +229,21 @@ func (h *DhcpHandler) buildOptions(
 		}
 	}
 	if !shouldOfferPXE {
+		delete(opts, dhcp.OptionTFTPServerName)
+		delete(opts, dhcp.OptionBootFileName)
+	} else if !h.shouldOfferPXE(log, p, l) {
 		log.Debugf("Directed to not offer PXE options")
 		delete(opts, dhcp.OptionTFTPServerName)
 		delete(opts, dhcp.OptionBootFileName)
-	} else if opts[dhcp.OptionTFTPServerName] == nil && opts[dhcp.OptionBootFileName] != nil {
-		opts[dhcp.OptionTFTPServerName] = []byte(nextServer.String())
+		shouldOfferPXE = false
+	} else if _, ok := opts[dhcp.OptionBootFileName]; ok {
+		if _, ok := opts[dhcp.OptionTFTPServerName]; !ok {
+			opts[dhcp.OptionTFTPServerName] = []byte(nextServer.String())
+		}
 	}
 	// If we got an incoming request with pxeclient options and the subnet responsible for this request
 	// says we should answer like we are a proxy request, add the proxy options.
-	if shouldOfferPXE && (h.proxyOnly || (s != nil && s.Proxy)) {
+	if shouldOfferPXE && h.proxyOnly || (s != nil && s.Proxy) {
 		if pxeClient, ok := srcOpts[int(dhcp.OptionVendorClassIdentifier)]; ok && strings.HasPrefix(pxeClient, "PXEClient:") {
 			// A single menu entry named PXE, and a 0 second timeout to automatically boot to it.
 			// This is what dnsmasq does when there is only one option it will return.
@@ -360,7 +370,6 @@ func (h *DhcpHandler) respondFrom(l logger.Logger, testAddr net.IP, cm *ipv4.Con
 	addrs := h.listenAddrs(cm)
 	for _, addr := range addrs {
 		if addr.Contains(testAddr) {
-			h.Debugf("Will respond to %s from %s", testAddr, addr.IP)
 			return addr.IP.To4()
 		}
 	}
@@ -592,15 +601,17 @@ func ServeDHCP(
 			l.Infof("%s: No lease in database, and no subnet or reservation covers %s. Ignoring request", xid(p), req)
 			return nil
 		}
+		serverID := h.respondFrom(l, lease.Addr, cm)
 		opts, duration, nextServer, _ := h.buildOptions(l,
 			p,
 			lease,
 			subnet,
 			reservation,
+			serverID,
 			cm)
 		reply := h.buildReply(p,
 			dhcp.ACK,
-			nextServer,
+			serverID,
 			lease.Addr,
 			duration,
 			opts,
@@ -608,7 +619,11 @@ func ServeDHCP(
 		if nextServer.IsGlobalUnicast() {
 			reply.SetSIAddr(nextServer)
 		}
-		rt.Infof("%s: Request handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), nextServer)
+		rt.Infof("%s: Request handing out: %s to %s via %s",
+			xid(p),
+			reply.YIAddr(),
+			reply.CHAddr(),
+			serverID)
 		return reply
 	case dhcp.Discover:
 		for _, s := range h.strats {
@@ -666,7 +681,8 @@ func ServeDHCP(
 			if lease == nil {
 				return nil
 			}
-			opts, duration, nextServer, shouldPXE := h.buildOptions(l, p, lease, subnet, reservation, cm)
+			serverID := h.respondFrom(l, lease.Addr, cm)
+			opts, duration, nextServer, shouldPXE := h.buildOptions(l, p, lease, subnet, reservation, serverID, cm)
 			repType := dhcp.Offer
 			addr := lease.Addr
 			// If we are responding as a Proxy DHCP server but we were directed to omit PXE options,
@@ -688,7 +704,7 @@ func ServeDHCP(
 			}
 			reply := h.buildReply(p,
 				repType,
-				nextServer,
+				serverID,
 				addr,
 				duration,
 				opts,
@@ -698,12 +714,16 @@ func ServeDHCP(
 				if !h.proxyOnly {
 					reply.SetBroadcast(true)
 				}
-				// Say who we are.
-				if nextServer.IsGlobalUnicast() {
-					reply.SetSIAddr(nextServer)
-				}
 			}
-			l.Infof("%s: Discovery handing out: %s to %s via %s", xid(p), reply.YIAddr(), reply.CHAddr(), nextServer)
+			// Say who we are.
+			if nextServer.IsGlobalUnicast() {
+				reply.SetSIAddr(nextServer)
+			}
+			l.Infof("%s: Discovery handing out: %s to %s via %s",
+				xid(p),
+				reply.YIAddr(),
+				reply.CHAddr(),
+				serverID)
 			return reply
 		}
 	}
