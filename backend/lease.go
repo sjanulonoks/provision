@@ -249,6 +249,7 @@ func (l *Lease) BeforeSave() error {
 
 func (l *Lease) OnLoad() error {
 	defer func() { l.rt = nil }()
+	l.Fill()
 	return l.BeforeSave()
 }
 

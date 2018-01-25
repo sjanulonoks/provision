@@ -103,6 +103,7 @@ func (n *Plugin) BeforeSave() error {
 
 func (n *Plugin) OnLoad() error {
 	defer func() { n.rt = nil }()
+	n.Fill()
 	return n.BeforeSave()
 }
 

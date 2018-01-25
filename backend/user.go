@@ -101,6 +101,7 @@ func (u *User) BeforeSave() error {
 
 func (u *User) OnLoad() error {
 	defer func() { u.rt = nil }()
+	u.Fill()
 
 	// This mustSave part is just to keep us from resaving all the users on startup.
 	mustSave := false

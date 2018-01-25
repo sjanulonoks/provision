@@ -122,6 +122,7 @@ func (p *Profile) BeforeSave() error {
 
 func (p *Profile) OnLoad() error {
 	defer func() { p.rt = nil }()
+	p.Fill()
 	return p.BeforeSave()
 }
 

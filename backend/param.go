@@ -101,6 +101,7 @@ func (p *Param) BeforeSave() error {
 
 func (p *Param) OnLoad() error {
 	defer func() { p.rt = nil }()
+	p.Fill()
 	return p.BeforeSave()
 }
 
