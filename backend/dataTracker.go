@@ -73,13 +73,25 @@ localboot 0
 `,
 				},
 				{
-					Name:     "elilo",
-					Path:     "{{.Machine.HexAddress}}.conf",
-					Contents: "exit",
-				},
-				{
 					Name: "ipxe",
 					Path: "{{.Machine.Address}}.ipxe",
+					Contents: `#!ipxe
+exit
+`,
+				},
+				{
+					Name: "pxelinux-mac",
+					Path: "pxelinux.cfg/{{.Machine.MacAddress \"pxelinux\"}}",
+					Contents: `DEFAULT local
+PROMPT 0
+TIMEOUT 10
+LABEL local
+localboot 0
+`,
+				},
+				{
+					Name: "ipxe-mac",
+					Path: "{{.Machine.MacAddress \"ipxe\"}}.ipxe",
 					Contents: `#!ipxe
 exit
 `,
