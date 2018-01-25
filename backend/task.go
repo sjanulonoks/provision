@@ -119,6 +119,7 @@ func (t *Task) Validate() {
 
 func (t *Task) OnLoad() error {
 	defer func() { t.rt = nil }()
+	t.Fill()
 	return t.BeforeSave()
 }
 

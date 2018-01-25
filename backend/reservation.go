@@ -218,6 +218,7 @@ func (r *Reservation) BeforeSave() error {
 
 func (r *Reservation) OnLoad() error {
 	defer func() { r.rt = nil }()
+	r.Fill()
 	return r.BeforeSave()
 }
 

@@ -351,6 +351,7 @@ func (j *Job) OnCreate() error {
 func (j *Job) OnLoad() error {
 	defer func() { j.rt = nil }()
 	j.oldState = j.State
+	j.Fill()
 	j.SetValid()
 	j.Validate()
 	return nil

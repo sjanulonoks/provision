@@ -601,6 +601,7 @@ func (s *Subnet) BeforeSave() error {
 
 func (s *Subnet) OnLoad() error {
 	defer func() { s.rt = nil }()
+	s.Fill()
 	return s.BeforeSave()
 }
 

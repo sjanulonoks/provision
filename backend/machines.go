@@ -528,11 +528,11 @@ func (n *Machine) AfterSave() {
 }
 
 func (n *Machine) OnLoad() error {
+	defer func() { n.rt = nil }()
+	n.Fill()
 	if n.Stage == "" {
 		n.Stage = "none"
 	}
-	defer func() { n.rt = nil }()
-
 	// This mustSave part is just to keep us from resaving all the machines on startup.
 	mustSave := false
 	if n.Secret == "" {

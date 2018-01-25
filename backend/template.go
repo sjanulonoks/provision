@@ -138,6 +138,8 @@ func (t *Template) BeforeSave() error {
 }
 
 func (t *Template) OnLoad() error {
+	defer func() { t.rt = nil }()
+	t.Fill()
 	t.Validated = true
 	t.Available = true
 	return nil

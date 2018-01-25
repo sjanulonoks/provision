@@ -204,6 +204,7 @@ func (s *Stage) Validate() {
 
 func (s *Stage) OnLoad() error {
 	defer func() { s.rt = nil }()
+	s.Fill()
 	return s.BeforeSave()
 }
 

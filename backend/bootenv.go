@@ -427,6 +427,7 @@ func (b *BootEnv) Validate() {
 
 func (b *BootEnv) OnLoad() error {
 	defer func() { b.rt = nil }()
+	b.Fill()
 	return b.BeforeSave()
 }
 
