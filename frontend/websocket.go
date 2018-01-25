@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/models"
@@ -115,15 +116,20 @@ func websocketHandler(s *melody.Session, buf []byte) {
 		val = []string{}
 	}
 	emap := val.([]string)
+	event := &models.Event{Time: time.Now(), Type: "websocket", Action: prefix, Key: msg}
 	switch prefix {
 	case "register":
+		found := false
 		for _, test := range emap {
 			if test == msg {
-				return
+				found = true
+				break
 			}
 		}
-		l.Debugf("Registering for %s", msg)
-		emap = append(emap, msg)
+		if !found {
+			l.Debugf("Registering for %s", msg)
+			emap = append(emap, msg)
+		}
 	case "deregister":
 		res := make([]string, 0, len(emap))
 		for _, test := range emap {
@@ -131,8 +137,17 @@ func websocketHandler(s *melody.Session, buf []byte) {
 				l.Debugf("Deregistering %s", msg)
 				continue
 			}
+			res = append(res, test)
 		}
 		emap = res
+	}
+	// Send event to wake up caller.
+	if jmsg, err := json.Marshal(event); err == nil {
+		if err := s.Write(jmsg); err != nil {
+			l.Errorf("Failed to write websocket registration event: %v, %v\n", event, err)
+		}
+	} else {
+		l.Errorf("Failed to marshal websocket registration event: %v, %v\n", event, err)
 	}
 	s.Set("EventMap", emap)
 }
