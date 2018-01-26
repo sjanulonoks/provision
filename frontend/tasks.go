@@ -223,6 +223,11 @@ func (f *Frontend) InitTaskApi() {
 			if !assureDecode(c, b) {
 				return
 			}
+			// All newly created tasks are assumed to have sane-exit-codes if not specified.
+			b.Fill()
+			if !b.HasFeature("original-exit-codes") && !b.HasFeature("sane-exit-codes") {
+				b.AddFeature("sane-exit-codes")
+			}
 			var res models.Model
 			var err error
 			rt := f.rt(c, b.Locks("create")...)
