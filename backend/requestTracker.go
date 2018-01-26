@@ -9,6 +9,7 @@ import (
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/logger"
+	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
@@ -30,6 +31,19 @@ func (rt *RequestTracker) Find(prefix, key string) models.Model {
 		res = s.Find(key)
 	}
 	return res
+}
+
+func (rt *RequestTracker) FindByIndex(prefix string, idx index.Maker, key string) models.Model {
+	items, err := index.Sort(idx)(rt.Index(prefix))
+	if err != nil {
+		rt.Errorf("Error sorting %s: %c", prefix, err)
+		return nil
+	}
+	return items.Find(key)
+}
+
+func (rt *RequestTracker) Index(name string) *index.Index {
+	return &rt.d(name).Index
 }
 
 func (rt *RequestTracker) Do(thunk func(Stores)) {

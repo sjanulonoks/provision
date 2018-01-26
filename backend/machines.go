@@ -26,7 +26,8 @@ type Machine struct {
 	// used during AfterSave() and AfterRemove() to handle boot environment changes.
 	oldBootEnv string
 	// used during AfterSave() and AfterRemove() to handle boot environment changes.
-	oldStage string
+	oldStage                 string
+	toDeRegister, toRegister renderers
 }
 
 func (obj *Machine) SetReadOnly(b bool) {
@@ -374,10 +375,33 @@ func (n *Machine) Validate() {
 	if n.Uuid == nil {
 		n.Errorf("Machine %#v was not assigned a uuid!", n)
 	}
+	n.toRegister = renderers{}
+	n.toDeRegister = renderers{}
 	n.Machine.Validate()
 	validateMaybeZeroIP4(n, n.Address)
 	n.AddError(index.CheckUnique(n, n.rt.stores("machines").Items()))
 	n.SetValid()
+	if n.Address != nil && !n.Address.IsUnspecified() {
+		others, err := index.All(
+			index.Sort(n.Indexes()["Address"]),
+			index.Eq(n.Address.String()))(n.rt.Index("machines"))
+		if err != nil {
+			n.rt.Errorf("Error getting Address index for Machines: %v", err)
+			n.Errorf("Unable to check for conflicting IP addresses: %v", err)
+		} else {
+			switch others.Count() {
+			case 0:
+			case 1:
+				if others.Items()[0].Key() != n.Key() {
+					n.Errorf("Machine %s already has Address %s, we cannot have it.", others.Items()[0].Key(), n.Address)
+					n.Address = nil
+				}
+			default:
+				n.Errorf("Multiple other machines have address %s, we cannot have it", n.Address)
+				n.Address = nil
+			}
+		}
+	}
 	objs := n.rt.stores
 	tasks := objs("tasks")
 	profiles := objs("profiles")
@@ -422,7 +446,7 @@ func (n *Machine) Validate() {
 				// Always update stage rendering to handle value changes
 				if obFound := stages.Find(n.oldStage); obFound != nil {
 					oldStage := AsStage(obFound)
-					oldStage.Render(n.rt, n, n).deregister(n.rt.dt.FS)
+					n.toDeRegister = append(n.toDeRegister, oldStage.Render(n.rt, n, n)...)
 				}
 				// Only if the stage changes should play with bootenvs and tasks
 				if n.oldStage != n.Stage {
@@ -445,7 +469,7 @@ func (n *Machine) Validate() {
 						n.CurrentTask = 0
 					}
 				}
-				stage.Render(n.rt, n, n).register(n.rt.dt.FS)
+				n.toRegister = append(n.toRegister, stage.Render(n.rt, n, n)...)
 			}
 		}
 	}
@@ -464,9 +488,9 @@ func (n *Machine) Validate() {
 			} else {
 				if obFound := bootenvs.Find(n.oldBootEnv); obFound != nil {
 					oldEnv := AsBootEnv(obFound)
-					oldEnv.Render(n.rt, n, n).deregister(n.rt.dt.FS)
+					n.toDeRegister = append(n.toDeRegister, oldEnv.Render(n.rt, n, n)...)
 				}
-				env.Render(n.rt, n, n).register(n.rt.dt.FS)
+				n.toRegister = append(n.toRegister, env.Render(n.rt, n, n)...)
 			}
 		}
 	}
@@ -524,6 +548,16 @@ func (n *Machine) BeforeSave() error {
 	return nil
 }
 func (n *Machine) AfterSave() {
+	if n.Available {
+		if n.toDeRegister != nil {
+			n.toDeRegister.deregister(n.rt.dt.FS)
+		}
+		if n.toRegister != nil {
+			n.toRegister.register(n.rt.dt.FS)
+		}
+	}
+	n.toDeRegister = nil
+	n.toRegister = nil
 	n.oldStage = n.Stage
 }
 

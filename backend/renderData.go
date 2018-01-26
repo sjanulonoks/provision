@@ -72,18 +72,22 @@ func newRenderedTemplate(r *RenderData,
 	if r.Task != nil {
 		prefixes = append(prefixes, "tasks")
 		keys = append(keys, r.Task.Key())
+		r.rt.Debugf("Making renderer for %s:%s template %s at path %s", r.Task.Prefix(), r.Task.Key(), tmplKey, path)
 	}
 	if r.Stage != nil {
 		prefixes = append(prefixes, "stages")
 		keys = append(keys, r.Stage.Key())
+		r.rt.Debugf("Making renderer for %s:%s template %s at path %s", r.Stage.Prefix(), r.Stage.Key(), tmplKey, path)
 	}
 	if r.Env != nil {
 		prefixes = append(prefixes, "bootenvs")
 		keys = append(keys, r.Env.Key())
+		r.rt.Debugf("Making renderer for %s:%s template %s at path %s", r.Env.Prefix(), r.Env.Key(), tmplKey, path)
 	}
 	if r.Machine != nil {
 		prefixes = append(prefixes, "machines")
 		keys = append(keys, r.Machine.Key())
+		r.rt.Debugf("Making renderer for %s:%s template %s at path %s", r.Machine.Prefix(), r.Machine.Key(), tmplKey, path)
 	}
 	targetPrefix := r.target.Prefix()
 	dt := r.rt.dt
@@ -701,6 +705,7 @@ func (r *RenderData) makeRenderers(e models.ErrorAdder) renderers {
 				tmplPath = path.Clean("/" + buf.String())
 			}
 		}
+
 		rts[i] = newRenderedTemplate(r, ti.Id(), tmplPath)
 	}
 	return renderers(rts)
