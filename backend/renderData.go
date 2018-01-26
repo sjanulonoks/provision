@@ -118,7 +118,8 @@ func newRenderedTemplate(r *RenderData,
 					case *Machine:
 						rd.Machine = &rMachine{Machine: obj, renderData: rd}
 					default:
-						rd.rt.Panicf("%s:%s is neither Renderable nor a machine", item.Prefix(), item.Key())
+						rd.rt.Errorf("%s:%s is neither Renderable nor a machine", prefix, keys[1])
+						rd.rt.Panicf("Unrenderable Item: %#v", item)
 					}
 				}
 			})
