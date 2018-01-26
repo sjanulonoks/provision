@@ -147,8 +147,7 @@ func (pc *PluginController) walkPluginDir() error {
 		pc.Debugf("Walk plugin importing: %s\n", f.Name())
 		err = pc.importPluginProvider(f.Name())
 		if err != nil {
-			pc.Tracef("walkPlugDir: finished error: %v\n", err)
-			return err
+			pc.Tracef("walkPlugDir: importing %s error: %v\n", f.Name(), err)
 		}
 	}
 	pc.Tracef("walkPlugDir: finished\n")
@@ -438,14 +437,21 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 	out, err := exec.Command(pc.pluginDir+"/"+provider, "define").Output()
 	if err != nil {
 		pc.Errorf("Skipping %s because %s\n", provider, err)
+		return fmt.Errorf("Skipping %s because %s\n", provider, err)
 	} else {
 		pp := &models.PluginProvider{}
 		err = json.Unmarshal(out, pp)
 		if err != nil {
 			pc.Errorf("Skipping %s because of bad json: %s\n%s\n", provider, err, out)
+			return fmt.Errorf("Skipping %s because of bad json: %s\n%s\n", provider, err, out)
 		} else {
 			skip := false
 			pp.Fill()
+
+			if pp.PluginVersion != 2 {
+				pc.Errorf("Skipping %s because of bad version: %d\n", provider, pp.PluginVersion)
+				return fmt.Errorf("Skipping %s because of bad version: %d\n", provider, pp.PluginVersion)
+			}
 
 			content := &models.Content{}
 			content.Fill()
