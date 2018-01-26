@@ -2,11 +2,11 @@
 
 set -e
 
-DEFAULT_DRP_VERSION="stable"
+DEFAULT_DRP_VERSION=${DEFAULT_DRP_VERSION:-"stable"}
 
 usage() {
 cat <<EOFUSAGE
-Usage: $0 [--drp-version=<Version to install>] [--nocontent]
+Usage: $0 [--version=<Version to install>] [--nocontent]
           [--isolate] [--ipaddr=<ip>] install | remove
 
 Options:
@@ -18,14 +18,14 @@ Options:
     --nocontent             # Don't add content to the system
     --ipaddr=<ip>           # The IP to use for the system identified IP.  The system
                             # will attepmto to discover the value if not specified
-    --drp-version=<string>  # Version identifier if downloading.  stable, tip, or
+    --version=<string>      # Version identifier if downloading.  stable, tip, or
                             # specific version label.  Defaults to: $DEFAULT_DRP_VERSION
 
     install                 # Sets up an insolated or system 'production' enabled install.
     remove                  # Removes the system enabled install.  Requires no other flags
 
 Defaults are:
-    version     = tip       (examples: 'tip', 'v2.9.1003' or 'stable')
+    version     = $DEFAULT_DRP_VERSION    (examples: 'tip', 'v3.6.0' or 'stable')
     isolated    = false
     nocontent   = false
     upgrade     = false
@@ -36,7 +36,6 @@ EOFUSAGE
 exit 0
 }
 
-DRP_VERSION=$DEFAULT_DRP_VERSION
 ISOLATED=false
 NO_CONTENT=false
 DBG=false
@@ -54,6 +53,9 @@ while (( $# > 0 )); do
             ;;
         --debug)
             DBG=true
+            ;;
+        --version|--drp-version)
+            DRP_VERSION=${arg_data}
             ;;
         --isolated)
             ISOLATED=true
@@ -83,6 +85,8 @@ while (( $# > 0 )); do
     shift
 done
 set -- "${args[@]}"
+
+DRP_VERSION=${DRP_VERSION:-"$DEFAULT_DRP_VERSION"}
 
 [[ $DBG == true ]] && set -x
 
