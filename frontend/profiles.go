@@ -103,6 +103,45 @@ type ProfileListPathParameter struct {
 	Name string
 }
 
+// ProfileActionsPathParameter used to find a Profile / Actions in the path
+// swagger:parameters getProfileActions
+type ProfileActionsPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// ProfileActionPathParameter used to find a Profile / Action in the path
+// swagger:parameters getProfileAction
+type ProfileActionPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// ProfileActionBodyParameter used to post a Profile / Action in the path
+// swagger:parameters postProfileAction
+type ProfileActionBodyParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 func (f *Frontend) InitProfileApi() {
 	// swagger:route GET /profiles Profiles listProfiles
 	//
@@ -364,4 +403,57 @@ func (f *Frontend) InitProfileApi() {
 	//       404: ErrorResponse
 	//       409: ErrorResponse
 	f.ApiGroup.POST("/profiles/:name/params/*key", pSetOne)
+
+	profile := &backend.Profile{}
+	pActions, pAction, pRun := f.makeActionEndpoints(profile.Prefix(), profile, "name")
+
+	// swagger:route GET /profiles/{name}/actions Profiles getProfileActions
+	//
+	// List profile actions Profile
+	//
+	// List Profile actions for a Profile specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoProfileResponse
+	//       403: NoProfileResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/profiles/:name/actions", pActions)
+
+	// swagger:route GET /profiles/{name}/actions/{cmd} Profiles getProfileAction
+	//
+	// List specific action for a profile Profile
+	//
+	// List specific {cmd} action for a Profile specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoProfileResponse
+	//       403: NoProfileResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/profiles/:name/actions/:cmd", pAction)
+
+	// swagger:route POST /profiles/{name}/actions/{cmd} Profiles postProfileAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoProfileResponse
+	//       403: NoProfileResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/profiles/:name/actions/:cmd", pRun)
 }

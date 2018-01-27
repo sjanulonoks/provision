@@ -504,6 +504,7 @@ func NewFrontend(
 	me.InitJobApi()
 	me.InitEventApi()
 	me.InitContentApi()
+	me.InitSystemApi()
 
 	if EmbeddedAssetsServerFunc != nil {
 		EmbeddedAssetsServerFunc(mgmtApi, lgr)
@@ -634,7 +635,8 @@ func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bo
 		c.AbortWithStatus(http.StatusForbidden)
 		return false
 	}
-	f.rt(c).Auditf("Authenticated %s", obj.(*backend.DrpCustomClaims).Id)
+	f.rt(c).Auditf("Authenticated %s - %s %s %s - %s", obj.(*backend.DrpCustomClaims).Id,
+		scope, action, specific, c.ClientIP())
 	return true
 }
 

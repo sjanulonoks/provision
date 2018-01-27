@@ -521,21 +521,21 @@ func (s *Subnet) Validate() {
 	// Make sure that options have the correct netmask and broadcast options enabled
 	needMask := true
 	needBCast := true
-	for _, opt := range s.Options {
+	for i, opt := range s.Options {
 		if opt.Code == byte(dhcp.OptionBroadcastAddress) {
-			opt.Value = net.IP(buf).String()
+			s.Options[i].Value = net.IP(buf).String()
 			needBCast = false
 		}
 		if opt.Code == byte(dhcp.OptionSubnetMask) {
-			opt.Value = mask.String()
+			s.Options[i].Value = mask.String()
 			needMask = false
 		}
 	}
 	if needMask {
-		s.Options = append(s.Options, &models.DhcpOption{byte(dhcp.OptionSubnetMask), mask.String()})
+		s.Options = append(s.Options, models.DhcpOption{byte(dhcp.OptionSubnetMask), mask.String()})
 	}
 	if needBCast {
-		s.Options = append(s.Options, &models.DhcpOption{byte(dhcp.OptionBroadcastAddress), net.IP(buf).String()})
+		s.Options = append(s.Options, models.DhcpOption{byte(dhcp.OptionBroadcastAddress), net.IP(buf).String()})
 	}
 
 	if !s.OnlyReservations {
@@ -616,11 +616,12 @@ func (s *Subnet) next(used map[string]models.Model, token string, hint net.IP) (
 }
 
 var subnetLockMap = map[string][]string{
-	"get":    []string{"subnets"},
-	"create": []string{"subnets"},
-	"update": []string{"subnets"},
-	"patch":  []string{"subnets"},
-	"delete": []string{"subnets"},
+	"get":     []string{"subnets"},
+	"create":  []string{"subnets"},
+	"update":  []string{"subnets"},
+	"patch":   []string{"subnets"},
+	"delete":  []string{"subnets"},
+	"actions": []string{"subnets", "profiles", "params"},
 }
 
 func (s *Subnet) Locks(action string) []string {

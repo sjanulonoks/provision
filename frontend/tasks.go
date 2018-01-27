@@ -79,6 +79,45 @@ type TaskListPathParameter struct {
 	Name string
 }
 
+// TaskActionsPathParameter used to find a Task / Actions in the path
+// swagger:parameters getTaskActions
+type TaskActionsPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// TaskActionPathParameter used to find a Task / Action in the path
+// swagger:parameters getTaskAction
+type TaskActionPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// TaskActionBodyParameter used to post a Task / Action in the path
+// swagger:parameters postTaskAction
+type TaskActionBodyParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 func (f *Frontend) InitTaskApi() {
 	// swagger:route GET /tasks Tasks listTasks
 	//
@@ -183,6 +222,11 @@ func (f *Frontend) InitTaskApi() {
 			b := &backend.Task{}
 			if !assureDecode(c, b) {
 				return
+			}
+			// All newly created tasks are assumed to have sane-exit-codes if not specified.
+			b.Fill()
+			if !b.HasFeature("original-exit-codes") && !b.HasFeature("sane-exit-codes") {
+				b.AddFeature("sane-exit-codes")
 			}
 			var res models.Model
 			var err error
@@ -295,4 +339,57 @@ func (f *Frontend) InitTaskApi() {
 		func(c *gin.Context) {
 			f.Remove(c, &backend.Task{}, c.Param(`name`))
 		})
+
+	task := &backend.Task{}
+	pActions, pAction, pRun := f.makeActionEndpoints(task.Prefix(), task, "name")
+
+	// swagger:route GET /tasks/{name}/actions Tasks getTaskActions
+	//
+	// List task actions Task
+	//
+	// List Task actions for a Task specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoTaskResponse
+	//       403: NoTaskResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/tasks/:name/actions", pActions)
+
+	// swagger:route GET /tasks/{name}/actions/{cmd} Tasks getTaskAction
+	//
+	// List specific action for a task Task
+	//
+	// List specific {cmd} action for a Task specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoTaskResponse
+	//       403: NoTaskResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/tasks/:name/actions/:cmd", pAction)
+
+	// swagger:route POST /tasks/{name}/actions/{cmd} Tasks postTaskAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoTaskResponse
+	//       403: NoTaskResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/tasks/:name/actions/:cmd", pRun)
 }

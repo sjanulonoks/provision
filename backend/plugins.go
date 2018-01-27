@@ -120,11 +120,12 @@ func AsPlugins(o []models.Model) []*Plugin {
 }
 
 var pluginLockMap = map[string][]string{
-	"get":    []string{"plugins", "params"},
-	"create": []string{"plugins", "params"},
-	"update": []string{"plugins", "params"},
-	"patch":  []string{"plugins", "params"},
-	"delete": []string{"plugins", "params"},
+	"get":     []string{"plugins", "params"},
+	"create":  []string{"plugins", "params"},
+	"update":  []string{"plugins", "params"},
+	"patch":   []string{"plugins", "params"},
+	"delete":  []string{"plugins", "params"},
+	"actions": []string{"plugins", "profiles", "params"},
 }
 
 func (m *Plugin) Locks(action string) []string {

@@ -64,6 +64,45 @@ type BootEnvListPathParameter struct {
 	Name string
 }
 
+// BootEnvActionsPathParameter used to find a BootEnv / Actions in the path
+// swagger:parameters getBootEnvActions
+type BootEnvActionsPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// BootEnvActionPathParameter used to find a BootEnv / Action in the path
+// swagger:parameters getBootEnvAction
+type BootEnvActionPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// BootEnvActionBodyParameter used to post a BootEnv / Action in the path
+// swagger:parameters postBootEnvAction
+type BootEnvActionBodyParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 func (f *Frontend) InitBootEnvApi() {
 	// swagger:route GET /bootenvs BootEnvs listBootEnvs
 	//
@@ -252,4 +291,56 @@ func (f *Frontend) InitBootEnvApi() {
 		func(c *gin.Context) {
 			f.Remove(c, &backend.BootEnv{}, c.Param(`name`))
 		})
+
+	b := &backend.BootEnv{}
+	pActions, pAction, pRun := f.makeActionEndpoints(b.Prefix(), b, "name")
+
+	// swagger:route GET /bootenvs/{name}/actions BootEnvs getBootEnvActions
+	//
+	// List bootenv actions BootEnv
+	//
+	// List BootEnv actions for a BootEnv specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/bootenvs/:name/actions", pActions)
+
+	// swagger:route GET /bootenvs/{name}/actions/{cmd} BootEnvs getBootEnvAction
+	//
+	// List specific action for a bootenv BootEnv
+	//
+	// List specific {cmd} action for a BootEnv specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/bootenvs/:name/actions/:cmd", pAction)
+
+	// swagger:route POST /bootenvs/{name}/actions/{cmd} BootEnvs postBootEnvAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/bootenvs/:name/actions/:cmd", pRun)
 }

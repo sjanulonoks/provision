@@ -119,11 +119,12 @@ func (u *User) OnLoad() error {
 }
 
 var userLockMap = map[string][]string{
-	"get":    []string{"users"},
-	"create": []string{"users"},
-	"update": []string{"users"},
-	"patch":  []string{"users"},
-	"delete": []string{"users"},
+	"get":     []string{"users"},
+	"create":  []string{"users"},
+	"update":  []string{"users"},
+	"patch":   []string{"users"},
+	"delete":  []string{"users"},
+	"actions": []string{"users", "profiles", "params"},
 }
 
 func (u *User) Locks(action string) []string {

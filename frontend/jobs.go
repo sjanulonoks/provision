@@ -127,6 +127,48 @@ type JobListPathParameter struct {
 	EndTime string
 }
 
+// JobActionsPathParameter used to find a Job / Actions in the path
+// swagger:parameters getJobActions
+type JobActionsPathParameter struct {
+	// in: path
+	// required: true
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// JobActionPathParameter used to find a Job / Action in the path
+// swagger:parameters getJobAction
+type JobActionPathParameter struct {
+	// in: path
+	// required: true
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// JobActionBodyParameter used to post a Job / Action in the path
+// swagger:parameters postJobAction
+type JobActionBodyParameter struct {
+	// in: path
+	// required: true
+	// swagger:strfmt uuid
+	Uuid uuid.UUID `json:"uuid"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 func (f *Frontend) InitJobApi() {
 	// swagger:route GET /jobs Jobs listJobs
 	//
@@ -646,4 +688,55 @@ func (f *Frontend) InitJobApi() {
 			}
 		})
 
+	job := &backend.Job{}
+	pActions, pAction, pRun := f.makeActionEndpoints(job.Prefix(), job, "uuid")
+
+	// swagger:route GET /jobs/{uuid}/plugin_actions Jobs getJobActions
+	//
+	// List job plugin_actions Job
+	//
+	// List Job plugin_actions for a Job specified by {uuid}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoJobResponse
+	//       403: NoJobResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/jobs/:uuid/plugin_actions", pActions)
+
+	// swagger:route GET /jobs/{uuid}/plugin_actions/{cmd} Jobs getJobAction
+	//
+	// List specific action for a job Job
+	//
+	// List specific {cmd} action for a Job specified by {uuid}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoJobResponse
+	//       403: NoJobResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/jobs/:uuid/plugin_actions/:cmd", pAction)
+
+	// swagger:route POST /jobs/{uuid}/plugin_actions/{cmd} Jobs postJobAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoJobResponse
+	//       403: NoJobResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/jobs/:uuid/plugin_actions/:cmd", pRun)
 }

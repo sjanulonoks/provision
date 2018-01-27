@@ -106,6 +106,45 @@ type UserListPathParameter struct {
 	Name string
 }
 
+// UserActionsPathParameter used to find a User / Actions in the path
+// swagger:parameters getUserActions
+type UserActionsPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// UserActionPathParameter used to find a User / Action in the path
+// swagger:parameters getUserAction
+type UserActionPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// UserActionBodyParameter used to post a User / Action in the path
+// swagger:parameters postUserAction
+type UserActionBodyParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 func (f *Frontend) InitUserApi(drpid string) {
 	// swagger:route GET /users Users listUsers
 	//
@@ -445,4 +484,57 @@ func (f *Frontend) InitUserApi(drpid string) {
 		func(c *gin.Context) {
 			f.Remove(c, &backend.User{}, c.Param(`name`))
 		})
+
+	user := &backend.User{}
+	pActions, pAction, pRun := f.makeActionEndpoints(user.Prefix(), user, "name")
+
+	// swagger:route GET /users/{name}/actions Users getUserActions
+	//
+	// List user actions User
+	//
+	// List User actions for a User specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoUserResponse
+	//       403: NoUserResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/users/:name/actions", pActions)
+
+	// swagger:route GET /users/{name}/actions/{cmd} Users getUserAction
+	//
+	// List specific action for a user User
+	//
+	// List specific {cmd} action for a User specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoUserResponse
+	//       403: NoUserResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/users/:name/actions/:cmd", pAction)
+
+	// swagger:route POST /users/{name}/actions/{cmd} Users postUserAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoUserResponse
+	//       403: NoUserResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/users/:name/actions/:cmd", pRun)
 }

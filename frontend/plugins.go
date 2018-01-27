@@ -107,6 +107,45 @@ type PluginListPathParameter struct {
 	Provider string
 }
 
+// PluginActionsPathParameter used to find a Plugin / Actions in the path
+// swagger:parameters getPluginActions
+type PluginActionsPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// PluginActionPathParameter used to find a Plugin / Action in the path
+// swagger:parameters getPluginAction
+type PluginActionPathParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+}
+
+// PluginActionBodyParameter used to post a Plugin / Action in the path
+// swagger:parameters postPluginAction
+type PluginActionBodyParameter struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+	// in: path
+	// required: true
+	Cmd string `json:"cmd"`
+	// in: query
+	Plugin string `json:"plugin"`
+	// in: body
+	// required: true
+	Body map[string]interface{}
+}
+
 func (f *Frontend) InitPluginApi() {
 	// swagger:route GET /plugins Plugins listPlugins
 	//
@@ -210,6 +249,9 @@ func (f *Frontend) InitPluginApi() {
 			// for testing purposes amd if they alrady have a UUID scheme for plugins.
 			b := &backend.Plugin{}
 			if !assureDecode(c, b) {
+				return
+			}
+			if !f.assureAuth(c, b.Prefix(), "create", "") {
 				return
 			}
 			var err error
@@ -402,4 +444,57 @@ func (f *Frontend) InitPluginApi() {
 	//       404: ErrorResponse
 	//       409: ErrorResponse
 	f.ApiGroup.POST("/plugins/:name/params/*key", pSetOne)
+
+	plugin := &backend.Plugin{}
+	pActions, pAction, pRun := f.makeActionEndpoints(plugin.Prefix(), plugin, "name")
+
+	// swagger:route GET /plugins/{name}/actions Plugins getPluginActions
+	//
+	// List plugin actions Plugin
+	//
+	// List Plugin actions for a Plugin specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionsResponse
+	//       401: NoPluginResponse
+	//       403: NoPluginResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/plugins/:name/actions", pActions)
+
+	// swagger:route GET /plugins/{name}/actions/{cmd} Plugins getPluginAction
+	//
+	// List specific action for a plugin Plugin
+	//
+	// List specific {cmd} action for a Plugin specified by {name}
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//     Responses:
+	//       200: ActionResponse
+	//       400: ErrorResponse
+	//       401: NoPluginResponse
+	//       403: NoPluginResponse
+	//       404: ErrorResponse
+	f.ApiGroup.GET("/plugins/:name/actions/:cmd", pAction)
+
+	// swagger:route POST /plugins/{name}/actions/{cmd} Plugins postPluginAction
+	//
+	// Call an action on the node.
+	//
+	// Optionally, a query parameter can be used to limit the scope to a specific plugin.
+	//   e.g. ?plugin=fred
+	//
+	//
+	//     Responses:
+	//       400: ErrorResponse
+	//       200: ActionPostResponse
+	//       401: NoPluginResponse
+	//       403: NoPluginResponse
+	//       404: ErrorResponse
+	//       409: ErrorResponse
+	f.ApiGroup.POST("/plugins/:name/actions/:cmd", pRun)
 }

@@ -13,48 +13,116 @@ import (
 type AvailableAction struct {
 	models.AvailableAction
 
-	plugin *RunningPlugin
-	ma     *MachineActions
+	Plugin *RunningPlugin
+	ma     *Actions
 
 	lock      sync.Mutex
 	inflight  int
 	unloading bool
 }
 
-type MachineActions struct {
-	actions map[string]*AvailableAction
+/*
+ * Actions are maintained in lists in a map of maps.
+ * Each action command could be satified by multiple plugins.
+ * so each action is stored in a list (one per plugin)
+ * The list is stored by command name in a map.
+ * The command map is stored by object type.
+ *
+ * Like this:
+ * ObjectType -> Command Name -> list of actions
+ */
+
+type AvailableActions []*AvailableAction
+type ObjectCommands map[string]AvailableActions
+type ObjectsCommands map[string]ObjectCommands
+
+type Actions struct {
+	actions ObjectsCommands
 	lock    sync.Mutex
 }
 
-func NewMachineActions() *MachineActions {
-	return &MachineActions{actions: make(map[string]*AvailableAction, 0)}
+func NewActions() *Actions {
+	return &Actions{actions: make(ObjectsCommands, 0)}
 }
 
-func (ma *MachineActions) Add(model_aa *models.AvailableAction, plugin *RunningPlugin) error {
+func (ma *Actions) Add(model_aa models.AvailableAction, plugin *RunningPlugin) error {
 	aa := &AvailableAction{}
-	aa.AvailableAction = *model_aa
-	aa.plugin = plugin
+	aa.AvailableAction = model_aa
+	aa.Plugin = plugin
+	aa.ma = ma
 
 	ma.lock.Lock()
 	defer ma.lock.Unlock()
 
-	if _, ok := ma.actions[aa.Command]; ok {
-		return fmt.Errorf("Duplicate Action %s: already present\n", aa.Command)
+	ob := "system"
+	if aa.Model != "" {
+		ob = aa.Model
 	}
-	ma.actions[aa.Command] = aa
-	aa.ma = ma
+	cmd := aa.Command
+	pn := aa.Plugin.Plugin.Name
+
+	var oc ObjectCommands
+	if toc, ok := ma.actions[ob]; !ok {
+		oc = make(ObjectCommands, 0)
+		ma.actions[ob] = oc
+	} else {
+		oc = toc
+	}
+
+	var list AvailableActions
+	if tlist, ok := oc[cmd]; !ok {
+		list = make(AvailableActions, 0, 0)
+		oc[cmd] = list
+	} else {
+		list = tlist
+	}
+
+	for _, laa := range list {
+		if laa.Plugin.Plugin.Name == pn {
+			return fmt.Errorf("Duplicate Action (%s,%s): already present\n", pn, cmd)
+		}
+	}
+
+	oc[cmd] = append(list, aa)
 	return nil
 }
 
-func (ma *MachineActions) Remove(aa *models.AvailableAction) error {
+func (ma *Actions) Remove(aa models.AvailableAction, plugin *RunningPlugin) error {
 	var err error
 	var the_aa *AvailableAction
 	ma.lock.Lock()
-	if ta, ok := ma.actions[aa.Command]; !ok {
+
+	ob := "system"
+	if aa.Model != "" {
+		ob = aa.Model
+	}
+	cmd := aa.Command
+	pn := plugin.Plugin.Name
+
+	if oc, ok := ma.actions[ob]; !ok {
+		err = fmt.Errorf("Missing Action %s: already removed\n", aa.Command)
+	} else if list, ok := oc[cmd]; !ok {
 		err = fmt.Errorf("Missing Action %s: already removed\n", aa.Command)
 	} else {
-		the_aa = ta
-		delete(ma.actions, aa.Command)
+		newlist := make(AvailableActions, 0, 0)
+		for _, laa := range list {
+			if pn == laa.Plugin.Plugin.Name {
+				the_aa = laa
+			} else {
+				newlist = append(newlist, laa)
+			}
+		}
+
+		if the_aa == nil {
+			err = fmt.Errorf("Missing Action %s: already removed\n", aa.Command)
+		} else if len(newlist) > 0 {
+			oc[cmd] = newlist
+		} else {
+			delete(oc, cmd)
+			if len(oc) == 0 {
+				delete(ma.actions, ob)
+			}
+		}
 	}
 	ma.lock.Unlock()
 
@@ -65,51 +133,70 @@ func (ma *MachineActions) Remove(aa *models.AvailableAction) error {
 	return err
 }
 
-func (ma *MachineActions) List() []*models.AvailableAction {
+func (ma *Actions) List(ob string) []AvailableActions {
 	ma.lock.Lock()
 	defer ma.lock.Unlock()
 
-	// get the list of keys and sort them
-	keys := []string{}
-	for key := range ma.actions {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	answer := []AvailableActions{}
+	if oc, ok := ma.actions[ob]; ok {
+		// get the list of keys and sort them
+		keys := []string{}
+		for key := range oc {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
 
-	answer := []*models.AvailableAction{}
-	for _, key := range keys {
-		answer = append(answer, &ma.actions[key].AvailableAction)
+		for _, key := range keys {
+			answer = append(answer, oc[key])
+		}
 	}
 	return answer
 
 }
 
-func (ma *MachineActions) Get(name string) (*models.AvailableAction, bool) {
+func (ma *Actions) Get(ob, name string) (AvailableActions, bool) {
 	ma.lock.Lock()
 	defer ma.lock.Unlock()
 
-	if ta, ok := ma.actions[name]; ok {
-		return &ta.AvailableAction, true
+	if oc, ok := ma.actions[ob]; !ok {
+		return nil, false
+	} else if tl, ok := oc[name]; ok {
+		return tl, true
 	}
 	return nil, false
 }
 
-func (ma *MachineActions) Run(rt *backend.RequestTracker, maa *models.MachineAction) error {
-	var aa *AvailableAction
-	var ok bool
+func (ma *Actions) GetSpecific(ob, name, plugin string) (*AvailableAction, bool) {
 	ma.lock.Lock()
-	aa, ok = ma.actions[maa.Command]
-	if !ok {
-		return fmt.Errorf("Action no longer available: %s", aa.Command)
+	defer ma.lock.Unlock()
+
+	if oc, ok := ma.actions[ob]; !ok {
+		return nil, false
+	} else if tl, ok := oc[name]; ok {
+		for _, laa := range tl {
+			if laa.Plugin.Plugin.Name == plugin {
+				return laa, true
+			}
+		}
 	}
-	ma.lock.Unlock()
+	return nil, false
+}
+
+func (ma *Actions) Run(rt *backend.RequestTracker, ob string, maa *models.Action) (interface{}, error) {
+	aa, ok := ma.GetSpecific(ob, maa.Command, maa.Plugin)
+	if !ok {
+		return nil, fmt.Errorf("Action no longer available: %s", aa.Command)
+	}
 
 	if err := aa.Reserve(); err != nil {
-		return nil
+		return nil, err
 	}
 	defer aa.Release()
 
-	return aa.plugin.Client.Action(rt, maa)
+	rt.Debugf("Starting action: %s on %v\n", maa.Command, maa.Model)
+	v, e := aa.Plugin.Client.Action(rt, maa)
+	rt.Debugf("Finished action: %s on %v: %v, %v\n", maa.Command, maa.Model, v, e)
+	return v, e
 }
 
 func (aa *AvailableAction) Reserve() error {

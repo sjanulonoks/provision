@@ -8,6 +8,11 @@ import (
 	"github.com/digitalrebar/provision/models"
 )
 
+/*
+ * NOTE: CRUCIAL: CRITICAL: This could be bad if not adhered.
+ * The Publish, release, and reserve routines must not call loggers
+ * that publish events!
+ */
 type Publisher interface {
 	Publish(event *models.Event) error
 	Reserve() error
