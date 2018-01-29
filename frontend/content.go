@@ -3,6 +3,7 @@ package frontend
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/midlayer"
@@ -45,9 +46,18 @@ type ContentParameter struct {
 }
 
 func (f *Frontend) buildNewStore(content *models.Content) (newStore store.Store, err error) {
-	filename := fmt.Sprintf("file:///%s/%s-%s.yaml?codec=yaml", f.SaasDir, content.Meta.Name, content.Meta.Version)
+	filename := fmt.Sprintf("/%s/%s-%s.yaml", f.SaasDir, content.Meta.Name, content.Meta.Version)
+	count := 1
+	for true {
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			break
+		}
+		filename = fmt.Sprintf("/%s/%s-%s-%d.yaml", f.SaasDir, content.Meta.Name, content.Meta.Version, count)
+		count += 1
+	}
 
-	newStore, err = store.Open(filename)
+	filenameUrl := fmt.Sprintf("file://%s?codec=yaml", filename)
+	newStore, err = store.Open(filenameUrl)
 	if err != nil {
 		return
 	}
