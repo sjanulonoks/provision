@@ -329,7 +329,7 @@ func Server(c_opts *ProgOpts) {
 
 	// Handle SIGHUP, SIGINT and SIGTERM.
 	ch := make(chan os.Signal)
-	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
 
 	go func() {
 		for {
@@ -337,7 +337,7 @@ func Server(c_opts *ProgOpts) {
 			log.Println(s)
 
 			switch s {
-			case syscall.SIGQUIT:
+			case syscall.SIGUSR1:
 				localLogger.Printf("Dumping all goroutine stacks")
 				pprof.Lookup("goroutine").WriteTo(os.Stderr, 2)
 				localLogger.Printf("Dumping stacks of contested mutexes")
