@@ -3,6 +3,7 @@ package frontend
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/midlayer"
@@ -45,9 +46,18 @@ type ContentParameter struct {
 }
 
 func (f *Frontend) buildNewStore(content *models.Content) (newStore store.Store, err error) {
-	filename := fmt.Sprintf("file:///%s/%s-%s.yaml?codec=yaml", f.SaasDir, content.Meta.Name, content.Meta.Version)
+	filename := fmt.Sprintf("/%s/%s-%s.yaml", f.SaasDir, content.Meta.Name, content.Meta.Version)
+	count := 1
+	for true {
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			break
+		}
+		filename = fmt.Sprintf("/%s/%s-%s-%d.yaml", f.SaasDir, content.Meta.Name, content.Meta.Version, count)
+		count += 1
+	}
 
-	newStore, err = store.Open(filename)
+	filenameUrl := fmt.Sprintf("file://%s?codec=yaml", filename)
+	newStore, err = store.Open(filenameUrl)
 	if err != nil {
 		return
 	}
@@ -94,20 +104,25 @@ func buildSummary(st store.Store) *models.ContentSummary {
 	cs.Meta.Source = metaData["Source"]
 	cs.Meta.Description = metaData["Description"]
 	cs.Meta.Version = metaData["Version"]
+	cs.Meta.Writable = false
+	cs.Meta.Overwritable = false
 	if val, ok := metaData["Type"]; ok {
 		cs.Meta.Type = val
+		if val == "default" {
+			cs.Meta.Overwritable = true
+		}
 	} else {
 		cs.Meta.Type = "dynamic"
 	}
-	cs.Meta.Writable = false
-	cs.Meta.Overwritable = false
 	if cs.Meta.Name == "BackingStore" {
 		cs.Meta.Type = "writable"
 		cs.Meta.Writable = true
 	} else if cs.Meta.Name == "LocalStore" {
 		cs.Meta.Type = "local"
+		cs.Meta.Overwritable = true
 	} else if cs.Meta.Name == "BasicStore" {
 		cs.Meta.Type = "basic"
+		cs.Meta.Overwritable = true
 	} else if cs.Meta.Name == "DefaultStore" {
 		cs.Meta.Type = "default"
 		cs.Meta.Overwritable = true
@@ -156,21 +171,27 @@ func (f *Frontend) buildContent(st store.Store) (*models.Content, *models.Error)
 	} else {
 		content.Meta.Version = "Unknown"
 	}
+
+	content.Meta.Writable = false
+	content.Meta.Overwritable = false
 	if val, ok := md["Type"]; ok {
 		content.Meta.Type = val
+		if val == "default" {
+			content.Meta.Overwritable = true
+		}
 	} else {
 		content.Meta.Type = "dynamic"
 	}
 
-	content.Meta.Writable = false
-	content.Meta.Overwritable = false
 	if content.Meta.Name == "BackingStore" {
 		content.Meta.Type = "writable"
 		content.Meta.Writable = true
 	} else if content.Meta.Name == "LocalStore" {
 		content.Meta.Type = "local"
+		content.Meta.Overwritable = true
 	} else if content.Meta.Name == "BasicStore" {
 		content.Meta.Type = "basic"
+		content.Meta.Overwritable = true
 	} else if content.Meta.Name == "DefaultStore" {
 		content.Meta.Type = "default"
 		content.Meta.Overwritable = true
