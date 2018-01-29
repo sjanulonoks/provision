@@ -94,13 +94,16 @@ func buildSummary(st store.Store) *models.ContentSummary {
 	cs.Meta.Source = metaData["Source"]
 	cs.Meta.Description = metaData["Description"]
 	cs.Meta.Version = metaData["Version"]
+	cs.Meta.Writable = false
+	cs.Meta.Overwritable = false
 	if val, ok := metaData["Type"]; ok {
 		cs.Meta.Type = val
+		if val == "default" {
+			cs.Meta.Overwritable = true
+		}
 	} else {
 		cs.Meta.Type = "dynamic"
 	}
-	cs.Meta.Writable = false
-	cs.Meta.Overwritable = false
 	if cs.Meta.Name == "BackingStore" {
 		cs.Meta.Type = "writable"
 		cs.Meta.Writable = true
@@ -156,14 +159,18 @@ func (f *Frontend) buildContent(st store.Store) (*models.Content, *models.Error)
 	} else {
 		content.Meta.Version = "Unknown"
 	}
+
+	content.Meta.Writable = false
+	content.Meta.Overwritable = false
 	if val, ok := md["Type"]; ok {
 		content.Meta.Type = val
+		if val == "default" {
+			content.Meta.Overwritable = true
+		}
 	} else {
 		content.Meta.Type = "dynamic"
 	}
 
-	content.Meta.Writable = false
-	content.Meta.Overwritable = false
 	if content.Meta.Name == "BackingStore" {
 		content.Meta.Type = "writable"
 		content.Meta.Writable = true

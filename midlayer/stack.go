@@ -319,8 +319,11 @@ func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasD
 		if md, ok := defaultStore.(store.MetaSaver); ok {
 			d := md.MetaData()
 			if _, ok := d["Name"]; !ok {
-				data := map[string]string{"Name": "DefaultStore", "Description": "Initial Default Content", "Version": "user"}
+				data := map[string]string{"Name": "DefaultStore", "Description": "Initial Default Content", "Version": "user", "Type": "default"}
 				md.SetMetaData(data)
+			} else {
+				d["Type"] = "default"
+				md.SetMetaData(d)
 			}
 		}
 	}
