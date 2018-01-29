@@ -35,6 +35,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/pprof"
 	"strings"
 	"syscall"
 
@@ -336,6 +337,13 @@ func Server(c_opts *ProgOpts) {
 			log.Println(s)
 
 			switch s {
+			case syscall.SIGQUIT:
+				localLogger.Printf("Dumping all goroutine stacks")
+				pprof.Lookup("goroutine").WriteTo(os.Stderr, 2)
+				localLogger.Printf("Dumping stacks of contested mutexes")
+				pprof.Lookup("mutex").WriteTo(os.Stderr, 2)
+				localLogger.Printf("Exiting")
+				os.Exit(1)
 			case syscall.SIGHUP:
 				localLogger.Println("Reloading data stores...")
 				// Make data store - THIS IS BAD if datastore is memory.
