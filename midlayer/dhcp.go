@@ -633,16 +633,16 @@ func (dhr *DhcpRequest) Process() dhcp.Packet {
 		dhr.Debugf("Handling packet:\n%s", models.UnmarshalDHCP(dhr.pkt))
 	}
 	if dhr.pkt.HLen() > 16 {
-		dhr.Debugf("Invalid hlen")
+		dhr.Errorf("Invalid hlen")
 		return nil
 	}
 	dhr.pktOpts = dhr.pkt.ParseOptions()
 	var reqType dhcp.MessageType
 	if t, ok := dhr.pktOpts[dhcp.OptionDHCPMessageType]; !ok || len(t) != 1 {
-		dhr.Debugf("Missing DHCP message type")
+		dhr.Errorf("Missing DHCP message type")
 		return nil
 	} else if reqType = dhcp.MessageType(t[0]); reqType < dhcp.Discover || reqType > dhcp.Inform {
-		dhr.Debugf("Invalid DHCP message type")
+		dhr.Errorf("Invalid DHCP message type")
 		return nil
 	}
 	tgtName := dhr.ifname()
@@ -659,7 +659,7 @@ func (dhr *DhcpRequest) Process() dhcp.Packet {
 			}
 		}
 		if !canProcess {
-			dhr.Infof("Ignoring packet from interface %s", tgtName)
+			dhr.Infof("%s Ignoring packet from interface %s", dhr.xid(), tgtName)
 			return nil
 		}
 	}
