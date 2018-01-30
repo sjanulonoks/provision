@@ -7,45 +7,74 @@ import (
 	"os"
 	"testing"
 
+	"golang.org/x/net/ipv4"
+
 	"github.com/digitalrebar/logger"
+	"github.com/digitalrebar/pinger"
 	"github.com/digitalrebar/provision/backend"
+	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
-	dhcp "github.com/krolaw/dhcp4"
 )
 
 var tmpDir string
 var dataTracker *backend.DataTracker
+var dhcpHandler *DhcpHandler
 
-func TestDhcpHelpers(t *testing.T) {
+type dhcpTestCase struct {
+	Name           string
+	InUse          bool
+	SrcAddr        *net.UDPAddr
+	ControlMessage *ipv4.ControlMessage
+	Req, Resp      string
+}
 
-	xids := "test"
-	xids_res := "xid 0x74657374"
-	hws := "01:23:45:67:89:ab"
-	hw, _ := net.ParseMAC(hws)
-	req := dhcp.RequestPacket(dhcp.Discover, hw, net.ParseIP("1.1.1.1"), []byte(xids), false, nil)
-
-	s := xid(req)
-	if s != xids_res {
-		t.Errorf("xid processing, expected: %s got: %s\n", xids_res, s)
+func rt(t *testing.T, tc dhcpTestCase) {
+	t.Helper()
+	t.Logf("Processing test case %s", tc.Name)
+	reqPkt, err := models.MarshalDHCP(tc.Req)
+	if err != nil {
+		t.Errorf("%s: Error marshalling Req: %v", tc.Name, tc.Req)
+		return
 	}
-
-	s = MacStrategy(req, nil) // Options currently ignored
-	if s != hws {
-		t.Errorf("mac strategy processing, expected: %s got: %s\n", hws, s)
+	req := &DhcpRequest{
+		Logger: logger.New(nil).Log("dhcp"),
+		idxMap: map[int][]*net.IPNet{
+			1: []*net.IPNet{&net.IPNet{IP: net.IPv4(127, 0, 0, 1), Mask: net.IPv4Mask(255, 0, 0, 0)}},
+			2: []*net.IPNet{
+				&net.IPNet{IP: net.IPv4(192, 168, 124, 1), Mask: net.IPv4Mask(255, 255, 255, 0)},
+				&net.IPNet{IP: net.IPv4(172, 17, 0, 8), Mask: net.IPv4Mask(255, 255, 0, 0)},
+			},
+			3: []*net.IPNet{&net.IPNet{IP: net.IPv4(10, 0, 0, 10), Mask: net.IPv4Mask(255, 0, 0, 0)}},
+		},
+		nameMap: map[int]string{1: "lo", 2: "eno1", 3: "eno2"},
+		srcAddr: tc.SrcAddr,
+		cm:      tc.ControlMessage,
+		pkt:     reqPkt,
+		pinger:  pinger.Fake(!tc.InUse),
+		handler: dhcpHandler,
+	}
+	resp := models.UnmarshalDHCP(req.Process())
+	if resp != tc.Resp {
+		t.Errorf("%s: Unexpected DHCP response", tc.Name)
+		t.Errorf("Got:\n%s\n", resp)
+		t.Errorf("Expected:\n%s\n", tc.Resp)
+		return
+	} else {
+		t.Logf("%s handled as expected", tc.Name)
 	}
 }
 
-func TestDhcpHandler(t *testing.T) {
-	locallogger := log.New(os.Stdout, "dt", 0)
-	l := logger.New(locallogger).Log("dhcp")
-	handler := &DhcpHandler{
-		Logger: l,
-		ifs:    []string{},
-		port:   20000,
-		bk:     dataTracker,
-		strats: []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
+func makeHandler(dt *backend.DataTracker, proxy bool) *DhcpHandler {
+	res := &DhcpHandler{
+		Logger:    logger.New(nil).Log("dhcp"),
+		ifs:       []string{},
+		port:      20000,
+		bk:        dt,
+		strats:    []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
+		pinger:    pinger.Fake(true),
+		proxyOnly: proxy,
 	}
-	handler.Errorf("Fred rules")
+	return res
 }
 
 func TestMain(m *testing.M) {
@@ -75,7 +104,7 @@ func TestMain(m *testing.M) {
 		l,
 		map[string]string{"defaultBootEnv": "default", "unknownBootEnv": "ignore"},
 		backend.NewPublishers(locallogger))
-
+	dhcpHandler = makeHandler(dataTracker, false)
 	ret := m.Run()
 	err = os.RemoveAll(tmpDir)
 	if err != nil {
