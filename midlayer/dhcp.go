@@ -630,7 +630,7 @@ func (dhr *DhcpRequest) ServeDHCP(msgType dhcp.MessageType) dhcp.Packet {
 
 func (dhr *DhcpRequest) Process() dhcp.Packet {
 	if dhr.IsDebug() {
-		dhr.Debugf("Handling packet:\n%s", models.UnmarshalDHCP(dhr.pkt))
+		dhr.Debugf("Handling packet:\n%s", dhr.PrintIncoming())
 	}
 	if dhr.pkt.HLen() > 16 {
 		dhr.Errorf("Invalid hlen")
@@ -663,21 +663,14 @@ func (dhr *DhcpRequest) Process() dhcp.Packet {
 			return nil
 		}
 	}
-	return dhr.ServeDHCP(reqType)
-}
-
-func (dhr *DhcpRequest) Run() {
-	res := dhr.Process()
+	res := dhr.ServeDHCP(reqType)
 	if res == nil {
-		return
+		return nil
 	}
 	// If IP not available, broadcast
 	ipStr, portStr, err := net.SplitHostPort(dhr.srcAddr.String())
 	if err != nil {
-		return
-	}
-	if dhr.IsDebug() {
-		dhr.Debugf("Sending packet:\n%s", models.UnmarshalDHCP(res))
+		return nil
 	}
 	port, _ := strconv.Atoi(portStr)
 	if dhr.pkt.GIAddr().Equal(net.IPv4zero) {
@@ -688,6 +681,17 @@ func (dhr *DhcpRequest) Run() {
 		dhr.srcAddr = &net.UDPAddr{IP: dhr.pkt.GIAddr(), Port: port}
 	}
 	dhr.cm.Src = nil
+	if dhr.IsDebug() {
+		dhr.Debugf("Sending packet:\n%s", dhr.PrintOutgoing(res))
+	}
+	return res
+}
+
+func (dhr *DhcpRequest) Run() {
+	res := dhr.Process()
+	if res == nil {
+		return
+	}
 	dhr.handler.conn.WriteTo(res, dhr.cm, dhr.srcAddr)
 }
 

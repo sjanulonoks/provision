@@ -7,8 +7,6 @@ import (
 	"os"
 	"testing"
 
-	"golang.org/x/net/ipv4"
-
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/pinger"
 	"github.com/digitalrebar/provision/backend"
@@ -19,50 +17,6 @@ import (
 var tmpDir string
 var dataTracker *backend.DataTracker
 var dhcpHandler *DhcpHandler
-
-type dhcpTestCase struct {
-	Name           string
-	InUse          bool
-	SrcAddr        *net.UDPAddr
-	ControlMessage *ipv4.ControlMessage
-	Req, Resp      string
-}
-
-func rt(t *testing.T, tc dhcpTestCase) {
-	t.Helper()
-	t.Logf("Processing test case %s", tc.Name)
-	reqPkt, err := models.MarshalDHCP(tc.Req)
-	if err != nil {
-		t.Errorf("%s: Error marshalling Req: %v", tc.Name, tc.Req)
-		return
-	}
-	req := &DhcpRequest{
-		Logger: logger.New(nil).Log("dhcp"),
-		idxMap: map[int][]*net.IPNet{
-			1: []*net.IPNet{&net.IPNet{IP: net.IPv4(127, 0, 0, 1), Mask: net.IPv4Mask(255, 0, 0, 0)}},
-			2: []*net.IPNet{
-				&net.IPNet{IP: net.IPv4(192, 168, 124, 1), Mask: net.IPv4Mask(255, 255, 255, 0)},
-				&net.IPNet{IP: net.IPv4(172, 17, 0, 8), Mask: net.IPv4Mask(255, 255, 0, 0)},
-			},
-			3: []*net.IPNet{&net.IPNet{IP: net.IPv4(10, 0, 0, 10), Mask: net.IPv4Mask(255, 0, 0, 0)}},
-		},
-		nameMap: map[int]string{1: "lo", 2: "eno1", 3: "eno2"},
-		srcAddr: tc.SrcAddr,
-		cm:      tc.ControlMessage,
-		pkt:     reqPkt,
-		pinger:  pinger.Fake(!tc.InUse),
-		handler: dhcpHandler,
-	}
-	resp := models.UnmarshalDHCP(req.Process())
-	if resp != tc.Resp {
-		t.Errorf("%s: Unexpected DHCP response", tc.Name)
-		t.Errorf("Got:\n%s\n", resp)
-		t.Errorf("Expected:\n%s\n", tc.Resp)
-		return
-	} else {
-		t.Logf("%s handled as expected", tc.Name)
-	}
-}
 
 func makeHandler(dt *backend.DataTracker, proxy bool) *DhcpHandler {
 	res := &DhcpHandler{
@@ -105,6 +59,75 @@ func TestMain(m *testing.M) {
 		map[string]string{"defaultBootEnv": "default", "unknownBootEnv": "ignore"},
 		backend.NewPublishers(locallogger))
 	dhcpHandler = makeHandler(dataTracker, false)
+	rt := dataTracker.Request(l, "subnets")
+	rt.Do(func(d backend.Stores) {
+		subs := []*models.Subnet{
+			&models.Subnet{
+				Name:              "sub2",
+				Enabled:           true,
+				Subnet:            "172.17.0.8/24",
+				NextServer:        net.IPv4(172, 17, 0, 8),
+				ActiveStart:       net.IPv4(172, 17, 0, 10),
+				ActiveEnd:         net.IPv4(172, 17, 0, 15),
+				ReservedLeaseTime: 7200,
+				ActiveLeaseTime:   60,
+				Strategy:          "MAC",
+				Options: []models.DhcpOption{
+					{Code: 1, Value: "255.255.0.0"},
+					{Code: 3, Value: "172.17.0.1"},
+					{Code: 6, Value: "172.17.0.1"},
+					{Code: 15, Value: "sub2.com"},
+					{Code: 28, Value: "172.17.0.255"},
+					{Code: 67, Value: `{{if (eq (index . 77) "iPXE") }}default.ipxe{{else if (eq (index . 93) "0")}}lpxelinux.0{{else}}ipxe.efi{{end}}`},
+				},
+			},
+			&models.Subnet{
+				Name:              "sub1",
+				Enabled:           true,
+				Subnet:            "192.168.124.1/24",
+				NextServer:        net.IPv4(192, 168, 124, 1),
+				ActiveStart:       net.IPv4(192, 168, 124, 10),
+				ActiveEnd:         net.IPv4(192, 168, 124, 15),
+				ReservedLeaseTime: 7200,
+				ActiveLeaseTime:   60,
+				Strategy:          "MAC",
+				Options: []models.DhcpOption{
+					{Code: 1, Value: "255.255.0.0"},
+					{Code: 3, Value: "192.168.124.1"},
+					{Code: 6, Value: "192.168.124.1"},
+					{Code: 15, Value: "sub1.com"},
+					{Code: 28, Value: "192.168.124.255"},
+					{Code: 67, Value: `{{if (eq (index . 77) "iPXE") }}default.ipxe{{else if (eq (index . 93) "0")}}lpxelinux.0{{else}}ipxe.efi{{end}}`},
+				},
+			},
+			&models.Subnet{
+				Name:              "sub3",
+				Enabled:           true,
+				Proxy:             true,
+				Subnet:            "10.0.0.0/8",
+				NextServer:        net.IPv4(10, 0, 0, 10),
+				ActiveStart:       net.IPv4(10, 0, 0, 10),
+				ActiveEnd:         net.IPv4(10, 0, 0, 15),
+				ReservedLeaseTime: 7200,
+				ActiveLeaseTime:   60,
+				Strategy:          "MAC",
+				Options: []models.DhcpOption{
+					{Code: 1, Value: "255.0.0.0"},
+					{Code: 3, Value: "10.0.0.1"},
+					{Code: 6, Value: "10.0.0.1"},
+					{Code: 15, Value: "sub1.com"},
+					{Code: 28, Value: "10.255.255.255"},
+					{Code: 67, Value: `{{if (eq (index . 77) "iPXE") }}default.ipxe{{else if (eq (index . 93) "0")}}lpxelinux.0{{else}}ipxe.efi{{end}}`},
+				},
+			},
+		}
+		for _, sub := range subs {
+			_, err := rt.Create(sub)
+			if err != nil {
+				log.Fatalf("Error creating subnet %s: %v", sub.Name, err)
+			}
+		}
+	})
 	ret := m.Run()
 	err = os.RemoveAll(tmpDir)
 	if err != nil {
