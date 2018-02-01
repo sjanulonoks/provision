@@ -15,6 +15,7 @@ import (
 
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/pinger"
+	"github.com/digitalrebar/provision/backend"
 )
 
 /*
@@ -32,9 +33,18 @@ dhcp-tests/0000-test-name/
 */
 
 func diff(expect, actual string) (string, error) {
-	cmd := exec.Command("diff", "-NZBu", expect, actual)
+	cmd := exec.Command("diff", "-NwBu", expect, actual)
 	res, err := cmd.CombinedOutput()
 	return string(res), err
+}
+
+func clearLeases() {
+	rt := dataTracker.Request(dataTracker.Logger, "leases")
+	rt.Do(func(d backend.Stores) {
+		for _, item := range rt.Index("leases").Items() {
+			rt.Remove(item)
+		}
+	})
 }
 
 func rt(t *testing.T) *DhcpRequest {
@@ -52,71 +62,84 @@ func rt(t *testing.T) *DhcpRequest {
 }
 
 func TestDHCPCases(t *testing.T) {
-	ents, err := filepath.Glob("dhcp-tests/*/*.request")
-	if err != nil || len(ents) == 0 {
+	dirs, err := filepath.Glob("dhcp-tests/*")
+	if err != nil || len(dirs) == 0 {
 		t.Errorf("No tests to run")
 		return
 	}
-	sort.Strings(ents)
-	for _, ent := range ents {
-		testPath := path.Dir(ent)
-		testFailed := false
-		req, err := ioutil.ReadFile(ent)
-		if err != nil {
-			t.Errorf("FAIL: %s: cannot read %s: %v", testPath, path.Base(ent), err)
-			return
-		}
-		part := strings.TrimSuffix(path.Base(ent), ".request")
-		testPart := path.Join(testPath, part)
-		respName := path.Join(testPart + ".response-expect")
-		logName := path.Join(testPart + ".logs-expect")
-		actualResp := path.Join(testPart + ".response-actual")
-		actualLog := path.Join(testPart + ".logs-actual")
-
-		if info, err := os.Stat(respName); err != nil || !info.Mode().IsRegular() {
-			t.Errorf("FAIL: %s: missing %s.response-expect", testPath, part)
-			testFailed = true
-		}
-		if info, err := os.Stat(logName); err != nil || !info.Mode().IsRegular() {
-			t.Errorf("FAIL: %s: missing %s.logs-expect", testPath, part)
-			testFailed = true
-		}
-		request := rt(t)
-		if err := request.UnmarshalText(req); err != nil {
-			t.Errorf("FAIL: %s: Error parsing request: %v", testPart, err)
-			return
-		}
-		response := request.PrintOutgoing(request.Process())
-		if err := ioutil.WriteFile(actualResp, []byte(response), 0644); err != nil {
-			t.Errorf("FAIL: %s: Error saving response: %v", testPart, err)
-			return
-		}
-		logBuf := []string{}
-		lines := request.Logger.Buffer().Lines(-1)
-		for _, line := range lines {
-			logBuf = append(logBuf, line.Message)
-		}
-		if err := ioutil.WriteFile(actualLog, []byte(strings.Join(logBuf, "\n")), 0644); err != nil {
-			t.Errorf("FAIL: %s: Error saving logs: %v", testPart, err)
-			return
-		}
-		respDiff, err := diff(respName, actualResp)
-		if err != nil || strings.TrimSpace(respDiff) != "" {
-			t.Errorf("FAIL: %s: Diff from expected response:\n%s", testPart, respDiff)
-			testFailed = true
-		}
-		logDiff, err := diff(logName, actualLog)
-		if err != nil || strings.TrimSpace(logDiff) != "" {
-			t.Errorf("FAIL: %s: Diff from expected logs:\n%s", testPart, logDiff)
-			testFailed = true
-		}
-		if testFailed {
+	sort.Strings(dirs)
+	for _, testPath := range dirs {
+		if info, err := os.Stat(testPath); err != nil || !info.IsDir() {
 			continue
 		}
-		delay, err := ioutil.ReadFile(testPart + ".delay")
-		if delaySecs, _ := strconv.Atoi(string(delay)); err == nil && delaySecs > 0 {
-			time.Sleep(time.Duration(delaySecs) * time.Second)
+		t.Logf("Testing %s", testPath)
+		clearLeases()
+		testFailed := false
+		ents, err := filepath.Glob(path.Join(testPath, "*.request"))
+		if err != nil || len(ents) == 0 {
+			t.Errorf("No requests to process in %s", testPath)
+			continue
 		}
-		t.Logf("PASS: %s", testPart)
+		for _, ent := range ents {
+			req, err := ioutil.ReadFile(ent)
+			if err != nil {
+				t.Errorf("FAIL: %s: cannot read %s: %v", testPath, path.Base(ent), err)
+				break
+			}
+			part := strings.TrimSuffix(path.Base(ent), ".request")
+			testPart := path.Join(testPath, part)
+			respName := path.Join(testPart + ".response-expect")
+			logName := path.Join(testPart + ".logs-expect")
+			actualResp := path.Join(testPart + ".response-actual")
+			actualLog := path.Join(testPart + ".logs-actual")
+
+			if info, err := os.Stat(respName); err != nil || !info.Mode().IsRegular() {
+				t.Errorf("FAIL: %s: missing %s.response-expect", testPath, part)
+				testFailed = true
+			}
+			if info, err := os.Stat(logName); err != nil || !info.Mode().IsRegular() {
+				t.Errorf("FAIL: %s: missing %s.logs-expect", testPath, part)
+				testFailed = true
+			}
+			request := rt(t)
+			if err := request.UnmarshalText(req); err != nil {
+				t.Errorf("FAIL: %s: Error parsing request: %v", testPart, err)
+				break
+			}
+			response := request.PrintOutgoing(request.Process())
+			if err := ioutil.WriteFile(actualResp, []byte(response), 0644); err != nil {
+				t.Errorf("FAIL: %s: Error saving response: %v", testPart, err)
+				break
+			}
+			logBuf := []string{}
+			lines := request.Logger.Buffer().Lines(-1)
+			for _, line := range lines {
+				logBuf = append(logBuf, line.Message)
+			}
+			if err := ioutil.WriteFile(actualLog, []byte(strings.Join(logBuf, "\n")), 0644); err != nil {
+				t.Errorf("FAIL: %s: Error saving logs: %v", testPart, err)
+				break
+			}
+			respDiff, err := diff(respName, actualResp)
+			if err != nil || strings.TrimSpace(respDiff) != "" {
+				t.Errorf("FAIL: %s: Diff from expected response:\n%s", testPart, respDiff)
+				testFailed = true
+			}
+			logDiff, err := diff(logName, actualLog)
+			if err != nil || strings.TrimSpace(logDiff) != "" {
+				t.Errorf("FAIL: %s: Diff from expected logs:\n%s", testPart, logDiff)
+				testFailed = true
+			}
+			if testFailed {
+				break
+			}
+			delay, err := ioutil.ReadFile(testPart + ".delay")
+			if delaySecs, _ := strconv.Atoi(string(delay)); err == nil && delaySecs > 0 {
+				time.Sleep(time.Duration(delaySecs) * time.Second)
+			}
+		}
+		if !testFailed {
+			t.Logf("PASS: %s", testPath)
+		}
 	}
 }

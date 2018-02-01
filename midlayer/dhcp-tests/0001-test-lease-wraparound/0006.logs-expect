@@ -1,0 +1,2 @@
+Subnet sub1: MAC:52:54:be:1e:00:06 is in my range, attempting lease creation.
+Subnet sub1: No lease for MAC:52:54:be:1e:00:06, it gets no IP from us

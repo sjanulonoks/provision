@@ -1,0 +1,5 @@
+proto:dhcp4 iface:eno1 ifaddr:255.255.255.255:68
+op:0x02 htype:0x01 hlen:0x06 hops:0x00 xid:0xed2b0d78 secs:0x0000 flags:0x0000
+ci:0.0.0.0 yi:0.0.0.0 si:0.0.0.0 gi:0.0.0.0 ch:52:54:be:1e:00:06
+option:code:053 val:"nak"
+option:code:054 val:"192.168.124.1"

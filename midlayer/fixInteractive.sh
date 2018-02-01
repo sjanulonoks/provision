@@ -12,10 +12,12 @@ go test "$@"
 for testcase in dhcp-tests/*/*.request; do
     [[ -f $testcase ]] || continue
     tc="${testcase%.request}"
-    if ! diff -NZBu "$tc.response-expect" "$tc.response-actual"; then
-        prompt_to_copy "$tc.response-actual" "$tc.response-expect"
-    fi
-    if ! diff -NZBu "$tc.logs-expect" "$tc.logs-actual"; then
-        prompt_to_copy "$tc.logs-actual" "$tc.logs-expect"
-    fi
+    for item in response logs; do
+        ex="$tc.$item-expect"
+        ac="$tc.$item-actual"
+        [[ -f $ex ]] || touch "$ex"
+        if ! diff -NwBu "$ex" "$ac"; then
+            prompt_to_copy "$ac" "$ex"
+        fi
+    done
 done
