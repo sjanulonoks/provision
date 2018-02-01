@@ -1,8 +1,17 @@
 package midlayer
 
 import (
+	"io/ioutil"
 	"net"
+	"os"
+	"os/exec"
+	"path"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/pinger"
@@ -11,15 +20,25 @@ import (
 /*
 DHCP test layout:
 
-test-data/0000-test-name/:
-
+dhcp-tests/0000-test-name/
+     0000.request
+     0000.response-expect
+     0000.response-actual
+     0000.logs-expect
+     0000.logs-actual
+     0000.delay
+     ....
 
 */
 
-func rt(t *testing.T, name, in, expect string) {
-	t.Helper()
-	t.Logf("Processing test case %s", name)
-	req := &DhcpRequest{
+func diff(expect, actual string) (string, error) {
+	cmd := exec.Command("diff", "-NZBu", expect, actual)
+	res, err := cmd.CombinedOutput()
+	return string(res), err
+}
+
+func rt(t *testing.T) *DhcpRequest {
+	return &DhcpRequest{
 		Logger: logger.New(nil).Log("dhcp").SetLevel(logger.Info),
 		idxMap: map[int][]*net.IPNet{
 			1: []*net.IPNet{&net.IPNet{IP: net.IPv4(127, 0, 0, 1), Mask: net.IPv4Mask(255, 0, 0, 0)}},
@@ -30,86 +49,74 @@ func rt(t *testing.T, name, in, expect string) {
 		pinger:  pinger.Fake(false),
 		handler: dhcpHandler,
 	}
-	if err := req.UnmarshalText([]byte(in)); err != nil {
-		t.Errorf("Error parsing request: %v", err)
-		return
-	}
-	resp := req.PrintOutgoing(req.Process())
-	if resp != expect {
-		t.Errorf("%s: Unexpected DHCP response", name)
-		t.Errorf("Got:\n%s\n", resp)
-		t.Errorf("Expected:\n%s\n", expect)
-		return
-	} else {
-		t.Logf("%s handled as expected", name)
-	}
 }
 
-func TestParseMessage(t *testing.T) {
-	rt(t, "test discover", `proto:dhcp4 iface:eno1 ifaddr:0.0.0.0:68
-op:0x01 htype:0x01 hlen:0x06 hops:0x00 xid:0xed2b0d78 secs:0x0000 flags:0x0000
-ci:0.0.0.0 yi:0.0.0.0 si:0.0.0.0 gi:0.0.0.0 ch:52:54:be:1e:00:00
-option:code:053 val:"dis"
-option:code:057 val:"1472"
-option:code:093 val:"0"
-option:code:094 val:"1,2,1"
-option:code:060 val:"PXEClient:Arch:00000:UNDI:002001"
-option:code:077 val:"iPXE"
-option:code:055 val:"1,3,6,7,12,15,17,26,43,60,66,67,119,128,129,130,131,132,133,134,135,175,203"
-option:code:175 val:"177,5,1,128,134,16,14,235,3,1,0,0,23,1,1,34,1,1,19,1,1,17,1,1,39,1,1,25,1,1,16,1,2,33,1,1,21,1,1,24,1,1,18,1,1"
-option:code:061 val:"1,82,84,190,30,0,0"
-option:code:097 val:"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
-`,
-		`proto:dhcp4 iface:eno1 ifaddr:255.255.255.255:68
-op:0x02 htype:0x01 hlen:0x06 hops:0x00 xid:0xed2b0d78 secs:0x0000 flags:0x0000
-ci:0.0.0.0 yi:192.168.124.10 si:192.168.124.1 gi:0.0.0.0 ch:52:54:be:1e:00:00
-sname:"192.168.124.1"
-file:"default.ipxe"
-option:code:053 val:"ofr"
-option:code:054 val:"192.168.124.1"
-option:code:051 val:"60"
-option:code:001 val:"255.255.255.0"
-option:code:003 val:"192.168.124.1"
-option:code:006 val:"192.168.124.1"
-option:code:015 val:"sub1.com"
-option:code:058 val:"30"
-option:code:059 val:"45"
-`)
-	rt(t, "test offer", `proto:dhcp4 iface:eno1 ifaddr:0.0.0.0:68
-op:0x01 htype:0x01 hlen:0x06 hops:0x00 xid:0xed2b0d78 secs:0x0012 flags:0x0000
-ci:0.0.0.0 yi:0.0.0.0 si:0.0.0.0 gi:0.0.0.0 ch:52:54:be:1e:00:00
-option:code:053 val:"req"
-option:code:057 val:"1472"
-option:code:093 val:"0"
-option:code:094 val:"1,2,1"
-option:code:060 val:"PXEClient:Arch:00000:UNDI:002001"
-option:code:077 val:"iPXE"
-option:code:055 val:"1,3,6,7,12,15,17,26,43,60,66,67,119,128,129,130,131,132,133,134,135,175,203"
-option:code:175 val:"177,5,1,128,134,16,14,235,3,1,0,0,23,1,1,34,1,1,19,1,1,17,1,1,39,1,1,25,1,1,16,1,2,33,1,1,21,1,1,24,1,1,18,1,1"
-option:code:061 val:"1,82,84,190,30,0,0"
-option:code:097 val:"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
-option:code:054 val:"192.168.124.1"
-option:code:050 val:"192.168.124.10"
-`, `proto:dhcp4 iface:eno1 ifaddr:255.255.255.255:68
-op:0x02 htype:0x01 hlen:0x06 hops:0x00 xid:0xed2b0d78 secs:0x0000 flags:0x0000
-ci:0.0.0.0 yi:192.168.124.10 si:192.168.124.1 gi:0.0.0.0 ch:52:54:be:1e:00:00
-sname:"192.168.124.1"
-file:"default.ipxe"
-option:code:053 val:"ack"
-option:code:054 val:"192.168.124.1"
-option:code:051 val:"60"
-option:code:001 val:"255.255.255.0"
-option:code:003 val:"192.168.124.1"
-option:code:006 val:"192.168.124.1"
-option:code:015 val:"sub1.com"
-option:code:058 val:"30"
-option:code:059 val:"45"
-`)
-	rt(t, "test release", `proto:dhcp4 iface:eno1 ifaddr:192.168.124.10:68
-op:0x01 htype:0x01 hlen:0x06 hops:0x00 xid:0x458a1533 secs:0x0004 flags:0x0000
-ci:192.168.124.10 yi:0.0.0.0 si:0.0.0.0 gi:0.0.0.0 ch:52:54:be:1e:00:00
-option:code:053 val:"rel"
-option:code:061 val:"1,82,84,190,30,0,0"
-option:code:054 val:"192.168.124.11"
-`, ``)
+func TestDHCPCases(t *testing.T) {
+	ents, err := filepath.Glob("dhcp-tests/*/*.request")
+	if err != nil || len(ents) == 0 {
+		t.Errorf("No tests to run")
+		return
+	}
+	sort.Strings(ents)
+	for _, ent := range ents {
+		testPath := path.Dir(ent)
+		testFailed := false
+		req, err := ioutil.ReadFile(ent)
+		if err != nil {
+			t.Errorf("FAIL: %s: cannot read %s: %v", testPath, path.Base(ent), err)
+			return
+		}
+		part := strings.TrimSuffix(path.Base(ent), ".request")
+		testPart := path.Join(testPath, part)
+		respName := path.Join(testPart + ".response-expect")
+		logName := path.Join(testPart + ".logs-expect")
+		actualResp := path.Join(testPart + ".response-actual")
+		actualLog := path.Join(testPart + ".logs-actual")
+
+		if info, err := os.Stat(respName); err != nil || !info.Mode().IsRegular() {
+			t.Errorf("FAIL: %s: missing %s.response-expect", testPath, part)
+			testFailed = true
+		}
+		if info, err := os.Stat(logName); err != nil || !info.Mode().IsRegular() {
+			t.Errorf("FAIL: %s: missing %s.logs-expect", testPath, part)
+			testFailed = true
+		}
+		request := rt(t)
+		if err := request.UnmarshalText(req); err != nil {
+			t.Errorf("FAIL: %s: Error parsing request: %v", testPart, err)
+			return
+		}
+		response := request.PrintOutgoing(request.Process())
+		if err := ioutil.WriteFile(actualResp, []byte(response), 0644); err != nil {
+			t.Errorf("FAIL: %s: Error saving response: %v", testPart, err)
+			return
+		}
+		logBuf := []string{}
+		lines := request.Logger.Buffer().Lines(-1)
+		for _, line := range lines {
+			logBuf = append(logBuf, line.Message)
+		}
+		if err := ioutil.WriteFile(actualLog, []byte(strings.Join(logBuf, "\n")), 0644); err != nil {
+			t.Errorf("FAIL: %s: Error saving logs: %v", testPart, err)
+			return
+		}
+		respDiff, err := diff(respName, actualResp)
+		if err != nil || strings.TrimSpace(respDiff) != "" {
+			t.Errorf("FAIL: %s: Diff from expected response:\n%s", testPart, respDiff)
+			testFailed = true
+		}
+		logDiff, err := diff(logName, actualLog)
+		if err != nil || strings.TrimSpace(logDiff) != "" {
+			t.Errorf("FAIL: %s: Diff from expected logs:\n%s", testPart, logDiff)
+			testFailed = true
+		}
+		if testFailed {
+			continue
+		}
+		delay, err := ioutil.ReadFile(testPart + ".delay")
+		if delaySecs, _ := strconv.Atoi(string(delay)); err == nil && delaySecs > 0 {
+			time.Sleep(time.Duration(delaySecs) * time.Second)
+		}
+		t.Logf("PASS: %s", testPart)
+	}
 }
