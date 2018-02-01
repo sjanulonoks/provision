@@ -171,7 +171,7 @@ func (f *Frontend) makeActionEndpoints(cmdSet string, obj models.Model, idKey st
 				return
 			}
 
-			f.pubs.Publish(cmdSet, cmd, id, ma)
+			rt.Publish(cmdSet, cmd, id, ma)
 			retval, runErr := f.pc.Actions.Run(rt, cmdSet, ma)
 			if runErr != nil {
 				be, ok := runErr.(*models.Error)

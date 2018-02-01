@@ -530,10 +530,6 @@ func NewFrontend(
 	})
 
 	pubs.Add(me)
-	me.Logger.Buffer().SetPublisher(func(l *logger.Line) {
-		pubs.Publish("log", l.Level.String(), l.Service, l)
-	})
-
 	return
 }
 

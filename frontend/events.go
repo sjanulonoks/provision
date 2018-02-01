@@ -37,7 +37,7 @@ func (f *Frontend) InitEventApi() {
 				return
 			}
 
-			if err := f.pubs.PublishEvent(&event); err != nil {
+			if err := f.rt(c).PublishEvent(&event); err != nil {
 				be, ok := err.(*models.Error)
 				if ok {
 					c.JSON(be.Code, be)

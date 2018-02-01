@@ -509,12 +509,6 @@ func (p *DataTracker) LogFor(s string) logger.Logger {
 	return p.Logger.Buffer().Log(s)
 }
 
-func (p *DataTracker) Publish(prefix, action, key string, ref interface{}) {
-	if p.publishers != nil {
-		p.publishers.Publish(prefix, action, key, ref)
-	}
-}
-
 func (dt *DataTracker) reportPath(s string) string {
 	return strings.TrimPrefix(s, dt.FileRoot)
 }

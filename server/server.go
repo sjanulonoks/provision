@@ -239,6 +239,7 @@ func Server(c_opts *ProgOpts) {
 	fe.TftpPort = c_opts.TftpPort
 	fe.BinlPort = c_opts.BinlPort
 	fe.NoBinl = c_opts.DisableBINL
+	backend.SetLogPublisher(buf, publishers)
 
 	// Start the controller now that we have a frontend to front.
 	if err := pc.StartController(fe.ApiGroup); err != nil {

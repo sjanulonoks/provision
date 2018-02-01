@@ -52,7 +52,7 @@ func publishHandler(c *gin.Context, pc *PluginClient) {
 		return
 	}
 	resp := models.Error{Code: http.StatusOK}
-	if err := pc.pc.publishers.PublishEvent(&event); err != nil {
+	if err := pc.pc.Request().PublishEvent(&event); err != nil {
 		resp.Code = 409
 		resp.AddError(err)
 	}

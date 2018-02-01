@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/models"
 )
 
@@ -18,6 +19,12 @@ type Publisher interface {
 	Reserve() error
 	Release()
 	Unload()
+}
+
+func SetLogPublisher(l *logger.Buffer, pubs *Publishers) {
+	l.SetPublisher(func(l *logger.Line) {
+		pubs.publish("log", l.Level.String(), l.Service, l)
+	})
 }
 
 type Publishers struct {
@@ -62,12 +69,12 @@ func (p *Publishers) List() []Publisher {
 	return newPubs
 }
 
-func (p *Publishers) Publish(t, a, k string, o interface{}) error {
+func (p *Publishers) publish(t, a, k string, o interface{}) error {
 	e := &models.Event{Time: time.Now(), Type: t, Action: a, Key: k, Object: o}
-	return p.PublishEvent(e)
+	return p.publishEvent(e)
 }
 
-func (p *Publishers) PublishEvent(e *models.Event) error {
+func (p *Publishers) publishEvent(e *models.Event) error {
 	newPubs := make([]Publisher, 0, 0)
 	p.lock.Lock()
 	for _, pub := range p.pubs {
