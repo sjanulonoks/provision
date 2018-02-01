@@ -16,13 +16,17 @@ import (
 
 var tmpDir string
 var dataTracker *backend.DataTracker
-var dhcpHandler *DhcpHandler
+var dhcpHandler, binlHandler *DhcpHandler
 
 func makeHandler(dt *backend.DataTracker, proxy bool) *DhcpHandler {
+	port := 67
+	if proxy {
+		port = 4011
+	}
 	res := &DhcpHandler{
 		Logger:    logger.New(nil).Log("dhcp"),
 		ifs:       []string{},
-		port:      20000,
+		port:      port,
 		bk:        dt,
 		strats:    []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
 		pinger:    pinger.Fake(true),
@@ -59,6 +63,7 @@ func TestMain(m *testing.M) {
 		map[string]string{"defaultBootEnv": "default", "unknownBootEnv": "ignore"},
 		backend.NewPublishers(locallogger))
 	dhcpHandler = makeHandler(dataTracker, false)
+	binlHandler = makeHandler(dataTracker, true)
 	rt := dataTracker.Request(l, "subnets")
 	rt.Do(func(d backend.Stores) {
 		subs := []*models.Subnet{

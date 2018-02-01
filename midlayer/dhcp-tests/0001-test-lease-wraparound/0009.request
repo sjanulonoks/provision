@@ -1,4 +1,4 @@
-proto:dhcp4 iface:eno1 ifaddr:0.0.0.0:68
+proto:dhcp4 iface:eno1 ifaddr:0.0.0.0:68 lport:67
 op:0x01 htype:0x01 hlen:0x06 hops:0x00 xid:0xed2b0d78 secs:0x0012 flags:0x0000
 ci:0.0.0.0 yi:0.0.0.0 si:0.0.0.0 gi:0.0.0.0 ch:52:54:be:1e:00:02
 option:code:053 val:"req"

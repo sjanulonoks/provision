@@ -46,6 +46,7 @@ type DhcpRequest struct {
 	pktOpts   dhcp.Options
 	pinger    pinger.Pinger
 	handler   *DhcpHandler
+	lPort     int
 }
 
 func (dhr *DhcpRequest) xid() string {
@@ -721,6 +722,7 @@ func (h *DhcpHandler) NewRequest(buf []byte, cm *ipv4.ControlMessage, srcAddr ne
 	res.pkt = dhcp.Packet(buf)
 	res.handler = h
 	res.pinger = h.pinger
+	res.lPort = h.port
 	res.fill()
 	return res
 }

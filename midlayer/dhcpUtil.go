@@ -15,7 +15,10 @@ import (
 
 func (dhr *DhcpRequest) marshalText(p dhcp.Packet) ([]byte, error) {
 	buf := &bytes.Buffer{}
-	fmt.Fprintf(buf, "proto:dhcp4 iface:%s ifaddr:%s\n", dhr.ifname(), dhr.srcAddr.String())
+	fmt.Fprintf(buf, "proto:dhcp4 iface:%s ifaddr:%s lport:%d\n",
+		dhr.ifname(),
+		dhr.srcAddr.String(),
+		dhr.lPort)
 	fmt.Fprintf(buf, "op:%#02x htype:%#02x hlen:%#02x hops:%#02x xid:%#08x secs:%#04x flags:%#04x\n",
 		p.OpCode(),
 		p.HType(),
@@ -72,11 +75,13 @@ func (dhr *DhcpRequest) UnmarshalText(buf []byte) error {
 	}
 	var (
 		intf, intfaddr string
+		lport          int
 	)
-	count, err := fmt.Sscanf(lines[0], "proto:dhcp4 iface:%s ifaddr:%s", &intf, &intfaddr)
-	if err != nil || count != 2 {
+	count, err := fmt.Sscanf(lines[0], "proto:dhcp4 iface:%s ifaddr:%s lport:%d", &intf, &intfaddr, &lport)
+	if err != nil || count != 3 {
 		return fmt.Errorf("Error scanning packet line 0: %v", err)
 	}
+	dhr.lPort = lport
 	dhr.cm = &ipv4.ControlMessage{}
 	for idx, intfname := range dhr.nameMap {
 		if intfname == intf {

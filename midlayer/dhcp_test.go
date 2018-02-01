@@ -104,7 +104,10 @@ func TestDHCPCases(t *testing.T) {
 			request := rt(t)
 			if err := request.UnmarshalText(req); err != nil {
 				t.Errorf("FAIL: %s: Error parsing request: %v", testPart, err)
-				break
+				continue
+			}
+			if request.lPort == 4011 {
+				request.handler = binlHandler
 			}
 			response := request.PrintOutgoing(request.Process())
 			if err := ioutil.WriteFile(actualResp, []byte(response), 0644); err != nil {
@@ -131,7 +134,7 @@ func TestDHCPCases(t *testing.T) {
 				testFailed = true
 			}
 			if testFailed {
-				break
+				continue
 			}
 			delay, err := ioutil.ReadFile(testPart + ".delay")
 			if delaySecs, _ := strconv.Atoi(string(delay)); err == nil && delaySecs > 0 {
