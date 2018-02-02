@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 )
@@ -13,30 +12,6 @@ import (
 type Pref struct {
 	*models.Pref
 	validate
-}
-
-func (p *Pref) Indexes() map[string]index.Maker {
-	fix := AsPref
-	res := index.MakeBaseIndexes(p)
-	res["Name"] = index.Make(
-		true,
-		"string",
-		func(i, j models.Model) bool { return fix(i).Name < fix(j).Name },
-		func(ref models.Model) (gte, gt index.Test) {
-			refName := fix(ref).Name
-			return func(s models.Model) bool {
-					return fix(s).Name >= refName
-				},
-				func(s models.Model) bool {
-					return fix(s).Name > refName
-				}
-		},
-		func(s string) (models.Model, error) {
-			pref := fix(p.New())
-			pref.Name = s
-			return pref, nil
-		})
-	return res
 }
 
 func (p *Pref) New() store.KeySaver {
