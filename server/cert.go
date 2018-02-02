@@ -16,7 +16,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"math/big"
 	"net"
 	"os"
@@ -38,16 +37,16 @@ func publicKey(priv interface{}) (answer interface{}) {
 	return
 }
 
-func pemBlockForKey(priv interface{}) (answer *pem.Block) {
+func pemBlockForKey(priv interface{}) (answer *pem.Block, err error) {
 	switch k := priv.(type) {
 	case *rsa.PrivateKey:
 		answer = &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k)}
 	case *ecdsa.PrivateKey:
-		b, err := x509.MarshalECPrivateKey(k)
-		if err != nil {
-			log.Fatalf("Unable to marshal ECDSA private key: %v\n", err)
+		if b, err2 := x509.MarshalECPrivateKey(k); err2 != nil {
+			err = fmt.Errorf("Unable to marshal ECDSA private key: %v\n", err2)
+		} else {
+			answer = &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
 		}
-		answer = &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
 	}
 	return
 }
@@ -146,7 +145,12 @@ func buildKeys(curveOrBits, certFile, keyFile string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open key.pem for writing: %s", err)
 	}
-	pem.Encode(keyOut, pemBlockForKey(priv))
+
+	if b, err := pemBlockForKey(priv); err != nil {
+		return err
+	} else {
+		pem.Encode(keyOut, b)
+	}
 	keyOut.Close()
 	return nil
 }

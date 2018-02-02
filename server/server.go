@@ -101,24 +101,27 @@ type ProgOpts struct {
 	DefaultLogLevel     string `long:"log-level" description:"Level to log messages at" default:"warn"`
 }
 
-func mkdir(d string, localLogger *log.Logger) {
-	err := os.MkdirAll(d, 0755)
-	if err != nil {
-		localLogger.Fatalf("Error creating required directory %s: %v", d, err)
-	}
+func mkdir(d string) error {
+	return os.MkdirAll(d, 0755)
 }
 
 func Server(c_opts *ProgOpts) {
-	var err error
 	localLogger := log.New(os.Stderr, "dr-provision", log.LstdFlags|log.Lmicroseconds|log.LUTC)
+	localLogger.Fatalf(server(localLogger, c_opts))
+}
+
+func server(localLogger *log.Logger, c_opts *ProgOpts) string {
+	var err error
 
 	if c_opts.VersionFlag {
-		localLogger.Fatalf("Version: %s", provision.RS_VERSION)
+		return fmt.Sprintf("Version: %s", provision.RS_VERSION)
 	}
 	localLogger.Printf("Version: %s\n", provision.RS_VERSION)
 
 	// Make base root dir
-	mkdir(c_opts.BaseRoot, localLogger)
+	if err = mkdir(c_opts.BaseRoot); err != nil {
+		return fmt.Sprintf("Error creating required directory %s: %v", c_opts.BaseRoot, err)
+	}
 
 	// Make other dirs as needed - adjust the dirs as well.
 	if strings.IndexRune(c_opts.FileRoot, filepath.Separator) != 0 {
@@ -131,7 +134,7 @@ func Server(c_opts *ProgOpts) {
 		c_opts.PluginCommRoot = filepath.Join(c_opts.BaseRoot, c_opts.PluginCommRoot)
 	}
 	if len(c_opts.PluginCommRoot) > 70 {
-		localLogger.Fatalf("PluginCommRoot Must be less than 70 characters")
+		return fmt.Sprintf("PluginCommRoot Must be less than 70 characters")
 	}
 	if strings.IndexRune(c_opts.DataRoot, filepath.Separator) != 0 {
 		c_opts.DataRoot = filepath.Join(c_opts.BaseRoot, c_opts.DataRoot)
@@ -148,18 +151,34 @@ func Server(c_opts *ProgOpts) {
 	if strings.IndexRune(c_opts.LocalUI, filepath.Separator) != 0 {
 		c_opts.LocalUI = filepath.Join(c_opts.BaseRoot, c_opts.LocalUI)
 	}
-	mkdir(c_opts.FileRoot, localLogger)
-	mkdir(c_opts.ReplaceRoot, localLogger)
-	mkdir(c_opts.PluginRoot, localLogger)
-	mkdir(c_opts.PluginCommRoot, localLogger)
-	mkdir(c_opts.DataRoot, localLogger)
-	mkdir(c_opts.LogRoot, localLogger)
-	mkdir(c_opts.LocalUI, localLogger)
-	mkdir(c_opts.SaasContentRoot, localLogger)
+	if err = mkdir(c_opts.FileRoot); err != nil {
+		return fmt.Sprintf("Error creating required directory %s: %v", c_opts.FileRoot, err)
+	}
+	if err = mkdir(c_opts.ReplaceRoot); err != nil {
+		return fmt.Sprintf("Error creating required directory %s: %v", c_opts.ReplaceRoot, err)
+	}
+	if err = mkdir(c_opts.PluginRoot); err != nil {
+		return fmt.Sprintf("Error creating required directory %s: %v", c_opts.PluginRoot, err)
+	}
+	if err = mkdir(c_opts.PluginCommRoot); err != nil {
+		return fmt.Sprintf("Error creating required directory %s: %v", c_opts.PluginCommRoot, err)
+	}
+	if err = mkdir(c_opts.DataRoot); err != nil {
+		return fmt.Sprintf("Error creating required directory %s: %v", c_opts.DataRoot, err)
+	}
+	if err = mkdir(c_opts.LogRoot); err != nil {
+		return fmt.Sprintf("Error creating required directory %s: %v", c_opts.LogRoot, err)
+	}
+	if err = mkdir(c_opts.LocalUI); err != nil {
+		return fmt.Sprintf("Error creating required directory %s: %v", c_opts.LocalUI, err)
+	}
+	if err = mkdir(c_opts.SaasContentRoot); err != nil {
+		return fmt.Sprintf("Error creating required directory %s: %v", c_opts.SaasContentRoot, err)
+	}
 	if EmbeddedAssetsExtractFunc != nil {
 		localLogger.Printf("Extracting Default Assets\n")
 		if err := EmbeddedAssetsExtractFunc(c_opts.ReplaceRoot, c_opts.FileRoot); err != nil {
-			localLogger.Fatalf("Unable to extract assets: %v", err)
+			return fmt.Sprintf("Unable to extract assets: %v", err)
 		}
 	}
 
@@ -167,12 +186,12 @@ func Server(c_opts *ProgOpts) {
 	dtStore, err := midlayer.DefaultDataStack(c_opts.DataRoot, c_opts.BackEndType,
 		c_opts.LocalContent, c_opts.DefaultContent, c_opts.SaasContentRoot)
 	if err != nil {
-		localLogger.Fatalf("Unable to create DataStack: %v", err)
+		return fmt.Sprintf("Unable to create DataStack: %v", err)
 	}
 	logLevel, err := logger.ParseLevel(c_opts.DefaultLogLevel)
 	if err != nil {
 		localLogger.Printf("Invalid log level %s", c_opts.DefaultLogLevel)
-		localLogger.Fatalf("Try one of `trace`,`debug`,`info`,`warn`,`error`,`fatal`,`panic")
+		return fmt.Sprintf("Try one of `trace`,`debug`,`info`,`warn`,`error`,`fatal`,`panic`")
 	}
 
 	// We have a backend, now get default assets
@@ -209,7 +228,7 @@ func Server(c_opts *ProgOpts) {
 	if c_opts.DrpId == "" {
 		intfs, err := net.Interfaces()
 		if err != nil {
-			localLogger.Fatalf("Error getting interfaces for DrpId: %v", err)
+			return fmt.Sprintf("Error getting interfaces for DrpId: %v", err)
 		}
 
 		for _, intf := range intfs {
@@ -229,7 +248,7 @@ func Server(c_opts *ProgOpts) {
 
 	pc, err := midlayer.InitPluginController(c_opts.PluginRoot, c_opts.PluginCommRoot, dt, publishers)
 	if err != nil {
-		localLogger.Fatalf("Error starting plugin service: %v", err)
+		return fmt.Sprintf("Error starting plugin service: %v", err)
 	} else {
 		services = append(services, pc)
 	}
@@ -248,19 +267,19 @@ func Server(c_opts *ProgOpts) {
 
 	// Start the controller now that we have a frontend to front.
 	if err := pc.StartController(fe.ApiGroup); err != nil {
-		localLogger.Fatalf("Error starting plugin service: %v", err)
+		return fmt.Sprintf("Error starting plugin service: %v", err)
 	}
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		if err = buildKeys(c_opts.CurveOrBits, c_opts.TlsCertFile, c_opts.TlsKeyFile); err != nil {
-			localLogger.Fatalf("Error building certs: %v", err)
+			return fmt.Sprintf("Error building certs: %v", err)
 		}
 	}
 
 	if !c_opts.DisableTftpServer {
 		localLogger.Printf("Starting TFTP server")
 		if svc, err := midlayer.ServeTftp(fmt.Sprintf(":%d", c_opts.TftpPort), dt.FS.TftpResponder(), buf.Log("static"), publishers); err != nil {
-			localLogger.Fatalf("Error starting TFTP server: %v", err)
+			return fmt.Sprintf("Error starting TFTP server: %v", err)
 		} else {
 			services = append(services, svc)
 		}
@@ -269,7 +288,7 @@ func Server(c_opts *ProgOpts) {
 	if !c_opts.DisableProvisioner {
 		localLogger.Printf("Starting static file server")
 		if svc, err := midlayer.ServeStatic(fmt.Sprintf(":%d", c_opts.StaticPort), dt.FS, buf.Log("static"), publishers); err != nil {
-			localLogger.Fatalf("Error starting static file server: %v", err)
+			return fmt.Sprintf("Error starting static file server: %v", err)
 		} else {
 			services = append(services, svc)
 		}
@@ -278,7 +297,7 @@ func Server(c_opts *ProgOpts) {
 	if !c_opts.DisableDHCP {
 		localLogger.Printf("Starting DHCP server")
 		if svc, err := midlayer.StartDhcpHandler(dt, buf.Log("dhcp"), c_opts.DhcpInterfaces, c_opts.DhcpPort, publishers, false, c_opts.FakePinger); err != nil {
-			localLogger.Fatalf("Error starting DHCP server: %v", err)
+			return fmt.Sprintf("Error starting DHCP server: %v", err)
 		} else {
 			services = append(services, svc)
 		}
@@ -286,7 +305,7 @@ func Server(c_opts *ProgOpts) {
 		if !c_opts.DisableBINL {
 			localLogger.Printf("Starting PXE/BINL server")
 			if svc, err := midlayer.StartDhcpHandler(dt, buf.Log("dhcp"), c_opts.DhcpInterfaces, c_opts.BinlPort, publishers, true, c_opts.FakePinger); err != nil {
-				localLogger.Fatalf("Error starting PXE/BINL server: %v", err)
+				return fmt.Sprintf("Error starting PXE/BINL server: %v", err)
 			} else {
 				services = append(services, svc)
 			}
@@ -388,6 +407,7 @@ func Server(c_opts *ProgOpts) {
 				localLogger.Printf("could not shutdown: %v", err)
 			}
 		}
-		localLogger.Fatalf("Error running API service: %v\n", err)
+		return fmt.Sprintf("Error running API service: %v\n", err)
 	}
+	return "Exiting"
 }
