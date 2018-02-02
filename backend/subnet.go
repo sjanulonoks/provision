@@ -478,7 +478,9 @@ func (s *Subnet) InActiveRange(ip net.IP) bool {
 }
 
 func (s *Subnet) LeaseTimeFor(ip net.IP) time.Duration {
-	if s.InActiveRange(ip) {
+	if s.Proxy {
+		return 0
+	} else if s.InActiveRange(ip) {
 		return time.Duration(s.ActiveLeaseTime) * time.Second
 	} else if s.InSubnetRange(ip) {
 		return time.Duration(s.ReservedLeaseTime) * time.Second

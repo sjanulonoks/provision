@@ -239,6 +239,10 @@ func (l *Lease) Validate() {
 	l.SetAvailable()
 }
 
+func (l *Lease) Fake() bool {
+	return l.State == "FAKE"
+}
+
 func (l *Lease) BeforeSave() error {
 	l.Validate()
 	if !l.Useable() {
