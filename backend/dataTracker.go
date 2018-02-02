@@ -40,14 +40,11 @@ localboot 0
 `,
 				},
 				{
-					Name:     `elilo`,
-					Path:     `elilo.conf`,
-					Contents: `exit`,
-				},
-				{
 					Name: `ipxe`,
 					Path: `default.ipxe`,
 					Contents: `#!ipxe
+chain {{.ProvisionerURL}}/${netX/mac}.ipxe && exit || goto chainip
+:chainip
 chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 `,
 				},
@@ -76,13 +73,25 @@ localboot 0
 `,
 				},
 				{
-					Name:     "elilo",
-					Path:     "{{.Machine.HexAddress}}.conf",
-					Contents: "exit",
-				},
-				{
 					Name: "ipxe",
 					Path: "{{.Machine.Address}}.ipxe",
+					Contents: `#!ipxe
+exit
+`,
+				},
+				{
+					Name: "pxelinux-mac",
+					Path: "pxelinux.cfg/{{.Machine.MacAddr \"pxelinux\"}}",
+					Contents: `DEFAULT local
+PROMPT 0
+TIMEOUT 10
+LABEL local
+localboot 0
+`,
+				},
+				{
+					Name: "ipxe-mac",
+					Path: "{{.Machine.MacAddr \"ipxe\"}}.ipxe",
 					Contents: `#!ipxe
 exit
 `,
@@ -503,6 +512,8 @@ type DataTracker struct {
 	thunks              []func()
 	thunkMux            *sync.Mutex
 	publishers          *Publishers
+	macAddrMap          map[string]string
+	macAddrMux          *sync.RWMutex
 }
 
 func (p *DataTracker) LogFor(s string) logger.Logger {
@@ -709,6 +720,8 @@ func ValidateDataTrackerStore(backend store.Store, logger logger.Logger) (hard, 
 		thunks:            make([]func(), 0),
 		thunkMux:          &sync.Mutex{},
 		publishers:        &Publishers{},
+		macAddrMap:        map[string]string{},
+		macAddrMux:        &sync.RWMutex{},
 	}
 
 	// Load stores.
@@ -747,6 +760,8 @@ func NewDataTracker(backend store.Store,
 		thunks:            make([]func(), 0),
 		thunkMux:          &sync.Mutex{},
 		publishers:        publishers,
+		macAddrMap:        map[string]string{},
+		macAddrMux:        &sync.RWMutex{},
 	}
 
 	// Make sure incoming writable backend has all stores created

@@ -336,12 +336,14 @@ func (n *Machine) HasProfile(name string) bool {
 
 func (n *Machine) New() store.KeySaver {
 	res := &Machine{Machine: &models.Machine{}}
-	if n.Machine != nil && n.ChangeForced() {
-		res.ForceChange()
-	}
 	res.Tasks = []string{}
 	res.Profiles = []string{}
-	res.rt = n.rt
+	if n != nil {
+		res.rt = n.rt
+		if n.Machine != nil && n.ChangeForced() {
+			res.ForceChange()
+		}
+	}
 	return res
 }
 
@@ -380,6 +382,20 @@ func (n *Machine) Validate() {
 	n.Machine.Validate()
 	validateMaybeZeroIP4(n, n.Address)
 	n.AddError(index.CheckUnique(n, n.rt.stores("machines").Items()))
+	if !n.Address.IsUnspecified() {
+		others, err := index.All(
+			index.Sort(n.Indexes()["Address"]),
+			index.Eq(n.Address.String()))(n.rt.Index("machines"))
+		if err == nil {
+			for _, item := range others.Items() {
+				m2 := AsMachine(item)
+				if m2.Key() == n.Key() {
+					continue
+				}
+				n.Errorf("Machine %s already has IP address %s", m2.UUID(), m2.Address)
+			}
+		}
+	}
 	n.SetValid()
 	if n.Address != nil && !n.Address.IsUnspecified() {
 		others, err := index.All(
@@ -559,6 +575,11 @@ func (n *Machine) AfterSave() {
 	n.toDeRegister = nil
 	n.toRegister = nil
 	n.oldStage = n.Stage
+	n.rt.dt.macAddrMux.Lock()
+	for _, mac := range n.HardwareAddrs {
+		n.rt.dt.macAddrMap[mac] = n.UUID()
+	}
+	n.rt.dt.macAddrMux.Unlock()
 }
 
 func (n *Machine) OnLoad() error {
@@ -587,6 +608,11 @@ func (n *Machine) OnLoad() error {
 		err = n.rt.stores("machines").backingStore.Save(n.Key(), n)
 		n.RestoreValidation(v)
 	}
+	n.rt.dt.macAddrMux.Lock()
+	for _, mac := range n.HardwareAddrs {
+		n.rt.dt.macAddrMap[mac] = n.UUID()
+	}
+	n.rt.dt.macAddrMux.Unlock()
 	return err
 }
 
@@ -648,6 +674,14 @@ func (n *Machine) AfterDelete() {
 		job.Current = false
 		n.rt.Save(job)
 	}
+	n.rt.dt.macAddrMux.Lock()
+	for _, mac := range n.HardwareAddrs {
+		if v, ok := n.rt.dt.macAddrMap[mac]; ok && v == n.UUID() {
+			delete(n.rt.dt.macAddrMap, mac)
+		}
+	}
+	n.rt.dt.macAddrMux.Unlock()
+
 }
 
 func AsMachine(o models.Model) *Machine {

@@ -158,24 +158,24 @@ func newRenderedTemplate(r *RenderData,
 type rMachine struct {
 	*Machine
 	renderData *RenderData
+	currMac    string
 }
 
 func (n *rMachine) Url() string {
 	return n.renderData.rt.FileURL(n.renderData.remoteIP) + "/" + n.Path()
 }
 
+func (n *rMachine) MacAddr(format string) string {
+	switch format {
+	case "pxelinux":
+		return "01-" + strings.Replace(n.currMac, ":", "-", -1)
+	default:
+		return n.currMac
+	}
+}
+
 type rBootEnv struct {
 	*BootEnv
-	renderData *RenderData
-}
-
-type rTask struct {
-	*Task
-	renderData *RenderData
-}
-
-type rStage struct {
-	*Stage
 	renderData *RenderData
 }
 
@@ -197,6 +197,25 @@ func (b *rBootEnv) PathFor(proto, f string) string {
 		b.renderData.rt.Fatalf("Unknown protocol %v", proto)
 	}
 	return ""
+}
+
+// JoinInitrds joins the fully expanded initrd paths into a comma-separated string.
+func (b *rBootEnv) JoinInitrds(proto string) string {
+	fullInitrds := make([]string, len(b.Initrds))
+	for i, initrd := range b.Initrds {
+		fullInitrds[i] = b.PathFor(proto, initrd)
+	}
+	return strings.Join(fullInitrds, " ")
+}
+
+type rTask struct {
+	*Task
+	renderData *RenderData
+}
+
+type rStage struct {
+	*Stage
+	renderData *RenderData
 }
 
 type Repo struct {
@@ -339,15 +358,6 @@ func (b *rBootEnv) InstallUrl() (string, error) {
 		return "", fmt.Errorf("No install repository available")
 	}
 	return repos[0].URL, nil
-}
-
-// JoinInitrds joins the fully expanded initrd paths into a comma-separated string.
-func (b *rBootEnv) JoinInitrds(proto string) string {
-	fullInitrds := make([]string, len(b.Initrds))
-	for i, initrd := range b.Initrds {
-		fullInitrds[i] = b.PathFor(proto, initrd)
-	}
-	return strings.Join(fullInitrds, " ")
 }
 
 // RenderData is the struct that is passed to templates as a source of
@@ -678,35 +688,42 @@ func (r *RenderData) CallTemplate(name string, data interface{}) (ret interface{
 	return
 }
 
-func (r *RenderData) makeRenderers(e models.ErrorAdder) renderers {
+func (r *RenderData) validateRequiredParams(e models.ErrorAdder) []models.TemplateInfo {
 	toRender, requiredParams := r.target.renderInfo()
 	for _, param := range requiredParams {
 		if !r.ParamExists(param) {
 			e.Errorf("Missing required parameter %s for %s %s", param, r.target.Prefix(), r.target.Key())
 		}
 	}
-	rts := make(renderers, len(toRender))
-	for i := range toRender {
-		tmplPath := ""
-		ti := &toRender[i]
-		if ti.PathTemplate() != nil {
-			// first, render the path
-			buf := &bytes.Buffer{}
-			if err := ti.PathTemplate().Execute(buf, r); err != nil {
-				e.Errorf("Error rendering template %s path %s: %v",
-					ti.Name,
-					ti.Path,
-					err)
-				continue
-			}
-			if r.target.Prefix() == "tasks" {
-				tmplPath = path.Clean(buf.String())
-			} else {
-				tmplPath = path.Clean("/" + buf.String())
-			}
-		}
+	return toRender
+}
 
-		rts[i] = newRenderedTemplate(r, ti.Id(), tmplPath)
+func (r *RenderData) addRenderer(e models.ErrorAdder, ti *models.TemplateInfo, rts renderers) renderers {
+	tmplPath := ""
+	if ti.PathTemplate() != nil {
+		// first, render the path
+		buf := &bytes.Buffer{}
+		if err := ti.PathTemplate().Execute(buf, r); err != nil {
+			e.Errorf("Error rendering template %s path %s: %v",
+				ti.Name,
+				ti.Path,
+				err)
+			return rts
+		}
+		if r.target.Prefix() == "tasks" {
+			tmplPath = path.Clean(buf.String())
+		} else {
+			tmplPath = path.Clean("/" + buf.String())
+		}
 	}
-	return renderers(rts)
+	return append(rts, newRenderedTemplate(r, ti.Id(), tmplPath))
+}
+
+func (r *RenderData) makeRenderers(e models.ErrorAdder) renderers {
+	tmpls := r.validateRequiredParams(e)
+	rts := renderers([]renderer{})
+	for i := range tmpls {
+		rts = r.addRenderer(e, &tmpls[i], rts)
+	}
+	return rts
 }

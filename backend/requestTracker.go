@@ -432,3 +432,13 @@ func (rt *RequestTracker) FileURL(remoteIP net.IP) string {
 func (rt *RequestTracker) SealClaims(claims *DrpCustomClaims) (string, error) {
 	return rt.dt.SealClaims(claims)
 }
+
+func (rt *RequestTracker) MachineForMac(mac string) *Machine {
+	rt.dt.macAddrMux.RLock()
+	defer rt.dt.macAddrMux.RUnlock()
+	m := rt.Find("machines", rt.dt.macAddrMap[mac])
+	if m != nil {
+		return AsMachine(m)
+	}
+	return nil
+}

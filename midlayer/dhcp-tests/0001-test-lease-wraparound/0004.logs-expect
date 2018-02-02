@@ -1,0 +1,2 @@
+Subnet sub1: MAC:52:54:be:1e:00:04 is in my range, attempting lease creation.
+xid 0xed2b0d78: Discovery handing out: 192.168.124.14 to 52:54:be:1e:00:04 via 192.168.124.1

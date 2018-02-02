@@ -40,6 +40,10 @@ type BootEnv struct {
 	tmplMux        sync.Mutex
 }
 
+func (b *BootEnv) NetBoot() bool {
+	return b.OnlyUnknown || b.Kernel != ""
+}
+
 func (obj *BootEnv) SetReadOnly(b bool) {
 	obj.ReadOnly = b
 }
@@ -334,23 +338,17 @@ func (b *BootEnv) Validate() {
 	b.fillInstallRepo()
 	// OK, we are sane, if not useable.  Check to see if we are useable
 	seenPxeLinux := false
-	seenELilo := false
 	seenIPXE := false
 	for _, template := range b.Templates {
-		if template.Name == "pxelinux" {
+		if template.Name == "pxelinux" || template.Name == "pxelinux-mac" {
 			seenPxeLinux = true
 		}
-		if template.Name == "elilo" {
-			seenELilo = true
-		}
-		if template.Name == "ipxe" {
+		if template.Name == "ipxe" || template.Name == "ipxe-mac" {
 			seenIPXE = true
 		}
 	}
-	if !seenIPXE {
-		if !(seenPxeLinux && seenELilo) {
-			b.Errorf("bootenv: Missing elilo or pxelinux template")
-		}
+	if !(seenPxeLinux || seenIPXE) && b.Kernel != "" {
+		b.Errorf("bootenv: Missing elilo or pxelinux template")
 	}
 	// Make sure the ISO for this bootenv has been exploded locally so that
 	// the boot env can use its contents.
@@ -524,7 +522,23 @@ func (b *BootEnv) Render(rt *RequestTracker, m *Machine, e models.ErrorAdder) re
 		return nil
 	}
 	r := newRenderData(rt, m, b)
-	return r.makeRenderers(e)
+	if m == nil {
+		return r.makeRenderers(e)
+	}
+	res := renderers([]renderer{})
+	toRender := r.validateRequiredParams(e)
+	for i := range toRender {
+		switch toRender[i].Name {
+		case "ipxe-mac", "pxelinux-mac":
+			for _, mac := range m.HardwareAddrs {
+				r.Machine.currMac = mac
+				res = r.addRenderer(e, &toRender[i], res)
+			}
+		default:
+			res = r.addRenderer(e, &toRender[i], res)
+		}
+	}
+	return res
 }
 
 func (b *BootEnv) AfterSave() {
