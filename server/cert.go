@@ -15,50 +15,47 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"log"
 	"math/big"
 	"net"
 	"os"
+	"strconv"
 	"time"
 )
 
 var (
-	validFor   = 365 * 24 * time.Hour
-	isCA       = false
-	rsaBits    = 2048
-	ecdsaCurve = "P384"
+	validFor = 365 * 24 * time.Hour
 )
 
-func publicKey(priv interface{}) interface{} {
+func publicKey(priv interface{}) (answer interface{}) {
 	switch k := priv.(type) {
 	case *rsa.PrivateKey:
-		return &k.PublicKey
+		answer = &k.PublicKey
 	case *ecdsa.PrivateKey:
-		return &k.PublicKey
-	default:
-		return nil
+		answer = &k.PublicKey
 	}
+	return
 }
 
-func pemBlockForKey(priv interface{}) *pem.Block {
+func pemBlockForKey(priv interface{}) (answer *pem.Block) {
 	switch k := priv.(type) {
 	case *rsa.PrivateKey:
-		return &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k)}
+		answer = &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k)}
 	case *ecdsa.PrivateKey:
 		b, err := x509.MarshalECPrivateKey(k)
 		if err != nil {
 			log.Fatalf("Unable to marshal ECDSA private key: %v\n", err)
 		}
-		return &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
-	default:
-		return nil
+		answer = &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
 	}
+	return
 }
 
-func buildKeys(certFile, keyFile string) {
+func buildKeys(curveOrBits, certFile, keyFile string) error {
 	ips, err := net.InterfaceAddrs()
 	if err != nil {
-		return
+		return err
 	}
 	addrs := []string{"greg.fill.in", "localhost"}
 	for _, ip := range ips {
@@ -70,9 +67,23 @@ func buildKeys(certFile, keyFile string) {
 		addrs = append(addrs, ip.String())
 	}
 
+	rsaBits := 2048
+	ecdsaCurve := "P384"
+	if curveOrBits[0] == 'P' {
+		ecdsaCurve = curveOrBits
+	} else if curveOrBits == "RSA" {
+		ecdsaCurve = "RSA"
+	} else {
+		ecdsaCurve = "RSA"
+		rsaBits, err = strconv.Atoi(curveOrBits)
+		if err != nil {
+			return err
+		}
+	}
+
 	var priv interface{}
 	switch ecdsaCurve {
-	case "":
+	case "RSA":
 		priv, err = rsa.GenerateKey(rand.Reader, rsaBits)
 	case "P224":
 		priv, err = ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
@@ -83,10 +94,10 @@ func buildKeys(certFile, keyFile string) {
 	case "P521":
 		priv, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	default:
-		log.Fatalf("Unrecognized elliptic curve: %q", ecdsaCurve)
+		return fmt.Errorf("Unrecognized elliptic curve: %q", ecdsaCurve)
 	}
 	if err != nil {
-		log.Fatalf("failed to generate private key: %s", err)
+		return fmt.Errorf("failed to generate private key: %s", err)
 	}
 
 	notBefore := time.Now()
@@ -95,7 +106,7 @@ func buildKeys(certFile, keyFile string) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		log.Fatalf("failed to generate serial number: %s", err)
+		return fmt.Errorf("failed to generate serial number: %s", err)
 	}
 
 	template := x509.Certificate{
@@ -119,28 +130,23 @@ func buildKeys(certFile, keyFile string) {
 		}
 	}
 
-	if isCA {
-		template.IsCA = true
-		template.KeyUsage |= x509.KeyUsageCertSign
-	}
-
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
 	if err != nil {
-		log.Fatalf("Failed to create certificate: %s", err)
+		return fmt.Errorf("Failed to create certificate: %s", err)
 	}
 
 	certOut, err := os.Create(certFile)
 	if err != nil {
-		log.Fatalf("failed to open cert.pem for writing: %s", err)
+		return fmt.Errorf("failed to open cert.pem for writing: %s", err)
 	}
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	certOut.Close()
 
 	keyOut, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		log.Print("failed to open key.pem for writing:", err)
-		return
+		return fmt.Errorf("failed to open key.pem for writing: %s", err)
 	}
 	pem.Encode(keyOut, pemBlockForKey(priv))
 	keyOut.Close()
+	return nil
 }
