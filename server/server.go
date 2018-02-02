@@ -93,6 +93,7 @@ type ProgOpts struct {
 	TlsCertFile   string `long:"tls-cert" description:"The TLS Cert File" default:"server.crt"`
 	UseOldCiphers bool   `long:"use-old-ciphers" description:"Use Original Less Secure Cipher List"`
 	DrpId         string `long:"drp-id" description:"The id of this Digital Rebar Provision instance" default:""`
+	CurveOrBits   string `long:"cert-type" description:"Type of cert to generate. values are: P224, P256, P384, P521, RSA, or <number of RSA bits>" default:"P384"`
 
 	BaseTokenSecret     string `long:"base-token-secret" description:"Auth Token secret to allow revocation of all tokens" default:""`
 	SystemGrantorSecret string `long:"system-grantor-secret" description:"Auth Token secret to allow revocation of all Machine tokens" default:""`
@@ -251,7 +252,9 @@ func Server(c_opts *ProgOpts) {
 	}
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
-		buildKeys(c_opts.TlsCertFile, c_opts.TlsKeyFile)
+		if err = buildKeys(c_opts.CurveOrBits, c_opts.TlsCertFile, c_opts.TlsKeyFile); err != nil {
+			localLogger.Fatalf("Error building certs: %v", err)
+		}
 	}
 
 	if !c_opts.DisableTftpServer {
