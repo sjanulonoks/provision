@@ -76,7 +76,7 @@ func TestServerArgs(t *testing.T) {
 	badArgTest(t, "Error creating required directory", "--base-root", tmpDir, "--saas-content-root", existingFile)
 
 	badArgTest(t, "Unable to create DataStack: Failed to open local content: Unknown schema type:", "--base-root", tmpDir, "--local-content", existingFile)
-	badArgTest(t, "Unable to create DataStack: Failed to open default content: Unknown schema type:", "--base-root", tmpDir, "--default-content", existingFile)
+	badArgTest(t, "Unable to create DataStack: Failed to open default content: Unknown schema type:", "--base-root", tmpDir, "--local-content", "", "--default-content", existingFile)
 	badArgTest(t, "Try one of `trace`,`debug`,`info`,`warn`,`error`,`fatal`,`panic`", "--base-root", tmpDir, "--default-content", "", "--local-content", "", "--log-level", "cow")
 
 	badArgTest(t, "Error building certs: failed to open key.pem for writing: open", "--base-root", tmpDir, "--default-content", "", "--local-content", "", "--drp-id", "gregfield", "--tls-cert", certFile, "--tls-key", tmpDir)
