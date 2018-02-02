@@ -62,170 +62,23 @@ func (f *Frontend) buildNewStore(content *models.Content) (newStore store.Store,
 		return
 	}
 
-	if md, ok := newStore.(store.MetaSaver); ok {
-		data := map[string]string{
-			"Name":        content.Meta.Name,
-			"Source":      content.Meta.Source,
-			"Description": content.Meta.Description,
-			"Version":     content.Meta.Version,
-			"Type":        "dynamic",
-		}
-		md.SetMetaData(data)
-	}
-
-	for prefix, objs := range content.Sections {
-		var sub store.Store
-		sub, err = newStore.MakeSub(prefix)
-		if err != nil {
-			return
-		}
-
-		for k, obj := range objs {
-			err = sub.Save(k, obj)
-			if err != nil {
-				return
-			}
-		}
-	}
-
+	content.Meta.Type = "dynamic"
+	err = content.ToStore(newStore)
 	return
 }
 
 func buildSummary(st store.Store) *models.ContentSummary {
-	mst, ok := st.(store.MetaSaver)
-	if !ok {
-		return nil
-	}
 	cs := &models.ContentSummary{}
-	cs.Fill()
-	metaData := mst.MetaData()
-
-	cs.Meta.Name = metaData["Name"]
-	cs.Meta.Source = metaData["Source"]
-	cs.Meta.Description = metaData["Description"]
-	cs.Meta.Version = metaData["Version"]
-	cs.Meta.Writable = false
-	cs.Meta.Overwritable = false
-	if val, ok := metaData["Type"]; ok {
-		cs.Meta.Type = val
-		if val == "default" {
-			cs.Meta.Overwritable = true
-		}
-	} else {
-		cs.Meta.Type = "dynamic"
-	}
-	if cs.Meta.Name == "BackingStore" {
-		cs.Meta.Type = "writable"
-		cs.Meta.Writable = true
-	} else if cs.Meta.Name == "LocalStore" {
-		cs.Meta.Type = "local"
-		cs.Meta.Overwritable = true
-	} else if cs.Meta.Name == "BasicStore" {
-		cs.Meta.Type = "basic"
-		cs.Meta.Overwritable = true
-	} else if cs.Meta.Name == "DefaultStore" {
-		cs.Meta.Type = "default"
-		cs.Meta.Overwritable = true
-	}
-	subs := mst.Subs()
-	for k, sub := range subs {
-		keys, err := sub.Keys()
-		if err != nil {
-			continue
-		}
-		cs.Counts[k] = len(keys)
-	}
-
+	cs.FromStore(st)
 	return cs
 }
 
 func (f *Frontend) buildContent(st store.Store) (*models.Content, *models.Error) {
 	content := &models.Content{}
-
-	var md map[string]string
-	mst, ok := st.(store.MetaSaver)
-	if ok {
-		md = mst.MetaData()
-	} else {
-		md = map[string]string{}
+	err := content.FromStore(st)
+	if err != nil {
+		return nil, models.NewError("ServerError", http.StatusInternalServerError, err.Error())
 	}
-
-	// Copy in MetaData
-	if val, ok := md["Name"]; ok {
-		content.Meta.Name = val
-	} else {
-		content.Meta.Name = "Unknown"
-	}
-	if val, ok := md["Source"]; ok {
-		content.Meta.Source = val
-	} else {
-		content.Meta.Source = "Unknown"
-	}
-	if val, ok := md["Description"]; ok {
-		content.Meta.Description = val
-	} else {
-		content.Meta.Description = "Unknown"
-	}
-	if val, ok := md["Version"]; ok {
-		content.Meta.Version = val
-	} else {
-		content.Meta.Version = "Unknown"
-	}
-
-	content.Meta.Writable = false
-	content.Meta.Overwritable = false
-	if val, ok := md["Type"]; ok {
-		content.Meta.Type = val
-		if val == "default" {
-			content.Meta.Overwritable = true
-		}
-	} else {
-		content.Meta.Type = "dynamic"
-	}
-
-	if content.Meta.Name == "BackingStore" {
-		content.Meta.Type = "writable"
-		content.Meta.Writable = true
-	} else if content.Meta.Name == "LocalStore" {
-		content.Meta.Type = "local"
-		content.Meta.Overwritable = true
-	} else if content.Meta.Name == "BasicStore" {
-		content.Meta.Type = "basic"
-		content.Meta.Overwritable = true
-	} else if content.Meta.Name == "DefaultStore" {
-		content.Meta.Type = "default"
-		content.Meta.Overwritable = true
-	}
-
-	// Walk subs to build content sets
-	content.Sections = models.Sections{}
-	for prefix, sub := range st.Subs() {
-		_, err := models.New(prefix)
-		if err != nil {
-			berr := models.NewError("ValidationError", http.StatusUnprocessableEntity, err.Error())
-			return nil, berr
-		}
-
-		keys, err := sub.Keys()
-		if err != nil {
-			berr := models.NewError("ServerError", http.StatusInternalServerError, err.Error())
-			return nil, berr
-		}
-		objs := make(models.Section, 0)
-		for _, k := range keys {
-			// This is protected by the earlier check
-			v, _ := models.New(prefix)
-			err := sub.Load(k, &v)
-			if err != nil {
-				berr := models.NewError("ServerError", http.StatusInternalServerError, err.Error())
-				return nil, berr
-			}
-			objs[k] = v
-		}
-
-		content.Sections[prefix] = objs
-	}
-	content.Fill()
 	return content, nil
 }
 
@@ -355,14 +208,13 @@ func (f *Frontend) InitContentApi() {
 	//       507: ErrorResponse
 	f.ApiGroup.POST("/contents",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "contents", "create", "*") {
-				return
-			}
 			content := &models.Content{}
 			if !assureDecode(c, content) {
 				return
 			}
-
+			if !f.assureAuth(c, "contents", "create", content.AuthKey()) {
+				return
+			}
 			name := content.Meta.Name
 			rt := f.rt(c)
 			res := &models.Error{
@@ -423,11 +275,11 @@ func (f *Frontend) InitContentApi() {
 	//       507: ErrorResponse
 	f.ApiGroup.PUT("/contents/:name",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "contents", "update", "*") {
-				return
-			}
 			content := &models.Content{}
 			if !assureDecode(c, content) {
+				return
+			}
+			if !f.assureAuth(c, "contents", "update", content.AuthKey()) {
 				return
 			}
 			name := c.Param(`name`)

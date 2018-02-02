@@ -55,7 +55,7 @@ func (f *Frontend) filterFunction(emap []string, claim interface{}, e *models.Ev
 
 	// Make sure we are authorized to see this event.
 	if matched {
-		matched = f.assureAuthWithClaim(nil, claim, e.Type, e.Action, e.Key)
+		matched = f.assureClaimMatch(nil, claim, e.Type, e.Action, e.Key)
 	}
 	return matched
 }

@@ -563,15 +563,25 @@ func (f *Frontend) getAuthUser(c *gin.Context) string {
 }
 
 //
-// THIS MUST NOT BE CALLED UNDER LOCKS!
+// THIS CAN BE CALLED UNDER LOCKS, but will not validate the secrets.
 //
-func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope, action, specific string) bool {
+func (f *Frontend) assureClaimMatch(c *gin.Context, claim interface{}, scope, action, specific string) bool {
 	drpClaim, ok := claim.(*backend.DrpCustomClaims)
 	if !ok {
 		f.Logger.Warnf("Request with bad claims")
 		return false
 	}
 	if !drpClaim.Match(scope, action, specific) {
+		return false
+	}
+	return true
+}
+
+//
+// THIS MUST NOT BE CALLED UNDER LOCKS!
+//
+func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope, action, specific string) bool {
+	if !f.assureClaimMatch(c, claim, scope, action, specific) {
 		return false
 	}
 
@@ -582,6 +592,7 @@ func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope,
 	machineRef := &backend.Machine{}
 	userRT := f.rt(c, userRef.Locks("get")...)
 	machineRT := f.rt(c, machineRef.Locks("get")...)
+	drpClaim := claim.(*backend.DrpCustomClaims)
 	if drpClaim.HasUserId() {
 		userRT.Do(func(d backend.Stores) {
 			if obj := userRT.Find("users", drpClaim.UserId()); obj != nil {
