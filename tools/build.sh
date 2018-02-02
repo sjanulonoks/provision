@@ -91,13 +91,19 @@ for build in ${builds}; do
       binpath="bin/$os/$arch"
     fi
 
+    if [[ "$os" == "windows" ]] ; then
+        ext=".exe"
+    else
+        ext=""
+    fi
+
     export GOOS="$os" GOARCH="$arch" 
     echo "Building binaries for ${arch}${ver_part} ${os} (staging to: '$BLD/$binpath')"
     mkdir -p "$binpath"
-    go build -ldflags "$VERFLAGS" -o "$binpath/drpcli" cmds/drpcli/drpcli.go
-    go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision" cmds/dr-provision/dr-provision.go
+    go build -ldflags "$VERFLAGS" -o "$binpath/drpcli${ext}" cmds/drpcli/drpcli.go
+    go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision${ext}" cmds/dr-provision/dr-provision.go
     go generate cmds/incrementer/incrementer.go
-    go build -ldflags "$VERFLAGS" -o "$binpath/incrementer" cmds/incrementer/incrementer.go cmds/incrementer/content.go
+    go build -ldflags "$VERFLAGS" -o "$binpath/incrementer${ext}" cmds/incrementer/incrementer.go cmds/incrementer/content.go
   )
 done
 
