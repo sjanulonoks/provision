@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/logger"
@@ -15,14 +16,61 @@ import (
 )
 
 type RequestTracker struct {
+	*sync.Mutex
 	logger.Logger
-	dt    *DataTracker
-	locks []string
-	d     Stores
+	dt        *DataTracker
+	locks     []string
+	d         Stores
+	toPublish []func()
+}
+
+func (rt *RequestTracker) unlocker(u func()) {
+	rt.Lock()
+	u()
+	rt.d = nil
+	for _, f := range rt.toPublish {
+		f()
+	}
+	rt.toPublish = []func(){}
+	rt.Unlock()
 }
 
 func (p *DataTracker) Request(l logger.Logger, locks ...string) *RequestTracker {
-	return &RequestTracker{dt: p, Logger: l, locks: locks}
+	return &RequestTracker{Mutex: &sync.Mutex{}, dt: p, Logger: l, locks: locks, toPublish: []func(){}}
+}
+
+func (rt *RequestTracker) PublishEvent(e *models.Event) error {
+	rt.Lock()
+	defer rt.Unlock()
+	if rt.dt.publishers == nil {
+		return nil
+	}
+	if rt.d == nil {
+		return rt.dt.publishers.publishEvent(e)
+	}
+	rt.toPublish = append(rt.toPublish, func() { rt.dt.publishers.publishEvent(e) })
+	return nil
+}
+
+func (rt *RequestTracker) Publish(prefix, action, key string, ref interface{}) error {
+	rt.Lock()
+	defer rt.Unlock()
+	if rt.dt.publishers == nil {
+		return nil
+	}
+	if rt.d == nil {
+		return rt.dt.publishers.publish(prefix, action, key, ref)
+
+	}
+	var toSend interface{}
+	switch m := ref.(type) {
+	case models.Model:
+		toSend = models.Clone(m)
+	default:
+		toSend = ref
+	}
+	rt.toPublish = append(rt.toPublish, func() { rt.dt.publishers.publish(prefix, action, key, toSend) })
+	return nil
 }
 
 func (rt *RequestTracker) Find(prefix, key string) models.Model {
@@ -47,16 +95,20 @@ func (rt *RequestTracker) Index(name string) *index.Index {
 }
 
 func (rt *RequestTracker) Do(thunk func(Stores)) {
+	rt.Lock()
 	d, unlocker := rt.dt.lockEnts(rt.locks...)
 	rt.d = d
-	defer unlocker()
+	rt.Unlock()
+	defer rt.unlocker(unlocker)
 	thunk(d)
 }
 
 func (rt *RequestTracker) AllLocked(thunk func(Stores)) {
+	rt.Lock()
 	d, unlocker := rt.dt.lockAll()
 	rt.d = d
-	defer unlocker()
+	rt.Unlock()
+	defer rt.unlocker(unlocker)
 	thunk(d)
 }
 
@@ -125,7 +177,7 @@ func (rt *RequestTracker) Create(obj models.Model) (saved bool, err error) {
 		ref.(validator).clearRT()
 		idx.Add(ref)
 
-		rt.dt.Publish(prefix, "create", key, ref)
+		rt.Publish(prefix, "create", key, ref)
 	}
 
 	return saved, err
@@ -146,7 +198,7 @@ func (rt *RequestTracker) Remove(obj models.Model) (removed bool, err error) {
 	removed, err = store.Remove(backend, item.(store.KeySaver))
 	if removed {
 		idx.Remove(item)
-		rt.dt.Publish(prefix, "delete", key, item)
+		rt.Publish(prefix, "delete", key, item)
 	}
 	return removed, err
 }
@@ -218,7 +270,7 @@ func (rt *RequestTracker) Patch(obj models.Model, key string, patch jsonpatch2.P
 	toSave.(validator).clearRT()
 	if saved {
 		idx.Add(toSave)
-		rt.dt.Publish(prefix, "update", key, toSave)
+		rt.Publish(prefix, "update", key, toSave)
 	}
 	return toSave, err
 }
@@ -246,7 +298,7 @@ func (rt *RequestTracker) Update(obj models.Model) (saved bool, err error) {
 	ref.(validator).clearRT()
 	if saved {
 		idx.Add(ref)
-		rt.dt.Publish(prefix, "update", key, ref)
+		rt.Publish(prefix, "update", key, ref)
 	}
 	return saved, err
 }
@@ -265,7 +317,7 @@ func (rt *RequestTracker) Save(obj models.Model) (saved bool, err error) {
 	ref.(validator).clearRT()
 	if saved {
 		idx.Add(ref)
-		rt.dt.Publish(prefix, "save", key, ref)
+		rt.Publish(prefix, "save", key, ref)
 	}
 	return saved, err
 }

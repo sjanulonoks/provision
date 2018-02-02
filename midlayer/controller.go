@@ -47,6 +47,10 @@ type PluginController struct {
 	Actions            *Actions
 }
 
+func (pc *PluginController) Request(locks ...string) *backend.RequestTracker {
+	return pc.dt.Request(pc.Logger, locks...)
+}
+
 func InitPluginController(pluginDir, pluginCommDir string, dt *backend.DataTracker, pubs *backend.Publishers) (pc *PluginController, err error) {
 	dt.Logger.Debugf("Starting Plugin Controller\n")
 	pc = &PluginController{
@@ -72,7 +76,7 @@ func InitPluginController(pluginDir, pluginCommDir string, dt *backend.DataTrack
 			case event := <-pc.events:
 				pc.lock.Lock()
 				ref := &backend.Plugin{}
-				rt := pc.dt.Request(pc.Logger, ref.Locks("get")...)
+				rt := pc.Request(ref.Locks("get")...)
 				rt.Do(func(d backend.Stores) {
 					ref2 := rt.Find(ref.Prefix(), event.Key)
 					switch event.Action {
@@ -90,7 +94,7 @@ func InitPluginController(pluginDir, pluginCommDir string, dt *backend.DataTrack
 						}
 					case "delete":
 						rt.Debugf("handling plugin delete:", event)
-						pc.stopPlugin(event.Object.(*backend.Plugin).Name)
+						pc.stopPlugin(rt, event.Object.(*models.Plugin).Name)
 					default:
 						rt.Infof("internal event:", event)
 					}
@@ -127,13 +131,13 @@ func (pc *PluginController) StartController(apiGroup *gin.RouterGroup) error {
 	pc.Debugf("Starting Start Plugin Controller:\n")
 
 	apiGroup.Any("/plugin-apis/:plugin/*path", ReverseProxy(pc, pc.pluginCommDir))
-
-	err := pc.walkPluginDir()
+	rt := pc.Request()
+	err := pc.walkPluginDir(rt)
 	pc.Debugf("Finishing Start Plugin Controller: %v\n", err)
 	return err
 }
 
-func (pc *PluginController) walkPluginDir() error {
+func (pc *PluginController) walkPluginDir(rt *backend.RequestTracker) error {
 	pc.Tracef("walkPlugDir: started\n")
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
@@ -145,7 +149,7 @@ func (pc *PluginController) walkPluginDir() error {
 	}
 	for _, f := range files {
 		pc.Debugf("Walk plugin importing: %s\n", f.Name())
-		err = pc.importPluginProvider(f.Name())
+		err = pc.importPluginProvider(rt, f.Name())
 		if err != nil {
 			pc.Tracef("walkPlugDir: importing %s error: %v\n", f.Name(), err)
 		}
@@ -158,7 +162,7 @@ func (pc *PluginController) walkPlugins(provider string) (err error) {
 	pc.Tracef("walkPlugins: started\n")
 	// Walk all plugin objects from dt.
 	ref := &backend.Plugin{}
-	rt := pc.dt.Request(pc.Logger, ref.Locks("get")...)
+	rt := pc.Request(ref.Locks("get")...)
 	rt.Do(func(d backend.Stores) {
 		var idx *index.Index
 		idx, err = index.All([]index.Filter{index.Native()}...)(&d(ref.Prefix()).Index)
@@ -179,10 +183,11 @@ func (pc *PluginController) walkPlugins(provider string) (err error) {
 }
 
 func (pc *PluginController) Shutdown(ctx context.Context) error {
+	rt := pc.Request()
 	pc.Debugf("Stopping plugin controller\n")
 	for _, rp := range pc.runningPlugins {
 		pc.Debugf("Stopping plugin: %s\n", rp.Plugin.Name)
-		pc.stopPlugin(rp.Plugin.Name)
+		pc.stopPlugin(rt, rp.Plugin.Name)
 	}
 	pc.Debugf("Stopping plugin gofuncs\n")
 	pc.done <- true
@@ -322,7 +327,7 @@ func (pc *PluginController) startPlugin(rt *backend.RequestTracker, plugin *back
 			plugin.PluginErrors = errors
 			rt.Update(plugin)
 		}
-		pc.publishers.Publish("plugin", "started", plugin.Name, plugin)
+		rt.Publish("plugin", "started", plugin.Name, plugin)
 		pc.Infof("Starting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
 	} else {
 		pc.Errorf("Starting plugin: %s(%s) missing provider\n", plugin.Name, plugin.Provider)
@@ -333,33 +338,33 @@ func (pc *PluginController) startPlugin(rt *backend.RequestTracker, plugin *back
 	}
 }
 
-func (pc *PluginController) stopPlugin(pluginName string) {
+func (pc *PluginController) stopPlugin(rt *backend.RequestTracker, pluginName string) {
 	rp, ok := pc.runningPlugins[pluginName]
 	if ok {
 		plugin := rp.Plugin
-		pc.Infof("Stopping plugin: %s(%s)\n", plugin.Name, plugin.Provider)
+		rt.Infof("Stopping plugin: %s(%s)\n", plugin.Name, plugin.Provider)
 		delete(pc.runningPlugins, plugin.Name)
 
 		if rp.Provider.HasPublish {
-			pc.Debugf("Remove publisher: %s(%s)\n", plugin.Name, plugin.Provider)
+			rt.Debugf("Remove publisher: %s(%s)\n", plugin.Name, plugin.Provider)
 			pc.publishers.Remove(rp.Client)
 		}
 		for _, aa := range rp.Provider.AvailableActions {
-			pc.Debugf("Remove actions: %s(%s,%s)\n", plugin.Name, plugin.Provider, aa.Command)
+			rt.Debugf("Remove actions: %s(%s,%s)\n", plugin.Name, plugin.Provider, aa.Command)
 			pc.Actions.Remove(aa, rp)
 		}
-		pc.Debugf("Drain executable: %s(%s)\n", plugin.Name, plugin.Provider)
+		rt.Debugf("Drain executable: %s(%s)\n", plugin.Name, plugin.Provider)
 		rp.Client.Unload()
-		pc.Debugf("Stop executable: %s(%s)\n", plugin.Name, plugin.Provider)
+		rt.Debugf("Stop executable: %s(%s)\n", plugin.Name, plugin.Provider)
 		rp.Client.Stop()
-		pc.Infof("Stopping plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
-		pc.publishers.Publish("plugin", "stopped", plugin.Name, plugin)
+		rt.Infof("Stopping plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
+		rt.Publish("plugin", "stopped", plugin.Name, plugin)
 	}
 }
 
 func (pc *PluginController) restartPlugin(rt *backend.RequestTracker, plugin *backend.Plugin) {
 	rt.Infof("Restarting plugin: %s(%s)\n", plugin.Name, plugin.Provider)
-	pc.stopPlugin(plugin.Name)
+	pc.stopPlugin(rt, plugin.Name)
 	pc.startPlugin(rt, plugin)
 	rt.Infof("Restarting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
 }
@@ -432,7 +437,7 @@ func forceParamRemoval(d *DataStack, l store.Store) error {
 }
 
 // Try to add to available - Must lock before calling
-func (pc *PluginController) importPluginProvider(provider string) error {
+func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, provider string) error {
 	pc.Infof("Importing plugin provider: %s\n", provider)
 	out, err := exec.Command(pc.pluginDir+"/"+provider, "define").Output()
 	if err != nil {
@@ -486,7 +491,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 				} else {
 					var err error
 					pc.Tracef("Replacing new datastore for: %s\n", provider)
-					rt := pc.dt.Request(pc.Logger)
+					rt := pc.Request()
 					rt.AllLocked(func(d backend.Stores) {
 						ds := pc.dt.Backend.(*DataStack)
 						nbs, hard, _ := ds.AddReplacePlugin(cName, ns, pc.dt.Logger, forceParamRemoval)
@@ -510,7 +515,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 					for _, aa := range pp.AvailableActions {
 						aa.Provider = pp.Name
 					}
-					pc.publishers.Publish("plugin_provider", "create", pp.Name, pp)
+					rt.Publish("plugin_provider", "create", pp.Name, pp)
 					return pc.walkPlugins(provider)
 				} else {
 					pc.Infof("Already exists plugin provider: %s\n", pp.Name)
@@ -522,7 +527,7 @@ func (pc *PluginController) importPluginProvider(provider string) error {
 }
 
 // Try to stop using plugins and remove available - Must lock controller lock before calling
-func (pc *PluginController) removePluginProvider(provider string) error {
+func (pc *PluginController) removePluginProvider(rt *backend.RequestTracker, provider string) error {
 	pc.Tracef("removePluginProvider Started: %s\n", provider)
 	var name string
 	for _, pp := range pc.AvailableProviders {
@@ -539,10 +544,10 @@ func (pc *PluginController) removePluginProvider(provider string) error {
 			}
 		}
 		ref := &backend.Plugin{}
-		rt := pc.dt.Request(pc.dt.Logger, ref.Locks("get")...)
+		rt := pc.Request(ref.Locks("get")...)
 		rt.Do(func(d backend.Stores) {
 			for _, p := range remove {
-				pc.stopPlugin(p.Name)
+				pc.stopPlugin(rt, p.Name)
 				ref2 := rt.Find(ref.Prefix(), p.Name)
 				myPP := ref2.(*backend.Plugin)
 				myPP.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", provider)}
@@ -551,7 +556,7 @@ func (pc *PluginController) removePluginProvider(provider string) error {
 		})
 
 		pc.Infof("Removing plugin provider: %s\n", name)
-		pc.publishers.Publish("plugin_provider", "delete", name, pc.AvailableProviders[name])
+		rt.Publish("plugin_provider", "delete", name, pc.AvailableProviders[name])
 
 		// Remove the plugin content
 		rt.AllLocked(func(d backend.Stores) {
@@ -642,10 +647,11 @@ func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) 
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
 	// If it is here, remove it.
-	pc.removePluginProvider(name)
+	rt := pc.Request()
+	pc.removePluginProvider(rt, name)
 
 	var berr *models.Error
-	err = pc.importPluginProvider(name)
+	err = pc.importPluginProvider(rt, name)
 	if err != nil {
 		berr = models.NewError("API ERROR", http.StatusBadRequest,
 			fmt.Sprintf("Import plugin failed %s: %v", name, err))
@@ -660,5 +666,6 @@ func (pc *PluginController) RemovePlugin(name string) error {
 	}
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
-	return pc.removePluginProvider(name)
+	rt := pc.Request()
+	return pc.removePluginProvider(rt, name)
 }
