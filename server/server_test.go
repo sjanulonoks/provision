@@ -2,13 +2,16 @@ package server
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/digitalrebar/provision"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -29,6 +32,58 @@ func generateArgs(args []string) *ProgOpts {
 	}
 
 	return &c_opts
+}
+
+func badArgTest(t *testing.T, errString string, args ...string) {
+	t.Helper()
+	c_opts := generateArgs(args)
+	localLogger := log.New(os.Stderr, "dr-provision", log.LstdFlags|log.Lmicroseconds|log.LUTC)
+	if answer := server(localLogger, c_opts); !strings.HasPrefix(answer, errString) {
+		t.Errorf("Failed to get error string: %s: Got: %s\n", errString, answer)
+	}
+}
+
+func TestServerArgs(t *testing.T) {
+	badArgTest(t, fmt.Sprintf("Version: %s", provision.RS_VERSION), "--version")
+
+	certFile := fmt.Sprintf("/%s/certfile.pem", tmpDir)
+	existingFile := fmt.Sprintf("/%s/placeholder.txt", tmpDir)
+	f, err := os.OpenFile(existingFile, os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	if err := f.Close(); err != nil {
+		t.Errorf(err.Error())
+	}
+
+	f, err = os.OpenFile("/tmp/greg.txt", os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	if err := f.Close(); err != nil {
+		t.Errorf(err.Error())
+	}
+
+	badArgTest(t, "Error creating required directory", "--base-root", existingFile)
+	badArgTest(t, "PluginCommRoot Must be less than 70 characters", "--base-root", tmpDir, "--plugin-comm-root", "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")
+	badArgTest(t, "Error creating required directory", "--base-root", tmpDir, "--file-root", existingFile)
+	badArgTest(t, "Error creating required directory", "--base-root", tmpDir, "--replace-root", existingFile)
+	badArgTest(t, "Error creating required directory", "--base-root", tmpDir, "--plugin-root", existingFile)
+	badArgTest(t, "Error creating required directory", "--base-root", tmpDir, "--plugin-comm-root", "/tmp/greg.txt")
+	badArgTest(t, "Error creating required directory", "--base-root", tmpDir, "--data-root", existingFile)
+	badArgTest(t, "Error creating required directory", "--base-root", tmpDir, "--log-root", existingFile)
+	badArgTest(t, "Error creating required directory", "--base-root", tmpDir, "--local-ui", existingFile)
+	badArgTest(t, "Error creating required directory", "--base-root", tmpDir, "--saas-content-root", existingFile)
+
+	badArgTest(t, "Unable to create DataStack: Failed to open local content: Unknown schema type:", "--base-root", tmpDir, "--local-content", existingFile)
+	badArgTest(t, "Unable to create DataStack: Failed to open default content: Unknown schema type:", "--base-root", tmpDir, "--default-content", existingFile)
+	badArgTest(t, "Try one of `trace`,`debug`,`info`,`warn`,`error`,`fatal`,`panic`", "--base-root", tmpDir, "--default-content", "", "--log-level", "cow")
+
+	badArgTest(t, "Error building certs: failed to open key.pem for writing: open", "--base-root", tmpDir, "--default-content", "", "--drp-id", "gregfield", "--tls-cert", certFile, "--tls-key", tmpDir)
+
+	os.Remove(certFile)
+	os.Remove(existingFile)
+	os.Remove("/tmp/greg.txt")
 }
 
 func TestServer(t *testing.T) {
