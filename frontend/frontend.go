@@ -378,7 +378,7 @@ func NewFrontend(
 	lgr logger.Logger,
 	address string,
 	apiport, provport, dhcpport, binlport int,
-	fileRoot, devUI, UIUrl string,
+	fileRoot, localUI, UIUrl string,
 	authSource AuthSource,
 	pubs *backend.Publishers,
 	drpid string,
@@ -511,9 +511,9 @@ func NewFrontend(
 	}
 
 	// Optionally add a local dev-ui
-	if len(devUI) != 0 {
-		lgr.Infof("DEV: Running UI from %s\n", devUI)
-		mgmtApi.Static("/dev-ui", devUI)
+	if len(localUI) != 0 {
+		lgr.Infof("Running Local UI from %s\n", localUI)
+		mgmtApi.Static("/local-ui", localUI)
 	}
 
 	// UI points to the cloud
