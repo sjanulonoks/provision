@@ -77,8 +77,8 @@ type ProgOpts struct {
 	FileRoot        string `long:"file-root" description:"Root of filesystem we should manage" default:"tftpboot"`
 	ReplaceRoot     string `long:"replace-root" description:"Root of filesystem we should use to replace embedded assets" default:"replace"`
 
-	DevUI          string `long:"dev-ui" description:"Root of UI Pages for Development"`
-	UIUrl          string `long:"ui-url" description:"URL to redirect to UI" default:"https://rackn.github.io/provision-ux"`
+	LocalUI        string `long:"local-ui" description:"Root of Local UI Pages" default:"ux"`
+	UIUrl          string `long:"ui-url" description:"URL to redirect to UI" default:"https://portal.rackn.io"`
 	DhcpInterfaces string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
 	DefaultStage   string `long:"default-stage" description:"The default stage for the nodes" default:"none"`
 	DefaultBootEnv string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"local"`
@@ -144,12 +144,16 @@ func Server(c_opts *ProgOpts) {
 	if strings.IndexRune(c_opts.ReplaceRoot, filepath.Separator) != 0 {
 		c_opts.ReplaceRoot = filepath.Join(c_opts.BaseRoot, c_opts.ReplaceRoot)
 	}
+	if strings.IndexRune(c_opts.LocalUI, filepath.Separator) != 0 {
+		c_opts.LocalUI = filepath.Join(c_opts.BaseRoot, c_opts.LocalUI)
+	}
 	mkdir(c_opts.FileRoot, localLogger)
 	mkdir(c_opts.ReplaceRoot, localLogger)
 	mkdir(c_opts.PluginRoot, localLogger)
 	mkdir(c_opts.PluginCommRoot, localLogger)
 	mkdir(c_opts.DataRoot, localLogger)
 	mkdir(c_opts.LogRoot, localLogger)
+	mkdir(c_opts.LocalUI, localLogger)
 	mkdir(c_opts.SaasContentRoot, localLogger)
 	if EmbeddedAssetsExtractFunc != nil {
 		localLogger.Printf("Extracting Default Assets\n")
@@ -233,7 +237,7 @@ func Server(c_opts *ProgOpts) {
 		c_opts.OurAddress,
 		c_opts.ApiPort, c_opts.StaticPort, c_opts.DhcpPort, c_opts.BinlPort,
 		c_opts.FileRoot,
-		c_opts.DevUI, c_opts.UIUrl, nil, publishers, c_opts.DrpId, pc,
+		c_opts.LocalUI, c_opts.UIUrl, nil, publishers, c_opts.DrpId, pc,
 		c_opts.DisableDHCP, c_opts.DisableTftpServer, c_opts.DisableProvisioner, c_opts.DisableBINL,
 		c_opts.SaasContentRoot)
 	fe.TftpPort = c_opts.TftpPort
