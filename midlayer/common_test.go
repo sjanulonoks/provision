@@ -24,13 +24,13 @@ func makeHandler(dt *backend.DataTracker, proxy bool) *DhcpHandler {
 		port = 4011
 	}
 	res := &DhcpHandler{
-		Logger:    logger.New(nil).Log("dhcp"),
-		ifs:       []string{},
-		port:      port,
-		bk:        dt,
-		strats:    []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
-		pinger:    pinger.Fake(true),
-		proxyOnly: proxy,
+		Logger:   logger.New(nil).Log("dhcp"),
+		ifs:      []string{},
+		port:     port,
+		bk:       dt,
+		strats:   []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
+		pinger:   pinger.Fake(true),
+		binlOnly: proxy,
 	}
 	return res
 }
