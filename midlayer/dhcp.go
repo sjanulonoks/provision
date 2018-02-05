@@ -37,16 +37,18 @@ func MacStrategy(p dhcp.Packet, options dhcp.Options) string {
 // DHCP packet.
 type DhcpRequest struct {
 	logger.Logger
-	idxMap    map[int][]*net.IPNet
-	nameMap   map[int]string
-	srcAddr   net.Addr
-	defaultIP net.IP
-	cm        *ipv4.ControlMessage
-	pkt       dhcp.Packet
-	pktOpts   dhcp.Options
-	pinger    pinger.Pinger
-	handler   *DhcpHandler
-	lPort     int
+	idxMap                map[int][]*net.IPNet
+	nameMap               map[int]string
+	srcAddr               net.Addr
+	defaultIP, nextServer net.IP
+	cm                    *ipv4.ControlMessage
+	pkt                   dhcp.Packet
+	pktOpts, outOpts      dhcp.Options
+	pinger                pinger.Pinger
+	handler               *DhcpHandler
+	lPort                 int
+	duration              time.Duration
+	offerPXE              bool
 }
 
 // xid is a helper function that returns the xid of the request we are
@@ -177,32 +179,95 @@ func (dhr *DhcpRequest) listenOn(testAddr net.IP) bool {
 	return false
 }
 
-// shouldOfferPXE determines whether we should offer a filename and other
-// associated PXE information in our DHCP response.
-func (dhr *DhcpRequest) shouldOfferPXE(lease *backend.Lease) bool {
+// coalesceOptions is responsible for building the options we will
+// reply with, as well as figuring out whether or not we should offer
+// PXE and TFTP file name options in the outgoing packet.
+func (dhr *DhcpRequest) coalesceOptions(l *backend.Lease,
+	s *backend.Subnet,
+	r *backend.Reservation) {
+	dhr.offerPXE = true
+	dhr.outOpts = dhcp.Options{}
+	// Compile and render options from the subnet and the reservation first.
+	srcOpts := map[int]string{}
+	for c, v := range dhr.pktOpts {
+		opt := &models.DhcpOption{Code: byte(c)}
+		opt.FillFromPacketOpt(v)
+		srcOpts[int(c)] = opt.Value
+	}
+	if r != nil {
+		for _, opt := range r.Options {
+			if opt.Value == "" {
+				if dhcp.OptionCode(opt.Code) != dhcp.OptionBootFileName {
+					dhr.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
+					continue
+				}
+			}
+			c, v, err := opt.RenderToDHCP(srcOpts)
+			if err != nil {
+				dhr.Errorf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
+				continue
+			}
+			dhr.outOpts[dhcp.OptionCode(c)] = v
+		}
+	}
+	if s != nil {
+		for _, opt := range s.Options {
+			if dhr.outOpts[dhcp.OptionCode(opt.Code)] != nil {
+				continue
+			}
+			if opt.Value == "" {
+				dhr.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
+				continue
+			}
+			c, v, err := opt.RenderToDHCP(srcOpts)
+			if err != nil {
+				dhr.Errorf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
+				continue
+			}
+			dhr.outOpts[dhcp.OptionCode(c)] = v
+		}
+		if s.NextServer.IsGlobalUnicast() {
+			dhr.nextServer = s.NextServer
+		}
+	}
+	if r != nil && r.NextServer.IsGlobalUnicast() {
+		dhr.nextServer = r.NextServer
+	}
 	// If the incoming packet does not want a filename, it does not want
 	// to PXE boot.
 	if vals, ok := dhr.pktOpts[dhcp.OptionParameterRequestList]; !ok ||
 		bytes.IndexByte(vals, byte(dhcp.OptionBootFileName)) == -1 {
-		return false
+		dhr.offerPXE = false
+		return
 	}
 	// If the incoming packet does not have a PXEClient vendor class identifier,
 	// it does not want to PXE boot.
 	if val, ok := dhr.pktOpts[dhcp.OptionVendorClassIdentifier]; !ok ||
 		!strings.HasPrefix(string(val), "PXEClient") {
-		return false
+		dhr.offerPXE = false
+		return
+	}
+	// If we have a dhcp.OptionBootFileName set to "", a reservation told us
+	// to not PXE boot.
+	if val, ok := dhr.pktOpts[dhcp.OptionBootFileName]; ok && len(val) == 0 {
+		dhr.offerPXE = false
+		return
+	}
+	// If the subnet is unmanaged, we never want machines to PXE boot from it.
+	if s != nil && s.Unmanaged {
+		dhr.offerPXE = false
+		return
 	}
 	// Otherwise, assume we will want to offer PXE information unless
 	// we can tie the incoming packet to a machine we know about and we
 	// can determine that we should not attempt to PXE boot it.
-	shouldOffer := true
 	rt := dhr.Request("machines", "bootenvs")
 	var machine *backend.Machine
 	var bootEnv *backend.BootEnv
 	rt.Do(func(d backend.Stores) {
 		machine = rt.MachineForMac(dhr.pkt.CHAddr().String())
 		if machine == nil {
-			m2 := rt.FindByIndex("machines", machine.Indexes()["Address"], lease.Addr.String())
+			m2 := rt.FindByIndex("machines", machine.Indexes()["Address"], l.Addr.String())
 			if m2 != nil {
 				machine = backend.AsMachine(m2)
 			}
@@ -226,39 +291,38 @@ func (dhr *DhcpRequest) shouldOfferPXE(lease *backend.Lease) bool {
 		if !bootEnv.NetBoot() {
 			// We found a machine, and the bootenv it is set to does not
 			// want to net boot.  We should not let it PXE boot from us.
-			shouldOffer = false
+			dhr.offerPXE = false
 			return
 		}
-		if lease.Addr.IsUnspecified() {
+		if l.Addr.IsUnspecified() {
 			return
 		}
 		// We want the machine to PXE boot, and we know what address it is
 		// getting.  However, that address may not be one that we are
 		// currently rendering templates for.  Check to see if we need to
 		// update the machine's address of record.
-		machineSave := !machine.Address.Equal(lease.Addr)
+		machineSave := !machine.Address.Equal(l.Addr)
 		others, err := index.All(
 			index.Sort(machine.Indexes()["Address"]),
-			index.Eq(lease.Addr.String()))(rt.Index("machines"))
+			index.Eq(l.Addr.String()))(rt.Index("machines"))
 		if err == nil && others.Count() > 0 {
 			for _, other := range others.Items() {
 				if other.Key() == machine.UUID() {
 					continue
 				}
 				oMachine := backend.AsMachine(other)
-				rt.Warnf("Machine %s also has address %s, which we are handing out to %s", oMachine.UUID(), lease.Addr, machine.UUID())
+				rt.Warnf("Machine %s also has address %s, which we are handing out to %s", oMachine.UUID(), l.Addr, machine.UUID())
 				rt.Warnf("Setting machine %s address to all zeros", oMachine.UUID())
 				oMachine.Address = net.IPv4(0, 0, 0, 0)
 				rt.Save(oMachine)
 			}
 		}
 		if machineSave {
-			rt.Infof("%s: Updating machine %s address from %s to %s", machine.UUID(), machine.Address, lease.Addr)
-			machine.Address = lease.Addr
+			rt.Infof("%s: Updating machine %s address from %s to %s", machine.UUID(), machine.Address, l.Addr)
+			machine.Address = l.Addr
 			rt.Save(machine)
 		}
 	})
-	return shouldOffer
 }
 
 // buildReply is the general purpose function for building the
@@ -266,9 +330,7 @@ func (dhr *DhcpRequest) shouldOfferPXE(lease *backend.Lease) bool {
 func (dhr *DhcpRequest) buildReply(
 	mt dhcp.MessageType,
 	serverID,
-	yAddr net.IP,
-	leaseDuration time.Duration,
-	options dhcp.Options) dhcp.Packet {
+	yAddr net.IP) dhcp.Packet {
 	order := dhr.pktOpts[dhcp.OptionParameterRequestList]
 	toAdd := []dhcp.Option{}
 	var fileName, sName []byte
@@ -283,7 +345,7 @@ func (dhr *DhcpRequest) buildReply(
 	//
 	// THis also appears to be required to make UEFI boot mode work properly on
 	// the Dell T320.
-	for _, opt := range options.SelectOrderOrAll(order) {
+	for _, opt := range dhr.outOpts.SelectOrderOrAll(order) {
 		c, v := opt.Code, opt.Value
 		switch c {
 		case dhcp.OptionBootFileName:
@@ -295,24 +357,46 @@ func (dhr *DhcpRequest) buildReply(
 		}
 	}
 	// Add renew and rebind times based on the expire time.
-	if leaseDuration > 0 {
+	if dhr.duration > 0 {
 		toAdd = append(toAdd,
 			dhcp.Option{
 				Code:  dhcp.OptionRenewalTimeValue,
-				Value: dhcp.OptionsLeaseTime(leaseDuration / 2),
+				Value: dhcp.OptionsLeaseTime(dhr.duration / 2),
 			},
 			dhcp.Option{
 				Code:  dhcp.OptionRebindingTimeValue,
-				Value: dhcp.OptionsLeaseTime(leaseDuration * 3 / 4),
+				Value: dhcp.OptionsLeaseTime(dhr.duration * 3 / 4),
 			},
 		)
 	}
-	res := dhcp.ReplyPacket(dhr.pkt, mt, serverID, yAddr, leaseDuration, toAdd)
-	if fileName != nil {
-		res.SetFile(fileName)
-	}
-	if sName != nil {
-		res.SetSName(sName)
+	res := dhcp.ReplyPacket(dhr.pkt, mt, serverID, yAddr, dhr.duration, toAdd)
+	if dhr.offerPXE {
+		if fileName != nil {
+			res.SetFile(fileName)
+		} else if val, ok := dhr.pktOpts[dhcp.OptionUserClass]; ok && string(val) == "iPXE" {
+			res.SetFile([]byte("default.ipxe"))
+		} else if val, ok := dhr.pktOpts[dhcp.OptionClientArchitecture]; ok {
+			arch := uint(val[0])<<8 + uint(val[1])
+			switch arch {
+			case 0:
+				res.SetFile([]byte("lpxelinux.0"))
+			case 7, 9:
+				res.SetFile([]byte("ipxe.efi"))
+			case 6:
+				dhr.Errorf("dr-provision does not support 32 bit EFI systems")
+			case 10:
+				dhr.Errorf("dr-provision does not support 32 bit ARM EFI systems")
+			case 11:
+				dhr.Errorf("dr-provision does not support 64 bit ARM EFI systems")
+			default:
+				dhr.Errorf("Unknown client arch %d: cannot PXE boot it remotely", arch)
+			}
+		}
+		if sName != nil {
+			res.SetSName(sName)
+		} else {
+			res.SetSName([]byte(serverID.String()))
+		}
 	}
 	return res
 }
@@ -329,74 +413,22 @@ func (dhr *DhcpRequest) buildDhcpOptions(
 	l *backend.Lease,
 	s *backend.Subnet,
 	r *backend.Reservation,
-	serverID net.IP) (dhcp.Options, time.Duration, net.IP) {
+	serverID net.IP) {
 	var leaseTime uint32 = 7200
 	if s != nil {
 		leaseTime = uint32(s.LeaseTimeFor(l.Addr) / time.Second)
 	}
-
-	opts := make(dhcp.Options)
-	options := dhr.pktOpts
-	shouldOfferPXE := dhr.shouldOfferPXE(l)
-	srcOpts := map[int]string{}
-	for c, v := range options {
-		opt := &models.DhcpOption{Code: byte(c)}
-		opt.FillFromPacketOpt(v)
-		srcOpts[int(c)] = opt.Value
+	dhr.nextServer = serverID
+	dhr.duration = time.Duration(leaseTime) * time.Second
+	dhr.coalesceOptions(l, s, r)
+	if !dhr.offerPXE {
+		delete(dhr.outOpts, dhcp.OptionTFTPServerName)
+		delete(dhr.outOpts, dhcp.OptionBootFileName)
+		delete(dhr.outOpts, dhcp.OptionVendorSpecificInformation)
+		delete(dhr.outOpts, dhcp.OptionVendorClassIdentifier)
+	} else if dhr.outOpts[dhcp.OptionBootFileName] != nil && dhr.outOpts[dhcp.OptionTFTPServerName] == nil {
+		dhr.outOpts[dhcp.OptionTFTPServerName] = []byte(dhr.nextServer.String())
 	}
-	nextServer := serverID
-	dur := time.Duration(leaseTime) * time.Second
-	if s != nil {
-		for _, opt := range s.Options {
-			if opt.Value == "" {
-				dhr.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
-				continue
-			}
-			c, v, err := opt.RenderToDHCP(srcOpts)
-			if err != nil {
-				dhr.Errorf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
-				continue
-			}
-			opts[dhcp.OptionCode(c)] = v
-		}
-		if s.NextServer.IsGlobalUnicast() {
-			nextServer = s.NextServer
-		}
-	}
-	if r != nil {
-		for _, opt := range r.Options {
-			if opt.Value == "" {
-				if dhcp.OptionCode(opt.Code) != dhcp.OptionBootFileName {
-					dhr.Debugf("Ignoring DHCP option %d with zero-length value", opt.Code)
-					continue
-				} else {
-					// This special case allows the DHCP server to refuse to PXE
-					// boot a server without needing to create a machine in
-					// dr-provision -- you just need to create a reservation
-					// with a BootFileName option set to a zero-length string.
-					delete(opts, dhcp.OptionBootFileName)
-				}
-			}
-			c, v, err := opt.RenderToDHCP(srcOpts)
-			if err != nil {
-				dhr.Errorf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
-				continue
-			}
-			opts[dhcp.OptionCode(c)] = v
-		}
-		if r.NextServer.IsGlobalUnicast() {
-			nextServer = r.NextServer
-		}
-	}
-	if !shouldOfferPXE || opts[dhcp.OptionBootFileName] == nil {
-		delete(opts, dhcp.OptionTFTPServerName)
-		delete(opts, dhcp.OptionBootFileName)
-		delete(opts, dhcp.OptionVendorSpecificInformation)
-		delete(opts, dhcp.OptionVendorClassIdentifier)
-	} else if opts[dhcp.OptionBootFileName] != nil && opts[dhcp.OptionTFTPServerName] == nil {
-		opts[dhcp.OptionTFTPServerName] = []byte(nextServer.String())
-	}
-	return opts, dur, nextServer
 }
 
 func (dhr *DhcpRequest) Strategy(name string) StrategyFunc {
@@ -475,9 +507,10 @@ func (dhr *DhcpRequest) FakeLease(req net.IP) (*backend.Lease, *backend.Subnet, 
 func (dhr *DhcpRequest) buildBinlOptions(
 	l *backend.Lease,
 	s *backend.Subnet,
-	r *backend.Reservation) (dhcp.Options, bool) {
-	if !dhr.shouldOfferPXE(l) {
-		return nil, false
+	r *backend.Reservation) {
+	dhr.coalesceOptions(l, s, r)
+	if !dhr.offerPXE {
+		return
 	}
 	opts := dhcp.Options{dhcp.OptionVendorClassIdentifier: []byte("PXEClient")}
 	if arch, ok := dhr.pktOpts[dhcp.OptionClientArchitecture]; ok {
@@ -495,45 +528,8 @@ func (dhr *DhcpRequest) buildBinlOptions(
 	if dhr.pktOpts[97] != nil {
 		opts[97] = dhr.pktOpts[97]
 	}
-	srcOpts := map[int]string{}
-	for c, v := range dhr.pktOpts {
-		opt := &models.DhcpOption{Code: byte(c)}
-		opt.FillFromPacketOpt(v)
-		srcOpts[int(c)] = opt.Value
-	}
-	if s != nil {
-		for _, opt := range s.Options {
-			if opt.Code != byte(dhcp.OptionBootFileName) || opt.Value == "" {
-				continue
-			}
-			c, v, err := opt.RenderToDHCP(srcOpts)
-			if err != nil {
-				dhr.Errorf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
-				break
-			}
-			opts[dhcp.OptionCode(c)] = v
-			break
-		}
-	}
-	if r != nil {
-		for _, opt := range r.Options {
-			if opt.Code != byte(dhcp.OptionBootFileName) {
-				continue
-			}
-			if opt.Value == "" {
-				delete(opts, dhcp.OptionBootFileName)
-				break
-			}
-			c, v, err := opt.RenderToDHCP(srcOpts)
-			if err != nil {
-				dhr.Errorf("Failed to render option %v: %v, %v", opt.Code, opt.Value, err)
-				break
-			}
-			opts[dhcp.OptionCode(c)] = v
-			break
-		}
-	}
-	return opts, opts[dhcp.OptionBootFileName] != nil
+	opts[dhcp.OptionBootFileName] = dhr.outOpts[dhcp.OptionBootFileName]
+	dhr.outOpts = opts
 }
 
 // ServeBinl is responsible for handling ProxyDHCP Request messages
@@ -554,13 +550,13 @@ func (dhr *DhcpRequest) ServeBinl(msgType dhcp.MessageType) dhcp.Packet {
 		return nil
 	}
 	lease.Addr = req
-	opts, shouldPXE := dhr.buildBinlOptions(lease, subnet, reservation)
-	if !shouldPXE {
+	serverID := dhr.respondFrom(req)
+	dhr.buildBinlOptions(lease, subnet, reservation)
+	if !dhr.offerPXE {
 		dhr.Infof("%s: BINL directed to not offer PXE response to %s", dhr.xid(), req)
 		return nil
 	}
-	serverID := dhr.respondFrom(req)
-	reply := dhr.buildReply(respType, serverID, req, 0, opts)
+	reply := dhr.buildReply(respType, serverID, req)
 	if serverID.IsGlobalUnicast() {
 		reply.SetSIAddr(serverID)
 	}
@@ -682,10 +678,10 @@ func (dhr *DhcpRequest) ServeDHCP(msgType dhcp.MessageType) dhcp.Packet {
 			return nil
 		}
 		serverID := dhr.respondFrom(lease.Addr)
-		opts, duration, nextServer := dhr.buildDhcpOptions(lease, subnet, reservation, serverID)
-		reply := dhr.buildReply(dhcp.ACK, serverID, lease.Addr, duration, opts)
-		if nextServer.IsGlobalUnicast() {
-			reply.SetSIAddr(nextServer)
+		dhr.buildDhcpOptions(lease, subnet, reservation, serverID)
+		reply := dhr.buildReply(dhcp.ACK, serverID, lease.Addr)
+		if dhr.nextServer.IsGlobalUnicast() {
+			reply.SetSIAddr(dhr.nextServer)
 		}
 		rt.Infof("%s: Request handing out: %s to %s via %s",
 			dhr.xid(),
@@ -755,11 +751,11 @@ func (dhr *DhcpRequest) ServeDHCP(msgType dhcp.MessageType) dhcp.Packet {
 			serverID := dhr.respondFrom(lease.Addr)
 			if lease.Fake() {
 				// This is a proxy DHCP response
-				opts, shouldPXE := dhr.buildBinlOptions(lease, subnet, reservation)
-				if !shouldPXE {
+				dhr.buildBinlOptions(lease, subnet, reservation)
+				if !dhr.offerPXE {
 					return nil
 				}
-				reply := dhr.buildReply(dhcp.Offer, serverID, lease.Addr, 0, opts)
+				reply := dhr.buildReply(dhcp.Offer, serverID, lease.Addr)
 				reply.SetBroadcast(true)
 				if serverID.IsGlobalUnicast() {
 					reply.SetSIAddr(serverID)
@@ -767,11 +763,11 @@ func (dhr *DhcpRequest) ServeDHCP(msgType dhcp.MessageType) dhcp.Packet {
 				dhr.Infof("%s: Sending ProxyDHCP offer to %s via %s", reply.CHAddr(), serverID)
 				return reply
 			}
-			opts, duration, nextServer := dhr.buildDhcpOptions(lease, subnet, reservation, serverID)
-			reply := dhr.buildReply(dhcp.Offer, serverID, lease.Addr, duration, opts)
+			dhr.buildDhcpOptions(lease, subnet, reservation, serverID)
+			reply := dhr.buildReply(dhcp.Offer, serverID, lease.Addr)
 			// Say who we are.
-			if nextServer.IsGlobalUnicast() {
-				reply.SetSIAddr(nextServer)
+			if dhr.nextServer.IsGlobalUnicast() {
+				reply.SetSIAddr(dhr.nextServer)
 			}
 			dhr.Infof("%s: Discovery handing out: %s to %s via %s",
 				dhr.xid(),

@@ -539,8 +539,10 @@ func (s *Subnet) Validate() {
 	if needBCast {
 		s.Options = append(s.Options, models.DhcpOption{byte(dhcp.OptionBroadcastAddress), net.IP(buf).String()})
 	}
-
-	if !s.OnlyReservations {
+	if s.Proxy && s.Unmanaged {
+		s.Errorf("Unmanaged and Proxy cannot both be true")
+	}
+	if !s.OnlyReservations || s.Proxy {
 		validateIP4(s, s.ActiveStart)
 		validateIP4(s, s.ActiveEnd)
 		if !subnet.Contains(s.ActiveStart) {

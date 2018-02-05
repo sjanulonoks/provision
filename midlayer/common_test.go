@@ -83,7 +83,6 @@ func TestMain(m *testing.M) {
 					{Code: 6, Value: "172.17.0.1"},
 					{Code: 15, Value: "sub2.com"},
 					{Code: 28, Value: "172.17.0.255"},
-					{Code: 67, Value: `{{if (eq (index . 77) "iPXE") }}default.ipxe{{else if (eq (index . 93) "0")}}lpxelinux.0{{else}}ipxe.efi{{end}}`},
 				},
 			},
 			&models.Subnet{
@@ -102,7 +101,6 @@ func TestMain(m *testing.M) {
 					{Code: 6, Value: "192.168.124.1"},
 					{Code: 15, Value: "sub1.com"},
 					{Code: 28, Value: "192.168.124.255"},
-					{Code: 67, Value: `{{if (eq (index . 77) "iPXE") }}default.ipxe{{else if (eq (index . 93) "0")}}lpxelinux.0{{else}}ipxe.efi{{end}}`},
 				},
 			},
 			&models.Subnet{
@@ -122,7 +120,6 @@ func TestMain(m *testing.M) {
 					{Code: 6, Value: "10.0.0.1"},
 					{Code: 15, Value: "sub1.com"},
 					{Code: 28, Value: "10.255.255.255"},
-					{Code: 67, Value: `{{if (eq (index . 77) "iPXE") }}default.ipxe{{else if (eq (index . 93) "0")}}lpxelinux.0{{else}}ipxe.efi{{end}}`},
 				},
 			},
 		}
