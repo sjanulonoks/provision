@@ -824,10 +824,10 @@ func (dhr *DhcpRequest) Process() dhcp.Packet {
 		}
 	}
 	var res dhcp.Packet
-	if !dhr.binlOnly() {
-		res = dhr.ServeDHCP(reqType)
-	} else {
+	if dhr.binlOnly() {
 		res = dhr.ServeBinl(reqType)
+	} else {
+		res = dhr.ServeDHCP(reqType)
 	}
 	if res == nil {
 		return nil
