@@ -171,8 +171,8 @@ func (dhr *DhcpRequest) respondFrom(testAddr net.IP) net.IP {
 // listenOn determines whether the passed IP address is one we are
 // listening on.
 func (dhr *DhcpRequest) listenOn(testAddr net.IP) bool {
-	for _, addr := range dhr.listenAddrs() {
-		if addr.Contains(testAddr) {
+	for _, addr := range dhr.listenIPs() {
+		if addr.Equal(testAddr) {
 			return true
 		}
 	}
@@ -182,7 +182,8 @@ func (dhr *DhcpRequest) listenOn(testAddr net.IP) bool {
 // coalesceOptions is responsible for building the options we will
 // reply with, as well as figuring out whether or not we should offer
 // PXE and TFTP file name options in the outgoing packet.
-func (dhr *DhcpRequest) coalesceOptions(l *backend.Lease,
+func (dhr *DhcpRequest) coalesceOptions(
+	l *backend.Lease,
 	s *backend.Subnet,
 	r *backend.Reservation) {
 	dhr.offerPXE = true
@@ -323,6 +324,37 @@ func (dhr *DhcpRequest) coalesceOptions(l *backend.Lease,
 			rt.Save(machine)
 		}
 	})
+	// Fill out default options for BootFileName and TFTPServerName
+	if _, ok := dhr.outOpts[dhcp.OptionBootFileName]; !ok && dhr.offerPXE {
+		fname := ""
+		if val, ok := dhr.pktOpts[dhcp.OptionUserClass]; ok && string(val) == "iPXE" {
+			fname = "default.ipxe"
+		} else if val, ok := dhr.pktOpts[dhcp.OptionClientArchitecture]; ok {
+			arch := uint(val[0])<<8 + uint(val[1])
+			switch arch {
+			case 0:
+				fname = "lpxelinux.0"
+			case 7, 9:
+				fname = "ipxe.efi"
+			case 6:
+				dhr.Errorf("dr-provision does not support 32 bit EFI systems")
+			case 10:
+				dhr.Errorf("dr-provision does not support 32 bit ARM EFI systems")
+			case 11:
+				dhr.Errorf("dr-provision does not support 64 bit ARM EFI systems")
+			default:
+				dhr.Errorf("Unknown client arch %d: cannot PXE boot it remotely", arch)
+			}
+		}
+		if fname == "" {
+			dhr.offerPXE = false
+			return
+		}
+		dhr.outOpts[dhcp.OptionBootFileName] = []byte(fname)
+	}
+	if _, ok := dhr.outOpts[dhcp.OptionTFTPServerName]; !ok && dhr.offerPXE {
+		dhr.outOpts[dhcp.OptionTFTPServerName] = dhr.nextServer
+	}
 }
 
 // buildReply is the general purpose function for building the
@@ -346,12 +378,11 @@ func (dhr *DhcpRequest) buildReply(
 	// THis also appears to be required to make UEFI boot mode work properly on
 	// the Dell T320.
 	for _, opt := range dhr.outOpts.SelectOrderOrAll(order) {
-		c, v := opt.Code, opt.Value
-		switch c {
+		switch opt.Code {
 		case dhcp.OptionBootFileName:
-			fileName = v
+			fileName = opt.Value
 		case dhcp.OptionTFTPServerName:
-			sName = v
+			sName = opt.Value
 		default:
 			toAdd = append(toAdd, opt)
 		}
@@ -370,33 +401,14 @@ func (dhr *DhcpRequest) buildReply(
 		)
 	}
 	res := dhcp.ReplyPacket(dhr.pkt, mt, serverID, yAddr, dhr.duration, toAdd)
-	if dhr.offerPXE {
-		if fileName != nil {
-			res.SetFile(fileName)
-		} else if val, ok := dhr.pktOpts[dhcp.OptionUserClass]; ok && string(val) == "iPXE" {
-			res.SetFile([]byte("default.ipxe"))
-		} else if val, ok := dhr.pktOpts[dhcp.OptionClientArchitecture]; ok {
-			arch := uint(val[0])<<8 + uint(val[1])
-			switch arch {
-			case 0:
-				res.SetFile([]byte("lpxelinux.0"))
-			case 7, 9:
-				res.SetFile([]byte("ipxe.efi"))
-			case 6:
-				dhr.Errorf("dr-provision does not support 32 bit EFI systems")
-			case 10:
-				dhr.Errorf("dr-provision does not support 32 bit ARM EFI systems")
-			case 11:
-				dhr.Errorf("dr-provision does not support 64 bit ARM EFI systems")
-			default:
-				dhr.Errorf("Unknown client arch %d: cannot PXE boot it remotely", arch)
-			}
-		}
-		if sName != nil {
-			res.SetSName(sName)
-		} else {
-			res.SetSName([]byte(serverID.String()))
-		}
+	if dhr.nextServer.IsGlobalUnicast() {
+		res.SetSIAddr(dhr.nextServer)
+	}
+	if fileName != nil {
+		res.SetFile(fileName)
+	}
+	if sName != nil {
+		res.SetSName(sName)
 	}
 	return res
 }
@@ -507,7 +519,9 @@ func (dhr *DhcpRequest) FakeLease(req net.IP) (*backend.Lease, *backend.Subnet, 
 func (dhr *DhcpRequest) buildBinlOptions(
 	l *backend.Lease,
 	s *backend.Subnet,
-	r *backend.Reservation) {
+	r *backend.Reservation,
+	serverID net.IP) {
+	dhr.nextServer = serverID
 	dhr.coalesceOptions(l, s, r)
 	if !dhr.offerPXE {
 		return
@@ -529,6 +543,7 @@ func (dhr *DhcpRequest) buildBinlOptions(
 		opts[97] = dhr.pktOpts[97]
 	}
 	opts[dhcp.OptionBootFileName] = dhr.outOpts[dhcp.OptionBootFileName]
+	opts[dhcp.OptionTFTPServerName] = dhr.outOpts[dhcp.OptionTFTPServerName]
 	dhr.outOpts = opts
 }
 
@@ -551,15 +566,12 @@ func (dhr *DhcpRequest) ServeBinl(msgType dhcp.MessageType) dhcp.Packet {
 	}
 	lease.Addr = req
 	serverID := dhr.respondFrom(req)
-	dhr.buildBinlOptions(lease, subnet, reservation)
+	dhr.buildBinlOptions(lease, subnet, reservation, serverID)
 	if !dhr.offerPXE {
 		dhr.Infof("%s: BINL directed to not offer PXE response to %s", dhr.xid(), req)
 		return nil
 	}
 	reply := dhr.buildReply(respType, serverID, req)
-	if serverID.IsGlobalUnicast() {
-		reply.SetSIAddr(serverID)
-	}
 	return reply
 }
 
@@ -680,9 +692,6 @@ func (dhr *DhcpRequest) ServeDHCP(msgType dhcp.MessageType) dhcp.Packet {
 		serverID := dhr.respondFrom(lease.Addr)
 		dhr.buildDhcpOptions(lease, subnet, reservation, serverID)
 		reply := dhr.buildReply(dhcp.ACK, serverID, lease.Addr)
-		if dhr.nextServer.IsGlobalUnicast() {
-			reply.SetSIAddr(dhr.nextServer)
-		}
 		rt.Infof("%s: Request handing out: %s to %s via %s",
 			dhr.xid(),
 			reply.YIAddr(),
@@ -751,24 +760,19 @@ func (dhr *DhcpRequest) ServeDHCP(msgType dhcp.MessageType) dhcp.Packet {
 			serverID := dhr.respondFrom(lease.Addr)
 			if lease.Fake() {
 				// This is a proxy DHCP response
-				dhr.buildBinlOptions(lease, subnet, reservation)
+				dhr.buildBinlOptions(lease, subnet, reservation, serverID)
 				if !dhr.offerPXE {
 					return nil
 				}
 				reply := dhr.buildReply(dhcp.Offer, serverID, lease.Addr)
 				reply.SetBroadcast(true)
-				if serverID.IsGlobalUnicast() {
-					reply.SetSIAddr(serverID)
-				}
+
 				dhr.Infof("%s: Sending ProxyDHCP offer to %s via %s", reply.CHAddr(), serverID)
 				return reply
 			}
 			dhr.buildDhcpOptions(lease, subnet, reservation, serverID)
 			reply := dhr.buildReply(dhcp.Offer, serverID, lease.Addr)
 			// Say who we are.
-			if dhr.nextServer.IsGlobalUnicast() {
-				reply.SetSIAddr(dhr.nextServer)
-			}
 			dhr.Infof("%s: Discovery handing out: %s to %s via %s",
 				dhr.xid(),
 				reply.YIAddr(),
