@@ -1,0 +1,9 @@
+proto:dhcp4 iface:eno2 ifaddr:10.0.0.5:4011 lport:4011
+op:0x02 htype:0x01 hlen:0x06 hops:0x00 xid:0xab57f1b8 secs:0x0000 flags:0x0000
+ci:0.0.0.0 yi:10.0.0.5 si:10.0.0.10 gi:0.0.0.0 ch:52:54:4d:21:00:00
+sname:"10.0.0.10"
+file:"ipxe.efi"
+option:code:053 val:"ack"
+option:code:054 val:"10.0.0.10"
+option:code:060 val:"PXEClient"
+option:code:097 val:"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
