@@ -542,7 +542,7 @@ func (s *Subnet) Validate() {
 	if s.Proxy && s.Unmanaged {
 		s.Errorf("Unmanaged and Proxy cannot both be true")
 	}
-	if !s.OnlyReservations || !s.Proxy {
+	if !(s.OnlyReservations || s.Proxy) {
 		validateIP4(s, s.ActiveStart)
 		validateIP4(s, s.ActiveEnd)
 		if !subnet.Contains(s.ActiveStart) {

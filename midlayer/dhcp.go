@@ -234,6 +234,12 @@ func (dhr *DhcpRequest) coalesceOptions(
 	if r != nil && r.NextServer.IsGlobalUnicast() {
 		dhr.nextServer = r.NextServer
 	}
+	if nextServer := dhr.nextServer.To4(); nextServer != nil && !nextServer.IsUnspecified() {
+		dhr.nextServer = nextServer
+		dhr.outOpts[dhcp.OptionTFTPServerName] = []byte(dhr.nextServer.String())
+	} else {
+		dhr.nextServer = nil
+	}
 	// If the incoming packet does not want a filename, it does not want
 	// to PXE boot.
 	if vals, ok := dhr.pktOpts[dhcp.OptionParameterRequestList]; !ok ||
@@ -250,7 +256,7 @@ func (dhr *DhcpRequest) coalesceOptions(
 	}
 	// If we have a dhcp.OptionBootFileName set to "", a reservation told us
 	// to not PXE boot.
-	if val, ok := dhr.pktOpts[dhcp.OptionBootFileName]; ok && len(val) == 0 {
+	if val, ok := dhr.outOpts[dhcp.OptionBootFileName]; ok && len(val) == 0 {
 		dhr.offerPXE = false
 		return
 	}
@@ -324,8 +330,11 @@ func (dhr *DhcpRequest) coalesceOptions(
 			rt.Save(machine)
 		}
 	})
+	if !dhr.offerPXE {
+		return
+	}
 	// Fill out default options for BootFileName and TFTPServerName
-	if _, ok := dhr.outOpts[dhcp.OptionBootFileName]; !ok && dhr.offerPXE {
+	if _, ok := dhr.outOpts[dhcp.OptionBootFileName]; !ok {
 		fname := ""
 		if val, ok := dhr.pktOpts[dhcp.OptionUserClass]; ok && string(val) == "iPXE" {
 			fname = "default.ipxe"
@@ -351,9 +360,6 @@ func (dhr *DhcpRequest) coalesceOptions(
 			return
 		}
 		dhr.outOpts[dhcp.OptionBootFileName] = []byte(fname)
-	}
-	if _, ok := dhr.outOpts[dhcp.OptionTFTPServerName]; !ok && dhr.offerPXE {
-		dhr.outOpts[dhcp.OptionTFTPServerName] = dhr.nextServer
 	}
 }
 
@@ -438,8 +444,6 @@ func (dhr *DhcpRequest) buildDhcpOptions(
 		delete(dhr.outOpts, dhcp.OptionBootFileName)
 		delete(dhr.outOpts, dhcp.OptionVendorSpecificInformation)
 		delete(dhr.outOpts, dhcp.OptionVendorClassIdentifier)
-	} else if dhr.outOpts[dhcp.OptionBootFileName] != nil && dhr.outOpts[dhcp.OptionTFTPServerName] == nil {
-		dhr.outOpts[dhcp.OptionTFTPServerName] = []byte(dhr.nextServer.String())
 	}
 }
 
@@ -757,8 +761,9 @@ func (dhr *DhcpRequest) ServeDHCP(msgType dhcp.MessageType) dhcp.Packet {
 			if lease == nil {
 				return nil
 			}
-			serverID := dhr.respondFrom(lease.Addr)
 			if lease.Fake() {
+				lease.Addr = net.IPv4(0, 0, 0, 0)
+				serverID := dhr.respondFrom(lease.Addr)
 				// This is a proxy DHCP response
 				dhr.buildBinlOptions(lease, subnet, reservation, serverID)
 				if !dhr.offerPXE {
@@ -767,9 +772,10 @@ func (dhr *DhcpRequest) ServeDHCP(msgType dhcp.MessageType) dhcp.Packet {
 				reply := dhr.buildReply(dhcp.Offer, serverID, lease.Addr)
 				reply.SetBroadcast(true)
 
-				dhr.Infof("%s: Sending ProxyDHCP offer to %s via %s", reply.CHAddr(), serverID)
+				dhr.Infof("%s: Sending ProxyDHCP offer to %s via %s", dhr.xid(), reply.CHAddr(), serverID)
 				return reply
 			}
+			serverID := dhr.respondFrom(lease.Addr)
 			dhr.buildDhcpOptions(lease, subnet, reservation, serverID)
 			reply := dhr.buildReply(dhcp.Offer, serverID, lease.Addr)
 			// Say who we are.
