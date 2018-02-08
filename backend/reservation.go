@@ -182,9 +182,8 @@ func (r *Reservation) OnCreate() error {
 
 func (r *Reservation) Validate() {
 	validateIP4(r, r.Addr)
-	validateMaybeZeroIP4(r, r.NextServer)
-	if len(r.NextServer) == 0 || r.NextServer.IsUnspecified() {
-		r.NextServer = nil
+	if r.NextServer != nil {
+		validateMaybeZeroIP4(r, r.NextServer)
 	}
 	if r.Token == "" {
 		r.Errorf("Reservation Token cannot be empty!")

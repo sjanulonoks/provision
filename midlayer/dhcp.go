@@ -227,11 +227,11 @@ func (dhr *DhcpRequest) coalesceOptions(
 			}
 			dhr.outOpts[dhcp.OptionCode(c)] = v
 		}
-		if s.NextServer.IsGlobalUnicast() {
+		if s.NextServer != nil && s.NextServer.IsGlobalUnicast() {
 			dhr.nextServer = s.NextServer
 		}
 	}
-	if r != nil && r.NextServer.IsGlobalUnicast() {
+	if r != nil && r.NextServer != nil && r.NextServer.IsGlobalUnicast() {
 		dhr.nextServer = r.NextServer
 	}
 	if nextServer := dhr.nextServer.To4(); nextServer != nil && !nextServer.IsUnspecified() {

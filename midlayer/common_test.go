@@ -67,24 +67,7 @@ func TestMain(m *testing.M) {
 	rt := dataTracker.Request(l, "subnets")
 	rt.Do(func(d backend.Stores) {
 		subs := []*models.Subnet{
-			&models.Subnet{
-				Name:              "sub2",
-				Enabled:           true,
-				Subnet:            "172.17.0.8/24",
-				NextServer:        net.IPv4(172, 17, 0, 8),
-				ActiveStart:       net.IPv4(172, 17, 0, 10),
-				ActiveEnd:         net.IPv4(172, 17, 0, 15),
-				ReservedLeaseTime: 7200,
-				ActiveLeaseTime:   60,
-				Strategy:          "MAC",
-				Options: []models.DhcpOption{
-					{Code: 1, Value: "255.255.0.0"},
-					{Code: 3, Value: "172.17.0.1"},
-					{Code: 6, Value: "172.17.0.1"},
-					{Code: 15, Value: "sub2.com"},
-					{Code: 28, Value: "172.17.0.255"},
-				},
-			},
+			// Normal DHCP network.
 			&models.Subnet{
 				Name:              "sub1",
 				Enabled:           true,
@@ -95,28 +78,40 @@ func TestMain(m *testing.M) {
 				ActiveLeaseTime:   60,
 				Strategy:          "MAC",
 				Options: []models.DhcpOption{
-					{Code: 1, Value: "255.255.0.0"},
 					{Code: 3, Value: "192.168.124.1"},
 					{Code: 6, Value: "192.168.124.1"},
 					{Code: 15, Value: "sub1.com"},
-					{Code: 28, Value: "192.168.124.255"},
 				},
 			},
+			// DHCP via a gateway
+			&models.Subnet{
+				Name:              "sub2",
+				Enabled:           true,
+				Subnet:            "172.17.0.8/24",
+				ActiveStart:       net.IPv4(172, 17, 0, 10),
+				ActiveEnd:         net.IPv4(172, 17, 0, 15),
+				ReservedLeaseTime: 7200,
+				ActiveLeaseTime:   60,
+				Strategy:          "MAC",
+				Options: []models.DhcpOption{
+					{Code: 3, Value: "172.17.0.1"},
+					{Code: 6, Value: "172.17.0.1"},
+					{Code: 15, Value: "sub2.com"},
+				},
+			},
+			// ProxyDHCP network.
 			&models.Subnet{
 				Name:              "sub3",
 				Enabled:           true,
 				Proxy:             true,
 				Subnet:            "10.0.0.0/8",
-				NextServer:        net.IPv4(10, 0, 0, 10),
 				ReservedLeaseTime: 7200,
 				ActiveLeaseTime:   60,
 				Strategy:          "MAC",
 				Options: []models.DhcpOption{
-					{Code: 1, Value: "255.0.0.0"},
 					{Code: 3, Value: "10.0.0.1"},
 					{Code: 6, Value: "10.0.0.1"},
 					{Code: 15, Value: "sub1.com"},
-					{Code: 28, Value: "10.255.255.255"},
 				},
 			},
 		}
