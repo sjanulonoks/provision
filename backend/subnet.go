@@ -513,7 +513,9 @@ func (s *Subnet) Validate() {
 	if s.Strategy == "" {
 		s.Errorf("Strategy must have a value")
 	}
-
+	if s.NextServer != nil {
+		validateMaybeZeroIP4(s, s.NextServer)
+	}
 	// Build mask and broadcast for always
 	mask := net.IP([]byte(net.IP(subnet.Mask).To4()))
 	bcastBits := binary.BigEndian.Uint32(subnet.IP) | ^binary.BigEndian.Uint32(mask)
