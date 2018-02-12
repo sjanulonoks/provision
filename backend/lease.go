@@ -210,10 +210,6 @@ func (l *Lease) OnChange(oldThing store.KeySaver) error {
 	return l.MakeError(422, ValidationError, l)
 }
 
-func (l *Lease) Expired() bool {
-	return l.ExpireTime.Before(time.Now())
-}
-
 func (l *Lease) Validate() {
 	idx := l.rt.stores("leases").Items()
 	l.AddError(index.CheckUnique(l, idx))
@@ -239,10 +235,6 @@ func (l *Lease) Validate() {
 	l.SetAvailable()
 }
 
-func (l *Lease) Fake() bool {
-	return l.State == "FAKE"
-}
-
 func (l *Lease) BeforeSave() error {
 	l.Validate()
 	if !l.Useable() {
@@ -255,18 +247,6 @@ func (l *Lease) OnLoad() error {
 	defer func() { l.rt = nil }()
 	l.Fill()
 	return l.BeforeSave()
-}
-
-func (l *Lease) Expire() {
-	l.ExpireTime = time.Now()
-	l.State = "EXPIRED"
-}
-
-func (l *Lease) Invalidate() {
-	l.ExpireTime = time.Now().Add(10 * time.Minute)
-	l.Token = ""
-	l.Strategy = ""
-	l.State = "INVALID"
 }
 
 var leaseLockMap = map[string][]string{

@@ -73,12 +73,20 @@ func (rt *RequestTracker) Publish(prefix, action, key string, ref interface{}) e
 	return nil
 }
 
-func (rt *RequestTracker) Find(prefix, key string) models.Model {
-	var res models.Model
-	if s := rt.d(prefix); s != nil {
-		res = s.Find(key)
+func (rt *RequestTracker) find(prefix, key string) models.Model {
+	s := rt.d(prefix)
+	if s == nil {
+		return nil
 	}
-	return res
+	return s.Find(key)
+}
+
+func (rt *RequestTracker) Find(prefix, key string) models.Model {
+	res := rt.find(prefix, key)
+	if res != nil {
+		return ModelToBackend(models.Clone(res))
+	}
+	return nil
 }
 
 func (rt *RequestTracker) FindByIndex(prefix string, idx index.Maker, key string) models.Model {
