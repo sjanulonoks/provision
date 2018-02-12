@@ -301,9 +301,12 @@ case $1 in
                  mkdir -p drp-data
 
                  # Make local links for execs
-                 rm -f drpcli dr-provision
+                 rm -f drpcli dr-provision drbundler
                  ln -s $binpath/drpcli drpcli
                  ln -s $binpath/dr-provision dr-provision
+                 if [[ -e $binpath/drbundler ]] ; then
+                     ln -s $binpath/drbundler drbundler
+                 fi
 
                  echo "# Run the following commands to start up dr-provision in a local isolated way."
                  echo "# The server will store information and serve files from the drp-data directory."

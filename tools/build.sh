@@ -104,6 +104,7 @@ for build in ${builds}; do
     go build -ldflags "$VERFLAGS" -o "$binpath/dr-provision${ext}" cmds/dr-provision/dr-provision.go
     go generate cmds/incrementer/incrementer.go
     go build -ldflags "$VERFLAGS" -o "$binpath/incrementer${ext}" cmds/incrementer/incrementer.go cmds/incrementer/content.go
+    go build -ldflags "$VERFLAGS" -o "$binpath/drbundler${ext}" cmds/drbundler/drbundler.go
   )
 done
 
