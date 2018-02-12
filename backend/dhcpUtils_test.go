@@ -170,7 +170,7 @@ func TestDHCPCreateSubnet(t *testing.T) {
 		obj.Test(t, rt)
 	}
 	rt.Do(func(d Stores) {
-		subnet = AsSubnet(rt.Find("subnets", "test"))
+		subnet = AsSubnet(rt.find("subnets", "test"))
 	})
 	subnet.Pickers = []string{"none"}
 	// Even though there are no leases and no reservations, we should fail to create a lease.
@@ -196,11 +196,11 @@ func TestDHCPCreateSubnet(t *testing.T) {
 		obj.test(t, rt)
 	}
 	rt.Do(func(d Stores) {
-		lease := AsLease(rt.Find("leases", models.Hexaddr(net.ParseIP("192.168.124.81"))))
+		lease := AsLease(rt.find("leases", models.Hexaddr(net.ParseIP("192.168.124.81"))))
 		lease.ExpireTime = time.Now().Add(-2 * time.Second)
-		lease = AsLease(rt.Find("leases", models.Hexaddr(net.ParseIP("192.168.124.80"))))
+		lease = AsLease(rt.find("leases", models.Hexaddr(net.ParseIP("192.168.124.80"))))
 		lease.ExpireTime = time.Now().Add(-2 * time.Hour)
-		lease = AsLease(rt.Find("leases", models.Hexaddr(net.ParseIP("192.168.124.82"))))
+		lease = AsLease(rt.find("leases", models.Hexaddr(net.ParseIP("192.168.124.82"))))
 		lease.ExpireTime = time.Now().Add(-48 * time.Hour)
 	})
 	expireTests := []ltc{

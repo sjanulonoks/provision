@@ -151,17 +151,17 @@ func (s *Stage) Validate() {
 	s.renderers = renderers{}
 	// First, the stuff that must be correct in order for
 	for _, taskName := range s.Tasks {
-		if s.rt.Find("tasks", taskName) == nil {
+		if s.rt.find("tasks", taskName) == nil {
 			s.Errorf("Task %s does not exist", taskName)
 		}
 	}
 	for _, profileName := range s.Profiles {
-		if s.rt.Find("profiles", profileName) == nil {
+		if s.rt.find("profiles", profileName) == nil {
 			s.Errorf("Profile %s does not exist", profileName)
 		}
 	}
 	if s.BootEnv != "" {
-		if nbFound := s.rt.Find("bootenvs", s.BootEnv); nbFound == nil {
+		if nbFound := s.rt.find("bootenvs", s.BootEnv); nbFound == nil {
 			s.Errorf("BootEnv %s does not exist", s.BootEnv)
 		} else {
 			env := AsBootEnv(nbFound)

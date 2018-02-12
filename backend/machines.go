@@ -175,7 +175,7 @@ func (n *Machine) Indexes() map[string]index.Maker {
 
 func (n *Machine) ParameterMaker(rt *RequestTracker, parameter string) (index.Maker, error) {
 	fix := AsMachine
-	pobj := rt.Find("params", parameter)
+	pobj := rt.find("params", parameter)
 	if pobj == nil {
 		return index.Maker{}, fmt.Errorf("Filter not found: %s", parameter)
 	}
