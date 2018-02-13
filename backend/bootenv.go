@@ -154,7 +154,7 @@ func (b *BootEnv) fillInstallRepo() {
 		return
 	}
 	b.rt.Tracef("fillInstallRepo: Looking for global profile")
-	o := b.rt.Find("profiles", b.rt.dt.GlobalProfileName)
+	o := b.rt.find("profiles", b.rt.dt.GlobalProfileName)
 	if o == nil {
 		return
 	}

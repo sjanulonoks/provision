@@ -61,7 +61,7 @@ func TestUserPassword(t *testing.T) {
 			t.Logf("Changing password passed.")
 		}
 		// reload the user, then check the password again.
-		buf := rt.Find("users", "test user")
+		buf := rt.find("users", "test user")
 		if buf == nil {
 			t.Errorf("Unable to fetch user from datatracker")
 		} else {

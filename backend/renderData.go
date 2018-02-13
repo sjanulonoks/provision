@@ -108,7 +108,7 @@ func newRenderedTemplate(r *RenderData,
 			rd := &RenderData{rt: rt}
 			rd.rt.Do(func(d Stores) {
 				for i, prefix := range prefixes {
-					item := rd.rt.Find(prefix, keys[i])
+					item := rd.rt.find(prefix, keys[i])
 					if item == nil {
 						err = fmt.Errorf("%s:%s has vanished", prefix, keys[i])
 					}
@@ -472,13 +472,13 @@ func newRenderData(rt *RequestTracker, m *Machine, r renderable) *RenderData {
 	}
 	if m != nil {
 		if res.Env == nil {
-			obj := rt.Find("bootenvs", m.BootEnv)
+			obj := rt.find("bootenvs", m.BootEnv)
 			if obj != nil {
 				res.Env = &rBootEnv{BootEnv: obj.(*BootEnv), renderData: res}
 			}
 		}
 		if res.Stage == nil {
-			obj := rt.Find("stages", m.Stage)
+			obj := rt.find("stages", m.Stage)
 			if obj != nil {
 				res.Stage = &rStage{Stage: obj.(*Stage), renderData: res}
 			}
@@ -588,7 +588,7 @@ func (r *RenderData) GenerateProfileToken(profile string, duration int) string {
 		return "InvalidTokenNotAllowedNotOnMachine"
 	}
 
-	if p := r.rt.Find("profiles", profile); p == nil {
+	if p := r.rt.find("profiles", profile); p == nil {
 		// Don't allow profile tokens.
 		return "InvalidTokenNotAllowedNoProfile"
 	}
@@ -660,7 +660,7 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 			return v, nil
 		}
 	}
-	if o := r.rt.Find("profiles", r.rt.dt.GlobalProfileName); o != nil {
+	if o := r.rt.find("profiles", r.rt.dt.GlobalProfileName); o != nil {
 		p := AsProfile(o)
 		if v, ok := r.rt.GetParam(p, key, true); ok {
 			return v, nil

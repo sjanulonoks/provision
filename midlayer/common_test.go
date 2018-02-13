@@ -24,13 +24,13 @@ func makeHandler(dt *backend.DataTracker, proxy bool) *DhcpHandler {
 		port = 4011
 	}
 	res := &DhcpHandler{
-		Logger:    logger.New(nil).Log("dhcp"),
-		ifs:       []string{},
-		port:      port,
-		bk:        dt,
-		strats:    []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
-		pinger:    pinger.Fake(true),
-		proxyOnly: proxy,
+		Logger:   logger.New(nil).Log("dhcp"),
+		ifs:      []string{},
+		port:     port,
+		bk:       dt,
+		strats:   []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
+		pinger:   pinger.Fake(true),
+		binlOnly: proxy,
 	}
 	return res
 }
@@ -67,62 +67,51 @@ func TestMain(m *testing.M) {
 	rt := dataTracker.Request(l, "subnets")
 	rt.Do(func(d backend.Stores) {
 		subs := []*models.Subnet{
-			&models.Subnet{
-				Name:              "sub2",
-				Enabled:           true,
-				Subnet:            "172.17.0.8/24",
-				NextServer:        net.IPv4(172, 17, 0, 8),
-				ActiveStart:       net.IPv4(172, 17, 0, 10),
-				ActiveEnd:         net.IPv4(172, 17, 0, 15),
-				ReservedLeaseTime: 7200,
-				ActiveLeaseTime:   60,
-				Strategy:          "MAC",
-				Options: []models.DhcpOption{
-					{Code: 1, Value: "255.255.0.0"},
-					{Code: 3, Value: "172.17.0.1"},
-					{Code: 6, Value: "172.17.0.1"},
-					{Code: 15, Value: "sub2.com"},
-					{Code: 28, Value: "172.17.0.255"},
-					{Code: 67, Value: `{{if (eq (index . 77) "iPXE") }}default.ipxe{{else if (eq (index . 93) "0")}}lpxelinux.0{{else}}ipxe.efi{{end}}`},
-				},
-			},
+			// Normal DHCP network.
 			&models.Subnet{
 				Name:              "sub1",
 				Enabled:           true,
 				Subnet:            "192.168.124.1/24",
-				NextServer:        net.IPv4(192, 168, 124, 1),
 				ActiveStart:       net.IPv4(192, 168, 124, 10),
 				ActiveEnd:         net.IPv4(192, 168, 124, 15),
 				ReservedLeaseTime: 7200,
 				ActiveLeaseTime:   60,
 				Strategy:          "MAC",
 				Options: []models.DhcpOption{
-					{Code: 1, Value: "255.255.0.0"},
 					{Code: 3, Value: "192.168.124.1"},
 					{Code: 6, Value: "192.168.124.1"},
 					{Code: 15, Value: "sub1.com"},
-					{Code: 28, Value: "192.168.124.255"},
-					{Code: 67, Value: `{{if (eq (index . 77) "iPXE") }}default.ipxe{{else if (eq (index . 93) "0")}}lpxelinux.0{{else}}ipxe.efi{{end}}`},
 				},
 			},
+			// DHCP via a gateway
+			&models.Subnet{
+				Name:              "sub2",
+				Enabled:           true,
+				Subnet:            "172.17.0.8/24",
+				ActiveStart:       net.IPv4(172, 17, 0, 10),
+				ActiveEnd:         net.IPv4(172, 17, 0, 15),
+				ReservedLeaseTime: 7200,
+				ActiveLeaseTime:   60,
+				Strategy:          "MAC",
+				Options: []models.DhcpOption{
+					{Code: 3, Value: "172.17.0.1"},
+					{Code: 6, Value: "172.17.0.1"},
+					{Code: 15, Value: "sub2.com"},
+				},
+			},
+			// ProxyDHCP network.
 			&models.Subnet{
 				Name:              "sub3",
 				Enabled:           true,
 				Proxy:             true,
 				Subnet:            "10.0.0.0/8",
-				NextServer:        net.IPv4(10, 0, 0, 10),
-				ActiveStart:       net.IPv4(10, 0, 0, 10),
-				ActiveEnd:         net.IPv4(10, 0, 0, 15),
 				ReservedLeaseTime: 7200,
 				ActiveLeaseTime:   60,
 				Strategy:          "MAC",
 				Options: []models.DhcpOption{
-					{Code: 1, Value: "255.0.0.0"},
 					{Code: 3, Value: "10.0.0.1"},
 					{Code: 6, Value: "10.0.0.1"},
 					{Code: 15, Value: "sub1.com"},
-					{Code: 28, Value: "10.255.255.255"},
-					{Code: 67, Value: `{{if (eq (index . 77) "iPXE") }}default.ipxe{{else if (eq (index . 93) "0")}}lpxelinux.0{{else}}ipxe.efi{{end}}`},
 				},
 			},
 		}

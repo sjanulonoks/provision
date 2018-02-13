@@ -15,6 +15,10 @@ func (t testThing) Key() string {
 	return fmt.Sprintf("%04d", int64(t))
 }
 
+func (t testThing) KeyName() string {
+	return fmt.Sprintf("%04d", int64(t))
+}
+
 func (t testThing) Prefix() string {
 	return "integers"
 }

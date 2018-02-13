@@ -1,0 +1,9 @@
+proto:dhcp4 iface:eno2 ifaddr:255.255.255.255:68 lport:67
+op:0x02 htype:0x01 hlen:0x06 hops:0x00 xid:0x72256e68 secs:0x0000 flags:0x8000
+ci:0.0.0.0 yi:0.0.0.0 si:10.0.0.10 gi:0.0.0.0 ch:52:54:9d:9f:00:00
+sname:"10.0.0.10"
+file:"lpxelinux.0"
+option:code:053 val:"ofr"
+option:code:054 val:"10.0.0.10"
+option:code:043 val:"6,1,8,255"
+option:code:060 val:"PXEClient"

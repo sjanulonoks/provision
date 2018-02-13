@@ -106,7 +106,9 @@ func FindLease(rt *RequestTracker,
 	return
 }
 
-func findViaReservation(rt *RequestTracker, strat, token string, req net.IP) (lease *Lease, reservation *Reservation, ok bool) {
+func findViaReservation(rt *RequestTracker,
+	strat, token string,
+	req net.IP, fake bool) (lease *Lease, reservation *Reservation, ok bool) {
 	leases, reservations := rt.d("leases"), rt.d("reservations")
 	if req != nil && req.IsGlobalUnicast() {
 		hex := models.Hexaddr(req)
@@ -128,6 +130,9 @@ func findViaReservation(rt *RequestTracker, strat, token string, req net.IP) (le
 	}
 	if reservation == nil {
 		return
+	}
+	if fake {
+		return nil, reservation, true
 	}
 	// We found a reservation for this strategy/token
 	// combination, see if we can create a lease using it.
@@ -173,7 +178,11 @@ func findViaReservation(rt *RequestTracker, strat, token string, req net.IP) (le
 	return
 }
 
-func findViaSubnet(rt *RequestTracker, strat, token string, req net.IP, vias []net.IP) (lease *Lease, subnet *Subnet, fresh bool) {
+func findViaSubnet(rt *RequestTracker,
+	strat, token string,
+	req net.IP,
+	vias []net.IP,
+	fake bool) (lease *Lease, subnet *Subnet, fresh bool) {
 	leases, subnets, reservations := rt.d("leases"), rt.d("subnets"), rt.d("reservations")
 	for _, idx := range subnets.Items() {
 		candidate := AsSubnet(idx)
@@ -196,14 +205,13 @@ func findViaSubnet(rt *RequestTracker, strat, token string, req net.IP, vias []n
 		return
 	}
 	// Return a fake lease
-	if subnet.Proxy {
-		fresh = true
+	if subnet.Proxy || fake {
 		lease = &Lease{}
 		Fill(lease)
 		lease.Strategy = strat
 		lease.Token = token
-		lease.State = "OFFER"
-		return
+		lease.State = "FAKE"
+		return lease, subnet, true
 	}
 	currLeases, _ := index.Between(
 		models.Hexaddr(subnet.ActiveStart),
@@ -254,6 +262,19 @@ func findViaSubnet(rt *RequestTracker, strat, token string, req net.IP, vias []n
 	return nil, nil, false
 }
 
+// FakeLeaseFor returns a lease that has zero duration and that should not be saved.
+// It is intended for use when we are acting as a proxy DHCP server or we are acting
+// as a BINL server.
+func FakeLeaseFor(rt *RequestTracker,
+	strat, token string,
+	via []net.IP) (lease *Lease, subnet *Subnet, reservation *Reservation) {
+	rt.Do(func(d Stores) {
+		_, reservation, _ = findViaReservation(rt, strat, token, nil, true)
+		lease, subnet, _ = findViaSubnet(rt, strat, token, nil, via, true)
+	})
+	return
+}
+
 // FindOrCreateLease will return a lease for the passed information, creating it if it can.
 // If a non-nil Lease is returned, it has been saved and the DHCP system can offer it.
 // If the returned lease is nil, then the DHCP system should not respond.
@@ -266,9 +287,9 @@ func FindOrCreateLease(rt *RequestTracker,
 	rt.Do(func(d Stores) {
 		leases := d("leases")
 		var ok bool
-		lease, reservation, ok = findViaReservation(rt, strat, token, req)
+		lease, reservation, ok = findViaReservation(rt, strat, token, req, false)
 		if lease == nil {
-			lease, subnet, fresh = findViaSubnet(rt, strat, token, req, via)
+			lease, subnet, fresh = findViaSubnet(rt, strat, token, req, via, false)
 		} else {
 			subnet = lease.Subnet(rt)
 		}

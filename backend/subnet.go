@@ -478,7 +478,9 @@ func (s *Subnet) InActiveRange(ip net.IP) bool {
 }
 
 func (s *Subnet) LeaseTimeFor(ip net.IP) time.Duration {
-	if s.InActiveRange(ip) {
+	if s.Proxy {
+		return 0
+	} else if s.InActiveRange(ip) {
 		return time.Duration(s.ActiveLeaseTime) * time.Second
 	} else if s.InSubnetRange(ip) {
 		return time.Duration(s.ReservedLeaseTime) * time.Second
@@ -511,7 +513,9 @@ func (s *Subnet) Validate() {
 	if s.Strategy == "" {
 		s.Errorf("Strategy must have a value")
 	}
-
+	if s.NextServer != nil {
+		validateMaybeZeroIP4(s, s.NextServer)
+	}
 	// Build mask and broadcast for always
 	mask := net.IP([]byte(net.IP(subnet.Mask).To4()))
 	bcastBits := binary.BigEndian.Uint32(subnet.IP) | ^binary.BigEndian.Uint32(mask)
@@ -537,8 +541,10 @@ func (s *Subnet) Validate() {
 	if needBCast {
 		s.Options = append(s.Options, models.DhcpOption{byte(dhcp.OptionBroadcastAddress), net.IP(buf).String()})
 	}
-
-	if !s.OnlyReservations {
+	if s.Proxy && s.Unmanaged {
+		s.Errorf("Unmanaged and Proxy cannot both be true")
+	}
+	if !(s.OnlyReservations || s.Proxy) {
 		validateIP4(s, s.ActiveStart)
 		validateIP4(s, s.ActiveEnd)
 		if !subnet.Contains(s.ActiveStart) {
