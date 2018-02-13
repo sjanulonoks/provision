@@ -14,7 +14,7 @@ imports:
 - name: github.com/digitalrebar/pinger
   version: 4b06d02345cad02a772ff21f13e1ef3551c943d4
 - name: github.com/digitalrebar/store
-  version: ac24d351a583fea9407fd118ce22cb9eaeb6ad97
+  version: 2c250af948738fedc26bf17345ad9938e3acec93
 - name: github.com/elazarl/go-bindata-assetfs
   version: 30f82fa23fd844bd5bb1e5f216db87fd77b5eb43
 - name: github.com/elithrar/simple-scrypt
