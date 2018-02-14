@@ -1,7 +1,6 @@
 FROM alpine:3.6
 
-ARG CACHE_TAG=stable
-ARG SOURCE_BRANCH=stable
+ARG DRP_VERSION=stable
 
 # add glibc so we can run drp executables
 # credit: http://www.manorrock.com/blog/2016/08/30/docker_tip_6_create_a_base_alpine_glibc_image.html
@@ -48,8 +47,7 @@ COPY tools/install.sh ${INSTALLDIR}/
 WORKDIR ${INSTALLDIR}
 VOLUME ["drp-data"]
 # install provision and its deps
-RUN echo "SOURCE_BRANCH=${SOURCE_BRANCH}"
-RUN echo "CACHE_TAG=${CACHE_TAG}"
-RUN apk add --no-cache iproute2 bash ipmitool curl libarchive-tools p7zip && ./install.sh --isolated install --drp-version=${CACHE_TAG}
+RUN echo "DRP_VERSION=${DRP_VERSION}"
+RUN apk add --no-cache iproute2 bash ipmitool curl libarchive-tools p7zip && ./install.sh --isolated install --drp-version=${DRP_VERSION}
 # run the api server so we can install sledgehammer image
 CMD ${drp}
