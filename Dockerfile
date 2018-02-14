@@ -36,14 +36,15 @@ RUN ALPINE_GLIBC_BASE_URL="https://github.com/sgerrand/alpine-pkg-glibc/releases
 ENV LANG=C.UTF-8
 
 # digital rebar provision install starts here
-EXPOSE 8091 8092 69 67
+EXPOSE 8091 8092 69 67 4011
 ENV INSTALLDIR "/provision"
-ENV STATICIP "172.17.0.2"
-ENV drp "./dr-provision --static-ip=${STATICIP} --base-root=${INSTALLDIR}/drp-data --local-content= --default-content="
+# If you set STATICIP, use "--static-ip=<IP>"
+ENV STATICIP ""
+ENV drp "./dr-provision ${STATICIP} --base-root=${INSTALLDIR}/drp-data --local-content= --default-content="
 COPY tools/install.sh ${INSTALLDIR}/
 WORKDIR ${INSTALLDIR}
 VOLUME ["drp-data"]
 # install provision and its deps
-RUN apk add --no-cache iproute2 bash ipmitool curl libarchive-tools p7zip && ./install.sh --isolated install --drp-version=tip
+RUN apk add --no-cache iproute2 bash ipmitool curl libarchive-tools p7zip && ./install.sh --isolated install --drp-version=${SOURCE_BRANCH}
 # run the api server so we can install sledgehammer image
 CMD ${drp}
