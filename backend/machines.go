@@ -639,7 +639,7 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	if n.oldStage == n.Stage && !(n.CurrentTask == -1 || n.CurrentTask == oldm.CurrentTask) {
 		e.Errorf("Cannot change CurrentTask from %d to %d", oldm.CurrentTask, n.CurrentTask)
 	}
-	if n.CurrentTask != -1 && !reflect.DeepEqual(oldm.Tasks, n.Tasks) {
+	if n.oldStage == n.Stage && n.CurrentTask != -1 && !reflect.DeepEqual(oldm.Tasks, n.Tasks) {
 		runningBound := n.CurrentTask
 		if runningBound != len(oldm.Tasks) {
 			runningBound += 1
