@@ -6,7 +6,7 @@ DEFAULT_DRP_VERSION=${DEFAULT_DRP_VERSION:-"stable"}
 
 usage() {
 cat <<EOFUSAGE
-Usage: $0 [--version=<Version to install>] [--nocontent]
+Usage: $0 [--version=<Version to install>] [--nocontent] [--commit=<githash>]
           [--isolate] [--ipaddr=<ip>] install | remove
 
 Options:
@@ -20,6 +20,8 @@ Options:
                             # will attepmto to discover the value if not specified
     --version=<string>      # Version identifier if downloading.  stable, tip, or
                             # specific version label.  Defaults to: $DEFAULT_DRP_VERSION
+    --commit=<string>       # github commit file to wait for.  Unset assumes the files
+                            # are in place
 
     install                 # Sets up an insolated or system 'production' enabled install.
     remove                  # Removes the system enabled install.  Requires no other flags
@@ -62,6 +64,9 @@ while (( $# > 0 )); do
             ;;
         --force)
             force=true
+            ;;
+        --commit)
+            COMMIT=${arg_data}
             ;;
         --upgrade)
             UPGRADE=true
@@ -220,6 +225,15 @@ case $(uname -s) in
         echo "No idea how to check sha256sums"
         exit 1;;
 esac
+
+if [[ $COMMIT != "" ]] ; then
+    set +e
+    while ! curl -sfL -o dr-provision-hash.$COMMIT https://github.com/digitalrebar/provision/releases/download/$DRP_VERSION/dr-provision-hash.$COMMIT ; do
+            echo "Waiting for dr-provision-hash.$COMMIT"
+            sleep 60
+    done
+    set -e
+fi
 
 case $1 in
      install)
