@@ -33,4 +33,6 @@ cp -a tools/install.sh "$tmpdir/tools"
 
 cp "$tmpdir/dr-provision.zip" .
 $shasum dr-provision.zip > dr-provision.sha256
+HASH=$(git rev-parse HEAD)
+echo $HASH > dr-provision-hash.$HASH
 rm -rf "$tmpdir"
