@@ -94,6 +94,9 @@ func (fs *FileSystem) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Length", strconv.FormatInt(sz.Size(), 10))
 		}
 		io.Copy(w, out)
+		if cl, ok := out.(io.ReadCloser); ok {
+			cl.Close()
+		}
 	} else {
 		http.ServeFile(w, r, path.Join(fs.lower, p))
 	}

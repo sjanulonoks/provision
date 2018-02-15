@@ -443,85 +443,90 @@ func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, pro
 	if err != nil {
 		pc.Errorf("Skipping %s because %s\n", provider, err)
 		return fmt.Errorf("Skipping %s because %s\n", provider, err)
-	} else {
-		pp := &models.PluginProvider{}
-		err = json.Unmarshal(out, pp)
-		if err != nil {
-			pc.Errorf("Skipping %s because of bad json: %s\n%s\n", provider, err, out)
-			return fmt.Errorf("Skipping %s because of bad json: %s\n%s\n", provider, err, out)
-		} else {
-			skip := false
-			pp.Fill()
+	}
+	pp := &models.PluginProvider{}
+	err = json.Unmarshal(out, pp)
+	if err != nil {
+		pc.Errorf("Skipping %s because of bad json: %s\n%s\n", provider, err, out)
+		return fmt.Errorf("Skipping %s because of bad json: %s\n%s\n", provider, err, out)
+	}
+	skip := false
+	pp.Fill()
 
-			if pp.PluginVersion != 2 {
-				pc.Errorf("Skipping %s because of bad version: %d\n", provider, pp.PluginVersion)
-				return fmt.Errorf("Skipping %s because of bad version: %d\n", provider, pp.PluginVersion)
-			}
+	if pp.PluginVersion != 2 {
+		pc.Errorf("Skipping %s because of bad version: %d\n", provider, pp.PluginVersion)
+		return fmt.Errorf("Skipping %s because of bad version: %d\n", provider, pp.PluginVersion)
+	}
 
-			content := &models.Content{}
-			content.Fill()
+	content := &models.Content{}
+	content.Fill()
 
-			if pp.Content != "" {
-				codec := store.YamlCodec
-				if err := codec.Decode([]byte(pp.Content), content); err != nil {
-					return err
-				}
-			} else {
-				content.Meta.Meta = pp.Meta
-			}
-			cName := pp.Name
-			content.Meta.Name = cName
-
-			if content.Meta.Version == "" || content.Meta.Version == "Unspecified" {
-				content.Meta.Version = pp.Version
-			}
-			if content.Meta.Description == "" {
-				content.Meta.Description = fmt.Sprintf("Content layer for %s plugin provider", pp.Name)
-			}
-			if content.Meta.Source == "" {
-				content.Meta.Source = "FromPluginProvider"
-			}
-			content.Meta.Type = "plugin"
-
-			if !skip {
-				pc.Tracef("Building new datastore for: %s\n", provider)
-				if ns, err := pc.buildNewStore(content); err != nil {
-					pc.Errorf("Skipping %s because of bad store: %v\n", pp.Name, err)
-					return err
-				} else {
-					var err error
-					pc.Tracef("Replacing new datastore for: %s\n", provider)
-					rt := pc.Request()
-					rt.AllLocked(func(d backend.Stores) {
-						ds := pc.dt.Backend.(*DataStack)
-						nbs, hard, _ := ds.AddReplacePlugin(cName, ns, pc.dt.Logger, forceParamRemoval)
-						if hard != nil {
-							rt.Errorf("Skipping %s because of bad store errors: %v\n", pp.Name, hard)
-							err = hard
-							return
-						}
-						pc.dt.ReplaceBackend(rt, nbs)
-					})
-					pc.Tracef("Completed replacing new datastore for: %s\n", provider)
-					if err != nil {
-						return err
-					}
-				}
-
-				if _, ok := pc.AvailableProviders[pp.Name]; !ok {
-					pc.Infof("Adding plugin provider: %s\n", pp.Name)
-					pp.Fill()
-					pc.AvailableProviders[pp.Name] = pp
-					for _, aa := range pp.AvailableActions {
-						aa.Provider = pp.Name
-					}
-					rt.Publish("plugin_provider", "create", pp.Name, pp)
-					return pc.walkPlugins(provider)
-				} else {
-					pc.Infof("Already exists plugin provider: %s\n", pp.Name)
-				}
-			}
+	if pp.Content != "" {
+		codec := store.YamlCodec
+		if err := codec.Decode([]byte(pp.Content), content); err != nil {
+			return err
 		}
+	} else {
+		content.Meta.Meta = pp.Meta
+	}
+	cName := pp.Name
+	content.Meta.Name = cName
+
+	if content.Meta.Version == "" || content.Meta.Version == "Unspecified" {
+		content.Meta.Version = pp.Version
+	}
+	if content.Meta.Description == "" {
+		content.Meta.Description = fmt.Sprintf("Content layer for %s plugin provider", pp.Name)
+	}
+	if content.Meta.Source == "" {
+		content.Meta.Source = "FromPluginProvider"
+	}
+	content.Meta.Type = "plugin"
+
+	if skip {
+		return nil
+	}
+	pc.Tracef("Building new datastore for: %s\n", provider)
+	ns, err := pc.buildNewStore(content)
+	if err != nil {
+		pc.Errorf("Skipping %s because of bad store: %v\n", pp.Name, err)
+		return err
+	}
+	pc.Tracef("Replacing new datastore for: %s\n", provider)
+	rt.AllLocked(func(d backend.Stores) {
+		ds := pc.dt.Backend.(*DataStack)
+		nbs, hard, _ := ds.AddReplacePlugin(cName, ns, pc.dt.Logger, forceParamRemoval)
+		if hard != nil {
+			rt.Errorf("Skipping %s because of bad store errors: %v\n", pp.Name, hard)
+			err = hard
+			return
+		}
+		pc.dt.ReplaceBackend(rt, nbs)
+	})
+	pc.Tracef("Completed replacing new datastore for: %s\n", provider)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := pc.AvailableProviders[pp.Name]; !ok {
+		pc.Infof("Adding plugin provider: %s\n", pp.Name)
+		pp.Fill()
+		pc.AvailableProviders[pp.Name] = pp
+		for _, aa := range pp.AvailableActions {
+			aa.Provider = pp.Name
+		}
+		out, err = exec.Command(
+			path.Join(pc.pluginDir, provider),
+			"unpack",
+			path.Join(pc.dt.FileRoot, "files", "plugin_providers", pp.Name)).CombinedOutput()
+		if err != nil {
+			pc.Errorf("Unpack for %s failed: %v", pp.Name, err)
+			pc.Errorf("%s", out)
+		}
+		rt.Publish("plugin_provider", "create", pp.Name, pp)
+		return pc.walkPlugins(provider)
+	} else {
+		pc.Infof("Already exists plugin provider: %s\n", pp.Name)
 	}
 	return nil
 }
