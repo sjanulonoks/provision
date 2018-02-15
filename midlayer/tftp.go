@@ -52,6 +52,9 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 		if err != nil {
 			return err
 		}
+		if cl, ok := source.(io.ReadCloser); ok {
+			defer cl.Close()
+		}
 		if outgoing {
 			var size int64
 			switch src := source.(type) {
