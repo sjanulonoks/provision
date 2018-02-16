@@ -1,54 +1,18 @@
 package midlayer
 
 import (
+	"net"
 	"net/http"
-	"strings"
-	"time"
+	"os"
 
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/models"
-	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
+	"github.com/digitalrebar/provision/plugin/mux"
 )
 
-func testContentType(c *gin.Context, ct string) bool {
-	ct = strings.ToUpper(ct)
-	test := strings.ToUpper(c.ContentType())
-
-	return strings.Contains(test, ct)
-}
-
-func assureContentType(c *gin.Context, ct string) bool {
-	if testContentType(c, ct) {
-		return true
-	}
-	err := &models.Error{Type: c.Request.Method, Code: http.StatusBadRequest}
-	err.Errorf("Invalid content type: %s", c.ContentType())
-	c.JSON(err.Code, err)
-	return false
-}
-
-func assureDecode(c *gin.Context, val interface{}) bool {
-	if !assureContentType(c, "application/json") {
-		return false
-	}
-	if c.Request.ContentLength == 0 {
-		val = nil
-		return true
-	}
-	marshalErr := binding.JSON.Bind(c.Request, &val)
-	if marshalErr == nil {
-		return true
-	}
-	err := &models.Error{Type: c.Request.Method, Code: http.StatusBadRequest}
-	err.AddError(marshalErr)
-	c.JSON(err.Code, err)
-	return false
-}
-
-func publishHandler(c *gin.Context, pc *PluginClient) {
+func publishHandler(w http.ResponseWriter, r *http.Request, pc *PluginClient) {
 	var event models.Event
-	if !assureDecode(c, &event) {
+	if !mux.AssureDecode(w, r, &event) {
 		return
 	}
 	resp := models.Error{Code: http.StatusOK}
@@ -56,74 +20,37 @@ func publishHandler(c *gin.Context, pc *PluginClient) {
 		resp.Code = 409
 		resp.AddError(err)
 	}
-	c.JSON(resp.Code, resp)
+	mux.JsonResponse(w, resp.Code, resp)
 }
 
-func logHandler(c *gin.Context, pc *PluginClient) {
+func logHandler(w http.ResponseWriter, r *http.Request, pc *PluginClient) {
 	var line logger.Line
-	if !assureDecode(c, &line) {
+	if !mux.AssureDecode(w, r, &line) {
 		return
 	}
 	if line.Level == logger.Fatal || line.Level == logger.Panic {
 		line.Level = logger.Error
 	}
 	pc.AddLine(&line)
-	c.JSON(204, nil)
-}
-
-func newGinServer(bl logger.Logger) *gin.Engine {
-	gin.SetMode(gin.ReleaseMode)
-	mgmtApi := gin.New()
-	mgmtApi.Use(func(c *gin.Context) {
-		l := bl.Fork()
-		if logLevel := c.GetHeader("X-Log-Request"); logLevel != "" {
-			lvl, err := logger.ParseLevel(logLevel)
-			if err != nil {
-				l.Errorf("Invalid requested log level %s", logLevel)
-			} else {
-				l = l.Trace(lvl)
-			}
-		}
-		if logToken := c.GetHeader("X-Log-Token"); logToken != "" {
-			l.Errorf("Log token: %s", logToken)
-		}
-		c.Set("logger", l)
-		start := time.Now()
-		path := c.Request.URL.Path
-		raw := c.Request.URL.RawQuery
-		c.Next()
-		latency := time.Now().Sub(start)
-		clientIP := c.ClientIP()
-		method := c.Request.Method
-		statusCode := c.Writer.Status()
-		if raw != "" {
-			path = path + "?" + raw
-		}
-		l.Debugf("API: st: %d lt: %13v ip: %15s m: %s %s",
-			statusCode,
-			latency,
-			clientIP,
-			method,
-			path,
-		)
-	})
-	mgmtApi.Use(gin.Recovery())
-
-	return mgmtApi
+	mux.JsonResponse(w, 204, nil)
 }
 
 func (pc *PluginClient) pluginServer(commDir string) {
 	pc.Tracef("pluginServer: Starting com server: %s(%s)\n", pc.plugin, commDir)
-
-	gc := newGinServer(pc.NoPublish())
-	apiGroup := gc.Group("/api-server-plugin/v3")
-
-	apiGroup.POST("/publish", func(c *gin.Context) { publishHandler(c, pc) })
-	apiGroup.POST("/log", func(c *gin.Context) { logHandler(c, pc) })
+	pmux := mux.New(pc.NoPublish())
+	pmux.Handle("/api-server-plugin/v3/publish",
+		func(w http.ResponseWriter, r *http.Request) { publishHandler(w, r, pc) })
+	pmux.Handle("/api-server-plugin/v3/log",
+		func(w http.ResponseWriter, r *http.Request) { logHandler(w, r, pc) })
 	// apiGroup.POST("/object", func(c *gin.Context) { objectHandler(c, pc) })
-
 	go func() {
-		if err := gc.RunUnix(commDir); err != nil {
+		os.Remove(commDir)
+		sock, err := net.Listen("unix", commDir)
+		if err != nil {
+			return
+		}
+		defer sock.Close()
+		if err := http.Serve(sock, pmux); err != nil {
 			pc.Errorf("pluginServer: Finished (error) com server: %s(%s): %v\n", pc.plugin, commDir, err)
 		} else {
 			pc.Tracef("pluginServer: Finished com server: %s(%s)\n", pc.plugin, commDir)
