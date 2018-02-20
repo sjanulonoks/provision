@@ -1,14 +1,16 @@
 hash: e5158e4f5d9b79afe806f75dcd1798869ac7665113daae66d466ce0793c83bc2
-updated: 2018-01-23T10:54:38.116322-06:00
+updated: 2018-02-20T12:03:13.950432409-06:00
 imports:
+- name: github.com/armon/go-metrics
+  version: 7aa49fde808223f8dadfdbfd3a20ff6c19e5f9ec
 - name: github.com/boltdb/bolt
-  version: 2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8
+  version: 9da31745363232bc1e27dbab3569e77383a51585
 - name: github.com/cpuguy83/go-md2man
-  version: 1d903dcb749992f3741d744c0f8376b4bd7eb3e1
+  version: 48d8747a2ca13185e7cc8efe6e9fc196a83f71a5
   subpackages:
   - md2man
 - name: github.com/dgrijalva/jwt-go
-  version: a539ee1a749a2b895533f979515ac7e6e0f5b650
+  version: dbeaa9332f19a944acb5736b4456cfcc02140e29
 - name: github.com/digitalrebar/logger
   version: df37e916ed309e30f623151516522f436f5aa73c
 - name: github.com/digitalrebar/pinger
@@ -20,55 +22,61 @@ imports:
 - name: github.com/elithrar/simple-scrypt
   version: 2325946f714c95de4a6088202c402fbdfa64163b
 - name: github.com/fsnotify/fsnotify
-  version: 4da3e2cfbabc9f751898f250b49f2439785783a1
+  version: c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9
 - name: github.com/ghodss/yaml
   version: 0ca9ea5df5451ffdf184b4428c902747c2c11cd7
 - name: github.com/gin-contrib/cors
-  version: 88488351b0df049b2d3d65cab583c6bed894abb2
+  version: 51f0ef8b07e973afb8b6c192bf90d5c3e575c01a
 - name: github.com/gin-contrib/location
-  version: 3e26b9c1187f298ae3669e41d1b696d256113f66
+  version: 5220ebf8be6c350431168cbd884f2c0ace0e3f4c
 - name: github.com/gin-contrib/sse
   version: 22d885f9ecc78bf4ee5d72b937e4bbcdc58e8cae
 - name: github.com/gin-gonic/gin
-  version: 8902826696c1dad024e1c8ba4f903aa61a25c839
+  version: 783c7ee9c14eac0e65b501664b4f553291556b43
   subpackages:
   - binding
   - json
   - render
 - name: github.com/golang/protobuf
-  version: ab9f9a6dab164b7d1246e0e688b0ab7b94d8553e
+  version: bbd03ef6da3a115852eaf24c8a1c46aeb39aa175
   subpackages:
   - proto
 - name: github.com/gorilla/websocket
-  version: a69d9f6de432e2c6b296a947d8a5ee88f68522cf
+  version: f37d1588608ec036fa9b0b7b8afbde47dc06aea9
 - name: github.com/hashicorp/consul
-  version: a0b974620c29ec9372fa0583b4f1d0f0315062c8
+  version: 4c90fbfd90b62889daf8c178ff5eb1a04c996a5c
   subpackages:
   - api
 - name: github.com/hashicorp/go-cleanhttp
-  version: 3573b8b52aa7b37b9358d966a898feb387f62437
+  version: d5fe4b57a186c716b0e00b8c301cbd9b4182694d
+- name: github.com/hashicorp/go-immutable-radix
+  version: 7f3cd4390caab3250a57f30efdb2a65dd7649ecf
 - name: github.com/hashicorp/go-rootcerts
   version: 6bb64b370b90e7ef1fa532be9e591a81c3493e00
+- name: github.com/hashicorp/golang-lru
+  version: 0fb14efe8c47ae851c0034ed7a448854d3d34cf3
+  subpackages:
+  - simplelru
 - name: github.com/hashicorp/serf
-  version: b84a66cc5575994cb672940d244a2404141688c0
+  version: d4f33d5b6a0b7b252b122dc80d559e9e5280d2d4
   subpackages:
   - coordinate
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/jessevdk/go-flags
-  version: 6cf8f02b4ae8ba723ddc64dcfd403e530c06d927
+  version: f88afde2fa19a30cf50ba4b05b3d13bc6bae3079
 - name: github.com/json-iterator/go
-  version: 2dc0031b26575ddf5dab09ab7795105a05575473
+  version: e7c7f3b33712573affdcc7a107218e7926b9a05b
 - name: github.com/krolaw/dhcp4
-  version: 4de04cc59d6e4223583ec8117238e4d57e8b176d
+  version: 4abfceffa76a675ea43d133e49aad64c821d32bf
   subpackages:
   - conn
 - name: github.com/mattn/go-isatty
-  version: fc9e8d8ef48496124e79ae0df75490096eccf6fe
+  version: 6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c
 - name: github.com/mitchellh/go-homedir
   version: b8bc1bf767474819792c23f32d8286a45736f1c6
 - name: github.com/pborman/uuid
-  version: e790cca94e6cc75c7064b1332e63811d4aae1a53
+  version: c65b2f87fee37d1c7854c9164a450713c28d50cd
 - name: github.com/pin/tftp
   version: d715325c1fc1f1a22a8272a60dc6783a5ab093ba
   subpackages:
@@ -81,17 +89,17 @@ imports:
   - plugins/storage
   - plugins/system
 - name: github.com/russross/blackfriday
-  version: 4048872b16cc0fc2c5fd9eacf0ed2c2fedaa0c8c
+  version: 55d61fa8aa702f59229e6cff85793c22e580eaf5
 - name: github.com/spf13/cobra
-  version: 2df9a531813370438a4d79bfc33e21f58063ed87
+  version: be77323fc05148ef091e83b3866c0d47c8e74a8b
   subpackages:
   - doc
 - name: github.com/spf13/pflag
-  version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
+  version: ee5fd03fd6acfd43e44aea0b4135958546ed8e73
 - name: github.com/tylerb/graceful
   version: d72b0151351a13d0421b763b88f791469c4f5dc7
 - name: github.com/ugorji/go
-  version: 8c0409fcbb70099c748d71f714529204975f6c3f
+  version: b5b949564861e43a03568a0b134c135cf318e5c8
   subpackages:
   - codec
 - name: github.com/VictorLowther/godmi
@@ -101,24 +109,24 @@ imports:
   subpackages:
   - utils
 - name: github.com/vishvananda/netlink
-  version: f67b75edbf5e3bb7dfe70bb788610693a71be3d1
+  version: 25d2c79295b361cac34eb41cfae90d5c69078b2a
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
   version: be1fbeda19366dea804f00efff2dd73a1642fdcc
 - name: github.com/xeipuuv/gojsonpointer
-  version: 6fe8760cad3569743d51ddbb243b26f8456742dc
+  version: 4e3ac2762d5f479393488629ee9370b50873b3a6
 - name: github.com/xeipuuv/gojsonreference
-  version: e02fc20de94c78484cd5ffb007f8af96be030a45
+  version: bd5ef7bd5415a7ac448318e64f11a24cd21e594b
 - name: github.com/xeipuuv/gojsonschema
-  version: 0c8571ac0ce161a5feb57375a9cdf148c98c0f70
+  version: 8bcffc811467a5f691810420385be6e66b35a317
 - name: golang.org/x/crypto
-  version: 81e90905daefcd6fd217b62423c0908922eadb30
+  version: 432090b8f568c018896cd8a0fb0345872bbac6ce
   subpackages:
   - pbkdf2
   - scrypt
 - name: golang.org/x/net
-  version: 66aacef3dd8a676686c7ae3716979581e8b03c47
+  version: cbe0f9307d0156177f9dd5dc85da1a31abc5f2fb
   subpackages:
   - bpf
   - context
@@ -129,7 +137,7 @@ imports:
   - ipv6
   - route
 - name: golang.org/x/sys
-  version: 2d6f6f883a06fc0d5f4b14a81e4c28705ea64c15
+  version: 37707fdb30a5b38865cfb95e5aab41707daec7fd
   subpackages:
   - unix
 - name: gopkg.in/go-playground/validator.v8
