@@ -548,7 +548,7 @@ var jobLockMap = map[string][]string{
 	"update":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
 	"patch":   []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
 	"delete":  []string{"machines", "jobs"},
-	"actions": []string{"stages", "jobs", "machines", "tasks", "profiles", "bootenvs"},
+	"actions": []string{"stages", "jobs", "machines", "tasks", "profiles", "bootenvs", "params"},
 }
 
 func (j *Job) Locks(action string) []string {

@@ -7,7 +7,6 @@ package main
 import (
 	"os"
 
-	"github.com/digitalrebar/provision/embedded"
 	"github.com/digitalrebar/provision/server"
 	"github.com/jessevdk/go-flags"
 )
@@ -23,8 +22,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
-	embedded.IncludeMeFunction()
 
 	server.Server(&c_opts)
 }
