@@ -268,9 +268,9 @@ func (dhr *DhcpRequest) coalesceOptions(
 	// Otherwise, assume we will want to offer PXE information unless
 	// we can tie the incoming packet to a machine we know about and we
 	// can determine that we should not attempt to PXE boot it.
-	rt := dhr.Request("machines", "bootenvs")
 	var machine *backend.Machine
 	var bootEnv *backend.BootEnv
+	rt := dhr.Request(machine.Locks("update")...)
 	rt.Do(func(d backend.Stores) {
 		machine = rt.MachineForMac(dhr.pkt.CHAddr().String())
 		if machine == nil {
@@ -325,7 +325,7 @@ func (dhr *DhcpRequest) coalesceOptions(
 			}
 		}
 		if machineSave {
-			rt.Infof("%s: Updating machine %s address from %s to %s", machine.UUID(), machine.Address, l.Addr)
+			rt.Warnf("%s: Updating machine %s address from %s to %s", machine.UUID(), machine.Address, l.Addr)
 			machine.Address = l.Addr
 			rt.Save(machine)
 		}
