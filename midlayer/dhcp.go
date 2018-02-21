@@ -325,7 +325,7 @@ func (dhr *DhcpRequest) coalesceOptions(
 			}
 		}
 		if machineSave {
-			rt.Warnf("%s: Updating machine %s address from %s to %s", machine.UUID(), machine.Address, l.Addr)
+			rt.Warnf("%s: Updating machine %s address from %s to %s", dhr.xid(), machine.UUID(), machine.Address, l.Addr)
 			machine.Address = l.Addr
 			rt.Save(machine)
 		}
