@@ -267,9 +267,13 @@ case $1 in
              fi
 
              if [[ $NO_CONTENT == false ]] ; then
-                 echo "Installing Version $DRP_VERSION of Digital Rebar Provision Community Content"
-                 curl -sfL -o drp-community-content.yaml https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.yaml || echo "Failed to dowload content."
-                 curl -sfL -o drp-community-content.sha256 https://github.com/digitalrebar/provision-content/releases/download/$DRP_VERSION/drp-community-content.sha256 || echo "Failed to download sha of content."
+                 DRP_CONTENT_VERSION=stable
+                 if [[ $DRP_VERSION == tip ]] ; then
+                     DRP_CONTENT_VERSION=tip
+                 fi
+                 echo "Installing Version $DRP_CONTENT_VERSION of Digital Rebar Provision Community Content"
+                 curl -sfL -o drp-community-content.yaml https://github.com/digitalrebar/provision-content/releases/download/$DRP_CONTENT_VERSION/drp-community-content.yaml || echo "Failed to dowload content."
+                 curl -sfL -o drp-community-content.sha256 https://github.com/digitalrebar/provision-content/releases/download/$DRP_CONTENT_VERSION/drp-community-content.sha256 || echo "Failed to download sha of content."
                  $shasum -c drp-community-content.sha256
              fi
 
