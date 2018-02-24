@@ -136,6 +136,7 @@ esac
 ensure_packages() {
     echo "Ensuring required tools are installed"
     if [[ $OS_FAMILY == darwin ]] ; then
+        error=0
         VER=$(tar -h | grep "bsdtar " | awk '{ print $2 }' | awk -F. '{ print $1 }')
         if [[ $VER != 3 ]] ; then
             echo "Please update tar to greater than 3.0.0"
@@ -144,13 +145,18 @@ ensure_packages() {
             echo "  brew install libarchive --force"
             echo "  brew link libarchive --force"
             echo
-            echo "Close current terminal and open a new terminal"
-            echo
-            exit 1
+            error=1
         fi
         if ! which 7z &>/dev/null; then
             echo "Must have 7z"
             echo "E.g: brew install p7zip"
+            echo
+            error=1
+        fi
+        if [[ $error == 1 ]] ; then
+            echo "After install missing components, restart the terminal to pick"
+            echo "up the newly installed commands."
+            echo
             exit 1
         fi
     else
@@ -365,18 +371,7 @@ case $1 in
                      fi
                  fi
 
-                 if [[ $IPADDR ]] ; then
-                     IPADDR="--static-ip=${IPADDR}"
-                 fi
-
-                 set +e
-                 ./dr-provision --help | grep -q base-root
-                 if [[ $? -eq 0 ]] ; then
-                     echo "sudo ./dr-provision $IPADDR --base-root=`pwd`/drp-data --local-content=\"\" --default-content=\"\" &"
-                 else
-                     echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar --local-store=\"\" --default-store=\"\" &"
-                 fi
-                 set -e
+                 echo "sudo ./dr-provision --base-root=`pwd`/drp-data --local-content=\"\" --default-content=\"\" &"
                  mkdir -p "`pwd`/drp-data/saas-content"
                  if [[ $NO_CONTENT == false ]] ; then
                      DEFAULT_CONTENT_FILE="`pwd`/drp-data/saas-content/default.yaml"
