@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
@@ -20,13 +21,20 @@ func (h *TftpHandler) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+func OsUdpProtoCheck() string {
+	if runtime.GOOS == "darwin" {
+		return "udp4"
+	}
+	return "udp"
+}
+
 func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 	log logger.Logger, pubs *backend.Publishers) (Service, error) {
-	a, err := net.ResolveUDPAddr("udp", listen)
+	a, err := net.ResolveUDPAddr(OsUdpProtoCheck(), listen)
 	if err != nil {
 		return nil, err
 	}
-	conn, err := net.ListenUDP("udp", a)
+	conn, err := net.ListenUDP(OsUdpProtoCheck(), a)
 	if err != nil {
 		return nil, err
 	}
