@@ -22,6 +22,7 @@ Options:
                             # specific version label.  Defaults to: $DEFAULT_DRP_VERSION
     --commit=<string>       # github commit file to wait for.  Unset assumes the files
                             # are in place
+    --remove-data           # Remove data as well as program pieces
 
     install                 # Sets up an insolated or system 'production' enabled install.
     remove                  # Removes the system enabled install.  Requires no other flags
@@ -42,6 +43,7 @@ ISOLATED=false
 NO_CONTENT=false
 DBG=false
 UPGRADE=false
+REMOVE_DATA=false
 
 args=()
 while (( $# > 0 )); do
@@ -64,6 +66,9 @@ while (( $# > 0 )); do
             ;;
         --force)
             force=true
+            ;;
+        --remove-data)
+            REMOVE_DATA=true
             ;;
         --commit)
             COMMIT=${arg_data}
@@ -184,12 +189,11 @@ ensure_packages() {
 
 arch=$(uname -m)
 case $arch in
-	x86_64|amd64) arch=amd64  ;;
-	aarch64)      arch=arm64  ;;
+  x86_64|amd64) arch=amd64  ;;
+  aarch64)      arch=arm64  ;;
   armv7l)       arch=arm_v7 ;;
-	*) 	echo "FATAL: architecture ('$arch') not supported"
-		exit 1 
-	;;
+  *)            echo "FATAL: architecture ('$arch') not supported"
+                exit 1;;
 esac
 
 case $(uname -s) in
@@ -390,7 +394,22 @@ case $1 in
 
              ;;
      remove)
-         sudo rm -f "$bindest/dr-provision" "$bindest/drpcli" "$initdest";;
+         if [[ $ISOLATED == true ]] ; then
+             echo "Remove the directory that the initial isolated install was done in."
+             exit 0
+         fi
+         if pgrep dr-provision; then
+             echo "'dr-provision' service is running, CAN NOT remove ... please stop service first"
+             exit 9
+         else
+             echo "'dr-provision' service is not running, beginning removal process ... "
+         fi
+         echo "Removing program and service files"
+         sudo rm -f "$bindest/dr-provision" "$bindest/drpcli" "$initdest"
+         if [[ $REMOVE_DATA == true ]] ; then
+             echo "Removing data files"
+             sudo rm -rf "/usr/share/dr-provision" "/etc/dr-provision" "/var/lib/dr-provision"
+         fi;;
      *)
          echo "Unknown action \"$1\". Please use 'install' or 'remove'";;
 esac
