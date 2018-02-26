@@ -22,6 +22,7 @@ Options:
                             # specific version label.  Defaults to: $DEFAULT_DRP_VERSION
     --commit=<string>       # github commit file to wait for.  Unset assumes the files
                             # are in place
+    --remove-data           # Remove data as well as program pieces
 
     install                 # Sets up an insolated or system 'production' enabled install.
     remove                  # Removes the system enabled install.  Requires no other flags
@@ -42,6 +43,7 @@ ISOLATED=false
 NO_CONTENT=false
 DBG=false
 UPGRADE=false
+REMOVE_DATA=false
 
 args=()
 while (( $# > 0 )); do
@@ -64,6 +66,9 @@ while (( $# > 0 )); do
             ;;
         --force)
             force=true
+            ;;
+        --remove-data)
+            REMOVE_DATA=true
             ;;
         --commit)
             COMMIT=${arg_data}
@@ -136,6 +141,7 @@ esac
 ensure_packages() {
     echo "Ensuring required tools are installed"
     if [[ $OS_FAMILY == darwin ]] ; then
+        error=0
         VER=$(tar -h | grep "bsdtar " | awk '{ print $2 }' | awk -F. '{ print $1 }')
         if [[ $VER != 3 ]] ; then
             echo "Please update tar to greater than 3.0.0"
@@ -144,13 +150,18 @@ ensure_packages() {
             echo "  brew install libarchive --force"
             echo "  brew link libarchive --force"
             echo
-            echo "Close current terminal and open a new terminal"
-            echo
-            exit 1
+            error=1
         fi
         if ! which 7z &>/dev/null; then
             echo "Must have 7z"
             echo "E.g: brew install p7zip"
+            echo
+            error=1
+        fi
+        if [[ $error == 1 ]] ; then
+            echo "After install missing components, restart the terminal to pick"
+            echo "up the newly installed commands."
+            echo
             exit 1
         fi
     else
@@ -178,12 +189,11 @@ ensure_packages() {
 
 arch=$(uname -m)
 case $arch in
-	x86_64|amd64) arch=amd64  ;;
-	aarch64)      arch=arm64  ;;
+  x86_64|amd64) arch=amd64  ;;
+  aarch64)      arch=arm64  ;;
   armv7l)       arch=arm_v7 ;;
-	*) 	echo "FATAL: architecture ('$arch') not supported"
-		exit 1 
-	;;
+  *)            echo "FATAL: architecture ('$arch') not supported"
+                exit 1;;
 esac
 
 case $(uname -s) in
@@ -365,18 +375,7 @@ case $1 in
                      fi
                  fi
 
-                 if [[ $IPADDR ]] ; then
-                     IPADDR="--static-ip=${IPADDR}"
-                 fi
-
-                 set +e
-                 ./dr-provision --help | grep -q base-root
-                 if [[ $? -eq 0 ]] ; then
-                     echo "sudo ./dr-provision $IPADDR --base-root=`pwd`/drp-data --local-content=\"\" --default-content=\"\" &"
-                 else
-                     echo "sudo ./dr-provision $IPADDR --file-root=`pwd`/drp-data/tftpboot --data-root=drp-data/digitalrebar --local-store=\"\" --default-store=\"\" &"
-                 fi
-                 set -e
+                 echo "sudo ./dr-provision --base-root=`pwd`/drp-data --local-content=\"\" --default-content=\"\" &"
                  mkdir -p "`pwd`/drp-data/saas-content"
                  if [[ $NO_CONTENT == false ]] ; then
                      DEFAULT_CONTENT_FILE="`pwd`/drp-data/saas-content/default.yaml"
@@ -395,7 +394,22 @@ case $1 in
 
              ;;
      remove)
-         sudo rm -f "$bindest/dr-provision" "$bindest/drpcli" "$initdest";;
+         if [[ $ISOLATED == true ]] ; then
+             echo "Remove the directory that the initial isolated install was done in."
+             exit 0
+         fi
+         if pgrep dr-provision; then
+             echo "'dr-provision' service is running, CAN NOT remove ... please stop service first"
+             exit 9
+         else
+             echo "'dr-provision' service is not running, beginning removal process ... "
+         fi
+         echo "Removing program and service files"
+         sudo rm -f "$bindest/dr-provision" "$bindest/drpcli" "$initdest"
+         if [[ $REMOVE_DATA == true ]] ; then
+             echo "Removing data files"
+             sudo rm -rf "/usr/share/dr-provision" "/etc/dr-provision" "/var/lib/dr-provision"
+         fi;;
      *)
          echo "Unknown action \"$1\". Please use 'install' or 'remove'";;
 esac
