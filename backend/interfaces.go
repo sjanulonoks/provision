@@ -12,7 +12,9 @@ func (dt *DataTracker) GetInterfaces() ([]*models.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	dnsConf := dnsReadConfig("/etc/resolv.conf")
 	ifs := make([]*models.Interface, 0, 0)
+	iface, gw, err := defaultIPByRoute()
 	for _, intf := range intfs {
 		if (intf.Flags & net.FlagLoopback) == net.FlagLoopback {
 			continue
@@ -65,7 +67,12 @@ func (dt *DataTracker) GetInterfaces() ([]*models.Interface, error) {
 			Addresses:     addrList,
 			ActiveAddress: sip,
 		}
+		ii.DnsServers = dnsConf.servers
+		ii.DnsDomain = dnsConf.domain
 		ii.ReadOnly = true
+		if iface.Name == intf.Name && gw != nil {
+			ii.Gateway = gw.String()
+		}
 		ifs = append(ifs, ii)
 	}
 
