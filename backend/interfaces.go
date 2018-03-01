@@ -68,7 +68,7 @@ func (dt *DataTracker) GetInterfaces() ([]*models.Interface, error) {
 			ActiveAddress: sip,
 		}
 		ii.DnsServers = dnsConf.servers
-		ii.DnsDomain = dnsConf.domain
+		ii.DnsDomain = strings.TrimRight(dnsConf.domain, ".")
 		ii.ReadOnly = true
 		if iface.Name == intf.Name && gw != nil {
 			ii.Gateway = gw.String()
