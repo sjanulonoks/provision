@@ -393,10 +393,18 @@ func (j *Job) Validate() {
 		j.Errorf("Machine %s does not exist", j.Machine.String())
 	} else {
 		m = AsMachine(om)
-		if j.oldState != j.State && j.State == "failed" {
-			m.Runnable = false
-			_, e2 := j.rt.Save(m)
-			j.AddError(e2)
+		if j.oldState != j.State {
+			if j.State == "failed" {
+				m.Runnable = false
+				_, e2 := j.rt.Save(m)
+				j.AddError(e2)
+			} else if j.State == "finished" && m.CurrentTask+1 == len(m.Tasks) {
+				// We are at the end of task list. Bump here to let stages changes if the runner
+				// never comes back.
+				m.CurrentTask = len(m.Tasks)
+				_, e2 := j.rt.Save(m)
+				j.AddError(e2)
+			}
 		}
 	}
 
