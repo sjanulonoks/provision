@@ -49,7 +49,8 @@ cd $OLDPWD
 
 echo "Version = $Prepart$MajorV.$MinorV.$PatchV$Extra-$GITHASH"
 
-export VERFLAGS="-X github.com/digitalrebar/provision.RS_MAJOR_VERSION=$MajorV \
+export VERFLAGS="-s -w \
+          -X github.com/digitalrebar/provision.RS_MAJOR_VERSION=$MajorV \
           -X github.com/digitalrebar/provision.RS_MINOR_VERSION=$MinorV \
           -X github.com/digitalrebar/provision.RS_PATCH_VERSION=$PatchV \
           -X github.com/digitalrebar/provision.RS_EXTRA=$Extra \
