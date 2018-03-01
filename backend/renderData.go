@@ -538,6 +538,7 @@ func (r *RenderData) GenerateToken() string {
 			Add("info", "get", "*").
 			Add("events", "post", "*").
 			Add("reservations", "create", "*").
+			Add("reservations", "*", models.Hexaddr(r.Machine.Address)).
 			AddMachine(r.Machine.Key()).
 			AddSecrets("", grantorSecret, r.Machine.Secret).
 			Seal(r.rt.dt.tokenManager)
@@ -571,6 +572,7 @@ func (r *RenderData) GenerateInfiniteToken() string {
 		Add("info", "get", "*").
 		Add("events", "post", "*").
 		Add("reservations", "create", "*").
+		Add("reservations", "*", models.Hexaddr(r.Machine.Address)).
 		AddMachine(r.Machine.Key()).
 		AddSecrets("", grantorSecret, r.Machine.Secret).
 		Seal(r.rt.dt.tokenManager)
