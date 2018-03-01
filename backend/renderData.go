@@ -2,6 +2,7 @@ package backend
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -669,6 +670,17 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 		}
 	}
 	return nil, fmt.Errorf("No such machine parameter %s", key)
+}
+
+func (r *RenderData) ParamAsJSON(key string) (string, error) {
+	v, err := r.Param(key)
+	if err != nil {
+		return "", err
+	}
+	buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
+	err = enc.Encode(v)
+	return buf.String(), err
 }
 
 // ParamExists is a helper function for determining the existence of a machine parameter.
