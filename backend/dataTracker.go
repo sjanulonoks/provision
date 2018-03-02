@@ -51,6 +51,9 @@ chain tftp://{{.ProvisionerAddress}}/${netX/ip}.ipxe || exit
 			},
 			Meta: map[string]string{
 				"feature-flags": "change-stage-v2",
+				"icon":          "circle thin",
+				"color":         "green",
+				"title":         "Digital Rebar Provision",
 			},
 		}
 
@@ -99,6 +102,9 @@ exit
 			},
 			Meta: map[string]string{
 				"feature-flags": "change-stage-v2",
+				"icon":          "radio",
+				"color":         "green",
+				"title":         "Digital Rebar Provision",
 			},
 		}
 		noneStage = &models.Stage{
