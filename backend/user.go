@@ -75,9 +75,7 @@ func (u *User) ChangePassword(rt *RequestTracker, newPass string) error {
 		return err
 	}
 	u.PasswordHash = ph
-	if u.rt != nil {
-		_, err = rt.Save(u)
-	}
+	_, err = rt.Save(u)
 	return err
 }
 
