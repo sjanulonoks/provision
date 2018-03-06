@@ -147,6 +147,9 @@ func (s *Stage) Validate() {
 		// If we have not been validated at this point, return.
 		return
 	}
+	// With FSM Runner - Runner always Waits - to begin deprecation process
+	// we will always mark the stage as RunnerWait true
+	s.RunnerWait = true
 	// We are syntactically valid, although we may not be useable.
 	s.renderers = renderers{}
 	// First, the stuff that must be correct in order for
