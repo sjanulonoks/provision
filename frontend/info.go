@@ -45,6 +45,7 @@ func (f *Frontend) GetInfo(c *gin.Context, drpid string) (*models.Info, *models.
 			"profileless-machine",
 			"threaded-log-levels",
 			"plugin-v2",
+			"fsm-runner",
 		},
 	}
 
