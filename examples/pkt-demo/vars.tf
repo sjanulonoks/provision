@@ -10,7 +10,7 @@
 variable "packet_api_key" { default = "insert_api_key_here" }
 
 // Your Project ID, you can see it here https://app.packet.net/portal#/projects/list/table
-// NOTE:  THIS WILL BE MODIFIED FOR YOU !!
+// NOTE:  THIS WILL BE MODIFIED FOR YOU !! DO NOT change the formatting of the below line
 variable "packet_project_id" { default = "insert_project_id_here" }
 
 //
@@ -29,7 +29,7 @@ provider "packet" {
 //          character prefix for the cluster name.  This will be
 //          combined to create unique hostnames.
 //
-// maintain single line for cluster_name for automated use
+// DO NOT change the formatting of the below line !!
 variable "cluster_name" { default = "demo" }
 
 // set your Packet billing cycle 

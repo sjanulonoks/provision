@@ -1,4 +1,4 @@
-# Copyright (c) 2017 RackN Inc.
+# Copyright (c) 2018 RackN Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,31 +23,44 @@ NOTE:  This example used to be called "5min-demo".  It has been renamed
 OVERVIEW AND IMPORTANT REQUIREMENTS
 -----------------------------------
 
-You will need to perform the following requirements in preparation to
-using this demo pkt-demo process - details on these steps is provided
-further down in this README:
+You will need to perform the following FOUR EASY STEPS  in preparation 
+to using this demo pkt-demo process.  Details for each step are below.
 
-  * get the pkt-demo code from the github repo
+  1. GIT CLONE
+    - get the pkt-demo code from the github repo
 
-  * get your API and Username secrets - modify the "secrets" file
-    * have a packet.net account, and your API KEY, and PROJECT ID
-    * get your RackN USERNAME for registered content download authorization
+  2. SECRETS
+     - get your API and Username secrets - modify 'private-contents/secrets' file
+       * have a packet.net account, and your API KEY, and PROJECT ID
+       * get your RackN USERNAME for registered content download authorization
 
-  * [optional] make changes to the terraform "vars.tf" parameters
+  3. CUSTOMIZE
+     - make changes to the terraform "vars.tf" parameters
+
+  4. RUN demo-run.sh SCRIPT
+     - actually run the demo setup script
+
+Additional Sections (hopefully useful) of documentation:
+  
+  * WHAT HAPPENS
+  * PACKET SECRETS NOTE
+  * GENERAL NOTES
+  * CLEANUP
+  * OPERATING AND TROUBLESHOOTING
+  * ADVANCED USAGE OPTIONS
 
 
-NOTE: The terraform-provider-plugin has been updated in the public repo,
-      it's no longer necessary to get/build it manually and pre-stage it.
+DETAILED STEPS
+--------------
 
-
-GIT CLONE
----------
+1. GIT CLONE
+============
 
 *If you do not have the Repo Cloned already, do:*
 
-The following steps will clone this content from the digitalrebar/provision 
-github repo (we assume you will run this from $HOME/pkt-demo - adjust yourself
-accordingly if you want to put it somewhere else):
+  The following steps will clone this content from the digitalrebar/provision 
+  github repo (we assume you will run this from $HOME/pkt-demo - adjust yourself
+  accordingly if you want to put it somewhere else):
 
     git clone -n https://github.com/digitalrebar/provision.git --depth=1
     cd provision
@@ -58,19 +71,26 @@ accordingly if you want to put it somewhere else):
     rm -rf provision
     cd $HOME/pkt-demo
 
+  DO NOT run these steps with 'sudo', your username should own the new directory and files.
+
+
 *If you DO have the Repo Cloned already, do:*
 
-Simply copy the `digitalrebar/provision/examples/pkt-demo` directory to a new
-location.  For example: 
+  Simply copy the `digitalrebar/provision/examples/pkt-demo` directory to a new
+  location.  For example: 
 
     cp -r <path_to_github_clone>/digitalrebar/provision/examples/pkt-demo $HOME/mydemo
     cd $HOME/mydemo
 
 
-SECRETS INFORMATION
--------------------
+2. SECRETS
+==========
 
-EDIT THE SECRETS FILE !!  Located in private-content/secrets.  You need:
+ABSOLUTELY necessary - to authenticate to the packet.net API services and spin
+up Nodes, and to authenticate to the RackN Portal to download content and
+plugins.
+
+EDIT THE SECRETS FILE !!  Located in 'private-content/secrets'.  You need:
 
   API       packet.net key for access to your Packet Project
   PROJECT   packet.net project to create DRP and Nodes in 
@@ -80,39 +100,34 @@ EDIT THE SECRETS FILE !!  Located in private-content/secrets.  You need:
 
     vim private-content/secrets
 
-  API and PROJECT are from packet.net and you should find them in your
-  Packet portal management
+  * API and PROJECT are from packet.net and you should find them in your
+    Packet portal management (see PACKET SECRETS NOTE below for details).
 
-  USERNAME is from the RackN Portal - to find your USERNAME, log in 
-  to the portal, and navigate to:
+  * USERNAME is from the RackN Portal - to find your USERNAME, log in 
+    to the portal, and navigate to:
 
-    Hamburger Menu (3 horizontal lines in upper left)
-    User Profile
-    Unique User Identifier
+      Hamburger Menu (3 horizontal lines in upper left)
+      User Profile
+      Account ID
 
-  Direct URL:  https://rackn.github.io/provision-ux/#/user/ 
+      Direct URL:  https://portal.rackn.io/#/user/
 
-  It will be a big ugly UUID like string like:  ad9914b7-60bd-49d9-81d0-95e532e7ce1c
-
-
-  NOTE: Please do not modify the following in the 'secrets' file:
-        API_KEY, PROJECT_ID, and RACKN_USERNAME 
+    It will be a big ugly UUID like string like:  ad9914b7-60bd-49d9-81d0-95e532e7ce1c
 
 
-FINAL CHECK BEFORE RUNNING
---------------------------
+NOTE: Please do not modify the following in the 'secrets' file:
+      API_KEY, PROJECT_ID, and RACKN_USERNAME 
+
+
+3. CUSTOMIZATION
+================
 
   * make sure you've modified the 'secrets' file appropriately 
+    (see '3. SECRETS' above)
     (inject API, PROJECT, and USERNAME)
 
-  * make sure you've modified the 'vars.tf' file to suit your use
-    (change 'cluster_name', 'machines_count', etc....)
-
-
-[optional] MODIFY THE TERRAFORM "vars.tf" FILE
-----------------------------------------------
-
-  * you may optionally make changes to the "vars.tf" file - specifically, you can 
+  * HIGHLY suggested - modify the "cluster_name":
+    You may optionally make changes to the "vars.tf" file - specifically, you can 
     set the "cluster_name" to something other than "demo" - if you instantiate
     multiple DRP/Machines clusters, then the names will collide in the packet.net
     portal.  Changing the "cluster_name" will help in identifying which resources
@@ -121,13 +136,13 @@ FINAL CHECK BEFORE RUNNING
   * you can modify which Operating System the DRP endpoint is running on - the only
     two supported/tested are Centos 7 and Ubuntu 16.04
 
-  * specify the number of Machines to provision 
+  * specify the number of Machines to provision (default is 1 machine of type_0)
 
-  * change the packet.net facility to provsion the cluster in 
+  * change the packet.net facility to provsion the cluster in  (default is EWR1)
 
 
-RUN DEMO-RUN.SH SCRIPT
-----------------------
+4. RUN demo-run.sh SCRIPT
+=========================
 
 The 'demo-run.sh' is the control script that will walk you through the deployment
 process.  Simply start this script. 
@@ -140,6 +155,8 @@ answer "no" to the "ACTION" input.
 USAGE options for "demo-run.sh"
 
   CONFIRM=no ./demo-run.sh      # disable prompting for each step - auto run
+                                # we suggest NOT doing this the first time!!
+
   SKIP_LOCAL=yes ./demo-run.sh  # skip installing DRP locally - if you have a
                                 # current copy installed already - mostly used
                                 # in bandwidth constrained environments to 
@@ -147,8 +164,12 @@ USAGE options for "demo-run.sh"
 
   CONFIRM and SKIP_LOCAL can be combined if you choose
 
+
+ADDITIONAL SECTIONS
+-------------------
+
 WHAT HAPPENS?
--------------
+=============
 
 1.  set PATH to include the ./bin directory for DRP and terraform/etc.
 2.  install terraform locally in your ./bin directory 
@@ -166,9 +187,25 @@ WHAT HAPPENS?
     DRP endpoint 
     (set "N" in vars.tf for "machines_count" variable)
 
+  
+PACKET SECRETS NOTE
+===================
+Unfortunately, Packet doesn't provide a clean URL we can point you to 
+for finding your API and PROJECT identities.  You'll have to find these
+from the portal, hopefully, following the below path:
 
-CLEANUP:
---------
+   * log in to:  https://app.packet.net/login 
+   * use the down arrow next to User icon in upper right to select "Api Keys"
+   * select the API key you wish to use 
+   * use the back arrow in the upper left of the Portal (not your browser back button)
+   * use the down arrow next to User icon, select "Change Organization"
+   * select the Org/Project you want to place resources in 
+   * use the down arrow next to User icon, select "Settings" underneath 
+     Project name
+   * that page has the Project ID (labeled "Organization ID")
+
+CLEANUP
+=======
 
 You can cleanup/reset the pkt-demo/ directory back to "factory
 defaults" with the following:
@@ -177,12 +214,18 @@ defaults" with the following:
                                 # destroys SSH keys
                                 # cleansup local directory artifacts
 
+IF YOU WANT to rerun this process, we suggest you do 
+  cp private-contents/secrets secrets
+Then, to restore the secrets on the next run, do:
+  cp secrets private-contents/
 
-WARNING:  THIS NUKES everything !!
+You won't have to modify the 'secrets' file in the future.
+
+WARNING:  THIS NUKES everything !!  EVERYTHING !! 
 
 
-NOTES:
-------
+GENERAL NOTES
+=============
 
  CONTENT  By default demo-run.sh will have the DRP endpoint
           download content from the endpoint - in many 
@@ -196,8 +239,32 @@ NOTES:
           tested (hint: there are probably some minor bugs)
 
 
+OPERATING AND TROUBLESHOOTING
+=============================
+
+Some quick pointers for using or troubleshooting the environment tha
+gets set up...   All of these steps assume you are in the base directory
+that you ran the demo-run.sh script from.
+
+  export CLUSTER_NAME=<the_name_you_set_for_your_cluster>
+
+  export DRP_ID=`bin/control.sh get-drp-id`
+  export DRP_ADDR=`bin/control.sh get-address $DRP_ID`
+
+SSH to the DRP endpoint (uses above variables):
+
+  ssh -x -i ./${CLUSTER_NAME}-drp-ssh-key root@$DRP_ADDR
+
+SSH to a Machine (you must get the Machine IP address from DRP Endpoint):
+
+  ssh -x -i ./${CLUSTER_NAME}-machines-ssh-key root@<_MACHINE_IP_ADDRESS>
+
+
+Destroy everything - see the CLEANUP section above.
+
+
 ADVANCED USAGE OPTIONS
-----------------------
+======================
 
 "demo-run.sh" just drives the "bin/control.sh" script to make it easy 
 and prettier.  You can run the full demo without any Confirmation prompts, 

@@ -79,6 +79,48 @@ function os_info() {
 function my_machines() { local _u; for _u in $UUIDS; do set -x; drpcli machines $1 $_u $2; set +x; done; }
 
 ###
+#  simple function to request a new CLUSTER_NAME be set if the
+#  name is set to the defaul of "demo".  No additional checking
+#  will be done, so operator can override, and keep "demo" if
+#  desired.  
+#
+#  This function expects ARGv1 to be set to the value of CLUSTER_NAME
+#  and if that value is "demo", prompt for a change.
+###
+function set_cluster_name() {
+  local _cn
+
+  case $1 in
+    [dD][eE][mM][oO])
+      echo ""
+      echo "The CLUSTER NAME is set to the default value of 'demo'."
+      echo "You are STRONGLY urged to select a very short name that"
+      echo "is uniuque to your cluster - otherwise, multiple clusters"
+      echo "with the same name will result in Nodes built with the"
+      echo "same name.  This is not fatal, but it can cause confusion"
+      echo "when you view Nodes in the Packet portal"
+      echo ""
+      echo "We recommend keeping it to LESS than 8 to 12 characters or"
+      echo "less; with ONLY a dash ('-') as a special character."
+      echo ""
+      echo "examples: pkt-demo"
+      echo "          cluster01"
+      echo ""
+      read -p "Set a new cluster name: " _cn
+      echo ""
+
+      if [[ "${_cn}" != "${1}" ]]
+      then
+        # fixup vars.tf with new cluster name
+        sed -i "" "s/^\(variable \"cluster_name\" { default = \"\).*\(\" }\)$/\1${_cn}\2/g" vars.tf
+      fi
+
+      export CLUSTER_NAME="${_cn}"
+      ;;
+  esac
+} # end set_cluster_name()
+
+###
 #  accept as ARGv1 a sha256 check sum file to test - files will be tested
 #  relative to the path/filename found in the SHA256 sum file
 ###

@@ -88,11 +88,14 @@ function confirm() {
 
 if [[ "$USER" == "shane" ]]
 then
-  echo "<<SHANE>> Staging secrets ... "
+  echo "<<HI SHANE!>> Staging secrets for you ... :)"
   set -x
   cp $HOME/private-content/secrets ./private-content
   set +x
 fi
+
+# dummy run to just check prereqs and set_cluster_name 
+confirm control.sh safety_checks
 
 # installs terraform locally
 confirm control.sh install-terraform    

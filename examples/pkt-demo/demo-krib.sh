@@ -94,6 +94,9 @@ then
   set +x
 fi
 
+# dummy run to just check prereqs and set_cluster_name
+control.sh safety_checks
+
 # installs terraform locally
 confirm control.sh install-terraform    
 
