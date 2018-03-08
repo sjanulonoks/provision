@@ -43,6 +43,13 @@ then
     && xiterr 1 "RACKN_USERNAME is empty or unset ... check 'secrets' file"
 fi
 
+# get our OS info of this platform 
+_os=`uname -s | tr '[:upper:]' '[:lower:]'`
+_arch=`uname -m | tr '[:upper:]' '[:lower:]'`
+case $_arch in
+  x86_64) _arch="amd64" ;;
+esac
+
 RACKN_AUTH="?username=${RACKN_USENAME}"
 
 API="insert_api_key_here"
@@ -57,8 +64,8 @@ VER_CONTENT=${VER_CONTENT:-"stable"}
 VER_PLUGINS=${VER_PLUGINS:-"tip"}
 SSH_DRP_KEY=${SSH_DRP_KEY:-"${CLUSTER_NAME}-drp-ssh-key"}
 SSH_MACHINES_KEY=${SSH_MACHINES_KEY:-"${CLUSTER_NAME}-machines-ssh-key"}
-MY_OS=${MY_OS:-"darwin"}
-MY_ARCH=${MY_ARCH:-"amd64"}
+MY_OS=${MY_OS:-"$_os"}
+MY_ARCH=${MY_ARCH:-"$_arch"}
 DRP_OS=${DRP_OS:-"linux"}
 DRP_ARCH=${DRP_ARCH:-"amd64"}
 #CREDS=${CREDS:-"--username=rocketskates --password=r0cketsk8ts"}
@@ -185,7 +192,11 @@ function prereqs() {
   (( $XIT )) && xiterr 1 "prerequisites failed ('$_pkgs')"
 }
 
+# check our prereqs
 prereqs 
+
+# check if we have a default cluster name and prompt for a unique one
+set_cluster_name "$CLUSTER_NAME"
 
 # we're going to stuff some binaries in the local ./bin path
 PATH=`pwd`/bin:$PATH
@@ -193,6 +204,11 @@ PATH=`pwd`/bin:$PATH
 case $1 in 
   usage|--usage|help|--help|-h)
     usage
+    ;;
+
+  safety_checks)
+    # dummy run to insure prereqs and set_cluster_name and other setup
+    # checks are run prior to other tasks
     ;;
 
   install-secrets)
@@ -620,7 +636,9 @@ EOFPLUGIN
     ( $DRPCLI $ENDPOINT bootenvs exists discovery > /dev/null 2>&1 ) || xiterr 9 "unknown BootEnv ('discovery') doesn't exist"
 
     # set our default Stage, Default Boot Enviornment, and our Unknown Boot Environment
+    set -x
     $DRPCLI $ENDPOINT prefs set defaultStage discover defaultBootEnv sledgehammer unknownBootEnv discovery
+    set +x
   ;;
 
   drp-setup-demo)
@@ -640,34 +658,11 @@ EOFPLUGIN
       || echo "bootenv '$UPLOAD' doesn't exist, not uploading ISO"
     done
 
-    # sigh ... 'global' profile method changes in v3.5.x - but we also
-    # have to match v3.4.1-tip-29 for pre-release testing - yes, this 
-    # could be a bit more sophisticated ... 
-    NEW="no"
-    vPATTERN=`$DRPCLI $ENDPOINT info get | jq -r '.version | @text'`
-    REG1="v3.4.1-tip-29-"
-    REG2="v3.5.[0-9]"
+    # no longer support older endpoints
+    NEW="yes"
 
-    [[ ${vPATTERN} == ${REG1}* ]] && NEW="yes"
-    [[ ${vPATTERN} == ${REG2}* ]] && NEW="yes"
-
-	  cat <<EOFSTAGE > private-content/stagemap-create.json
-    {
-      "Available": true,
-      "Description": "packet-map",
-      "Name": "global",
-      "Params": {
-          "change-stage/map": {
-            "discover": "packet-discover:Success",
-            "packet-discover": "${MACHINES_OS}:Reboot",
-            "${MACHINES_OS}": "packet-ssh-keys:Success",
-            "packet-ssh-keys": "complete-nowait:Success"
-        }
-      }
-    }
-EOFSTAGE
-
-    cat <<EOFPARAM > private-content/stagemap-param.json
+    GLOBAL="private-content/stagemap-param.json"
+    cat <<EOFPARAM > $GLOBAL
       {
         "discover": "packet-discover:Success",
         "packet-discover": "centos-7-install:Reboot",
@@ -676,22 +671,7 @@ EOFSTAGE
       }
 EOFPARAM
 
-
-    # old way - destroy/create
-    if [[ $NEW == "no" ]]
-    then
-      J=private-content/stagemap-create.json
-
-      if ( $DRPCLI $ENDPOINT profiles exists global > /dev/null 2>&1 )
-      then
-        $DRPCLI $ENDPOINT profiles destroy global
-      fi
-      $DRPCLI $ENDPOINT profiles create - < $J
-    elif [[ $NEW == "yes" ]]
-    then
-      J=private-content/stagemap-param.json
-      $DRPCLI $ENDPOINT profiles set global param change-stage/map to - < $J
-    fi
+      $DRPCLI $ENDPOINT profiles set global param change-stage/map to - < $GLOBAL
 
   ;;
 
