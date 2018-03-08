@@ -351,10 +351,12 @@ func (rt *RequestTracker) GetParams(obj models.Paramer, aggregate bool) map[stri
 			subObjs = append(subObjs, pobj.(models.Paramer))
 		}
 	}
-	if sobj := rt.Find("stages", stage); sobj != nil {
-		for _, pn := range AsStage(sobj).Profiles {
-			if pobj := rt.Find("profiles", pn); pobj != nil {
-				subObjs = append(subObjs, pobj.(models.Paramer))
+	if stage != "" {
+		if sobj := rt.Find("stages", stage); sobj != nil {
+			for _, pn := range AsStage(sobj).Profiles {
+				if pobj := rt.Find("profiles", pn); pobj != nil {
+					subObjs = append(subObjs, pobj.(models.Paramer))
+				}
 			}
 		}
 	}
