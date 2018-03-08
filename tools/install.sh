@@ -24,7 +24,7 @@ Options:
                             # are in place
     --remove-data           # Remove data as well as program pieces
 
-    install                 # Sets up an insolated or system 'production' enabled install.
+    install                 # Sets up an isolated or system 'production' enabled install.
     remove                  # Removes the system enabled install.  Requires no other flags
 
 Defaults are:
