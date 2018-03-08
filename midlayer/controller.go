@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -85,20 +86,38 @@ func InitPluginController(pluginDir, pluginCommDir string, dt *backend.DataTrack
 					case "create":
 						// May be deleted before we get here.
 						if ref2 != nil {
-							rt.Debugf("handling plugin create:", event)
+							rt.Debugf("handling plugin create: %v", event)
 							rp = pc.startPlugin(rt, ref2.(*backend.Plugin))
 						}
 					case "save", "update":
 						// May be deleted before we get here.
 						if ref2 != nil {
-							rt.Debugf("handling plugin save/update:", event)
-							rp = pc.restartPlugin(rt, ref2.(*backend.Plugin))
+							rt.Debugf("handling plugin save/update: %v", event)
+							p := ref2.(*backend.Plugin)
+
+							doit := true
+							if oldRp, ok := pc.runningPlugins[p.Name]; ok {
+								oldP := oldRp.Plugin
+								doit = false
+								if p.Description != oldP.Description {
+									doit = true
+								}
+								if p.Provider != oldP.Provider {
+									doit = true
+								}
+								if !reflect.DeepEqual(p.Params, oldP.Params) {
+									doit = true
+								}
+							}
+							if doit {
+								rp = pc.restartPlugin(rt, p)
+							}
 						}
 					case "delete":
-						rt.Debugf("handling plugin delete:", event)
+						rt.Debugf("handling plugin delete: %v", event)
 						pc.stopPlugin(rt, event.Object.(*models.Plugin).Name)
 					default:
-						rt.Infof("internal event:", event)
+						rt.Infof("internal event: %v", event)
 					}
 				})
 				pc.lock.Unlock()
@@ -279,7 +298,14 @@ func (pc *PluginController) reallyStartPlugin(rt *backend.RequestTracker, rp *Ru
 		}
 		rp.Plugin = ref2.(*backend.Plugin)
 
+		// Store for loop prevention
+		pc.runningPlugins[rp.Plugin.Name] = rp
+
 		if err != nil {
+			pc.Errorf("Starting plugin: %s(%s) %s\n", rp.Plugin.Name, rp.Plugin.Provider, err.Error())
+			if len(rp.Plugin.PluginErrors) > 0 {
+				return
+			}
 			rp.Plugin.PluginErrors = []string{err.Error()}
 			rt.Update(rp.Plugin)
 			return
@@ -294,6 +320,11 @@ func (pc *PluginController) reallyStartPlugin(rt *backend.RequestTracker, rp *Ru
 			}
 			return
 		}
+
+		if len(rp.Plugin.PluginErrors) > 0 {
+			rp.Plugin.PluginErrors = []string{}
+			rt.Update(rp.Plugin)
+		}
 		if pp.HasPublish {
 			pc.publishers.Add(rp.Client)
 		}
@@ -302,7 +333,6 @@ func (pc *PluginController) reallyStartPlugin(rt *backend.RequestTracker, rp *Ru
 			pp.AvailableActions[i].Provider = pp.Name
 			pc.Actions.Add(pp.AvailableActions[i], rp)
 		}
-		pc.runningPlugins[rp.Plugin.Name] = rp
 	})
 }
 
