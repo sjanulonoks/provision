@@ -319,6 +319,10 @@ func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, pro
 	}
 	pc.Tracef("Replacing new datastore for: %s\n", provider)
 	rt.AllLocked(func(d backend.Stores) {
+		l := rt.Logger.Level()
+		rt.Logger.SetLevel(logger.Error)
+		defer rt.Logger.SetLevel(l)
+
 		ds := pc.dt.Backend.(*DataStack)
 		nbs, hard, _ := ds.AddReplacePluginLayer(cName, ns, pc.dt.Logger, forceParamRemoval)
 		if hard != nil {
