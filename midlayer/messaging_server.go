@@ -35,8 +35,8 @@ func logHandler(w http.ResponseWriter, r *http.Request, pc *PluginClient) {
 	mux.JsonResponse(w, 204, nil)
 }
 
-func (pc *PluginClient) pluginServer(commDir string) {
-	pc.Tracef("pluginServer: Starting com server: %s(%s)\n", pc.plugin, commDir)
+func (pc *PluginClient) pluginServer(commPath string) {
+	pc.Tracef("pluginServer: Starting com server: %s(%s)\n", pc.plugin, commPath)
 	pmux := mux.New(pc.NoPublish())
 	pmux.Handle("/api-server-plugin/v3/publish",
 		func(w http.ResponseWriter, r *http.Request) { publishHandler(w, r, pc) })
@@ -44,16 +44,16 @@ func (pc *PluginClient) pluginServer(commDir string) {
 		func(w http.ResponseWriter, r *http.Request) { logHandler(w, r, pc) })
 	// apiGroup.POST("/object", func(c *gin.Context) { objectHandler(c, pc) })
 	go func() {
-		os.Remove(commDir)
-		sock, err := net.Listen("unix", commDir)
+		os.Remove(commPath)
+		sock, err := net.Listen("unix", commPath)
 		if err != nil {
 			return
 		}
 		defer sock.Close()
 		if err := http.Serve(sock, pmux); err != nil {
-			pc.Errorf("pluginServer: Finished (error) com server: %s(%s): %v\n", pc.plugin, commDir, err)
+			pc.Errorf("pluginServer: Finished (error) com server: %s(%s): %v\n", pc.plugin, commPath, err)
 		} else {
-			pc.Tracef("pluginServer: Finished com server: %s(%s)\n", pc.plugin, commDir)
+			pc.Tracef("pluginServer: Finished com server: %s(%s)\n", pc.plugin, commPath)
 		}
 	}()
 }

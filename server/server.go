@@ -39,6 +39,7 @@ import (
 	"runtime/pprof"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision"
@@ -267,9 +268,7 @@ func server(localLogger *log.Logger, c_opts *ProgOpts) string {
 	backend.SetLogPublisher(buf, publishers)
 
 	// Start the controller now that we have a frontend to front.
-	if err := pc.StartController(fe.ApiGroup); err != nil {
-		return fmt.Sprintf("Error starting plugin service: %v", err)
-	}
+	pc.StartRouter(fe.ApiGroup)
 
 	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
 		if err = buildKeys(c_opts.CurveOrBits, c_opts.TlsCertFile, c_opts.TlsKeyFile); err != nil {
@@ -360,6 +359,29 @@ func server(localLogger *log.Logger, c_opts *ProgOpts) string {
 	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGABRT)
 
 	go func() {
+		// Wait for Api to come up
+		for count := 0; count < 5; count++ {
+			if count > 0 {
+				log.Printf("Waiting for API (%d) to come up...\n", count)
+			}
+			timeout := time.Duration(5 * time.Second)
+			tr := &http.Transport{
+				TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+				TLSHandshakeTimeout:   5 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			}
+			client := &http.Client{Transport: tr, Timeout: timeout}
+			if _, err := client.Get(fmt.Sprintf("https://127.0.0.1:%d/api/v3", c_opts.ApiPort)); err == nil {
+				break
+			}
+		}
+
+		// Start the controller now that we have a frontend to front.
+		if err := pc.StartController(); err != nil {
+			log.Printf("Error starting plugin service: %v", err)
+			ch <- syscall.SIGTERM
+		}
+
 		for {
 			s := <-ch
 			log.Println(s)

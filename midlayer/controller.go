@@ -13,26 +13,16 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
-	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 	"github.com/gin-gonic/gin"
 )
-
-type RunningPlugin struct {
-	Plugin   *backend.Plugin
-	Provider *models.PluginProvider
-	Client   *PluginClient
-	Prog     func() error
-}
 
 type PluginController struct {
 	logger.Logger
@@ -53,6 +43,9 @@ func (pc *PluginController) Request(locks ...string) *backend.RequestTracker {
 	return pc.dt.Request(pc.Logger, locks...)
 }
 
+/*
+ * Create contoller and start an event listener.
+ */
 func InitPluginController(pluginDir, pluginCommDir string, dt *backend.DataTracker, pubs *backend.Publishers) (pc *PluginController, err error) {
 	dt.Logger.Debugf("Starting Plugin Controller\n")
 	pc = &PluginController{
@@ -76,54 +69,7 @@ func InitPluginController(pluginDir, pluginCommDir string, dt *backend.DataTrack
 		for !done {
 			select {
 			case event := <-pc.events:
-				pc.lock.Lock()
-				ref := &backend.Plugin{}
-				rt := pc.Request(ref.Locks("get")...)
-				var rp *RunningPlugin
-				rt.Do(func(d backend.Stores) {
-					ref2 := rt.Find(ref.Prefix(), event.Key)
-					switch event.Action {
-					case "create":
-						// May be deleted before we get here.
-						if ref2 != nil {
-							rt.Debugf("handling plugin create: %v", event)
-							rp = pc.startPlugin(rt, ref2.(*backend.Plugin))
-						}
-					case "save", "update":
-						// May be deleted before we get here.
-						if ref2 != nil {
-							rt.Debugf("handling plugin save/update: %v", event)
-							p := ref2.(*backend.Plugin)
-
-							doit := true
-							if oldRp, ok := pc.runningPlugins[p.Name]; ok {
-								oldP := oldRp.Plugin
-								doit = false
-								if p.Description != oldP.Description {
-									doit = true
-								}
-								if p.Provider != oldP.Provider {
-									doit = true
-								}
-								if !reflect.DeepEqual(p.Params, oldP.Params) {
-									doit = true
-								}
-							}
-							if doit {
-								rp = pc.restartPlugin(rt, p)
-							}
-						}
-					case "delete":
-						rt.Debugf("handling plugin delete: %v", event)
-						pc.stopPlugin(rt, event.Object.(*models.Plugin).Name)
-					default:
-						rt.Infof("internal event: %v", event)
-					}
-				})
-				pc.lock.Unlock()
-				if rp != nil {
-					pc.reallyStartPlugin(rt, rp)
-				}
+				pc.handleEvent(event)
 			case <-pc.done:
 				done = true
 			}
@@ -151,18 +97,17 @@ func ReverseProxy(l logger.Logger, pluginCommDir string) gin.HandlerFunc {
 	}
 }
 
-func (pc *PluginController) StartController(apiGroup *gin.RouterGroup) error {
-	pc.Debugf("Starting Start Plugin Controller:\n")
-
+func (pc *PluginController) StartRouter(apiGroup *gin.RouterGroup) {
 	apiGroup.Any("/plugin-apis/:plugin/*path", ReverseProxy(pc, pc.pluginCommDir))
-	rt := pc.Request()
-	err := pc.walkPluginDir(rt)
-	pc.Debugf("Finishing Start Plugin Controller: %v\n", err)
-	return err
 }
 
-func (pc *PluginController) walkPluginDir(rt *backend.RequestTracker) error {
-	pc.Tracef("walkPlugDir: started\n")
+func (pc *PluginController) StartController() error {
+	pc.Debugf("Starting Start Plugin Controller:\n")
+
+	rt := pc.Request()
+
+	pc.StartPlugins()
+
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
 	// Walk plugin dir contents with lock
@@ -178,51 +123,15 @@ func (pc *PluginController) walkPluginDir(rt *backend.RequestTracker) error {
 			pc.Tracef("walkPlugDir: importing %s error: %v\n", f.Name(), err)
 		}
 	}
-	pc.Tracef("walkPlugDir: finished\n")
-	return nil
-}
-
-func (pc *PluginController) walkPlugins(provider string) (err error) {
-	pc.Tracef("walkPlugins: started\n")
-	// Walk all plugin objects from dt.
-	ref := &backend.Plugin{}
-	rt := pc.Request(ref.Locks("get")...)
-	startEm := []*RunningPlugin{}
-	rt.Do(func(d backend.Stores) {
-		var idx *index.Index
-		idx, err = index.All([]index.Filter{index.Native()}...)(&d(ref.Prefix()).Index)
-		if err != nil {
-			pc.Tracef("walkPlugins: finished error: %v\n", err)
-			return
-		}
-		arr := idx.Items()
-		for _, res := range arr {
-			plugin := res.(*backend.Plugin)
-			if plugin.Provider == provider {
-				rp := pc.startPlugin(rt, plugin)
-				if rp != nil {
-					startEm = append(startEm, rp)
-				}
-			}
-		}
-	})
-
-	pc.lock.Unlock()
-	defer pc.lock.Lock()
-	for _, rp := range startEm {
-		pc.reallyStartPlugin(rt, rp)
-	}
-
-	pc.Tracef("walkPlugins: finished\n")
-	return
+	pc.Debugf("Finishing Start Plugin Controller: %v\n", err)
+	return err
 }
 
 func (pc *PluginController) Shutdown(ctx context.Context) error {
-	rt := pc.Request()
 	pc.Debugf("Stopping plugin controller\n")
 	for _, rp := range pc.runningPlugins {
 		pc.Debugf("Stopping plugin: %s\n", rp.Plugin.Name)
-		pc.stopPlugin(rt, rp.Plugin.Name)
+		pc.stopPlugin(rp.Plugin)
 	}
 	pc.Debugf("Stopping plugin gofuncs\n")
 	pc.done <- true
@@ -233,12 +142,12 @@ func (pc *PluginController) Shutdown(ctx context.Context) error {
 }
 
 func (pc *PluginController) Publish(e *models.Event) error {
-	if e.Type != "plugins" && e.Type != "plugin" {
-		return nil
+	switch e.Type {
+	case "plugins", "plugin", "plugin_provider", "plugin_providers":
+		pc.NoPublish().Tracef("PluginController Publish Event stared: %v\n", e)
+		pc.events <- e
+		pc.NoPublish().Tracef("PluginController Publish Event finished: %v\n", e)
 	}
-	pc.NoPublish().Tracef("PluginController Publish Event stared: %v\n", e)
-	pc.events <- e
-	pc.NoPublish().Tracef("PluginController Publish Event finished: %v\n", e)
 	return nil
 }
 
@@ -283,170 +192,6 @@ func (pc *PluginController) GetPluginProviders() []*models.PluginProvider {
 	}
 	pc.Tracef("Returning GetPluginProviders: %d\n", len(answer))
 	return answer
-}
-
-func (pc *PluginController) reallyStartPlugin(rt *backend.RequestTracker, rp *RunningPlugin) {
-	err := rp.Prog()
-
-	pc.lock.Lock()
-	defer pc.lock.Unlock()
-
-	rt.Do(func(d backend.Stores) {
-		ref2 := rt.Find("plugins", rp.Plugin.Name)
-		if ref2 == nil {
-			return
-		}
-		rp.Plugin = ref2.(*backend.Plugin)
-
-		// Store for loop prevention
-		pc.runningPlugins[rp.Plugin.Name] = rp
-
-		if err != nil {
-			pc.Errorf("Starting plugin: %s(%s) %s\n", rp.Plugin.Name, rp.Plugin.Provider, err.Error())
-			if len(rp.Plugin.PluginErrors) > 0 {
-				return
-			}
-			rp.Plugin.PluginErrors = []string{err.Error()}
-			rt.Update(rp.Plugin)
-			return
-		}
-
-		pp, ok := pc.AvailableProviders[rp.Plugin.Provider]
-		if !ok {
-			pc.Errorf("Starting plugin: %s(%s) missing provider\n", rp.Plugin.Name, rp.Plugin.Provider)
-			if rp.Plugin.PluginErrors == nil || len(rp.Plugin.PluginErrors) == 0 {
-				rp.Plugin.PluginErrors = []string{fmt.Sprintf("Missing Plugin Provider: %s", rp.Plugin.Provider)}
-				rt.Update(rp.Plugin)
-			}
-			return
-		}
-
-		if len(rp.Plugin.PluginErrors) > 0 {
-			rp.Plugin.PluginErrors = []string{}
-			rt.Update(rp.Plugin)
-		}
-		if pp.HasPublish {
-			pc.publishers.Add(rp.Client)
-		}
-		for i, _ := range pp.AvailableActions {
-			pp.AvailableActions[i].Fill()
-			pp.AvailableActions[i].Provider = pp.Name
-			pc.Actions.Add(pp.AvailableActions[i], rp)
-		}
-	})
-}
-
-func (pc *PluginController) startPlugin(rt *backend.RequestTracker, plugin *backend.Plugin) (runp *RunningPlugin) {
-	pc.Infof("Starting plugin: %s(%s)\n", plugin.Name, plugin.Provider)
-	if _, ok := pc.runningPlugins[plugin.Name]; ok {
-		pc.Infof("Already started plugin: %s(%s)\n", plugin.Name, plugin.Provider)
-		return
-	}
-	pp, ok := pc.AvailableProviders[plugin.Provider]
-	if ok {
-		errors := []string{}
-
-		for _, parmName := range pp.RequiredParams {
-			obj, ok := plugin.Params[parmName]
-			if !ok {
-				errors = append(errors, fmt.Sprintf("Missing required parameter: %s", parmName))
-			} else {
-				pobj := rt.Find("params", parmName)
-				if pobj != nil {
-					rp := pobj.(*backend.Param)
-
-					if ev := rp.ValidateValue(obj); ev != nil {
-						errors = append(errors, ev.Error())
-					}
-				}
-			}
-		}
-		for _, parmName := range pp.OptionalParams {
-			obj, ok := plugin.Params[parmName]
-			if ok {
-				pobj := rt.Find("params", parmName)
-				if pobj != nil {
-					rp := pobj.(*backend.Param)
-
-					if ev := rp.ValidateValue(obj); ev != nil {
-						errors = append(errors, ev.Error())
-					}
-				}
-			}
-		}
-
-		if len(errors) == 0 {
-			claims := backend.NewClaim(plugin.Name, "system", time.Hour*1000000).
-				Add("*", "*", "*").
-				AddSecrets("", "", "")
-			token, _ := rt.SealClaims(claims)
-			ppath := pc.pluginDir + "/" + pp.Name
-			thingee, prog, err := NewPluginClient(
-				pc,
-				pc.pluginCommDir,
-				plugin.Name,
-				pc.Logger.Fork().SetService(plugin.Name),
-				rt.ApiURL(net.ParseIP("0.0.0.0")),
-				rt.FileURL(net.ParseIP("0.0.0.0")),
-				token,
-				ppath, plugin.Params)
-
-			if err != nil {
-				errors = append(errors, err.Error())
-			} else {
-				runp = &RunningPlugin{Plugin: plugin, Client: thingee, Provider: pp, Prog: prog}
-			}
-		}
-
-		if plugin.PluginErrors == nil {
-			plugin.PluginErrors = []string{}
-		}
-		if len(plugin.PluginErrors) != len(errors) {
-			plugin.PluginErrors = errors
-			rt.Update(plugin)
-		}
-		rt.Publish("plugin", "started", plugin.Name, plugin)
-		pc.Infof("Starting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
-	} else {
-		pc.Errorf("Starting plugin: %s(%s) missing provider\n", plugin.Name, plugin.Provider)
-		if plugin.PluginErrors == nil || len(plugin.PluginErrors) == 0 {
-			plugin.PluginErrors = []string{fmt.Sprintf("Missing Plugin Provider: %s", plugin.Provider)}
-			rt.Update(plugin)
-		}
-	}
-	return
-}
-
-func (pc *PluginController) stopPlugin(rt *backend.RequestTracker, pluginName string) {
-	rp, ok := pc.runningPlugins[pluginName]
-	if ok {
-		plugin := rp.Plugin
-		rt.Infof("Stopping plugin: %s(%s)\n", plugin.Name, plugin.Provider)
-		delete(pc.runningPlugins, plugin.Name)
-
-		if rp.Provider.HasPublish {
-			rt.Debugf("Remove publisher: %s(%s)\n", plugin.Name, plugin.Provider)
-			pc.publishers.Remove(rp.Client)
-		}
-		for _, aa := range rp.Provider.AvailableActions {
-			rt.Debugf("Remove actions: %s(%s,%s)\n", plugin.Name, plugin.Provider, aa.Command)
-			pc.Actions.Remove(aa, rp)
-		}
-		rt.Debugf("Drain executable: %s(%s)\n", plugin.Name, plugin.Provider)
-		rp.Client.Unload()
-		rt.Debugf("Stop executable: %s(%s)\n", plugin.Name, plugin.Provider)
-		rp.Client.Stop()
-		rt.Infof("Stopping plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
-		rt.Publish("plugin", "stopped", plugin.Name, plugin)
-	}
-}
-
-func (pc *PluginController) restartPlugin(rt *backend.RequestTracker, plugin *backend.Plugin) *RunningPlugin {
-	rt.Infof("Restarting plugin: %s(%s)\n", plugin.Name, plugin.Provider)
-	pc.stopPlugin(rt, plugin.Name)
-	rp := pc.startPlugin(rt, plugin)
-	rt.Infof("Restarting plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
-	return rp
 }
 
 func (pc *PluginController) buildNewStore(content *models.Content) (newStore store.Store, err error) {
@@ -575,7 +320,7 @@ func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, pro
 	pc.Tracef("Replacing new datastore for: %s\n", provider)
 	rt.AllLocked(func(d backend.Stores) {
 		ds := pc.dt.Backend.(*DataStack)
-		nbs, hard, _ := ds.AddReplacePlugin(cName, ns, pc.dt.Logger, forceParamRemoval)
+		nbs, hard, _ := ds.AddReplacePluginLayer(cName, ns, pc.dt.Logger, forceParamRemoval)
 		if hard != nil {
 			rt.Errorf("Skipping %s because of bad store errors: %v\n", pp.Name, hard)
 			err = hard
@@ -604,7 +349,7 @@ func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, pro
 			pc.Errorf("%s", out)
 		}
 		rt.Publish("plugin_provider", "create", pp.Name, pp)
-		return pc.walkPlugins(provider)
+		return nil
 	} else {
 		pc.Infof("Already exists plugin provider: %s\n", pp.Name)
 	}
@@ -622,31 +367,13 @@ func (pc *PluginController) removePluginProvider(rt *backend.RequestTracker, pro
 		}
 	}
 	if name != "" {
-		remove := []*backend.Plugin{}
-		for _, rp := range pc.runningPlugins {
-			if rp.Provider.Name == name {
-				remove = append(remove, rp.Plugin)
-			}
-		}
-		ref := &backend.Plugin{}
-		rt := pc.Request(ref.Locks("get")...)
-		rt.Do(func(d backend.Stores) {
-			for _, p := range remove {
-				pc.stopPlugin(rt, p.Name)
-				ref2 := rt.Find(ref.Prefix(), p.Name)
-				myPP := ref2.(*backend.Plugin)
-				myPP.Errors = []string{fmt.Sprintf("Missing Plugin Provider: %s", provider)}
-				rt.Update(myPP)
-			}
-		})
-
 		pc.Infof("Removing plugin provider: %s\n", name)
 		rt.Publish("plugin_provider", "delete", name, pc.AvailableProviders[name])
 
 		// Remove the plugin content
 		rt.AllLocked(func(d backend.Stores) {
 			ds := pc.dt.Backend.(*DataStack)
-			nbs, hard, _ := ds.RemovePlugin(name, pc.dt.Logger)
+			nbs, hard, _ := ds.RemovePluginLayer(name, pc.dt.Logger)
 			if hard != nil {
 				rt.Errorf("Skipping removal of plugin content layer %s because of bad store errors: %v\n", name, hard)
 			} else {
@@ -660,7 +387,7 @@ func (pc *PluginController) removePluginProvider(rt *backend.RequestTracker, pro
 	return nil
 }
 
-func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) (*models.PluginProviderUploadInfo, *models.Error) {
+func (pc *PluginController) UploadPluginProvider(c *gin.Context, fileRoot, name string) (*models.PluginProviderUploadInfo, *models.Error) {
 	if err := os.MkdirAll(path.Join(fileRoot, `plugins`), 0755); err != nil {
 		pc.Errorf("Unable to create plugins directory: %v", err)
 		return nil, models.NewError("API_ERROR", http.StatusConflict,
@@ -744,7 +471,7 @@ func (pc *PluginController) UploadPlugin(c *gin.Context, fileRoot, name string) 
 	return &models.PluginProviderUploadInfo{Path: name, Size: copied}, berr
 }
 
-func (pc *PluginController) RemovePlugin(name string) error {
+func (pc *PluginController) RemovePluginProvider(name string) error {
 	pluginProviderName := path.Join(pc.pluginDir, path.Base(name))
 	if err := os.Remove(pluginProviderName); err != nil {
 		return err

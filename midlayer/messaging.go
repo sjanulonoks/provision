@@ -92,109 +92,94 @@ func (pc *PluginClient) Unload() {
 	return
 }
 
-func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logger.Logger, apiURL, staticURL, token, path string, params map[string]interface{}) (answer *PluginClient, prog func() error, myErr error) {
+func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logger.Logger, apiURL, staticURL, token, path string, params map[string]interface{}) (answer *PluginClient, theErr error) {
 	answer = &PluginClient{pc: pc, plugin: plugin, Logger: l}
-	prog = func() (theErr error) {
-		answer.Debugf("Initialzing Plugin: %s\n", plugin)
+	answer.Debugf("Initialzing Plugin: %s\n", plugin)
 
-		retSocketPath := fmt.Sprintf("%s/%s.fromPlugin", pluginCommDir, plugin)
-		socketPath := fmt.Sprintf("%s/%s.toPlugin", pluginCommDir, plugin)
+	retSocketPath := fmt.Sprintf("%s/%s.fromPlugin", pluginCommDir, plugin)
+	socketPath := fmt.Sprintf("%s/%s.toPlugin", pluginCommDir, plugin)
 
-		// Make sure that the sockets are removed
-		os.Remove(retSocketPath)
-		os.Remove(socketPath)
+	// Start server side.
+	answer.pluginServer(retSocketPath)
 
-		// Start server side.
-		answer.pluginServer(retSocketPath)
+	// Setup client.
+	answer.cmd = exec.Command(path, "listen", socketPath, retSocketPath)
 
-		// Setup client.
-		answer.cmd = exec.Command(path, "listen", socketPath, retSocketPath)
+	// Setup env vars to run plugin - auth should be parameters.
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("RS_ENDPOINT=%s", apiURL))
+	env = append(env, fmt.Sprintf("RS_FILESERVER=%s", staticURL))
+	env = append(env, fmt.Sprintf("RS_TOKEN=%s", token))
+	answer.cmd.Env = env
 
-		// Setup env vars to run plugin - auth should be parameters.
-		env := os.Environ()
-		env = append(env, fmt.Sprintf("RS_ENDPOINT=%s", apiURL))
-		env = append(env, fmt.Sprintf("RS_FILESERVER=%s", staticURL))
-		env = append(env, fmt.Sprintf("RS_TOKEN=%s", token))
-		answer.cmd.Env = env
-
-		var err2 error
-		answer.stderr, err2 = answer.cmd.StderrPipe()
-		if err2 != nil {
-			return err2
-		}
-
-		// We need so for the ready call.
-		so, err2 := answer.cmd.StdoutPipe()
-		if err2 != nil {
-			return err2
-		}
-
-		// Close stdin, we don't need it.
-		if si, err2 := answer.cmd.StdinPipe(); err2 != nil {
-			return err2
-		} else {
-			si.Close()
-		}
-
-		// Start the err reader.
-		go answer.readLog("se", answer.stderr)
-
-		// Start the plugin
-		answer.Debugf("Start Plugin: %s\n", plugin)
-		if err := answer.cmd.Start(); err != nil {
-			answer.Stop()
-			err := fmt.Errorf("Failed to start plugin - didn't start")
-			l.Errorf("%v\n", err)
-			return err
-		}
-
-		// Wait for plugin to be listening
-		answer.Debugf("Wait for ready\n")
-		failed := false
-		in := bufio.NewScanner(so)
-		for in.Scan() {
-			s := in.Text()
-			if s == "READY!" {
-				break
-			}
-			if s == "Failed" {
-				failed = true
-				break
-			}
-			// Log each line until ready or fail
-			l.Infof("Plugin %s: start-up: %s", answer.plugin, s)
-		}
-		if err := in.Err(); err != nil {
-			l.Errorf("Plugin %s: start-up error: %s", answer.plugin, err)
-			failed = true
-		}
-		if failed {
-			answer.Stop()
-			err := fmt.Errorf("Failed to start plugin - didn't respond cleanly")
-			l.Errorf("%v\n", err)
-			return err
-		}
-		// Start so reader to make sure nothing else gets stashed in the pipe
-		go answer.readLog("so", so)
-
-		// Get HTTP2 client on our socket.
-		answer.client = &http.Client{
-			Transport: &http.Transport{
-				DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-					return net.Dial("unix", socketPath)
-				},
-			},
-		}
-
-		// Configure the plugin
-		answer.Debugf("Config Plugin: %s\n", plugin)
-		if terr := answer.Config(params); terr != nil {
-			answer.Debugf("Stop Plugin: %s Error: %v\n", plugin, terr)
-			answer.Stop()
-			theErr = terr
-		}
-		answer.Debugf("Initialzing Plugin: complete %s\n", plugin)
-		return
+	var err2 error
+	answer.stderr, err2 = answer.cmd.StderrPipe()
+	if err2 != nil {
+		return nil, err2
 	}
+
+	// We need so for the ready call.
+	so, err2 := answer.cmd.StdoutPipe()
+	if err2 != nil {
+		return nil, err2
+	}
+
+	// Close stdin, we don't need it.
+	if si, err2 := answer.cmd.StdinPipe(); err2 != nil {
+		return nil, err2
+	} else {
+		si.Close()
+	}
+
+	// Start the err reader.
+	go answer.readLog("se", answer.stderr)
+
+	// Start the plugin
+	answer.Debugf("Start Plugin: %s\n", plugin)
+	if err := answer.cmd.Start(); err != nil {
+		err := fmt.Errorf("Failed to start plugin - didn't start")
+		l.Errorf("%v\n", err)
+		return nil, err
+	}
+
+	// Wait for plugin to be listening
+	answer.Debugf("Wait for ready: %v\n", answer.cmd.Process.Pid)
+	failed := false
+	in := bufio.NewScanner(so)
+	for in.Scan() {
+		s := in.Text()
+		if s == "READY!" {
+			break
+		}
+		if s == "Failed" {
+			failed = true
+			break
+		}
+		// Log each line until ready or fail
+		l.Infof("Plugin %s: start-up: %s", answer.plugin, s)
+	}
+	if err := in.Err(); err != nil {
+		l.Errorf("Plugin %s: start-up error: %s", answer.plugin, err)
+		failed = true
+	}
+	if failed {
+		answer.Stop()
+		err := fmt.Errorf("Failed to start plugin - didn't respond cleanly")
+		l.Errorf("%v\n", err)
+		return nil, err
+	}
+	// Start so reader to make sure nothing else gets stashed in the pipe
+	go answer.readLog("so", so)
+
+	// Get HTTP2 client on our socket.
+	answer.client = &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", socketPath)
+			},
+		},
+	}
+
+	answer.Debugf("Initialzing Plugin: complete %s\n", plugin)
 	return
 }

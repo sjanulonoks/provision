@@ -110,14 +110,14 @@ func (d *DataStack) AddReplaceSAAS(
 	return dtStore.rebuild(oldStore, logger, fixup, newStore)
 }
 
-func (d *DataStack) RemovePlugin(name string, logger logger.Logger) (*DataStack, error, error) {
+func (d *DataStack) RemovePluginLayer(name string, logger logger.Logger) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.pluginContents[name]
 	delete(dtStore.pluginContents, name)
 	return dtStore.rebuild(oldStore, logger, nil, nil)
 }
 
-func (d *DataStack) AddReplacePlugin(
+func (d *DataStack) AddReplacePluginLayer(
 	name string,
 	newStore store.Store,
 	logger logger.Logger,
