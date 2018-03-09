@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -65,7 +64,7 @@ func (pc *PluginClient) get(l logger.Logger, path string) ([]byte, error) {
 }
 
 func (pc *PluginClient) Stop() error {
-	pc.Tracef("Stop: started\n")
+	pc.Tracef("Stop: started: %v\n", pc.cmd.Process.Pid)
 	// Send stop message
 	_, err := pc.post(pc, "/stop", nil)
 	if err != nil {
@@ -91,14 +90,8 @@ func (pc *PluginClient) Stop() error {
 	}
 
 	// Wait for exit
-	pc.Tracef("Stop: waiting for command exit\n")
+	pc.Debugf("Stop: waiting for command exit: %v\n", pc.cmd.Process.Pid)
 	pc.cmd.Wait()
-
-	// Make sure that the sockets are removed
-	retSocketPath := fmt.Sprintf("%s/%s.fromPlugin", pc.pc.pluginCommDir, pc.plugin)
-	socketPath := fmt.Sprintf("%s/%s.toPlugin", pc.pc.pluginCommDir, pc.plugin)
-	os.Remove(retSocketPath)
-	os.Remove(socketPath)
 
 	pc.Tracef("Stop: finished\n")
 	return nil

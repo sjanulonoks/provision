@@ -173,7 +173,7 @@ func (f *Frontend) InitPluginProviderApi() {
 			if !f.assureAuth(c, "plugin_providers", "post", c.Param(`name`)) {
 				return
 			}
-			answer, err := f.pc.UploadPlugin(c, f.FileRoot, c.Param(`name`))
+			answer, err := f.pc.UploadPluginProvider(c, f.FileRoot, c.Param(`name`))
 			if err != nil {
 				c.JSON(err.Code, err)
 				return
@@ -199,7 +199,7 @@ func (f *Frontend) InitPluginProviderApi() {
 			if !f.assureAuth(c, "plugin_providers", "delete", name) {
 				return
 			}
-			if err := f.pc.RemovePlugin(name); err != nil {
+			if err := f.pc.RemovePluginProvider(name); err != nil {
 				res := &models.Error{
 					Code:  http.StatusNotFound,
 					Type:  c.Request.Method,

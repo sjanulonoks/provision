@@ -388,7 +388,7 @@ func (rt *RequestTracker) GetParam(obj models.Paramer, key string, aggregate boo
 		return v, ok
 	}
 	if pobj := rt.Find("params", key); pobj != nil {
-		rt.Tracef("Param %s not defined, falling back to default value")
+		rt.Tracef("Param %s not defined, falling back to default value", key)
 		return AsParam(pobj).DefaultValue()
 	}
 	return nil, false
