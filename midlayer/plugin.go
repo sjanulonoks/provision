@@ -215,11 +215,11 @@ func (pc *PluginController) startPlugin(mp models.Model) {
 			return
 		} else if !ok && ref2 != nil {
 			pc.Infof("Plugin wants to be started, but isn't created, create it: %s\n", plugin.Name)
-			rt.PublishEvent(models.EventFor(r.Plugin, "create"))
+			rt.PublishEvent(models.EventFor(plugin, "create"))
 			return
 		} else if r.state == PLUGIN_STARTED {
 			pc.Infof("Plugin is already started. Try to config it")
-			rt.PublishEvent(models.EventFor(r.Plugin, "config"))
+			rt.PublishEvent(models.EventFor(plugin, "config"))
 		} else if r.state != PLUGIN_CREATED && r.state != PLUGIN_FAILED && r.state != PLUGIN_STOPPED {
 			pc.Infof("Plugin is already past start.  just return")
 			return
