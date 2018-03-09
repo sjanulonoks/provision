@@ -195,9 +195,6 @@ function prereqs() {
 # check our prereqs
 prereqs 
 
-# check if we have a default cluster name and prompt for a unique one
-set_cluster_name "$CLUSTER_NAME"
-
 # we're going to stuff some binaries in the local ./bin path
 PATH=`pwd`/bin:$PATH
 
@@ -207,8 +204,8 @@ case $1 in
     ;;
 
   safety_checks)
-    # dummy run to insure prereqs and set_cluster_name and other setup
-    # checks are run prior to other tasks
+    # check if we have a default cluster name and prompt for a unique one
+    validate_cluster_name "$CLUSTER_NAME"
     ;;
 
   install-secrets)
@@ -650,11 +647,12 @@ EOFPLUGIN
     # set up the packet stage map 
     # create stagemap JSON (MACHINES_OS:  ubuntu-16.04-install)
 
+    _n="\nNOTICE  ::  The 'uploadiso' steps may take some time.\nNOTICE  ::  ISOs are downloaded from public mirrors which may be slow at times.\n\n"
     UPLOADS="$MACHINES_OS"
     for UPLOAD in $UPLOADS
     do
     $DRPCLI $ENDPOINT bootenvs exists $UPLOAD \
-      && { set -x; $DRPCLI $ENDPOINT bootenvs uploadiso $UPLOAD; set +x; } \
+      && { printf "$_n"; set -x; $DRPCLI $ENDPOINT bootenvs uploadiso $UPLOAD; set +x; } \
       || echo "bootenv '$UPLOAD' doesn't exist, not uploading ISO"
     done
 
@@ -665,8 +663,8 @@ EOFPLUGIN
     cat <<EOFPARAM > $GLOBAL
       {
         "discover": "packet-discover:Success",
-        "packet-discover": "centos-7-install:Reboot",
-        "centos-7-install": "packet-ssh-keys:Success",
+        "packet-discover": "${MACHINES_OS}:Reboot",
+        "${MACHINES_OS}": "packet-ssh-keys:Success",
         "packet-ssh-keys": "complete-nowait:Success"
       }
 EOFPARAM

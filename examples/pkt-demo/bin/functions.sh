@@ -87,38 +87,69 @@ function my_machines() { local _u; for _u in $UUIDS; do set -x; drpcli machines 
 #  This function expects ARGv1 to be set to the value of CLUSTER_NAME
 #  and if that value is "demo", prompt for a change.
 ###
-function set_cluster_name() {
-  local _cn
+function validate_cluster_name() {
+  local _name="$1"
+  local _orig="$_name"
+  local _is_bad=1
 
-  case $1 in
-    [dD][eE][mM][oO])
-      echo ""
-      echo "The CLUSTER NAME is set to the default value of 'demo'."
-      echo "You are STRONGLY urged to select a very short name that"
-      echo "is uniuque to your cluster - otherwise, multiple clusters"
-      echo "with the same name will result in Nodes built with the"
-      echo "same name.  This is not fatal, but it can cause confusion"
-      echo "when you view Nodes in the Packet portal"
-      echo ""
-      echo "We recommend keeping it to LESS than 8 to 12 characters or"
-      echo "less; with ONLY a dash ('-') as a special character."
-      echo ""
-      echo "examples: pkt-demo"
-      echo "          cluster01"
-      echo ""
-      read -p "Set a new cluster name: " _cn
-      echo ""
+  if [[ "$_name" != "demo" ]]
+  then
+    cluster_reg_check "$_name" && { echo "Cluster name prefix set to '$_name'"; return; }
+  fi
 
-      if [[ "${_cn}" != "${1}" ]]
-      then
-        # fixup vars.tf with new cluster name
-        sed -i "" "s/^\(variable \"cluster_name\" { default = \"\).*\(\" }\)$/\1${_cn}\2/g" vars.tf
-      fi
+  while (( _is_bad )) 
+  do
+    case "$_name" in
+      demo)
+        echo ""
+        echo "The CLUSTER NAME is set to the default value of 'demo'."
+        echo "You are STRONGLY urged to select a very short name that"
+        echo "is uniuque to your cluster - otherwise, multiple clusters"
+        echo "with the same name will result in Nodes built with the"
+        echo "same name.  This is not fatal, but it can cause confusion"
+        echo "when you view Nodes in the Packet portal."
+        echo ""
+        echo "We recommend keeping it to a max of 8 to 12 characters or"
+        echo "LESS; with only Alphanumeric and dash ('-') characters."
+        echo "[a-z] [A-Z] [0-9] or dash ('-')"
+        echo ""
+        echo "examples: pkt-demo"
+        echo "          cluster01"
+        echo ""
+        read -p "Set a new cluster name prefix: " _name
+        echo ""
+        ;;
+      *)
+        echo ""
+        echo "Cluster name prefix validation for '$_name' failed."
+        echo "reminder - must match: [a-z] [A-Z] [0-9] or dash ('-')"
+        echo ""
+        read -p "Set a new cluster name prefix: " _name
+        echo ""
+        ;;
+    esac
 
-      export CLUSTER_NAME="${_cn}"
-      ;;
-  esac
-} # end set_cluster_name()
+    if cluster_reg_check "$_name"
+    then
+      echo "Cluster name prefix set to:  $_name"
+      _is_bad=0
+    fi
+  done
+
+  if [[ "$_orig" != "$_name" ]]
+  then
+    # fixup vars.tf with new cluster name
+    sed -i "" "s/^\(variable \"cluster_name\" { default = \"\).*\(\" }\)$/\1${_name}\2/g" vars.tf
+  fi
+
+  export CLUSTER_NAME="${_name}"
+} # end validate_cluster_name()
+
+# validate the cluster name against regex test
+function cluster_reg_check() {
+  local _check=$1
+  [[ "$_check" =~ ^[a-zA-Z0-9-]+$ ]] && return 0 || return 1
+} # end cluster_reg_check()
 
 ###
 #  accept as ARGv1 a sha256 check sum file to test - files will be tested
