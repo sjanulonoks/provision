@@ -23,7 +23,6 @@ func TestSubnetCrud(t *testing.T) {
 		{"Create invalid Subnet(ActiveEnd out of range)", rt.Create, &models.Subnet{Name: "test2", Subnet: "192.168.125.0/24", ActiveStart: net.ParseIP("192.168.125.80"), ActiveEnd: net.ParseIP("192.168.126.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, false},
 		{"Create invalid Subnet(ActiveLeaseTime too short)", rt.Create, &models.Subnet{Name: "test2", Subnet: "192.168.125.0/24", ActiveStart: net.ParseIP("192.168.125.80"), ActiveEnd: net.ParseIP("192.168.125.254"), ActiveLeaseTime: 59, ReservedLeaseTime: 7200, Strategy: "mac"}, false},
 		{"Create invalid Subnet(ReservedLeaseTime too short)", rt.Create, &models.Subnet{Name: "test2", Subnet: "192.168.125.0/24", ActiveStart: net.ParseIP("192.168.125.80"), ActiveEnd: net.ParseIP("192.168.125.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7199, Strategy: "mac"}, false},
-		{"Create invalid Subnet(no Strategy)", rt.Create, &models.Subnet{Name: "test2", Subnet: "192.168.125.0/24", ActiveStart: net.ParseIP("192.168.125.80"), ActiveEnd: net.ParseIP("192.168.125.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: ""}, false},
 	}
 	for _, test := range createTests {
 		test.Test(t, rt)

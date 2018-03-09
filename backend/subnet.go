@@ -502,6 +502,7 @@ func AsSubnets(o []models.Model) []*Subnet {
 }
 
 func (s *Subnet) Validate() {
+	s.Subnet.Fill()
 	s.Subnet.Validate()
 	_, subnet, err := net.ParseCIDR(s.Subnet.Subnet)
 	if err != nil {
@@ -509,12 +510,6 @@ func (s *Subnet) Validate() {
 		return
 	} else {
 		validateIP4(s, subnet.IP)
-	}
-	if s.Strategy == "" {
-		s.Errorf("Strategy must have a value")
-	}
-	if s.NextServer != nil {
-		validateMaybeZeroIP4(s, s.NextServer)
 	}
 	// Build mask and broadcast for always
 	mask := net.IP([]byte(net.IP(subnet.Mask).To4()))
@@ -541,44 +536,11 @@ func (s *Subnet) Validate() {
 	if needBCast {
 		s.Options = append(s.Options, models.DhcpOption{byte(dhcp.OptionBroadcastAddress), net.IP(buf).String()})
 	}
-	if s.Proxy && s.Unmanaged {
-		s.Errorf("Unmanaged and Proxy cannot both be true")
-	}
-	if !(s.OnlyReservations || s.Proxy) {
-		validateIP4(s, s.ActiveStart)
-		validateIP4(s, s.ActiveEnd)
-		if !subnet.Contains(s.ActiveStart) {
-			s.Errorf("ActiveStart %s not in subnet range %s", s.ActiveStart, subnet)
-		}
-		if !subnet.Contains(s.ActiveEnd) {
-			s.Errorf("ActiveEnd %s not in subnet range %s", s.ActiveEnd, subnet)
-		}
-		startBytes := big.NewInt(0)
-		endBytes := big.NewInt(0)
-		startBytes.SetBytes(s.ActiveStart)
-		endBytes.SetBytes(s.ActiveEnd)
-		if startBytes.Cmp(endBytes) != -1 {
-			s.Errorf("ActiveStart must be less than ActiveEnd")
-		}
-		if s.ActiveLeaseTime < 60 {
-			s.Errorf("ActiveLeaseTime must be greater than or equal to 60 seconds, not %d", s.ActiveLeaseTime)
-		}
-	}
-	if s.Pickers == nil || len(s.Pickers) == 0 {
-		if s.OnlyReservations {
-			s.Pickers = []string{"none"}
-		} else {
-			s.Pickers = []string{"hint", "nextFree", "mostExpired"}
-		}
-	}
 	for _, p := range s.Pickers {
 		_, ok := pickStrategies[p]
 		if !ok {
 			s.Errorf("Picker %s is not a valid lease picking strategy", p)
 		}
-	}
-	if s.ReservedLeaseTime < 7200 {
-		s.Errorf("ReservedLeaseTime must be greater than or equal to 7200 seconds, not %d", s.ReservedLeaseTime)
 	}
 	s.AddError(index.CheckUnique(s, s.rt.stores("subnets").Items()))
 	s.SetValid()
