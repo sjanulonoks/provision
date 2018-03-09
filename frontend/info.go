@@ -46,6 +46,7 @@ func (f *Frontend) GetInfo(c *gin.Context, drpid string) (*models.Info, *models.
 			"threaded-log-levels",
 			"plugin-v2",
 			"fsm-runner",
+			"plugin-v2-safe-config",
 		},
 	}
 
