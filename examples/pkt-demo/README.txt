@@ -24,7 +24,7 @@ OVERVIEW AND IMPORTANT REQUIREMENTS
 -----------------------------------
 
 You will need to perform the following FOUR EASY STEPS  in preparation 
-to using this demo pkt-demo process.  Details for each step are below.
+to using this pkt-demo process.  Details for each step are below.
 
   1. GIT CLONE
     - get the pkt-demo code from the github repo
@@ -65,28 +65,29 @@ DETAILED STEPS
     git clone -n https://github.com/digitalrebar/provision.git --depth=1
     cd provision
     git checkout HEAD examples/pkt-demo
-    cd examples/pkt-demo
-    mv pkt-demo $HOME/
-    cd ../..
+    mv examples/pkt-demo $HOME/
+    cd ..
     rm -rf provision
     cd $HOME/pkt-demo
 
   DO NOT run these steps with 'sudo', your username should own the new directory and files.
 
 
-*If you DO have the Repo Cloned already, do:*
+*If you ALREADY have the repo cloned locally, do:*
 
   Simply copy the `digitalrebar/provision/examples/pkt-demo` directory to a new
   location.  For example: 
 
-    cp -r <path_to_github_clone>/digitalrebar/provision/examples/pkt-demo $HOME/mydemo
+    cd <path_to_github_clone>/digitalrebar/provision/examples/
+    git pull
+    cp -r pkt-demo $HOME/pkt-demo
     cd $HOME/mydemo
 
 
 2. SECRETS
 ==========
 
-ABSOLUTELY necessary - to authenticate to the packet.net API services and spin
+ABSOLUTELY NECESSARY - to authenticate to the packet.net API services and spin
 up Nodes, and to authenticate to the RackN Portal to download content and
 plugins.
 
@@ -102,6 +103,9 @@ EDIT THE SECRETS FILE !!  Located in 'private-content/secrets'.  You need:
 
   * API and PROJECT are from packet.net and you should find them in your
     Packet portal management (see PACKET SECRETS NOTE below for details).
+
+  * Contact RackN for demo credit info if you don't have a packet account yet.
+    - contact: http://www.rackn.com/support/slack/
 
   * USERNAME is from the RackN Portal - to find your USERNAME, log in 
     to the portal, and navigate to:
@@ -122,23 +126,40 @@ NOTE: Please do not modify the following in the 'secrets' file:
 3. CUSTOMIZATION
 ================
 
-  * make sure you've modified the 'secrets' file appropriately 
-    (see '3. SECRETS' above)
-    (inject API, PROJECT, and USERNAME)
+Make sure you've modified the 'secrets' file appropriately (see '3. SECRETS' above).
 
-  * HIGHLY suggested - modify the "cluster_name":
-    You may optionally make changes to the "vars.tf" file - specifically, you can 
-    set the "cluster_name" to something other than "demo" - if you instantiate
-    multiple DRP/Machines clusters, then the names will collide in the packet.net
-    portal.  Changing the "cluster_name" will help in identifying which resources
-    belong to which cluster. 
+These steps are OPTIONAL - if you are just trying to "quickstart" and play - leave
+these as is.  If you want more Machines and some customization, read on. 
 
-  * you can modify which Operating System the DRP endpoint is running on - the only
-    two supported/tested are Centos 7 and Ubuntu 16.04
+These define what Packet resources you use, and thus; how much money you may end up 
+owing Packet.   By default we ONLY spin up 1 type_0 machine for the Digital Rebar
+Provision endpoint, and one type_0 test CentOS 7 machine provisioned against the DRP 
+endpoint in the Packet EWR1 (Parsipany, NJ, USA) datacenter.  
 
-  * specify the number of Machines to provision (default is 1 machine of type_0)
+Packet pricing:  https://www.packet.net/bare-metal/ 
 
-  * change the packet.net facility to provsion the cluster in  (default is EWR1)
+  * endpoint_type
+    - The DRP Endpoint node type in Packet parlance.  Type_0 is WAY more than you need.
+    - see: https://www.packet.net/developers/api/plans/
+    
+  * drp_os
+    - you can modify which Operating System the DRP endpoint is running on 
+    - only supported ones are CentOS 7 and Ubuntu 16.04
+
+  * machines_type
+    - The DRP Endpoint node type in Packet parlance.  Type_0 is plenty for testing.
+    - see: https://www.packet.net/developers/api/plans/
+
+  * machines_count
+    - specify the number of Machines to provision (default is 1 machine of type_0)
+
+  * machines_os
+    - you can modify which Operating System the Machines will be provisioned with
+    - only supported ones are CentOS 7 and Ubuntu 16.04
+
+  * packet_facility
+    - change the packet.net facility to provsion the cluster in  (default is EWR1)
+    - see: https://www.packet.net/developers/api/facilities/
 
 
 4. RUN demo-run.sh SCRIPT
@@ -167,6 +188,7 @@ USAGE options for "demo-run.sh"
 
 ADDITIONAL SECTIONS
 -------------------
+
 
 WHAT HAPPENS?
 =============

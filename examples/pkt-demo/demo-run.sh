@@ -158,6 +158,7 @@ case $1 in
     cprintf $bold "   SSH to remote DRP, stop, restart in foreground ... ? \n"
     cprintf $bold "   Maybe launch UI to show empty content too ... ? \n"
     cprintf $bold "   https://rackn.github.io/provision-ux/#/e/${ADDR}:8092/system "
+    https://portal.rackn.io/#/e/147.75.64.189:8092/system
     echo ""
     confirm control.sh remote-content-demo $DRP  
     echo ""
