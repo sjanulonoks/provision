@@ -266,7 +266,7 @@ func (pc *PluginController) startPlugin(mp models.Model) {
 			rt.ApiURL(net.ParseIP("0.0.0.0")),
 			rt.FileURL(net.ParseIP("0.0.0.0")),
 			token,
-			ppath, plugin.Params)
+			ppath)
 
 		if err != nil {
 			if len(r.Plugin.PluginErrors) == 0 {
