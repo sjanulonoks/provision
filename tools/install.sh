@@ -23,17 +23,22 @@ Options:
     --commit=<string>       # github commit file to wait for.  Unset assumes the files
                             # are in place
     --remove-data           # Remove data as well as program pieces
+    --skip-run-check        # Skip the process check for 'dr-provision' on new install
+                            # only valid in '--isolated' install mode
+    --skip-depends          # Skip OS dependency checks, for testing 'isolated' mode
 
     install                 # Sets up an isolated or system 'production' enabled install.
     remove                  # Removes the system enabled install.  Requires no other flags
 
 Defaults are:
-    version     = $DEFAULT_DRP_VERSION    (examples: 'tip', 'v3.6.0' or 'stable')
-    isolated    = false
-    nocontent   = false
-    upgrade     = false
-    force       = false
-    debug       = false
+    version        = $DEFAULT_DRP_VERSION    (examples: 'tip', 'v3.6.0' or 'stable')
+    isolated       = false
+    nocontent      = false
+    upgrade        = false
+    force          = false
+    debug          = false
+    skip-run-check = false
+    skip-depends   = false
 EOFUSAGE
 
 exit 0
@@ -44,6 +49,8 @@ NO_CONTENT=false
 DBG=false
 UPGRADE=false
 REMOVE_DATA=false
+SKIP_RUN_CHECK=false
+SKIP_DEPENDS=false
 
 args=()
 while (( $# > 0 )); do
@@ -63,6 +70,12 @@ while (( $# > 0 )); do
             ;;
         --isolated)
             ISOLATED=true
+            ;;
+        --skip-run-check)
+            SKIP_RUN_CHECK=true
+            ;;
+        --skip-depends)
+            SKIP_DEPENDS=true
             ;;
         --force)
             force=true
@@ -247,14 +260,19 @@ fi
 
 case $1 in
      install)
-             if pgrep dr-provision; then
-                 echo "'dr-provision' service is running, CAN NOT upgrade ... please stop service first"
-                 exit 9
+             if [[ "$ISOLATED" == "false" || "$SKIP_RUN_CHECK" == "false" ]]; then
+                 if pgrep dr-provision; then
+                     echo "'dr-provision' service is running, CAN NOT upgrade ... please stop service first"
+                     exit 9
+                 else
+                     echo "'dr-provision' service is not running, beginning install process ... "
+                 fi
              else
-                 echo "'dr-provision' service is not running, beginning install process ... "
+                 echo "Skipping 'dr-provision' service run check as requested ..."
              fi
 
-             ensure_packages
+            [[ "$SKIP_DEPENDS" == "false" ]] && ensure_packages || echo "Skipping dependency checking as requested ... "
+
              # Are we in a build tree
              if [ -e server ] ; then
                  if [ ! -e bin/linux/amd64/drpcli ] ; then
