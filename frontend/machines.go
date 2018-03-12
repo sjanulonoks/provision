@@ -308,6 +308,9 @@ func (f *Frontend) InitMachineApi() {
 			if !assureDecode(c, b) {
 				return
 			}
+			if !f.assureAuth(c, b.Prefix(), "create", "") {
+				return
+			}
 			if b.Uuid == nil || len(b.Uuid) == 0 {
 				b.Uuid = uuid.NewRandom()
 			}
@@ -316,6 +319,9 @@ func (f *Frontend) InitMachineApi() {
 			rt := f.rt(c, b.Locks("create")...)
 			rt.Do(func(d backend.Stores) {
 				_, err = rt.Create(b)
+				if err == nil {
+					res = models.Clone(b)
+				}
 			})
 			if err != nil {
 				be, ok := err.(*models.Error)
@@ -325,11 +331,9 @@ func (f *Frontend) InitMachineApi() {
 					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
 				}
 			} else {
-				s, ok := models.Model(b).(Sanitizable)
+				s, ok := models.Model(res).(Sanitizable)
 				if ok {
 					res = s.Sanitize()
-				} else {
-					res = b
 				}
 				c.JSON(http.StatusCreated, res)
 			}
