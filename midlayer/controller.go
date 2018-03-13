@@ -291,8 +291,6 @@ func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, pro
 		if err := codec.Decode([]byte(pp.Content), content); err != nil {
 			return err
 		}
-	} else {
-		content.Meta.Meta = pp.Meta
 	}
 	cName := pp.Name
 	content.Meta.Name = cName

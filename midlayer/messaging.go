@@ -92,7 +92,7 @@ func (pc *PluginClient) Unload() {
 	return
 }
 
-func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logger.Logger, apiURL, staticURL, token, path string, params map[string]interface{}) (answer *PluginClient, theErr error) {
+func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logger.Logger, apiURL, staticURL, token, path string) (answer *PluginClient, theErr error) {
 	answer = &PluginClient{pc: pc, plugin: plugin, Logger: l}
 	answer.Debugf("Initialzing Plugin: %s\n", plugin)
 

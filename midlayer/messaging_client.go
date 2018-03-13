@@ -99,6 +99,7 @@ func (pc *PluginClient) Stop() error {
 
 func (pc *PluginClient) Config(params map[string]interface{}) error {
 	pc.Tracef("Config %s: started\n", pc.plugin)
+	params["Name"] = pc.plugin
 	_, err := pc.post(pc, "/config", params)
 	pc.Tracef("Config %s: finished: %v\n", pc.plugin, err)
 	return err
