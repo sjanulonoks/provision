@@ -305,8 +305,8 @@ func (pc *PluginController) configPlugin(mp models.Model) {
 		pc.Infof("Plugin is already configed. Done!")
 		return
 	} else if r.state != PLUGIN_STARTED {
-		pc.Infof("Plugin is already isn't started.  Start over")
-		rt.PublishEvent(models.EventFor(r.Plugin, "config"))
+		pc.Infof("Plugin isn't started.  Start over")
+		rt.PublishEvent(models.EventFor(r.Plugin, "start"))
 		return
 	}
 
