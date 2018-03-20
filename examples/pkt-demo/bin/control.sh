@@ -185,7 +185,7 @@ function prereqs() {
 	case $_OS_FAMILY in
 		rhel)   sudo yum -y install $_pkgs; xit $? ;;
 		debian) sudo apt -y install $_pkgs; xit $? ;;
-    darwin) xiterr 4 "install required pkgs ($_pkgs) on Mac OS X first (eg 'brew install jq')";;
+    darwin) xiterr 4 "install required pkgs ($_pkgs) on Mac OS X first \n(eg 'brew install jq' - see https://brew.sh/ if you don't have Homebrew)";;
     *)  xiterr 4 "unsupported _OS_FAMILY ('$_OS_FAMILY') in prereqs()" ;;
 	esac
 
