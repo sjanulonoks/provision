@@ -516,7 +516,7 @@ func (r *RenderData) GenerateToken() string {
 			ttl = time.Second * time.Duration(mttl)
 		}
 		t, _ = NewClaim("general", grantor, ttl).
-			Add("machines", "post", "*").
+			Add("machines", "create", "*").
 			Add("machines", "get", "*").
 			AddSecrets("", grantorSecret, "").
 			Seal(r.rt.dt.tokenManager)

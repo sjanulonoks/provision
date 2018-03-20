@@ -299,11 +299,11 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GetToken should return a good claim. %v\n", e)
 		}
-		if !claim.Match("machines", "post", "anything") {
-			t.Errorf("Unknown token should match: machines/post/*\n")
+		if !claim.Match("machines", "create", "anything") {
+			t.Errorf("Unknown token should match: machines/create/*\n")
 		}
 		if !claim.Match("machines", "get", "anything") {
-			t.Errorf("Unknown token should match: machines/post/*\n")
+			t.Errorf("Unknown token should match: machines/get/*\n")
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 600 {
 			t.Errorf("Unknown token timeout should be 600, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
@@ -329,11 +329,11 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GetToken should return a good claim. %v\n", e)
 		}
-		if !claim.Match("machines", "post", "anything") {
-			t.Errorf("Unknown token should match: machines/post/*\n")
+		if !claim.Match("machines", "create", "anything") {
+			t.Errorf("Unknown token should match: machines/create/*\n")
 		}
 		if !claim.Match("machines", "get", "anything") {
-			t.Errorf("Unknown token should match: machines/post/*\n")
+			t.Errorf("Unknown token should match: machines/get/*\n")
 		}
 		if claim.Match("machines", "patch", "anything") {
 			t.Errorf("Unknown token should NOT match: machines/patch/*\n")
@@ -467,8 +467,8 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GetToken should return a good claim. %v\n", e)
 		}
-		if claim.Match("machines", "post", "anything") {
-			t.Errorf("Known token should NOT match: machines/post/*\n")
+		if claim.Match("machines", "create", "anything") {
+			t.Errorf("Known token should NOT match: machines/create/*\n")
 		}
 		if claim.Match("machines", "get", "anything") {
 			t.Errorf("Known token should NOT match: machines/get/*\n")
@@ -519,8 +519,8 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GetToken should return a good claim. %v\n", e)
 		}
-		if claim.Match("machines", "post", "anything") {
-			t.Errorf("Known token should NOT match: machines/post/*\n")
+		if claim.Match("machines", "create", "anything") {
+			t.Errorf("Known token should NOT match: machines/create/*\n")
 		}
 		if claim.Match("machines", "get", "anything") {
 			t.Errorf("Known token should NOT match: machines/get/*\n")
@@ -568,8 +568,8 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GetToken should return a good claim. %v\n", e)
 		}
-		if claim.Match("machines", "post", "anything") {
-			t.Errorf("Known token should NOT match: machines/post/*\n")
+		if claim.Match("machines", "create", "anything") {
+			t.Errorf("Known token should NOT match: machines/create/*\n")
 		}
 		if claim.Match("machines", "get", "anything") {
 			t.Errorf("Known token should NOT match: machines/get/*\n")
