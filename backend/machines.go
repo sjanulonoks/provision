@@ -772,12 +772,16 @@ func (n *Machine) oldOnChange(oldm *Machine, e *models.Error) {
 	}
 }
 
-func (n *Machine) newOnChange(oldm *Machine, e *models.Error) {
+func (n *Machine) resetCurrentTask(oldm *Machine, e *models.Error) {
 	if n.CurrentTask == oldm.CurrentTask || n.CurrentTask != -1 {
 		return
 	}
-	lBound := oldm.CurrentTask
-	for ; lBound > -1; lBound-- {
+	found := false
+	target := n.CurrentTask
+	for lBound := oldm.CurrentTask; lBound > -1; lBound-- {
+		if lBound >= len(n.Tasks) {
+			continue
+		}
 		thing := n.Tasks[lBound]
 		if !strings.HasPrefix("stage:", thing) {
 			continue
@@ -788,11 +792,16 @@ func (n *Machine) newOnChange(oldm *Machine, e *models.Error) {
 			return
 		}
 		stage := obj.(*Stage)
-		if stage.BootEnv != "" && stage.BootEnv != n.BootEnv {
-			break
+		if stage.BootEnv == "" || stage.BootEnv == n.BootEnv {
+			target = lBound
+			continue
 		}
+		found = true
+		break
 	}
-	n.CurrentTask = lBound
+	if found {
+		n.CurrentTask = target
+	}
 }
 
 func (n *Machine) OnChange(oldThing store.KeySaver) error {
@@ -814,8 +823,6 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 	}
 	if n.Workflow == "" {
 		n.oldOnChange(oldm, e)
-	} else {
-		n.newOnChange(oldm, e)
 	}
 	if oldm.CurrentTask == n.CurrentTask {
 		if !reflect.DeepEqual(oldPast, newPast) {
@@ -828,8 +835,11 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 		if !reflect.DeepEqual(oldFuture, newFuture) {
 			e.Errorf("Cannot change tasks that are past the next stage transition")
 		}
-	} else if !reflect.DeepEqual(n.Tasks, oldm.Tasks) && n.CurrentTask != -1 {
+	} else if !reflect.DeepEqual(n.Tasks, oldm.Tasks) && len(oldm.Tasks) > 0 && n.CurrentTask > -1 {
 		e.Errorf("Cannot change task list and current task at the same time")
+	}
+	if n.CurrentTask == -1 && n.Runnable {
+		n.resetCurrentTask(oldm, e)
 	}
 	return e.HasError()
 }
