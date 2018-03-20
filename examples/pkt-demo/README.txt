@@ -49,7 +49,6 @@ Additional Sections (hopefully useful) of documentation:
   * OPERATING AND TROUBLESHOOTING
   * ADVANCED USAGE OPTIONS
 
-
 DETAILED STEPS
 --------------
 
@@ -264,6 +263,19 @@ GENERAL NOTES
           this options _should_ work but is not very well 
           tested (hint: there are probably some minor bugs)
 
+
+ PREREQS  The machine you run the 'demo-run.sh' from must meet a
+          few basic requirements.  We support Mac OS X and Linux.
+          The demo script will give you a message if you're missing
+          anything important.  Here are a couple of notes on things
+          you'll probably need if you don't have them already... 
+
+
+          jq         tool for parsing JSON text, REQUIRED
+                     Mac:   1. Install Homebrew (https://brew.sh)
+                            2. 'brew install jq'
+                     Linux: 'sudo yum -y install jq'
+                        or: 'sudo apt -y install jq'
 
 OPERATING AND TROUBLESHOOTING
 =============================
