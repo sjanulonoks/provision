@@ -501,6 +501,7 @@ func NewFrontend(
 	me.InitPluginProviderApi()
 	me.InitTaskApi()
 	me.InitJobApi()
+	me.InitWorkflowApi()
 	me.InitEventApi()
 	me.InitContentApi()
 	me.InitSystemApi()
