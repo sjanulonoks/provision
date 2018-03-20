@@ -507,7 +507,7 @@ func (n *Machine) validateChangeWorkflow() {
 	for _, stageName := range workflow.Stages {
 		stage := n.rt.find("stages", stageName).(*Stage)
 		taskList = append(taskList, "stage:"+stageName)
-		if stage.BootEnv != "" || stage.BootEnv != lastEnv {
+		if stage.BootEnv != "" && stage.BootEnv != lastEnv {
 			taskList = append(taskList, "bootenv:"+stage.BootEnv)
 			lastEnv = stage.BootEnv
 		}
@@ -605,15 +605,21 @@ func (n *Machine) validateChangeEnv() {
 
 func (n *Machine) validateTaskList() {
 	stages := n.rt.stores("stages")
+	bootenvs := n.rt.stores("bootenvs")
 	tasks := n.rt.stores("tasks")
 	for i, ent := range n.Tasks {
 		parts := strings.SplitN(ent, ":", 2)
 		if len(parts) == 2 {
-			if parts[0] == "stage" && n.Workflow != "" {
+			switch parts[0] {
+			case "stage":
 				if stages.Find(parts[1]) == nil {
 					n.Errorf("Stage %s (at %d) does not exist", parts[1], i)
 				}
-			} else {
+			case "bootenv":
+				if bootenvs.Find(parts[1]) == nil {
+					n.Errorf("BootEnv %s (at %d) does not exist", parts[1], i)
+				}
+			default:
 				n.Errorf("%s (at %d) is malformed", ent, i)
 			}
 		} else {
@@ -621,6 +627,9 @@ func (n *Machine) validateTaskList() {
 				n.Errorf("Task %s (at %d) does not exist", ent, i)
 			}
 		}
+	}
+	if n.CurrentTask > len(n.Tasks) {
+		n.CurrentTask = len(n.Tasks)
 	}
 }
 

@@ -558,13 +558,13 @@ func allKeySavers() []models.Model {
 		&Profile{},
 		&BootEnv{},
 		&Stage{},
+		&Workflow{},
 		&Machine{},
 		&Subnet{},
 		&Reservation{},
 		&Lease{},
 		&Plugin{},
 		&Job{},
-		&Workflow{},
 	}
 }
 
