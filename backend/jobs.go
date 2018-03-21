@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/digitalrebar/provision/backend/index"
@@ -401,9 +402,10 @@ func (j *Job) Validate() {
 			}
 		}
 	}
-
-	if tasks.Find(j.Task) == nil {
-		j.Errorf("Task %s does not exist", j.Task)
+	if !strings.Contains(j.Task, ":") {
+		if tasks.Find(j.Task) == nil {
+			j.Errorf("Task %s does not exist", j.Task)
+		}
 	}
 
 	var env *Stage
@@ -546,11 +548,11 @@ func (j *Job) Log(rt *RequestTracker, src io.Reader) error {
 
 var jobLockMap = map[string][]string{
 	"get":     []string{"jobs"},
-	"create":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
-	"update":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
-	"patch":   []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
+	"create":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles", "workflows"},
+	"update":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles", "workflows"},
+	"patch":   []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles", "workflows"},
 	"delete":  []string{"machines", "jobs"},
-	"actions": []string{"stages", "jobs", "machines", "tasks", "profiles", "bootenvs", "params"},
+	"actions": []string{"stages", "jobs", "machines", "tasks", "profiles", "bootenvs", "params", "workflows"},
 }
 
 func (j *Job) Locks(action string) []string {
