@@ -679,7 +679,13 @@ func (n *Machine) OnLoad() error {
 }
 
 func (n *Machine) validateChangeWorkflow(oldm *Machine, e *models.Error) {
-	if oldm.Workflow == n.Workflow || n.Workflow == "" {
+	if oldm.Workflow == n.Workflow {
+		return
+	}
+	if n.Workflow == "" {
+		if n.Stage == oldm.Stage {
+			n.Stage = ""
+		}
 		return
 	}
 	workflows := n.rt.stores("workflows")
@@ -717,6 +723,7 @@ func (n *Machine) validateChangeStage(oldm *Machine, e *models.Error) {
 		return
 	}
 	if n.Stage == "" {
+		delete(n.Params, "change-stage/map")
 		n.Stage = "none"
 	}
 	stages := n.rt.stores("stages")
@@ -749,11 +756,7 @@ func (n *Machine) validateChangeStage(oldm *Machine, e *models.Error) {
 	}
 	n.Tasks = make([]string, len(stage.Tasks))
 	copy(n.Tasks, stage.Tasks)
-	if len(n.Tasks) > 0 {
-		n.CurrentTask = -1
-	} else {
-		n.CurrentTask = 0
-	}
+	n.CurrentTask = -1
 }
 
 func (n *Machine) validateChangeEnv(oldm *Machine, e *models.Error) {
@@ -785,10 +788,10 @@ func (n *Machine) oldOnChange(oldm *Machine, e *models.Error) {
 	// If we are changing stages and we aren't done running tasks,
 	// Fail unless the users marks a force
 	// If we have a stage set, don't change bootenv unless force
-	if n.Stage == "" {
-		n.Stage = "none"
-	}
-	if n.oldStage != n.Stage && oldm.CurrentTask != len(oldm.Tasks) && !n.ChangeForced() {
+	if n.oldStage != n.Stage &&
+		len(oldm.Tasks) != 0 &&
+		oldm.CurrentTask != len(oldm.Tasks) &&
+		!n.ChangeForced() {
 		e.Errorf("Can not change stages with pending tasks unless forced")
 	}
 	if n.Stage != "none" && n.oldStage == n.Stage && n.oldBootEnv != n.BootEnv && !n.ChangeForced() {
@@ -810,10 +813,10 @@ func (n *Machine) resetCurrentTask(oldm *Machine, e *models.Error) {
 			continue
 		}
 		thing := n.Tasks[lBound]
-		if !strings.HasPrefix("stage:", thing) {
+		if !strings.HasPrefix(thing, "stage:") {
 			continue
 		}
-		obj := n.rt.find("stages", strings.TrimPrefix("stage:", thing))
+		obj := n.rt.find("stages", strings.TrimPrefix(thing, "stage:"))
 		if obj == nil {
 			return
 		}

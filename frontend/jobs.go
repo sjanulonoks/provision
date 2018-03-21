@@ -308,7 +308,7 @@ func (f *Frontend) InitJobApi() {
 			rt.Do(func(d backend.Stores) {
 				cj := backend.ModelToBackend(&models.Job{}).(*backend.Job)
 				cj.Uuid = uuid.Parse("00000000-0000-0000-0000-000000000000")
-				cj.State = "finished"
+				cj.State = "failed"
 
 				mo := rt.Find("machines", b.Machine.String())
 				if mo == nil {
@@ -329,27 +329,18 @@ func (f *Frontend) InitJobApi() {
 					return
 				}
 				m := backend.ModelToBackend(models.Clone(oldM)).(*backend.Machine)
-				defer func() {
-					if oldM.CurrentTask != m.CurrentTask ||
-						oldM.CurrentJob.String() != m.CurrentJob.String() {
-						if _, err = rt.Update(m); err != nil {
-							code = http.StatusInternalServerError
-						}
-					}
-				}()
-
 				m.InRunner()
 				// Are we running a job or not on list yet, do some checking.
 				if jo := rt.Find("jobs", m.CurrentJob.String()); jo != nil {
 					cj = jo.(*backend.Job)
 				}
-				code = http.StatusNoContent
 				if m.CurrentTask >= len(m.Tasks) {
 					rt.Infof("Machine %s is out of tasks", b.Machine.String())
 					return
 				}
 				nextTask := m.CurrentTask + 1
-				if m.CurrentTask == -1 {
+				skipCurrentCheck := false
+				if m.CurrentTask == -1 || strings.Contains(m.Tasks[m.CurrentTask], ":") {
 					// At this point, we are starting over on the task list
 					// We could have been forced and need to close out a job.
 					// if it is running, created, or incomplete, we need
@@ -364,114 +355,126 @@ func (f *Frontend) InitJobApi() {
 						}
 						m.Runnable = true
 					}
-					m.CurrentTask = 0
-					nextTask = 0
-				}
-				if strings.Contains(m.Tasks[m.CurrentTask], ":") {
-					// If we return from inside this for loop, it will be with NoContent
-					currentStage := m.Stage
-					for i := m.CurrentTask; i < len(m.Tasks); i++ {
-						rt.Infof("Machine %s ([%d]%s)is checking to see if it needs to change stage", b.Machine.String(), i, m.Tasks[i])
-						st := strings.SplitN(m.Tasks[i], ":", 2)
-						if len(st) != 2 {
-							rt.Infof("Machine %s rolled forward to ([%d]%s)", b.Machine.String(), i, m.Tasks[i])
+					if m.CurrentTask == -1 {
+						m.CurrentTask = 0
+						nextTask = 0
+					}
+					if m.CurrentTask >= len(m.Tasks) {
+						rt.Infof("Machine %s is out of tasks", b.Machine.String())
+						return
+					}
+					if strings.Contains(m.Tasks[m.CurrentTask], ":") {
+						// If we return from inside this for loop, it will be with NoContent
+						for i := m.CurrentTask; i < len(m.Tasks); i++ {
+							rt.Infof("Machine %s ([%d]%s)is checking to see if it needs to change stage", b.Machine.String(), i, m.Tasks[i])
+							st := strings.SplitN(m.Tasks[i], ":", 2)
+							if len(st) != 2 {
+								rt.Infof("Machine %s rolled forward to ([%d]%s)", b.Machine.String(), i, m.Tasks[i])
+								m.CurrentTask = i
+								nextTask = i
+								break
+							}
+							// Handle bootenv and stage changes if needed
+							switch st[0] {
+							case "stage":
+								if m.Stage == st[1] {
+									continue
+								}
+								rt.Infof("Machine %s is changing stage from %s to %s", b.Machine.String(), m.Stage, st[1])
+								m.Stage = st[1]
+							case "bootenv":
+								if m.BootEnv == st[1] {
+									continue
+								}
+								rt.Infof("Machine %s is changing bootenv from %s to %s", b.Machine.String(), m.BootEnv, st[1])
+								m.BootEnv = st[1]
+							default:
+								code = http.StatusInternalServerError
+								err = &models.Error{
+									Code:  code,
+									Type:  "InvalidTaskList",
+									Key:   m.Key(),
+									Model: m.Prefix(),
+								}
+								err.(*models.Error).Errorf("Invalid task list entry[%d]: '%s'", i, m.Tasks[i])
+								return
+							}
+							// We need to update the machine. Create a fake job that is already
+							// finished to commemorate the occasion, save it,
+							// lie to the change-stage/map to make older runners happy, and return
 							m.CurrentTask = i
 							nextTask = i
+							skipCurrentCheck = true
 							break
 						}
-						// Handle bootenv and stage changes if needed
-						switch st[0] {
-						case "stage":
-							if m.Stage == st[1] {
-								continue
-							}
-							rt.Infof("Machine %s is changing stage from %s to %s", b.Machine.String(), m.Stage, st[1])
-							m.Stage = st[1]
-						case "bootenv":
-							if m.BootEnv == st[1] {
-								continue
-							}
-							rt.Infof("Machine %s is changing bootenv from %s to %s", b.Machine.String(), m.BootEnv, st[1])
-							m.BootEnv = st[1]
-						default:
-							code = http.StatusInternalServerError
-							err = &models.Error{
-								Code:  code,
-								Type:  "InvalidTaskList",
-								Key:   m.Key(),
-								Model: m.Prefix(),
-							}
-							err.(*models.Error).Errorf("Invalid task list entry[%d]: '%s'", i, m.Tasks[i])
-							return
-						}
-						// We need to update the machine. Create a fake job that is already
-						// finished to commemorate the occasion, save it,
-						// lie to the change-stage/map to make older runners happy, and return
-						m.CurrentTask = i
-						b.State = "finished"
-						b.StartTime = time.Now()
-						b.Previous = cj.Uuid
-						b.Machine = m.Uuid
-						b.Stage = m.Stage
-						b.BootEnv = m.BootEnv
-						b.Workflow = m.Workflow
-						b.CurrentIndex = m.CurrentTask
-						b.NextIndex = m.CurrentTask + 1
-						b.Task = m.Tasks[m.CurrentTask]
-						m.Params["change-stage/map"] = map[string]string{currentStage: m.Stage}
-						rt.Create(b)
-						rt.Infof("Created job %s for task %s at index %d", b.UUID(), b.Task, b.CurrentIndex)
-						m.CurrentJob = b.Uuid
+					}
+				}
+				if !skipCurrentCheck {
+					switch cj.State {
+					case "incomplete":
+						rt.Infof("Machine %s task %s at %d is incomplete, rerunning it",
+							cj.Machine.String(), cj.Task, m.CurrentTask)
+						b = cj
+						code = http.StatusAccepted
+						return
+					case "finished":
+						// Advance to the next task
+						rt.Infof("Machine %s task %s at %d is finished, advancing to %d",
+							cj.Machine.String(), cj.Task, m.CurrentTask, nextTask)
+						m.CurrentTask = nextTask
+					case "failed":
+						rt.Infof("Machine %s task %s at %d is failed, retrying",
+							cj.Machine.String(), cj.Task, m.CurrentTask)
+						// Someone has set the machine back to runnable and wants
+						// to rerun the current task again.  Let them
+					default:
+						rt.Warnf("Machine %s task %s at %d is %s, conflict",
+							cj.Machine.String(), cj.Task, m.CurrentTask, cj.State)
+						// Need to error - running job already running or just created.
+						err = &models.Error{Code: http.StatusConflict, Type: "Conflict",
+							Messages: []string{fmt.Sprintf("Machine %s already has running or created job", b.Machine.String())}}
+						code = http.StatusConflict
 						return
 					}
 				}
-				switch cj.State {
-				case "incomplete":
-					rt.Infof("Machine %s task %s at %d is incomplete, rerunning it",
-						cj.Machine.String(), cj.Task, m.CurrentTask)
-					b = cj
-					code = http.StatusAccepted
-					return
-				case "finished":
-					// Advance to the next task
-					rt.Infof("Machine %s task %s at %d is finished, advancing to %d",
-						cj.Machine.String(), cj.Task, m.CurrentTask, nextTask)
-					m.CurrentTask = nextTask
-				case "failed":
-					rt.Infof("Machine %s task %s at %d is failed, retrying",
-						cj.Machine.String(), cj.Task, m.CurrentTask)
-					// Someone has set the machine back to runnable and wants
-					// to rerun the current task again.  Let them
-				default:
-					rt.Warnf("Machine %s task %s at %d is %s, conflict",
-						cj.Machine.String(), cj.Task, m.CurrentTask, cj.State)
-					// Need to error - running job already running or just created.
-					err = &models.Error{Code: http.StatusConflict, Type: "Conflict",
-						Messages: []string{fmt.Sprintf("Machine %s already has running or created job", b.Machine.String())}}
-					code = http.StatusConflict
-					return
-				}
-				if nextTask >= len(m.Tasks) {
+				if m.CurrentTask >= len(m.Tasks) {
 					rt.Infof("Machine %s as no more tasks", cj.Machine.String())
+					if _, err = rt.Update(m); err != nil {
+						code = http.StatusInternalServerError
+					}
 					code = http.StatusNoContent
 					return
 				}
-				// Fill in new job.
-				b.State = "created"
+				thisTask := m.Tasks[m.CurrentTask]
+				b.StartTime = time.Now()
 				b.Previous = cj.Uuid
+				b.Machine = m.Uuid
 				b.Stage = m.Stage
 				b.BootEnv = m.BootEnv
 				b.Workflow = m.Workflow
-				b.Task = m.Tasks[m.CurrentTask]
 				b.CurrentIndex = m.CurrentTask
 				b.NextIndex = m.CurrentTask + 1
-				rt.Infof("Created job %s for task %s at index %d", b.UUID(), b.Task, b.CurrentIndex)
-				// Create the job, and then update the machine
-				_, err = rt.Create(b)
-				if err == nil {
-					m.CurrentJob = b.Uuid
+				b.Task = thisTask
+				if strings.Contains(thisTask, ":") {
+					b.State = "finished"
+					b.ExitState = "complete"
+					if oldM.Stage != m.Stage {
+						m.Params["change-stage/map"] = map[string]string{oldM.Stage: m.Stage}
+					}
+				} else {
+					b.State = "created"
+					b.Previous = cj.Uuid
+					code = http.StatusCreated
 				}
-				code = http.StatusCreated
+				if _, err = rt.Create(b); err != nil {
+					code = http.StatusInternalServerError
+					return
+				}
+				m.CurrentJob = b.Uuid
+				rt.Infof("Created job %s for task %s at index %d", b.UUID(), b.Task, b.CurrentIndex)
+				if _, err = rt.Update(m); err != nil {
+					code = http.StatusInternalServerError
+				}
 			})
 			switch code {
 			case http.StatusAccepted, http.StatusCreated:

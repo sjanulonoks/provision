@@ -431,10 +431,13 @@ func (j *Job) Validate() {
 	} else {
 		m = AsMachine(om)
 		if j.oldState != j.State {
-			if j.State == "failed" {
+			switch j.State {
+			case "failed":
 				m.Runnable = false
 				_, e2 := j.rt.Save(m)
 				j.AddError(e2)
+			case "created":
+				j.StartTime = time.Now()
 			}
 		}
 	}
