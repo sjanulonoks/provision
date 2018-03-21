@@ -357,6 +357,7 @@ func (fe *Frontend) userAuth() gin.HandlerFunc {
 				return
 			}
 			t := backend.NewClaim(string(userpass[0]), string(userpass[0]), 30).Add("*", "*", "*")
+			fe.rt(c).Auditf("Authenticated user %s from %s", userpass[0], c.ClientIP())
 			c.Set("DRP-CLAIM", t)
 		} else if hdrParts[0] == "Bearer" {
 			t, err := fe.dt.GetToken(string(hdrParts[1]))
@@ -640,8 +641,6 @@ func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bo
 		c.AbortWithStatus(http.StatusForbidden)
 		return false
 	}
-	f.rt(c).Auditf("Authenticated %s - %s %s %s - %s", obj.(*backend.DrpCustomClaims).Id,
-		scope, action, specific, c.ClientIP())
 	return true
 }
 
