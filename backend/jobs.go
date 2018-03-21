@@ -166,6 +166,42 @@ func (j *Job) Indexes() map[string]index.Maker {
 			job.Stage = s
 			return job, nil
 		})
+	res["Workflow"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Workflow < fix(j).Workflow },
+		func(ref models.Model) (gte, gt index.Test) {
+			refWorkflow := fix(ref).Workflow
+			return func(s models.Model) bool {
+					return fix(s).Workflow >= refWorkflow
+				},
+				func(s models.Model) bool {
+					return fix(s).Workflow > refWorkflow
+				}
+		},
+		func(s string) (models.Model, error) {
+			job := fix(j.New())
+			job.Workflow = s
+			return job, nil
+		})
+	res["BootEnv"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool { return fix(i).BootEnv < fix(j).BootEnv },
+		func(ref models.Model) (gte, gt index.Test) {
+			refBootEnv := fix(ref).BootEnv
+			return func(s models.Model) bool {
+					return fix(s).BootEnv >= refBootEnv
+				},
+				func(s models.Model) bool {
+					return fix(s).BootEnv > refBootEnv
+				}
+		},
+		func(s string) (models.Model, error) {
+			job := fix(j.New())
+			job.BootEnv = s
+			return job, nil
+		})
 	res["Task"] = index.Make(
 		false,
 		"string",
