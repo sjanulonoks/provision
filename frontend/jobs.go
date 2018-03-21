@@ -322,7 +322,7 @@ func (f *Frontend) InitJobApi() {
 
 				// Machine isn't runnable return conflict
 				if !(oldM.Runnable && oldM.Available) {
-					rt.Errorf("Machine %s is not runnable", b.Machine.String())
+					rt.Warnf("Machine %s is not runnable", b.Machine.String())
 					err = &models.Error{Code: http.StatusConflict, Type: "Conflict",
 						Messages: []string{fmt.Sprintf("Machine %s is not runnable", b.Machine.String())}}
 					code = http.StatusConflict
@@ -427,20 +427,24 @@ func (f *Frontend) InitJobApi() {
 				}
 				switch cj.State {
 				case "incomplete":
-					rt.Infof("Machine %s task %s at %d is incomplete, rerunning it", b.Machine.String(), b.Task, m.CurrentTask)
+					rt.Infof("Machine %s task %s at %d is incomplete, rerunning it",
+						cj.Machine.String(), cj.Task, m.CurrentTask)
 					b = cj
 					code = http.StatusAccepted
 					return
 				case "finished":
 					// Advance to the next task
-					rt.Infof("Machine %s task %s at %d is finished, advancing to %d", b.Machine.String(), b.Task, m.CurrentTask, nextTask)
+					rt.Infof("Machine %s task %s at %d is finished, advancing to %d",
+						cj.Machine.String(), cj.Task, m.CurrentTask, nextTask)
 					m.CurrentTask = nextTask
 				case "failed":
-					rt.Infof("Machine %s task %s at %d is failed, retrying", b.Machine.String(), b.Task, m.CurrentTask)
+					rt.Infof("Machine %s task %s at %d is failed, retrying",
+						cj.Machine.String(), cj.Task, m.CurrentTask)
 					// Someone has set the machine back to runnable and wants
 					// to rerun the current task again.  Let them
 				default:
-					rt.Errorf("Machine %s task %s at %d is %s, something is wrong", b.Machine.String(), b.Task, m.CurrentTask, b.State)
+					rt.Warnf("Machine %s task %s at %d is %s, conflict",
+						cj.Machine.String(), cj.Task, m.CurrentTask, cj.State)
 					// Need to error - running job already running or just created.
 					err = &models.Error{Code: http.StatusConflict, Type: "Conflict",
 						Messages: []string{fmt.Sprintf("Machine %s already has running or created job", b.Machine.String())}}
@@ -448,7 +452,7 @@ func (f *Frontend) InitJobApi() {
 					return
 				}
 				if nextTask >= len(m.Tasks) {
-					rt.Infof("Machine %s as no more tasks", b.Machine.String())
+					rt.Infof("Machine %s as no more tasks", cj.Machine.String())
 					code = http.StatusNoContent
 					return
 				}
