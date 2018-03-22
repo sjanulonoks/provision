@@ -80,10 +80,10 @@ func InitPluginController(pluginDir, pluginCommDir string, dt *backend.DataTrack
 	return
 }
 
-func ReverseProxy(l logger.Logger, pluginCommDir string) gin.HandlerFunc {
+func ReverseProxy(pc *PluginController) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		plugin := c.Param(`plugin`)
-		socketPath := fmt.Sprintf("%s/%s.toPlugin", pluginCommDir, plugin)
+		socketPath := fmt.Sprintf("%s/%s.toPlugin.%d", pc.pluginCommDir, plugin, pc.getSocketId(plugin))
 
 		url, _ := url.Parse(fmt.Sprintf("http://unix/%s", socketPath))
 		proxy := httputil.NewSingleHostReverseProxy(url)
@@ -98,7 +98,7 @@ func ReverseProxy(l logger.Logger, pluginCommDir string) gin.HandlerFunc {
 }
 
 func (pc *PluginController) StartRouter(apiGroup *gin.RouterGroup) {
-	apiGroup.Any("/plugin-apis/:plugin/*path", ReverseProxy(pc, pc.pluginCommDir))
+	apiGroup.Any("/plugin-apis/:plugin/*path", ReverseProxy(pc))
 }
 
 func (pc *PluginController) StartController() error {
@@ -482,4 +482,16 @@ func (pc *PluginController) RemovePluginProvider(name string) error {
 	defer pc.lock.Unlock()
 	rt := pc.Request()
 	return pc.removePluginProvider(rt, name)
+}
+
+// Get the socketId
+func (pc *PluginController) getSocketId(name string) int64 {
+	pc.lock.Lock()
+	defer pc.lock.Unlock()
+
+	rp, ok := pc.runningPlugins[name]
+	if !ok || rp.Client == nil {
+		return 0
+	}
+	return rp.Client.socketId
 }
