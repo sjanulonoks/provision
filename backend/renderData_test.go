@@ -66,7 +66,16 @@ BootParams = default`
 
 func TestRenderData(t *testing.T) {
 	dt := mkDT(nil)
-	rt := dt.Request(dt.Logger, "stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks", "preferences")
+	rt := dt.Request(dt.Logger,
+		"stages",
+		"bootenvs",
+		"templates",
+		"machines",
+		"profiles",
+		"params",
+		"tasks",
+		"preferences",
+		"workflows")
 	var machine *Machine
 	var paramWithDefault *Param
 	var defaultBootEnv, nothingBootEnv, badBootEnv *BootEnv
