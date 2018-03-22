@@ -396,6 +396,7 @@ func (n *Machine) OnCreate() error {
 		Code:  422,
 		Model: "machines",
 		Type:  ValidationError,
+		Key:   n.UUID(),
 	}
 	n.inCreate = true
 	n.oldStage = "none"
@@ -425,12 +426,9 @@ func (n *Machine) OnCreate() error {
 	if n.Tasks != nil && len(n.Tasks) > 0 {
 		n.CurrentTask = -1
 	}
-	n.Validate()
-	if !n.Validated {
-		return n.MakeError(422, ValidationError, n)
-	}
 	n.Runnable = true
-	return nil
+	n.Validate()
+	return n.MakeError(422, ValidationError, n)
 }
 
 func (n *Machine) Validate() {
@@ -764,8 +762,10 @@ func (n *Machine) validateChangeStage(oldm *Machine, e *models.Error) {
 		// changing stage does not imply changing the task list.
 		return
 	}
-	n.Tasks = make([]string, len(stage.Tasks))
-	copy(n.Tasks, stage.Tasks)
+	if len(stage.Tasks) > 0 || !n.inCreate {
+		n.Tasks = make([]string, len(stage.Tasks))
+		copy(n.Tasks, stage.Tasks)
+	}
 	n.CurrentTask = -1
 }
 
