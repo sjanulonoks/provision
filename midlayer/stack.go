@@ -26,6 +26,8 @@ type DataStack struct {
 	defaultContent store.Store
 	pluginContents map[string]store.Store
 	basicContent   store.Store
+
+	fileRoot string
 }
 
 func CleanUpStore(st store.Store) error {
@@ -54,6 +56,7 @@ func (d *DataStack) Clone() *DataStack {
 		defaultContent: d.defaultContent,
 		saasContents:   map[string]store.Store{},
 		pluginContents: map[string]store.Store{},
+		fileRoot:       d.fileRoot,
 	}
 	dtStore.Open(store.DefaultCodec)
 	for k, s := range d.saasContents {
@@ -83,7 +86,7 @@ func (d *DataStack) rebuild(oldStore store.Store, logger logger.Logger, fixup Fi
 		}
 		return nil, models.NewError("ValidationError", 422, err.Error()), nil
 	}
-	hard, soft := backend.ValidateDataTrackerStore(d, logger)
+	hard, soft := backend.ValidateDataTrackerStore(d.fileRoot, d, logger)
 	if hard == nil && oldStore != nil {
 		CleanUpStore(oldStore)
 	}
@@ -233,12 +236,14 @@ func (d *DataStack) buildStack(fixup FixerUpper, newStore store.Store) error {
 	return nil
 }
 
-func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasDir string) (*DataStack, error) {
+func DefaultDataStack(dataRoot, backendType, localContent, defaultContent, saasDir, fileRoot string) (*DataStack, error) {
 	dtStore := &DataStack{
 		StackedStore:   store.StackedStore{},
 		saasContents:   map[string]store.Store{},
 		pluginContents: map[string]store.Store{},
+		fileRoot:       fileRoot,
 	}
+
 	dtStore.Open(store.DefaultCodec)
 	dtStore.basicContent = backend.BasicContent()
 
