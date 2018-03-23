@@ -252,6 +252,7 @@ func (pc *PluginController) startPlugin(mp models.Model) {
 		} else if r.state == PLUGIN_STARTED {
 			pc.Infof("Plugin %s is already started. Try to config it", plugin.Name)
 			rt.PublishEvent(models.EventFor(plugin, "config"))
+			return
 		} else if r.state != PLUGIN_CREATED && r.state != PLUGIN_STOPPED {
 			pc.Infof("Plugin %s not in correct state to start, just return", plugin.Name)
 			return
