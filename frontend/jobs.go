@@ -333,6 +333,8 @@ func (f *Frontend) InitJobApi() {
 				// Are we running a job or not on list yet, do some checking.
 				if jo := rt.Find("jobs", m.CurrentJob.String()); jo != nil {
 					cj = jo.(*backend.Job)
+				} else if m.CurrentJob != nil && len(m.CurrentJob) > 0 {
+					cj.Uuid = m.CurrentJob
 				}
 				if m.CurrentTask >= len(m.Tasks) {
 					rt.Infof("Machine %s is out of tasks", b.Machine.String())
