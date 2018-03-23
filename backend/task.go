@@ -84,16 +84,18 @@ func (t *Task) genRoot(common *template.Template, e models.ErrorAdder) *template
 
 func (t *Task) Validate() {
 	t.Task.Validate()
-	t.tmplMux.Lock()
-	defer t.tmplMux.Unlock()
+
 	t.rt.dt.tmplMux.Lock()
-	defer t.rt.dt.tmplMux.Unlock()
+	t.tmplMux.Lock()
 	root := t.genRoot(t.rt.dt.rootTemplate, t)
+	t.rt.dt.tmplMux.Unlock()
 	t.SetValid()
 	if t.Useable() {
 		t.rootTemplate = root
 		t.SetAvailable()
 	}
+	t.tmplMux.Unlock()
+
 	stages := t.rt.stores("stages")
 	if stages != nil {
 		for _, i := range stages.Items() {
@@ -171,9 +173,9 @@ func (t *Task) Render(rt *RequestTracker, m *Machine, e *models.Error) renderers
 
 var taskLockMap = map[string][]string{
 	"get":     []string{"templates", "tasks"},
-	"create":  []string{"stages", "templates", "tasks", "bootenvs"},
-	"update":  []string{"stages", "templates", "tasks", "bootenvs"},
-	"patch":   []string{"stages", "templates", "tasks", "bootenvs"},
+	"create":  []string{"stages", "machines", "templates", "tasks", "bootenvs"},
+	"update":  []string{"stages", "machines", "templates", "tasks", "bootenvs"},
+	"patch":   []string{"stages", "machines", "templates", "tasks", "bootenvs"},
 	"delete":  []string{"stages", "tasks", "machines"},
 	"actions": []string{"tasks", "profiles", "params"},
 }
