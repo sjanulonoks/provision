@@ -16,6 +16,8 @@ import (
 	"github.com/digitalrebar/logger"
 )
 
+var globalSocketId int64 = 1
+
 type PluginClient struct {
 	logger.Logger
 	pc     *PluginController
@@ -29,7 +31,8 @@ type PluginClient struct {
 	inflight  int
 	unloading bool
 
-	client *http.Client
+	socketId int64
+	client   *http.Client
 }
 
 func (pc *PluginClient) readLog(name string, com io.ReadCloser) {
@@ -93,11 +96,13 @@ func (pc *PluginClient) Unload() {
 }
 
 func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logger.Logger, apiURL, staticURL, token, path string) (answer *PluginClient, theErr error) {
-	answer = &PluginClient{pc: pc, plugin: plugin, Logger: l}
+	id := atomic.AddInt64(&globalSocketId, 1)
+
+	answer = &PluginClient{pc: pc, plugin: plugin, Logger: l, socketId: id}
 	answer.Debugf("Initialzing Plugin: %s\n", plugin)
 
-	retSocketPath := fmt.Sprintf("%s/%s.fromPlugin", pluginCommDir, plugin)
-	socketPath := fmt.Sprintf("%s/%s.toPlugin", pluginCommDir, plugin)
+	retSocketPath := fmt.Sprintf("%s/%s.fromPlugin.%d", pluginCommDir, plugin, id)
+	socketPath := fmt.Sprintf("%s/%s.toPlugin.%d", pluginCommDir, plugin, id)
 
 	// Start server side.
 	answer.pluginServer(retSocketPath)
@@ -137,9 +142,9 @@ func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logge
 	// Start the plugin
 	answer.Debugf("Start Plugin: %s\n", plugin)
 	if err := answer.cmd.Start(); err != nil {
-		err := fmt.Errorf("Failed to start plugin - didn't start")
-		l.Errorf("%v\n", err)
-		return nil, err
+		err2 := fmt.Errorf("Failed to start plugin - didn't start: %v", err)
+		l.Errorf("%v\n", err2)
+		return nil, err2
 	}
 
 	// Wait for plugin to be listening

@@ -12,13 +12,13 @@ import (
 )
 
 const (
-	PLUGIN_REQUESTED int = 0
-	PLUGIN_CREATED   int = 1
-	PLUGIN_STARTED   int = 2
-	PLUGIN_CONFIGED  int = 3
-	PLUGIN_STOPPED   int = 4
-	PLUGIN_REMOVED   int = 5
-	PLUGIN_FAILED    int = 7
+	PLUGIN_CREATED     int = 1
+	PLUGIN_STARTED     int = 2
+	PLUGIN_CONFIGED    int = 3
+	PLUGIN_STOPPED     int = 4
+	PLUGIN_REMOVED     int = 5
+	PLUGIN_CONFIGURING int = 6
+	PLUGIN_SHOULD_STOP int = 7
 )
 
 type RunningPlugin struct {
@@ -143,27 +143,6 @@ func (pc *PluginController) allPlugins(provider, action string) (err error) {
 	return
 }
 
-func (pc *PluginController) createPlugin(mp models.Model) {
-	pc.lock.Lock()
-	defer pc.lock.Unlock()
-
-	plugin := mp.(*models.Plugin)
-
-	ref := &backend.Plugin{}
-	rt := pc.Request(ref.Locks("get")...)
-
-	if r, ok := pc.runningPlugins[plugin.Name]; ok && r.state == PLUGIN_CREATED {
-		pc.Infof("Already created plugin: %s\n", plugin.Name)
-		r.Plugin = plugin
-	} else if ok {
-		pc.Errorf("Plugin is already created and beyond created.  Wrong: %v", r.Plugin)
-		r.Plugin = plugin
-	} else {
-		pc.runningPlugins[plugin.Name] = &RunningPlugin{Plugin: plugin, state: PLUGIN_CREATED}
-	}
-	rt.PublishEvent(models.EventFor(plugin, "start"))
-}
-
 // Must be called under rt.Do()
 func validateParameters(rt *backend.RequestTracker, pp *models.PluginProvider, plugin *models.Plugin) []string {
 	errors := []string{}
@@ -197,6 +176,59 @@ func validateParameters(rt *backend.RequestTracker, pp *models.PluginProvider, p
 	}
 	return errors
 }
+
+//
+// State machine functions
+//
+
+/*
+ * Regardless of state, make sure we have a running plugin.
+ *
+ * PLUGIN_CREATED    : send start event
+ * PLUGIN_STARTED    : send start event
+ * PLUGIN_CONFIGED   : send start event
+ * PLUGIN_STOPPED    : send start event
+ * PLUGIN_REMOVED    : send start event
+ * PLUGIN_CONFIGURING: send start event
+ * PLUGIN_SHOULD_STOP: do nothing
+ */
+func (pc *PluginController) createPlugin(mp models.Model) {
+	pc.lock.Lock()
+	defer pc.lock.Unlock()
+
+	plugin := mp.(*models.Plugin)
+
+	ref := &backend.Plugin{}
+	rt := pc.Request(ref.Locks("get")...)
+
+	if r, ok := pc.runningPlugins[plugin.Name]; ok && r.state == PLUGIN_CREATED {
+		pc.Infof("Already created plugin %s. Updating model", plugin.Name)
+		r.Plugin = plugin
+	} else if ok && r.state == PLUGIN_SHOULD_STOP {
+		pc.Infof("Already created plugin %s, but should stop - do nothing", plugin.Name)
+	} else if ok {
+		pc.Errorf("Plugin %s is already created and in process.  Update model", r.Plugin.Name)
+		r.Plugin = plugin
+	} else {
+		pc.runningPlugins[plugin.Name] = &RunningPlugin{Plugin: plugin, state: PLUGIN_CREATED}
+	}
+	rt.PublishEvent(models.EventFor(plugin, "start"))
+}
+
+/*
+ * Start the Plugin
+ *
+ * not found         : send create event
+ * PLUGIN_CREATED    : start binary, state to PLUGIN_STARTED, send config event
+ * PLUGIN_STARTED    : send config event
+ * PLUGIN_CONFIGED   : do nothing
+ * PLUGIN_STOPPED    : start binary, state to PLUGIN_STARTED, send config event
+ * PLUGIN_REMOVED    : do nothing
+ * PLUGIN_CONFIGURING: do nothing
+ * PLUGIN_SHOULD_STOP: do nothing
+ *
+ * if start has error, go to PLUGIN_STOPPED
+ */
 func (pc *PluginController) startPlugin(mp models.Model) {
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
@@ -218,10 +250,11 @@ func (pc *PluginController) startPlugin(mp models.Model) {
 			rt.PublishEvent(models.EventFor(plugin, "create"))
 			return
 		} else if r.state == PLUGIN_STARTED {
-			pc.Infof("Plugin is already started. Try to config it")
+			pc.Infof("Plugin %s is already started. Try to config it", plugin.Name)
 			rt.PublishEvent(models.EventFor(plugin, "config"))
-		} else if r.state != PLUGIN_CREATED && r.state != PLUGIN_FAILED && r.state != PLUGIN_STOPPED {
-			pc.Infof("Plugin is already past start.  just return")
+			return
+		} else if r.state != PLUGIN_CREATED && r.state != PLUGIN_STOPPED {
+			pc.Infof("Plugin %s not in correct state to start, just return", plugin.Name)
 			return
 		}
 
@@ -229,7 +262,7 @@ func (pc *PluginController) startPlugin(mp models.Model) {
 
 		pp, ok := pc.AvailableProviders[plugin.Provider]
 		if !ok {
-			r.state = PLUGIN_FAILED
+			r.state = PLUGIN_STOPPED
 			pc.Errorf("Starting plugin: %s(%s) missing provider\n", plugin.Name, plugin.Provider)
 			if plugin.PluginErrors == nil || len(plugin.PluginErrors) == 0 {
 				plugin.PluginErrors = []string{fmt.Sprintf("Missing Plugin Provider: %s", plugin.Provider)}
@@ -242,7 +275,7 @@ func (pc *PluginController) startPlugin(mp models.Model) {
 
 		errors := validateParameters(rt, pp, plugin)
 		if len(errors) > 0 {
-			r.state = PLUGIN_FAILED
+			r.state = PLUGIN_STOPPED
 			if plugin.PluginErrors == nil {
 				plugin.PluginErrors = []string{}
 			}
@@ -273,7 +306,7 @@ func (pc *PluginController) startPlugin(mp models.Model) {
 				r.Plugin.PluginErrors = []string{err.Error()}
 				rt.Update(r.Plugin)
 			}
-			r.state = PLUGIN_FAILED
+			r.state = PLUGIN_STOPPED
 		} else {
 			r.Client = thingee
 			r.state = PLUGIN_STARTED
@@ -287,6 +320,20 @@ func (pc *PluginController) startPlugin(mp models.Model) {
 	})
 }
 
+/*
+ * Config the Plugin
+ *
+ * not found         : assume deleted - do nothing
+ * PLUGIN_CREATED    : send start event
+ * PLUGIN_STARTED    : mark start PLUGIN_CONFIGURING, unlock, do config, relock, and mark STOPPED or CONFIGED
+ * PLUGIN_CONFIGED   : do nothing
+ * PLUGIN_STOPPED    : Force a failure to STOPPED
+ * PLUGIN_REMOVED    : Force a failure to STOPPED
+ * PLUGIN_CONFIGURING: do nothing
+ * PLUGIN_SHOULD_STOP: Force a failure to STOPPED.
+ *
+ * if start has error, go to PLUGIN_STOPPED
+ */
 func (pc *PluginController) configPlugin(mp models.Model) {
 	pc.lock.Lock()
 	defer pc.lock.Unlock()
@@ -302,13 +349,17 @@ func (pc *PluginController) configPlugin(mp models.Model) {
 		pc.Errorf("Plugin delete before config. %v\n", plugin.Name)
 		return
 	} else if r.state == PLUGIN_CONFIGED {
-		pc.Infof("Plugin is already configed. Done!")
+		pc.Infof("Plugin %s is already configed. Done!", plugin.Name)
 		return
 	} else if r.state != PLUGIN_STARTED {
-		pc.Infof("Plugin isn't started.  Start over")
-		rt.PublishEvent(models.EventFor(r.Plugin, "start"))
+		pc.Infof("Plugin %s isn't started. do nothing ", plugin.Name)
+		return
+	} else if r.state == PLUGIN_CONFIGURING {
+		pc.Infof("Plugin %s is in the config process", plugin.Name)
 		return
 	}
+
+	r.state = PLUGIN_CONFIGURING
 
 	pc.lock.Unlock()
 
@@ -318,11 +369,11 @@ func (pc *PluginController) configPlugin(mp models.Model) {
 
 	pc.lock.Lock()
 
-	if terr != nil {
-		r.Client.Debugf("Stop Plugin: %s Error: %v\n", plugin, terr)
+	if terr != nil || r.state != PLUGIN_CONFIGURING {
+		r.Client.Infof("Stop Plugin: %s Error: %v\n", plugin, terr)
 		r.Client.Stop()
 		r.Client = nil
-		r.state = PLUGIN_FAILED
+		r.state = PLUGIN_STOPPED
 		rt.Do(func(d backend.Stores) {
 			ref2 := rt.Find("plugins", plugin.Name)
 			if ref2 == nil {
@@ -347,9 +398,23 @@ func (pc *PluginController) configPlugin(mp models.Model) {
 		r.Provider.AvailableActions[i].Provider = r.Provider.Name
 		pc.Actions.Add(r.Provider.AvailableActions[i], r)
 	}
-	rt.Publish("plugin", "configed", plugin.Name, plugin)
+	rt.Publish("plugins", "configed", plugin.Name, plugin)
 }
 
+/*
+ * Stop the Plugin
+ *
+ * not found         : assume deleted - do nothing
+ * PLUGIN_CREATED    : mark plugin PLUGIN_STOPPED
+ * PLUGIN_STARTED    : Remove touch points, drain callers, stop plugin, makr stopped.
+ * PLUGIN_CONFIGED   : Remove touch points, drain callers, stop plugin, makr stopped.
+ * PLUGIN_STOPPED    : do nothing
+ * PLUGIN_REMOVED    : do nothing
+ * PLUGIN_CONFIGURING: Mark state PLUGIN_SHOULD_STOP
+ * PLUGIN_SHOULD_STOP: do nothing
+ *
+ * if start has error, go to PLUGIN_STOPPED
+ */
 func (pc *PluginController) stopPlugin(mp models.Model) {
 	plugin := mp.(*models.Plugin)
 
@@ -364,6 +429,16 @@ func (pc *PluginController) stopPlugin(mp models.Model) {
 		// If we've missing, been removed, or stopped, then done
 		return
 	}
+
+	if rp.state == PLUGIN_SHOULD_STOP {
+		return
+	}
+
+	if rp.state == PLUGIN_CONFIGURING {
+		rp.state = PLUGIN_SHOULD_STOP
+		return
+	}
+
 	if rp.state == PLUGIN_STARTED || rp.state == PLUGIN_CONFIGED {
 		plugin := rp.Plugin
 		rt.Infof("Stopping plugin: %s(%s)\n", plugin.Name, plugin.Provider)
@@ -376,18 +451,14 @@ func (pc *PluginController) stopPlugin(mp models.Model) {
 			rt.Debugf("Remove actions: %s(%s,%s)\n", plugin.Name, plugin.Provider, aa.Command)
 			pc.Actions.Remove(aa, rp)
 		}
-		pc.lock.Unlock()
+		rp.state = PLUGIN_STOPPED
 
 		rt.Debugf("Drain executable: %s(%s)\n", plugin.Name, plugin.Provider)
 		rp.Client.Unload()
 		rt.Debugf("Stop executable: %s(%s)\n", plugin.Name, plugin.Provider)
 		rp.Client.Stop()
 		rt.Infof("Stopping plugin: %s(%s) complete\n", plugin.Name, plugin.Provider)
-		rt.Publish("plugin", "stopped", plugin.Name, plugin)
-
-		pc.lock.Lock()
-		rp.state = PLUGIN_STOPPED
-		rp.Client = nil
+		rt.Publish("plugins", "stopped", plugin.Name, plugin)
 	} else {
 		pc.Infof("Plugin should be started before stopping!! %v\n", rp.Plugin)
 		rp.state = PLUGIN_STOPPED

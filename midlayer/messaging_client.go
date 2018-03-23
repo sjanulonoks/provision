@@ -89,9 +89,15 @@ func (pc *PluginClient) Stop() error {
 		time.Sleep(1 * time.Second)
 	}
 
+	// Kill it!!
+	pc.Debugf("Stop: killing command: %v\n", pc.cmd.Process.Pid)
+	e3 := pc.cmd.Process.Kill()
+	pc.Debugf("Stop: killing result: %v\n", e3)
+
 	// Wait for exit
 	pc.Debugf("Stop: waiting for command exit: %v\n", pc.cmd.Process.Pid)
-	pc.cmd.Wait()
+	e3 = pc.cmd.Wait()
+	pc.Debugf("Stop: wait result: %v\n", e3)
 
 	pc.Tracef("Stop: finished\n")
 	return nil
