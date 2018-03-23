@@ -707,10 +707,10 @@ func (p *DataTracker) rebuildCache(loadRT *RequestTracker) (hard, soft *models.E
 }
 
 // This must be locked with ALL locks on the source datatracker from the caller.
-func ValidateDataTrackerStore(backend store.Store, logger logger.Logger) (hard, soft error) {
+func ValidateDataTrackerStore(fileRoot string, backend store.Store, logger logger.Logger) (hard, soft error) {
 	res := &DataTracker{
 		Backend:           backend,
-		FileRoot:          "baddir",
+		FileRoot:          fileRoot,
 		LogRoot:           "baddir",
 		StaticPort:        1,
 		ApiPort:           2,

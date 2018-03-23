@@ -186,7 +186,7 @@ func server(localLogger *log.Logger, c_opts *ProgOpts) string {
 
 	// Make data store
 	dtStore, err := midlayer.DefaultDataStack(c_opts.DataRoot, c_opts.BackEndType,
-		c_opts.LocalContent, c_opts.DefaultContent, c_opts.SaasContentRoot)
+		c_opts.LocalContent, c_opts.DefaultContent, c_opts.SaasContentRoot, c_opts.FileRoot)
 	if err != nil {
 		return fmt.Sprintf("Unable to create DataStack: %v", err)
 	}
@@ -398,7 +398,7 @@ func server(localLogger *log.Logger, c_opts *ProgOpts) string {
 				localLogger.Println("Reloading data stores...")
 				// Make data store - THIS IS BAD if datastore is memory.
 				dtStore, err := midlayer.DefaultDataStack(c_opts.DataRoot, c_opts.BackEndType,
-					c_opts.LocalContent, c_opts.DefaultContent, c_opts.SaasContentRoot)
+					c_opts.LocalContent, c_opts.DefaultContent, c_opts.SaasContentRoot, c_opts.FileRoot)
 				if err != nil {
 					localLogger.Printf("Unable to create new DataStack on SIGHUP: %v", err)
 				} else {
