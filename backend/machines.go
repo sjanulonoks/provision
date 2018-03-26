@@ -691,6 +691,7 @@ func (n *Machine) validateChangeWorkflow(oldm *Machine, e *models.Error) {
 		return
 	}
 	if n.Workflow == "" {
+		delete(n.Params, "change-stage/map")
 		if n.Stage == oldm.Stage {
 			n.Stage = ""
 		}
@@ -731,7 +732,6 @@ func (n *Machine) validateChangeStage(oldm *Machine, e *models.Error) {
 		return
 	}
 	if n.Stage == "" {
-		delete(n.Params, "change-stage/map")
 		n.Stage = "none"
 	}
 	stages := n.rt.stores("stages")
@@ -801,6 +801,7 @@ func (n *Machine) oldOnChange(oldm *Machine, e *models.Error) {
 	if n.oldStage != n.Stage &&
 		len(oldm.Tasks) != 0 &&
 		oldm.CurrentTask != len(oldm.Tasks) &&
+		oldm.Workflow == "" &&
 		!n.ChangeForced() {
 		e.Errorf("Can not change stages with pending tasks unless forced")
 	}
