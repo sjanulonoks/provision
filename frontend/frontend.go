@@ -880,27 +880,7 @@ func (f *Frontend) Exists(c *gin.Context, ref store.KeySaver, key string) {
 	var found bool
 	rt := f.rt(c, ref.(Lockable).Locks("get")...)
 	rt.Do(func(d backend.Stores) {
-		objs := d(prefix)
-		idxer, ok := ref.(index.Indexer)
-		if ok {
-			for idxName, idx := range idxer.Indexes() {
-				idxKey := strings.TrimPrefix(key, idxName+":")
-				if key == idxKey {
-					continue
-				}
-				if !idx.Unique {
-					break
-				}
-				items, err := index.All(index.Sort(idx))(&objs.Index)
-				if err == nil {
-					found = items.Find(idxKey) != nil
-				}
-				break
-			}
-		}
-		if !found {
-			found = objs.Find(key) != nil
-		}
+		found = rt.Find(prefix, key) != nil
 	})
 	if found {
 		c.Status(http.StatusOK)
@@ -916,30 +896,7 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	var res models.Model
 	rt := f.rt(c, ref.(Lockable).Locks("get")...)
 	rt.Do(func(d backend.Stores) {
-		objs := d(prefix)
-		idxer, ok := ref.(index.Indexer)
-		found := false
-		if ok {
-			for idxName, idx := range idxer.Indexes() {
-				idxKey := strings.TrimPrefix(key, idxName+":")
-				if key == idxKey {
-					continue
-				}
-				found = true
-				ref = nil
-				if !idx.Unique {
-					break
-				}
-				items, err := index.All(index.Sort(idx))(&objs.Index)
-				if err == nil {
-					res = models.Clone(items.Find(idxKey))
-				}
-				break
-			}
-		}
-		if !found {
-			res = models.Clone(objs.Find(key))
-		}
+		res = rt.Find(prefix, key)
 	})
 	if res != nil {
 		aref, _ := res.(backend.AuthSaver)
