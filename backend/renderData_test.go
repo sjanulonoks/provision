@@ -66,7 +66,16 @@ BootParams = default`
 
 func TestRenderData(t *testing.T) {
 	dt := mkDT(nil)
-	rt := dt.Request(dt.Logger, "stages", "bootenvs", "templates", "machines", "profiles", "params", "tasks", "preferences")
+	rt := dt.Request(dt.Logger,
+		"stages",
+		"bootenvs",
+		"templates",
+		"machines",
+		"profiles",
+		"params",
+		"tasks",
+		"preferences",
+		"workflows")
 	var machine *Machine
 	var paramWithDefault *Param
 	var defaultBootEnv, nothingBootEnv, badBootEnv *BootEnv
@@ -189,15 +198,21 @@ func TestRenderData(t *testing.T) {
 		t.Logf("BootEnv default with fred rendered properly for test machine")
 	}
 	rt.Do(func(d Stores) {
+		dbgPref := rt.dt.pref("logLevel")
+		rt.dt.SetPrefs(rt, map[string]string{"logLevel": "trace", "debugRenderer": "trace", "debugBootEnv": "trace"})
 		machine.BootEnv = "nothing"
 		saved, err := rt.Save(machine)
-		if !saved {
+		if !saved || err != nil {
 			t.Errorf("Failed to save test machine with new bootenv: %v", err)
 		}
+		if machine.HasError() != nil {
+			t.Errorf("Machine error: %v", machine.HasError())
+		}
+		rt.dt.SetPrefs(rt, map[string]string{"logLevel": dbgPref, "debugRenderer": dbgPref, "debugBootEnv": dbgPref})
 	})
 	out, err = dt.FS.Open(genLoc, nil)
 	if err != nil {
-		t.Errorf("Failed to get tmeplate for %s: %v", genLoc, err)
+		t.Errorf("Failed to get template for %s: %v", genLoc, err)
 	}
 	buf, err = ioutil.ReadAll(out)
 	if err != nil {

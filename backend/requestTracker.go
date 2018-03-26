@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/VictorLowther/jsonpatch2"
@@ -77,6 +78,21 @@ func (rt *RequestTracker) find(prefix, key string) models.Model {
 	s := rt.d(prefix)
 	if s == nil {
 		return nil
+	}
+	parts := strings.SplitN(key, ":", 2)
+	if len(parts) == 2 {
+		o, err := models.New(prefix)
+		if err == nil {
+			ref := ModelToBackend(o)
+			if idxer, ok := ref.(index.Indexer); ok {
+				if idx, ok := idxer.Indexes()[parts[0]]; ok && idx.Unique {
+					items, err := index.All(index.Sort(idx))(&s.Index)
+					if err == nil {
+						return items.Find(parts[1])
+					}
+				}
+			}
+		}
 	}
 	return s.Find(key)
 }

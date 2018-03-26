@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/digitalrebar/provision/backend/index"
@@ -163,6 +164,42 @@ func (j *Job) Indexes() map[string]index.Maker {
 		func(s string) (models.Model, error) {
 			job := fix(j.New())
 			job.Stage = s
+			return job, nil
+		})
+	res["Workflow"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool { return fix(i).Workflow < fix(j).Workflow },
+		func(ref models.Model) (gte, gt index.Test) {
+			refWorkflow := fix(ref).Workflow
+			return func(s models.Model) bool {
+					return fix(s).Workflow >= refWorkflow
+				},
+				func(s models.Model) bool {
+					return fix(s).Workflow > refWorkflow
+				}
+		},
+		func(s string) (models.Model, error) {
+			job := fix(j.New())
+			job.Workflow = s
+			return job, nil
+		})
+	res["BootEnv"] = index.Make(
+		false,
+		"string",
+		func(i, j models.Model) bool { return fix(i).BootEnv < fix(j).BootEnv },
+		func(ref models.Model) (gte, gt index.Test) {
+			refBootEnv := fix(ref).BootEnv
+			return func(s models.Model) bool {
+					return fix(s).BootEnv >= refBootEnv
+				},
+				func(s models.Model) bool {
+					return fix(s).BootEnv > refBootEnv
+				}
+		},
+		func(s string) (models.Model, error) {
+			job := fix(j.New())
+			job.BootEnv = s
 			return job, nil
 		})
 	res["Task"] = index.Make(
@@ -394,22 +431,20 @@ func (j *Job) Validate() {
 	} else {
 		m = AsMachine(om)
 		if j.oldState != j.State {
-			if j.State == "failed" {
+			switch j.State {
+			case "failed":
 				m.Runnable = false
 				_, e2 := j.rt.Save(m)
 				j.AddError(e2)
-			} else if j.State == "finished" && m.CurrentTask+1 == len(m.Tasks) {
-				// We are at the end of task list. Bump here to let stages changes if the runner
-				// never comes back.
-				m.CurrentTask = len(m.Tasks)
-				_, e2 := j.rt.Save(m)
-				j.AddError(e2)
+			case "created":
+				j.StartTime = time.Now()
 			}
 		}
 	}
-
-	if tasks.Find(j.Task) == nil {
-		j.Errorf("Task %s does not exist", j.Task)
+	if !strings.Contains(j.Task, ":") {
+		if tasks.Find(j.Task) == nil {
+			j.Errorf("Task %s does not exist", j.Task)
+		}
 	}
 
 	var env *Stage
@@ -552,11 +587,11 @@ func (j *Job) Log(rt *RequestTracker, src io.Reader) error {
 
 var jobLockMap = map[string][]string{
 	"get":     []string{"jobs"},
-	"create":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
-	"update":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
-	"patch":   []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles"},
+	"create":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles", "workflows"},
+	"update":  []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles", "workflows"},
+	"patch":   []string{"stages", "bootenvs", "jobs", "machines", "tasks", "profiles", "workflows"},
 	"delete":  []string{"machines", "jobs"},
-	"actions": []string{"stages", "jobs", "machines", "tasks", "profiles", "bootenvs", "params"},
+	"actions": []string{"stages", "jobs", "machines", "tasks", "profiles", "bootenvs", "params", "workflows"},
 }
 
 func (j *Job) Locks(action string) []string {
