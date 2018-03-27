@@ -570,10 +570,12 @@ func (f *Frontend) assureClaimMatch(c *gin.Context, claim interface{}, scope, ac
 		f.Logger.Warnf("Request with bad claims")
 		return false
 	}
-	if !drpClaim.Match(scope, action, specific) {
-		return false
+	if drpClaim.Match(scope, action, specific) {
+		f.Logger.Debugf("Claims ok: '%s' '%s' '%s'", scope, action, specific)
+		return true
 	}
-	return true
+	f.Logger.Debugf("Claims failed: '%s' '%s' '%s'", scope, action, specific)
+	return false
 }
 
 //
@@ -594,6 +596,7 @@ func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope,
 	drpClaim := claim.(*backend.DrpCustomClaims)
 	if drpClaim.HasUserId() {
 		userRT.Do(func(d backend.Stores) {
+			userRT.Debugf("claim has user id %v", drpClaim.UserId())
 			if obj := userRT.Find("users", drpClaim.UserId()); obj != nil {
 				userSecret = backend.AsUser(obj).Secret
 			}
@@ -602,6 +605,7 @@ func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope,
 	if drpClaim.HasGrantorId() {
 		if drpClaim.GrantorId() != "system" {
 			userRT.Do(func(d backend.Stores) {
+				userRT.Debugf("claim has user id %v", drpClaim.UserId())
 				if obj := userRT.Find("users", drpClaim.UserId()); obj != nil {
 					grantorSecret = backend.AsUser(obj).Secret
 				}
@@ -615,6 +619,7 @@ func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope,
 	}
 	if drpClaim.HasMachineUuid() {
 		machineRT.Do(func(d backend.Stores) {
+			machineRT.Debugf("claim has user id %v", drpClaim.MachineUuid())
 			if obj := machineRT.Find("machines", drpClaim.MachineUuid()); obj != nil {
 				machineSecret = backend.AsMachine(obj).Secret
 			}
@@ -623,13 +628,7 @@ func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope,
 			return false
 		}
 	}
-
-	if !drpClaim.ValidateSecrets(grantorSecret, userSecret, machineSecret) {
-		return false
-	}
-
-	return true
-
+	return drpClaim.ValidateSecrets(grantorSecret, userSecret, machineSecret)
 }
 
 //
@@ -638,6 +637,8 @@ func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope,
 func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bool {
 	obj, ok := c.Get("DRP-CLAIM")
 	if !ok || !f.assureAuthWithClaim(c, obj, scope, action, specific) {
+		f.rt(c).Auditf("Failed auth %s - %s %s %s - %s", obj.(*backend.DrpCustomClaims).Id,
+			scope, action, specific, c.ClientIP())
 		c.AbortWithStatus(http.StatusForbidden)
 		return false
 	}

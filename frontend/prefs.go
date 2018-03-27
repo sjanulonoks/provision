@@ -75,7 +75,7 @@ func (f *Frontend) InitPrefApi() {
 					if len(prefs[k]) != 32 {
 						err.Errorf("%s: Must be 32 bytes long", k)
 					}
-				case "defaultBootEnv", "unknownBootEnv", "defaultStage", "systemGrantorSecret",
+				case "defaultBootEnv", "unknownBootEnv", "defaultStage", "defaultWorkflow", "systemGrantorSecret",
 					"debugRenderer", "debugDhcp", "debugBootEnv", "debugFrontend", "debugPlugins", "logLevel":
 					if !f.assureAuth(c, "prefs", "post", k) {
 						return

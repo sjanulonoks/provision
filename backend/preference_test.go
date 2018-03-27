@@ -4,7 +4,7 @@ import "testing"
 
 func TestPreferences(t *testing.T) {
 	dt := mkDT(nil)
-	rt := dt.Request(dt.Logger, "preferences", "bootenvs", "stages")
+	rt := dt.Request(dt.Logger, "preferences", "bootenvs", "stages", "workflows")
 	rt.Do(func(d Stores) {
 		if be, err := dt.Pref("defaultBootEnv"); err != nil {
 			t.Errorf("Expected to get a defaultBootEnv preference, got nothing")

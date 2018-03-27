@@ -402,6 +402,9 @@ func (n *Machine) OnCreate() error {
 	n.oldStage = "none"
 	n.oldBootEnv = "local"
 	oldm := ModelToBackend(&models.Machine{}).(*Machine)
+	if n.Workflow == "" {
+		n.Workflow = n.rt.dt.pref("defaultWorkflow")
+	}
 	if n.Stage == "" {
 		n.Stage = n.rt.dt.pref("defaultStage")
 	}

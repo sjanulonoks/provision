@@ -805,7 +805,7 @@ func NewDataTracker(backend store.Store,
 		}
 	})
 	// Create minimal content.
-	rt := res.Request(res.Logger, "stages", "bootenvs", "preferences", "users", "machines", "profiles", "params")
+	rt := res.Request(res.Logger, "stages", "bootenvs", "preferences", "users", "machines", "profiles", "params", "workflows")
 	rt.Do(func(d Stores) {
 		// Load the prefs - overriding defaults.
 		savePrefs := false
@@ -923,6 +923,7 @@ func (p *DataTracker) SetPrefs(rt *RequestTracker, prefs map[string]string) erro
 	err := &models.Error{}
 	bootenvs := rt.d("bootenvs")
 	stages := rt.d("stages")
+	workflows := rt.d("workflows")
 	lenCheck := func(name, val string) bool {
 		if len(val) != 32 {
 			err.Errorf("%s: Must be a string of length 32: %s", name, val)
@@ -942,6 +943,16 @@ func (p *DataTracker) SetPrefs(rt *RequestTracker, prefs map[string]string) erro
 		stage := stages.Find(val)
 		if stage == nil {
 			err.Errorf("%s: Stage %s does not exist", name, val)
+			return false
+		}
+		return true
+	}
+	workflowCheck := func(name, val string) bool {
+		if val == "" {
+			return true
+		}
+		if workflows.Find(val) == nil {
+			err.Errorf("%s: Workflow %s does not exist", name, val)
 			return false
 		}
 		return true
@@ -983,6 +994,10 @@ func (p *DataTracker) SetPrefs(rt *RequestTracker, prefs map[string]string) erro
 			}
 		case "defaultStage":
 			if stageCheck(name, val) {
+				savePref(name, val)
+			}
+		case "defaultWorkflow":
+			if workflowCheck(name, val) {
 				savePref(name, val)
 			}
 		case "unknownBootEnv":
