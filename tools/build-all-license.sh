@@ -9,7 +9,7 @@ echo
 echo "DigitalRebar Provision License"
 echo
 
-cat LICENSE.rst
+cat LICENSE
 
 echo
 echo "TODO: Get the downloaded Assets Licenses"
