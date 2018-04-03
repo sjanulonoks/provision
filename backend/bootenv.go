@@ -150,7 +150,11 @@ func (r *rt) Size() int64 {
 }
 
 func (b *BootEnv) fillInstallRepo() {
-	if b.Kernel == "" {
+	if !b.NetBoot() {
+		return
+	}
+	if b.OS.Name == "" {
+		b.rt.Errorf("BootEnv %s: Missing OS.Name, cannot fill install repos", b.Name)
 		return
 	}
 	b.rt.Tracef("fillInstallRepo: Looking for global profile")
@@ -292,6 +296,10 @@ func (b *BootEnv) explodeIso() {
 		b.rt.Infof("Explode ISO: Skipping %s becausing no iso image specified\n", b.Name)
 		return
 	}
+	if b.OS.Name == "" {
+		b.rt.Errorf("Explode ISO: Skipping because BootEnv %s is missing OS.Name", b.Name)
+		return
+	}
 	b.kernelVerified = false
 	// Have we already exploded this?  If file exists, then good!
 	canaryPath := b.localPathFor("." + strings.Replace(b.OS.Name, "/", "_", -1) + ".rebar_canary")
@@ -334,6 +342,9 @@ func (b *BootEnv) Validate() {
 	if !b.SetValid() {
 		// If we have not been validated at this point, return.
 		return
+	}
+	if b.NetBoot() && b.OS.Name == "" {
+		b.Errorf("bootenv: Missing OS.Name")
 	}
 	b.fillInstallRepo()
 	// OK, we are sane, if not useable.  Check to see if we are useable
