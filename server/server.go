@@ -44,10 +44,11 @@ import (
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision"
 	"github.com/digitalrebar/provision/backend"
-	"github.com/digitalrebar/provision/embedded"
 	"github.com/digitalrebar/provision/frontend"
 	"github.com/digitalrebar/provision/midlayer"
 )
+
+var EmbeddedAssetsExtractFunc func(string, string) error
 
 type ProgOpts struct {
 	VersionFlag         bool   `long:"version" description:"Print Version and exit"`
@@ -180,8 +181,11 @@ func server(localLogger *log.Logger, c_opts *ProgOpts) string {
 		return fmt.Sprintf("Error creating required directory %s: %v", c_opts.SaasContentRoot, err)
 	}
 	localLogger.Printf("Extracting Default Assets\n")
-	if err := embedded.ExtractAssets(c_opts.ReplaceRoot, c_opts.FileRoot); err != nil {
-		return fmt.Sprintf("Unable to extract assets: %v", err)
+	if EmbeddedAssetsExtractFunc != nil {
+		localLogger.Printf("Extracting Default Assets\n")
+		if err := EmbeddedAssetsExtractFunc(c_opts.ReplaceRoot, c_opts.FileRoot); err != nil {
+			return fmt.Sprintf("Unable to extract assets: %v", err)
+		}
 	}
 
 	// Make data store

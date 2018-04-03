@@ -19,9 +19,16 @@ import (
 	"path"
 
 	"github.com/digitalrebar/logger"
+	"github.com/digitalrebar/provision/frontend"
+	"github.com/digitalrebar/provision/server"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gin-gonic/gin"
 )
+
+func init() {
+	frontend.EmbeddedAssetsServerFunc = Easf
+	server.EmbeddedAssetsExtractFunc = ExtractAssets
+}
 
 func Easf(mgmtApi *gin.Engine, logger logger.Logger) error {
 	// Swagger.json serve
@@ -41,6 +48,8 @@ func Easf(mgmtApi *gin.Engine, logger logger.Logger) error {
 
 	return nil
 }
+
+func IncludeMeFunction() {}
 
 func ExtractAssets(replaceRoot, fileRoot string) error {
 	dirs := []string{"isos", "files", "machines", "pxelinux.cfg"}

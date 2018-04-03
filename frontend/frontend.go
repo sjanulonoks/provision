@@ -16,7 +16,6 @@ import (
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/backend/index"
-	"github.com/digitalrebar/provision/embedded"
 	"github.com/digitalrebar/provision/midlayer"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
@@ -373,6 +372,8 @@ func (fe *Frontend) userAuth() gin.HandlerFunc {
 	}
 }
 
+var EmbeddedAssetsServerFunc func(*gin.Engine, logger.Logger) error
+
 func NewFrontend(
 	dt *backend.DataTracker,
 	lgr logger.Logger,
@@ -507,7 +508,9 @@ func NewFrontend(
 	me.InitContentApi()
 	me.InitSystemApi()
 
-	embedded.Easf(mgmtApi, lgr)
+	if EmbeddedAssetsServerFunc != nil {
+		EmbeddedAssetsServerFunc(mgmtApi, lgr)
+	}
 
 	// Optionally add a local dev-ui
 	if len(localUI) != 0 {
