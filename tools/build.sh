@@ -45,7 +45,9 @@ git checkout 0.12.0
 go install github.com/go-swagger/go-swagger/cmd/swagger
 cd $OLDPWD
 
+set +e
 . tools/version.sh
+set -e
 
 echo "Version = $Prepart$MajorV.$MinorV.$PatchV$Extra-$GITHASH"
 
