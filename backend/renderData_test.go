@@ -24,6 +24,12 @@ Name = {{.Env.Name}}
 
 {{if .ParamExists "fred"}}{{.Param "fred"}}{{end}}
 
+{{if .ParamExists "obj" -}}
+{{.ParamAsJSON "obj"}}
+
+{{.ParamAsYAML "obj"}}
+{{end -}}
+
 RenderData:
 ProvisionerAddress = {{.ProvisionerAddress}}
 ProvisionerURL = {{.ProvisionerURL}}
@@ -55,6 +61,12 @@ BootEnv:
 Name = default
 
 fred = fred
+
+{"Title":"title","Value":40}
+
+
+Title: title
+Value: 40
 
 RenderData:
 ProvisionerAddress = 127.0.0.1
@@ -182,6 +194,14 @@ func TestRenderData(t *testing.T) {
 		}
 	}
 	rt.Do(func(d Stores) {
+		obj := struct {
+			Title string
+			Value int
+		}{
+			"title",
+			40,
+		}
+		rt.SetParam(machine, "obj", obj)
 		rt.SetParam(machine, "fred", "fred = fred")
 	})
 	genLoc := path.Join("/", "machines", machine.UUID(), "file")

@@ -16,6 +16,7 @@ import (
 
 	"github.com/VictorLowther/jsonpatch2/utils"
 	"github.com/digitalrebar/provision/models"
+	yaml "github.com/ghodss/yaml"
 )
 
 type Sizer interface {
@@ -681,6 +682,18 @@ func (r *RenderData) ParamAsJSON(key string) (string, error) {
 	enc := json.NewEncoder(buf)
 	err = enc.Encode(v)
 	return buf.String(), err
+}
+
+func (r *RenderData) ParamAsYAML(key string) (string, error) {
+	v, err := r.Param(key)
+	if err != nil {
+		return "", err
+	}
+	b, e := yaml.Marshal(v)
+	if e != nil {
+		return "", e
+	}
+	return string(b), nil
 }
 
 // ParamExists is a helper function for determining the existence of a machine parameter.
