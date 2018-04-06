@@ -414,7 +414,13 @@ func (n *Machine) OnCreate() error {
 	if n.Tasks == nil {
 		n.Tasks = []string{}
 	}
-	n.validateChangeWorkflow(oldm, e)
+	realStage, realEnv := n.validateChangeWorkflow(oldm, e)
+	if realStage != "" {
+		n.Stage = realStage
+	}
+	if realEnv != "" {
+		n.BootEnv = realEnv
+	}
 	n.validateChangeStage(oldm, e)
 	n.validateChangeEnv(oldm, e)
 	if e.ContainsError() {
@@ -608,7 +614,9 @@ func (n *Machine) BeforeSave() error {
 	}
 
 	// Set the features meta tag.
+	// Make sure the machine defaults to change-stage-v2
 	n.ClearFeatures()
+	n.AddFeature("change-stage-v2")
 	env := n.rt.stores("bootenvs").Find(n.BootEnv)
 	if env != nil {
 		// Glean OS
@@ -689,7 +697,7 @@ func (n *Machine) OnLoad() error {
 	return err
 }
 
-func (n *Machine) validateChangeWorkflow(oldm *Machine, e *models.Error) {
+func (n *Machine) validateChangeWorkflow(oldm *Machine, e *models.Error) (newStage, newEnv string) {
 	if oldm.Workflow == n.Workflow {
 		return
 	}
@@ -718,16 +726,26 @@ func (n *Machine) validateChangeWorkflow(oldm *Machine, e *models.Error) {
 	n.CurrentTask = -1
 	taskList := []string{}
 	lastEnv := ""
+	firstStage := true
 	for _, stageName := range workflow.Stages {
 		stage := n.rt.find("stages", stageName).(*Stage)
 		taskList = append(taskList, "stage:"+stageName)
+		if firstStage {
+			newStage = stage.Name
+		}
 		if stage.BootEnv != "" && stage.BootEnv != lastEnv {
+			if firstStage {
+				newEnv = stage.BootEnv
+				n.BootEnv = stage.BootEnv
+			}
 			taskList = append(taskList, "bootenv:"+stage.BootEnv)
 			lastEnv = stage.BootEnv
 		}
 		taskList = append(taskList, stage.Tasks...)
+		firstStage = false
 	}
 	n.Tasks = taskList
+	return
 }
 
 func (n *Machine) validateChangeStage(oldm *Machine, e *models.Error) {
@@ -870,16 +888,22 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 		e.Errorf("Cannot change CurrentTask from %d to %d", oldm.CurrentTask, n.CurrentTask)
 		return e
 	}
-	n.validateChangeWorkflow(oldm, e)
+	newStage, newEnv := n.validateChangeWorkflow(oldm, e)
+	if newStage != "" {
+		n.Stage = newStage
+	}
+	if newEnv != "" {
+		n.BootEnv = newEnv
+	}
 	n.validateChangeStage(oldm, e)
 	n.validateChangeEnv(oldm, e)
 	if n.Workflow == "" {
 		n.oldOnChange(oldm, e)
 	} else {
-		if !n.inRunner && oldm.BootEnv != n.BootEnv {
+		if !n.inRunner && oldm.BootEnv != n.BootEnv && newEnv == "" {
 			n.Errorf("Changing machine bootenv not allowed")
 		}
-		if !n.inRunner && oldm.Stage != n.Stage {
+		if !n.inRunner && oldm.Stage != n.Stage && newStage == "" {
 			n.Errorf("Changing machine stage not allowed")
 		}
 	}
