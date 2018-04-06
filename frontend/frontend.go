@@ -271,7 +271,7 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 				found = true
 				err = rt.SetParam(ob.(models.Paramer), key, replacement)
 			})
-			if !item404(c, found, id, "Paras") {
+			if !item404(c, found, id, "Params") {
 				if err != nil {
 					c.JSON(err.(*models.Error).Code, err)
 				} else {
@@ -295,7 +295,7 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 				found = true
 				val, err = rt.DelParam(ob.(models.Paramer), key)
 			})
-			if !item404(c, found, id, "Paras") {
+			if !item404(c, found, id, "Params") {
 				if err != nil {
 					c.JSON(err.(*models.Error).Code, err)
 				} else {
