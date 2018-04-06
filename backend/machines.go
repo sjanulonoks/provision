@@ -614,7 +614,9 @@ func (n *Machine) BeforeSave() error {
 	}
 
 	// Set the features meta tag.
+	// Make sure the machine defaults to change-stage-v2
 	n.ClearFeatures()
+	n.AddFeature("change-stage-v2")
 	env := n.rt.stores("bootenvs").Find(n.BootEnv)
 	if env != nil {
 		// Glean OS
