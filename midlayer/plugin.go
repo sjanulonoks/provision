@@ -535,12 +535,7 @@ func (pc *PluginController) deletePlugin(mp models.Model) {
 	ref := &backend.Plugin{}
 	rt := pc.Request(ref.Locks("get")...)
 	rt.Do(func(d backend.Stores) {
-		ref2 := rt.Find(ref.Prefix(), plugin.Name)
-		// May be deleted before we get here. An event will be around to remove it
-		if ref2 != nil {
-			p := ref2.(*backend.Plugin)
-			rt.PublishEvent(models.EventFor(p, "stop"))
-			rt.PublishEvent(models.EventFor(p, "remove"))
-		}
+		rt.PublishEvent(models.EventFor(plugin, "stop"))
+		rt.PublishEvent(models.EventFor(plugin, "remove"))
 	})
 }
