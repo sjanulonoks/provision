@@ -227,13 +227,19 @@ type ipxeOpts struct {
 
 func (dhr *DhcpRequest) ipxeIsSane(arch uint) bool {
 	opts := parseIpxeOpts(dhr)
-	if !(opts.http && opts.bzimage) {
-		dhr.Warnf("Incoming iPXE does not support http or bzImage")
+	if !opts.http {
+		dhr.Warnf("Incoming iPXE does not support http")
 		return false
 	}
-	if arch == 0 && !opts.pxe {
-		dhr.Errorf("Incoming iPXE for arch %d does not support pxe. This should not happen", arch)
-		return false
+	if arch == 0 {
+		if !opts.pxe {
+			dhr.Errorf("Incoming iPXE for arch %d does not support pxe. This should not happen", arch)
+			return false
+		}
+		if !opts.bzimage {
+			dhr.Warnf("Incoming iPXE does not support bzImage")
+			return false
+		}
 	}
 	if arch != 0 && !opts.efi {
 		dhr.Errorf("Incoming iPXE for arch %d does not support efi. This should not happen", arch)
