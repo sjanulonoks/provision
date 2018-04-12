@@ -460,6 +460,7 @@ func NewFrontend(
 			"X-Return-Attributes",
 			"X-Log-Level",
 			"X-Log-Token",
+			"Range",
 		},
 		ExposeHeaders: []string{
 			"Content-Length",
