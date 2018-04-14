@@ -287,8 +287,8 @@ FASTMSG
 
     for BOOTENV in $*
     do
-        echo "  export URL=\`${EP}drpcli bootenvs show $BOOTENV | jq -r '.OS.IsoUrl'\`"
-        echo "  export ISO=\`${EP}drpcli bootenvs show $BOOTENV | jq -r '.OS.IsoFile'\`"
+        echo "  export URL=\`${EP}drpcli bootenvs show $BOOTENV | grep 'IsoUrl' | cut -d '\"' -f 4\`"
+        echo "  export ISO=\`${EP}drpcli bootenvs show $BOOTENV | grep 'IsoFile' | cut -d '\"' -f 4\`"
         echo "  \$CMD -o \$ISO \$URL"
     done
     echo "  # this should move the ISOs to the TFTP directory..."
@@ -353,8 +353,6 @@ esac
 if [[ $COMMIT != "" ]] ; then
     set +e
     DRP_CMT=dr-provision-hash.$COMMIT
-    #while ! curl -sfL -o dr-provision-hash.$COMMIT https://github.com/digitalrebar/provision/releases/download/$DRP_VERSION/dr-provision-hash.$COMMIT ; do
-    #while ! curl -sfL -o $DRP_CMT $URL_BASE_DRP/$DRP_VERSION/$DRP_CMT ; do
     while ! get $URL_BASE_DRP/$DRP_VERSION/$DRP_CMT ; do
             echo "Waiting for dr-provision-hash.$COMMIT"
             sleep 60
@@ -389,12 +387,8 @@ case $1 in
                  # If not, get the requested version.
                  if [[ ! -e sha256sums || $force ]] ; then
                      echo "Installing Version $DRP_VERSION of Digital Rebar Provision"
-                     #curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$DRP_VERSION/dr-provision.zip
-                     #curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$DRP_VERSION/dr-provision.sha256
                      ZIP="dr-provision.zip"
                      SHA="dr-provision.sha256"
-                     #curl -sfL -o $ZIP $URL_BASE_DRP/$DRP_VERSION/$ZIP
-                     #curl -sfL -o $SHA $URL_BASE_DRP/$DRP_VERSION/$SHA
                      get $URL_BASE_DRP/$DRP_VERSION/$ZIP $URL_BASE_DRP/$DRP_VERSION/$SHA
                      $shasum -c dr-provision.sha256
                      $tar -xf dr-provision.zip
@@ -408,12 +402,8 @@ case $1 in
                      DRP_CONTENT_VERSION=tip
                  fi
                  echo "Installing Version $DRP_CONTENT_VERSION of Digital Rebar Provision Community Content"
-                 #curl -sfL -o drp-community-content.yaml https://github.com/digitalrebar/provision-content/releases/download/$DRP_CONTENT_VERSION/drp-community-content.yaml || echo "Failed to dowload content."
-                 #curl -sfL -o drp-community-content.sha256 https://github.com/digitalrebar/provision-content/releases/download/$DRP_CONTENT_VERSION/drp-community-content.sha256 || echo "Failed to download sha of content."
                  CC_YML=drp-community-content.yaml
                  CC_SHA=drp-community-content.sha256
-                 #curl -sfL -o $CC_YML $URL_BASE_CONTENT/$DRP_CONTENT_VERSION/$CC_YML || echo "Failed to dowload content."
-                 #curl -sfL -o $CC_SHA $URL_BASE_CONTENT/$DRP_CONTENT_VERSION/$CC_SHA || echo "Failed to download sha of content."
                  get $URL_BASE_CONTENT/$DRP_CONTENT_VERSION/$CC_YML $URL_BASE_CONTENT/$DRP_CONTENT_VERSION/$CC_SHA
                  $shasum -c $CC_SHA
              fi
@@ -470,6 +460,9 @@ case $1 in
                      ln -s $binpath/drbundler drbundler
                  fi
 
+                 echo 
+                 echo "********************************************************************************"
+                 echo 
                  echo "# Run the following commands to start up dr-provision in a local isolated way."
                  echo "# The server will store information and serve files from the drp-data directory."
                  echo
