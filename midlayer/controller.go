@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/digitalrebar/logger"
 	"github.com/digitalrebar/provision/backend"
@@ -264,7 +265,24 @@ func forceParamRemoval(d *DataStack, l store.Store) error {
 // Try to add to available - Must lock before calling
 func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, provider string) error {
 	pc.Infof("Importing plugin provider: %s\n", provider)
-	out, err := exec.Command(pc.pluginDir+"/"+provider, "define").Output()
+
+	cmd := exec.Command(pc.pluginDir+"/"+provider, "define")
+
+	// Setup env vars to run plugin - auth should be parameters.
+	claims := backend.NewClaim(provider, "system", time.Hour*1).
+		Add("*", "*", "*").
+		AddSecrets("", "", "")
+	token, _ := rt.SealClaims(claims)
+	apiURL := rt.ApiURL(net.ParseIP("0.0.0.0"))
+	staticURL := rt.FileURL(net.ParseIP("0.0.0.0"))
+
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("RS_ENDPOINT=%s", apiURL))
+	env = append(env, fmt.Sprintf("RS_FILESERVER=%s", staticURL))
+	env = append(env, fmt.Sprintf("RS_TOKEN=%s", token))
+	cmd.Env = env
+
+	out, err := cmd.Output()
 	if err != nil {
 		pc.Errorf("Skipping %s because %s\n", provider, err)
 		return fmt.Errorf("Skipping %s because %s\n", provider, err)
