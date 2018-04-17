@@ -13,31 +13,59 @@
 # limitations under the License.
 
 
-README file for pkt-demo
+WHAT IS THIS?
+-------------
 
-NOTE:  This example used to be called "5min-demo".  It has been renamed
-       to "pkt-demo" to more closely align with the use case, and 
-       expanded scope.
+This 'pkt-demo' piece is a suite of scripts that integrates the following
+solutions:
 
+  * Digital Rebar Provision - for deploying operating systems
+  * Packet.net - bare metal service provider
+  * Terraform - "orchestrate" deployment and management of packet resources
+
+The goal of this tool is to quickly deploy a number of bare metal machines
+in the Packet.net environment, make changes to the Packet Nodes to enable
+Digital Rebar Provision to manage them, and automate all of these pieces. 
+
+In a nut shell this is what you get:
+
+  * automatically allocate hardware resources in packet.net
+  * deploy CentOS linux on one of those machines
+  * deploy and configure Digital Rebar Provision on that machines
+  * set up a Workflow and provision the remaining machines via DRP
+
+Once the Demo is completed - you will have a fully functioning, configured,
+and tested Digital Rebar Provision Endoint, and "N" number of machines 
+provisioned with a basic Workflow and Operating System deployment. 
+
+You can then remove the Workflow, and now "play" with the DRP provisioned
+environment. 
+
+Please note - this tool is used internally at RackN for deployment of 
+demonstration systems, lab/training system builds, etc.  It generally always
+tracks the latest/most current "stable" version. 
 
 OVERVIEW AND IMPORTANT REQUIREMENTS
 -----------------------------------
 
-You will need to perform the following FOUR EASY STEPS in preparation 
+You will need to perform the following FIVE EASY STEPS in preparation 
 to using this pkt-demo process.  Details for each step are below.
 
   1. GIT CLONE
     - get the pkt-demo code from the github repo
 
-  2. SECRETS
+  2. You need a packet.net account that has been setup, and you have generated
+     an API Key,  along with a Project ID - see https://www.packet.net/
+
+  3. SECRETS
      - get your API and Username secrets - modify 'private-contents/secrets' file
        * have a packet.net account, and your API KEY, and PROJECT ID
-       * get your RackN USERNAME for registered content download authorization
+       * get your RackN ID (UUID) for registered content download authorization
 
-  3. CUSTOMIZE
+  4. CUSTOMIZE
      - make changes to the terraform "vars.tf" parameters
 
-  4. RUN demo-run.sh SCRIPT
+  5. RUN demo-run.sh SCRIPT
      - actually run the demo setup script
 
 Additional Sections (hopefully useful) of documentation:
@@ -80,6 +108,10 @@ DETAILED STEPS
     cp -r pkt-demo $HOME/pkt-demo
     cd $HOME/pkt-demo
 
+We recommend recursively copying the `pkt-demo` directory out of the Git tree, if
+you intend to keep the Git repo around.  The directory will be modified with run-time
+state information and details, that may pollute your Git tree. 
+
 
 2. SECRETS
 ==========
@@ -114,7 +146,6 @@ EDIT THE SECRETS FILE !!  Located in 'private-content/secrets'.  You need:
       Direct URL:  https://portal.rackn.io/#/user/
 
     It will be a big ugly UUID like string like:  ad9914b7-60bd-49d9-81d0-95e532e7ce1c
-
 
 NOTE: Please do not modify the following in the 'secrets' file:
       API_KEY, PROJECT_ID, and RACKN_USERNAME 
@@ -192,6 +223,9 @@ ADDITIONAL SECTIONS
 WHAT HAPPENS?
 =============
 
+Some more details on things that happen as part of running the 'demo-run.sh'
+script.
+
 1.  set PATH to include the ./bin directory for DRP and terraform/etc.
 2.  install terraform locally in your ./bin directory 
     (can be skipped, eg for demo in bandwidth constrained environments)
@@ -246,7 +280,7 @@ Then, to restore the secrets on the next run, do:
 file in the future.
 
 WARNING:  CLEANUP NUKES everything !!  EVERYTHING !! ...and resets the
-          demo directory to the beginning
+          demo directory to the beginning and DESTROYS MACHINES !!
 
 
 GENERAL NOTES
