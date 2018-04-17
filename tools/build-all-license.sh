@@ -11,8 +11,7 @@ echo
 
 cat LICENSE
 
-echo
-echo "TODO: Get the downloaded Assets Licenses"
+#echo "TODO: Get the downloaded Assets Licenses"
 echo
 
 cd vendor
