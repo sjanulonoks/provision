@@ -282,10 +282,10 @@ func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, pro
 	env = append(env, fmt.Sprintf("RS_TOKEN=%s", token))
 	cmd.Env = env
 
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		pc.Errorf("Skipping %s because %s\n", provider, err)
-		return fmt.Errorf("Skipping %s because %s\n", provider, err)
+		pc.Errorf("Skipping %s because %s: %s\n", provider, err, string(out))
+		return fmt.Errorf("Skipping %s because %s: %s\n", provider, err, string(out))
 	}
 	pp := &models.PluginProvider{}
 	err = json.Unmarshal(out, pp)
