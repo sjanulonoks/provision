@@ -140,6 +140,16 @@ func (pc *PluginController) allPlugins(provider, action string) (err error) {
 			}
 		}
 	})
+
+	// Stop all those that might have disappeared from the database if content provided
+	if action == "stop" {
+		for _, rp := range pc.runningPlugins {
+			if rp.Provider.Name == provider {
+				rt.PublishEvent(models.EventFor(rp.Plugin, "stop"))
+			}
+		}
+	}
+
 	return
 }
 
