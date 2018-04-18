@@ -26,6 +26,7 @@ Options:
     --skip-run-check        # Skip the process check for 'dr-provision' on new install
                             # only valid in '--isolated' install mode
     --skip-depends          # Skip OS dependency checks, for testing 'isolated' mode
+    --fast-downloader       # (experimental) Use Fast Downloader (uses 'aria2')
 
     install                 # Sets up an isolated or system 'production' enabled install.
     remove                  # Removes the system enabled install.  Requires no other flags
@@ -44,6 +45,7 @@ EOFUSAGE
 exit 0
 }
 
+# control flags 
 ISOLATED=false
 NO_CONTENT=false
 DBG=false
@@ -51,6 +53,12 @@ UPGRADE=false
 REMOVE_DATA=false
 SKIP_RUN_CHECK=false
 SKIP_DEPENDS=false
+FAST_DOWNLOADER=false
+
+# download URL locations; overridable via ENV variables
+URL_BASE=${URL_BASE:-"https://github.com/digitalrebar/"}
+URL_BASE_DRP=${URL_BASE_DRP:-"$URL_BASE/provision/releases/download"}
+URL_BASE_CONTENT=${URL_BASE_CONTENT:-"$URL_BASE/provision-content/releases/download"}
 
 args=()
 while (( $# > 0 )); do
@@ -76,6 +84,9 @@ while (( $# > 0 )); do
             ;;
         --skip-depends)
             SKIP_DEPENDS=true
+            ;;
+        --fast-downloader)
+            FAST_DOWNLOADER=true
             ;;
         --force)
             force=true
@@ -151,6 +162,48 @@ case $OS_TYPE in
     *) OS_FAMILY=$OS_TYPE;;
 esac
 
+# install the EPEL repo if appropriate, and not enabled already
+install_epel() {
+    if [[ $OS_FAMILY == rhel ]] ; then
+        if ( `yum repolist enabled | grep -q "^epel/"` ); then
+            echo "EPEL repository installed already."
+        else
+            if [[ $OS_TYPE != fedora ]] ; then
+                sudo yum install -y epel-release
+            fi
+        fi
+    fi 
+}
+
+# set our downloader GET variable appropriately
+get() {
+    if [[ -z "$*" ]]; then
+        echo "Internal error, get() expects files to get"
+        exit 1
+    fi
+
+    if [[ "$FAST_DOWNLOADER" == "true" ]]; then
+        if which aria2c > /dev/null; then
+            GET="aria2c --quiet=true --continue=true --max-concurrent-downloads=10 --max-connection-per-server=16 --max-tries=0"
+        else
+            echo "'--fast-downloader' specified, but couldn't find tool ('aria2c')."
+            exit 1
+        fi
+    else
+        if which curl > /dev/null; then
+            GET="curl -sfL"
+        else
+            echo "Unable to find downloader tool ('curl')."
+            exit 1
+        fi
+    fi
+    for URL in $*; do
+        FILE=${URL##*/}
+        echo ">>> Downloading file:  $FILE"
+        $GET -o $FILE $URL 
+    done
+}
+
 ensure_packages() {
     echo "Ensuring required tools are installed"
     if [[ $OS_FAMILY == darwin ]] ; then
@@ -171,6 +224,14 @@ ensure_packages() {
             echo
             error=1
         fi
+        if [[ "$FAST_DOWNLOADER" == "true" ]]; then
+          if ! which aria2c  &>/dev/null; then
+            echo "Install 'aria2' package"
+            echo 
+            echo "E.g: "
+            echo "  brew install aria2"
+          fi
+        fi
         if [[ $error == 1 ]] ; then
             echo "After install missing components, restart the terminal to pick"
             echo "up the newly installed commands."
@@ -189,17 +250,57 @@ ensure_packages() {
         if ! which 7z &>/dev/null; then
             echo "Installing 7z"
             if [[ $OS_FAMILY == rhel ]] ; then
-                if [[ $OS_TYPE != fedora ]] ; then
-                    sudo yum install -y epel-release
-                fi
+                install_epel
                 sudo yum install -y p7zip
             elif [[ $OS_FAMILY == debian ]] ; then
                 sudo apt-get install -y p7zip-full
             fi
         fi
+        if [[ "$FAST_DOWNLOADER" == "true" ]]; then
+          if ! which aria2 &>/dev/null; then
+            echo "Installing aria2 for 'fast downloader'"
+            if [[ $OS_FAMILY == rhel ]] ; then
+                install_epel
+                sudo yum install -y aria2
+            elif [[ $OS_FAMILY == debian ]] ; then
+                sudo apt-get install -y aria2
+            fi
+          fi
+        fi 
     fi
 }
 
+# output a friendly statement on how to download ISOS via fast downloader
+show_fast_isos() {
+    cat <<FASTMSG
+Option '--fast-downloader' requested.  You may download the ISO images using
+'aria2c' command to significantly reduce download time of the ISO images.
+
+NOTE: The following genereted scriptlet should download, install, and enable
+      the ISO images.  VERIFY SCRIPTLET before running it.
+
+      YOU MUST START 'dr-provision' FIRST! Example commands:
+
+###### BEGIN scriptlet
+  export CMD="aria2c --continue=true --max-concurrent-downloads=10 --max-connection-per-server=16 --max-tries=0"
+FASTMSG
+
+    for BOOTENV in $*
+    do
+        echo "  export URL=\`${EP}drpcli bootenvs show $BOOTENV | grep 'IsoUrl' | cut -d '\"' -f 4\`"
+        echo "  export ISO=\`${EP}drpcli bootenvs show $BOOTENV | grep 'IsoFile' | cut -d '\"' -f 4\`"
+        echo "  \$CMD -o \$ISO \$URL"
+    done
+    echo "  # this should move the ISOs to the TFTP directory..."
+    echo "  sudo mv *.tar *.iso $TFTP_DIR/isos/"
+    echo "  sudo pkill -HUP dr-provision"
+    echo "  echo 'NOTICE:  exploding isos may take up to 5 minutes to complete ... '"
+    echo "###### END scriptlet"
+
+    echo
+}
+
+# main 
 arch=$(uname -m)
 case $arch in
   x86_64|amd64) arch=amd64  ;;
@@ -251,7 +352,8 @@ esac
 
 if [[ $COMMIT != "" ]] ; then
     set +e
-    while ! curl -sfL -o dr-provision-hash.$COMMIT https://github.com/digitalrebar/provision/releases/download/$DRP_VERSION/dr-provision-hash.$COMMIT ; do
+    DRP_CMT=dr-provision-hash.$COMMIT
+    while ! get $URL_BASE_DRP/$DRP_VERSION/$DRP_CMT ; do
             echo "Waiting for dr-provision-hash.$COMMIT"
             sleep 60
     done
@@ -285,9 +387,9 @@ case $1 in
                  # If not, get the requested version.
                  if [[ ! -e sha256sums || $force ]] ; then
                      echo "Installing Version $DRP_VERSION of Digital Rebar Provision"
-                     curl -sfL -o dr-provision.zip https://github.com/digitalrebar/provision/releases/download/$DRP_VERSION/dr-provision.zip
-                     curl -sfL -o dr-provision.sha256 https://github.com/digitalrebar/provision/releases/download/$DRP_VERSION/dr-provision.sha256
-
+                     ZIP="dr-provision.zip"
+                     SHA="dr-provision.sha256"
+                     get $URL_BASE_DRP/$DRP_VERSION/$ZIP $URL_BASE_DRP/$DRP_VERSION/$SHA
                      $shasum -c dr-provision.sha256
                      $tar -xf dr-provision.zip
                  fi
@@ -300,12 +402,14 @@ case $1 in
                      DRP_CONTENT_VERSION=tip
                  fi
                  echo "Installing Version $DRP_CONTENT_VERSION of Digital Rebar Provision Community Content"
-                 curl -sfL -o drp-community-content.yaml https://github.com/digitalrebar/provision-content/releases/download/$DRP_CONTENT_VERSION/drp-community-content.yaml || echo "Failed to dowload content."
-                 curl -sfL -o drp-community-content.sha256 https://github.com/digitalrebar/provision-content/releases/download/$DRP_CONTENT_VERSION/drp-community-content.sha256 || echo "Failed to download sha of content."
-                 $shasum -c drp-community-content.sha256
+                 CC_YML=drp-community-content.yaml
+                 CC_SHA=drp-community-content.sha256
+                 get $URL_BASE_CONTENT/$DRP_CONTENT_VERSION/$CC_YML $URL_BASE_CONTENT/$DRP_CONTENT_VERSION/$CC_SHA
+                 $shasum -c $CC_SHA
              fi
 
              if [[ $ISOLATED == false ]] ; then
+                 TFTP_DIR="/var/lib/dr-provision/tftpboot"
                  sudo cp "$binpath"/* "$bindest"
                  if [[ $initfile ]]; then
                      if [[ -r $initdest ]]
@@ -319,9 +423,10 @@ case $1 in
                      else
                          sudo cp "$initfile" "$initdest"
                      fi
-                     echo "# You can start the DigitalRebar Provision service with:"
+                     echo 
+                     echo "######### You can start the DigitalRebar Provision service with:"
                      echo "$starter"
-                     echo "# You can enable the DigitalRebar Provision service with:"
+                     echo "######### You can enable the DigitalRebar Provision service with:"
                      echo "$enabler"
                  fi
 
@@ -345,6 +450,7 @@ case $1 in
                  fi
              else
                  mkdir -p drp-data
+                 TFTP_DIR="`pwd`/drp-data/tftpboot"
 
                  # Make local links for execs
                  rm -f drpcli dr-provision drbundler
@@ -354,6 +460,9 @@ case $1 in
                      ln -s $binpath/drbundler drbundler
                  fi
 
+                 echo 
+                 echo "********************************************************************************"
+                 echo 
                  echo "# Run the following commands to start up dr-provision in a local isolated way."
                  echo "# The server will store information and serve files from the drp-data directory."
                  echo
@@ -409,6 +518,7 @@ case $1 in
              echo "  ${EP}drpcli bootenvs uploadiso centos-7-install"
              echo "  ${EP}drpcli bootenvs uploadiso sledgehammer"
              echo
+             [[ "$FAST_DOWNLOADER" == "true" ]] && show_fast_isos "ubuntu-16.04-install" "centos-7-install" "sledgehammer"
 
              ;;
      remove)
