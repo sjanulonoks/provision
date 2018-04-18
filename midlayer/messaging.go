@@ -20,12 +20,13 @@ var globalSocketId int64 = 1
 
 type PluginClient struct {
 	logger.Logger
-	pc     *PluginController
-	plugin string
-	cmd    *exec.Cmd
-	stderr io.ReadCloser
-	done   int64
-	lock   sync.Mutex
+	pc       *PluginController
+	plugin   string
+	provider string
+	cmd      *exec.Cmd
+	stderr   io.ReadCloser
+	done     int64
+	lock     sync.Mutex
 
 	publock   sync.Mutex
 	inflight  int
@@ -95,10 +96,10 @@ func (pc *PluginClient) Unload() {
 	return
 }
 
-func NewPluginClient(pc *PluginController, pluginCommDir, plugin string, l logger.Logger, apiURL, staticURL, token, path string) (answer *PluginClient, theErr error) {
+func NewPluginClient(pc *PluginController, pluginCommDir, plugin, provider string, l logger.Logger, apiURL, staticURL, token, path string) (answer *PluginClient, theErr error) {
 	id := atomic.AddInt64(&globalSocketId, 1)
 
-	answer = &PluginClient{pc: pc, plugin: plugin, Logger: l, socketId: id}
+	answer = &PluginClient{pc: pc, plugin: plugin, Logger: l, socketId: id, provider: provider}
 	answer.Debugf("Initialzing Plugin: %s\n", plugin)
 
 	retSocketPath := fmt.Sprintf("%s/%s.fromPlugin.%d", pluginCommDir, plugin, id)

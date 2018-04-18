@@ -35,11 +35,34 @@ func logHandler(w http.ResponseWriter, r *http.Request, pc *PluginClient) {
 	mux.JsonResponse(w, 204, nil)
 }
 
+func leavingHandler(w http.ResponseWriter, r *http.Request, pc *PluginClient) {
+	var err models.Error
+	if !mux.AssureDecode(w, r, &err) {
+		return
+	}
+	if err.Code == 403 {
+		pc.pc.lock.Lock()
+		defer pc.pc.lock.Unlock()
+		rt := pc.pc.Request()
+		pc.pc.removePluginProvider(rt, pc.provider)
+	} else {
+		pc.lock.Lock()
+		defer pc.lock.Unlock()
+		if r, ok := pc.pc.runningPlugins[pc.plugin]; ok {
+			rt := pc.pc.Request()
+			rt.PublishEvent(models.EventFor(r.Plugin, "stop"))
+		}
+	}
+	mux.JsonResponse(w, 204, nil)
+}
+
 func (pc *PluginClient) pluginServer(commPath string) {
 	pc.Tracef("pluginServer: Starting com server: %s(%s)\n", pc.plugin, commPath)
 	pmux := mux.New(pc.NoPublish())
 	pmux.Handle("/api-server-plugin/v3/publish",
 		func(w http.ResponseWriter, r *http.Request) { publishHandler(w, r, pc) })
+	pmux.Handle("/api-server-plugin/v3/leaving",
+		func(w http.ResponseWriter, r *http.Request) { leavingHandler(w, r, pc) })
 	pmux.Handle("/api-server-plugin/v3/log",
 		func(w http.ResponseWriter, r *http.Request) { logHandler(w, r, pc) })
 	// apiGroup.POST("/object", func(c *gin.Context) { objectHandler(c, pc) })
