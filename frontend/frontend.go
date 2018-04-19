@@ -644,7 +644,12 @@ func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bo
 	if !ok || !f.assureAuthWithClaim(c, obj, scope, action, specific) {
 		f.rt(c).Auditf("Failed auth %s - %s %s %s - %s", obj.(*backend.DrpCustomClaims).Id,
 			scope, action, specific, c.ClientIP())
-		c.AbortWithStatus(http.StatusForbidden)
+		res := &models.Error{
+			Type: "AUTH",
+			Code: http.StatusForbidden,
+		}
+		res.Errorf("Cannot access %s with claims %s %s %s", c.Request.URL.String(), scope, action, specific)
+		c.AbortWithStatusJSON(res.Code, res)
 		return false
 	}
 	return true
