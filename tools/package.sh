@@ -18,8 +18,10 @@ case $(uname -s) in
         exit 1;;
 esac
 
+tools/build-all-license.sh > ALL-LICENSE
 
 tmpdir="$(mktemp -d /tmp/rs-bundle-XXXXXXXX)"
+cp ALL-LICENSE "$tmpdir"
 cp -a bin "$tmpdir"
 mkdir -p "$tmpdir/assets"
 cp -a assets/startup "$tmpdir/assets"

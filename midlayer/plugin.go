@@ -140,6 +140,16 @@ func (pc *PluginController) allPlugins(provider, action string) (err error) {
 			}
 		}
 	})
+
+	// Stop all those that might have disappeared from the database if content provided
+	if action == "stop" {
+		for _, rp := range pc.runningPlugins {
+			if rp.Provider.Name == provider {
+				rt.PublishEvent(models.EventFor(rp.Plugin, "stop"))
+			}
+		}
+	}
+
 	return
 }
 
@@ -295,6 +305,7 @@ func (pc *PluginController) startPlugin(mp models.Model) {
 			pc,
 			pc.pluginCommDir,
 			plugin.Name,
+			plugin.Provider,
 			pc.Logger.Fork().SetService(plugin.Name),
 			rt.ApiURL(net.ParseIP("0.0.0.0")),
 			rt.FileURL(net.ParseIP("0.0.0.0")),
@@ -386,6 +397,11 @@ func (pc *PluginController) configPlugin(mp models.Model) {
 				rt.Update(r.Plugin)
 			}
 		})
+
+		// If we got permission denied, we need to remove the plugin provider.
+		if berr, ok := terr.(*models.Error); ok && berr.Code == 403 {
+			pc.removePluginProvider(rt, r.Plugin.Provider)
+		}
 		return
 	}
 
