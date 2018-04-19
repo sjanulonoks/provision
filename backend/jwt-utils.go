@@ -219,7 +219,7 @@ func (d *DrpCustomClaims) ValidateSecrets(grantor, user, machine string) bool {
 // NewClaim creates a new, unsigned Token that doesn't allow access to anything.
 // You must call Seal() to turn this into a signed JWT token.
 func NewClaim(user, grantor string, ttl time.Duration) *DrpCustomClaims {
-	res := &DrpCustomClaims{DrpClaims: []models.Claim{}}
+	res := &DrpCustomClaims{DrpClaims: []models.Claim{}, DrpRoles: []string{}}
 	res.IssuedAt = time.Now().Unix()
 	res.ExpiresAt = time.Now().Add(ttl).Unix()
 	res.Issuer = "digitalrebar provision"
@@ -243,9 +243,14 @@ func (d *DrpCustomClaims) AddSecrets(user, grantor, machine string) *DrpCustomCl
 	return d
 }
 
-// Add adds a discrete Claim to our custom Token class.
-func (d *DrpCustomClaims) Add(scope, action, specific string) *DrpCustomClaims {
+// AddRawClaim adds a discrete Claim to our custom Token class.
+func (d *DrpCustomClaims) AddRawClaim(scope, action, specific string) *DrpCustomClaims {
 	d.DrpClaims = append(d.DrpClaims, models.Claim{scope, action, specific})
+	return d
+}
+
+func (d *DrpCustomClaims) AddRoles(names ...string) *DrpCustomClaims {
+	d.DrpRoles = append(d.DrpRoles, names...)
 	return d
 }
 

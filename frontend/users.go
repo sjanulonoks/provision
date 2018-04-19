@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/VictorLowther/jsonpatch2"
@@ -71,22 +72,13 @@ type UserTokenQueryTTLParameter struct {
 	TTL int `json:"ttl"`
 }
 
+// UserTokenQueryRolesParameter is used to restrict the requested
+// token to a subset of the Roles that a User has.
+//
 // swagger:parameters getUserToken
-type UserTokenQueryScopeParameter struct {
+type UserTokenQueryRolesParameter struct {
 	// in: query
-	Scope string `json:"scope"`
-}
-
-// swagger:parameters getUserToken
-type UserTokenQueryActionParameter struct {
-	// in: query
-	Action string `json:"action"`
-}
-
-// swagger:parameters getUserToken
-type UserTokenQuerySpecificParameter struct {
-	// in: query
-	Specific string `json:"specific"`
+	Roles string `json:"roles"`
 }
 
 // UserListPathParameter used to limit lists of User by path options
@@ -291,6 +283,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 		func(c *gin.Context) {
 			ref := &backend.User{}
 			var userName, grantorName, userSecret, grantorSecret string
+			haveRoles := []string{}
 			var err *models.Error
 			rt := f.rt(c, ref.Locks("get")...)
 			rt.Do(func(d backend.Stores) {
@@ -308,7 +301,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 				}
 				uobj := backend.AsUser(u)
 				gobj := backend.AsUser(g)
-				userName, userSecret = uobj.Name, uobj.Secret
+				userName, userSecret, haveRoles = uobj.Name, uobj.Secret, uobj.Roles
 				grantorName, grantorSecret = gobj.Name, gobj.Secret
 				err = nil
 			})
@@ -336,22 +329,39 @@ func (f *Frontend) InitUserApi(drpid string) {
 				}
 				ttl = time.Second * time.Duration(ttl64)
 			}
-			scope, _ := c.GetQuery("scope")
-			if scope == "" {
-				scope = "*"
+			claims := backend.NewClaim(c.Param(`name`), grantorName, ttl)
+			wantedRoles, _ := c.GetQuery("roles")
+			if wantedRoles != "" {
+				// Be very stupid for now and assume are roles are disjoint even though
+				// they are really partially ordered with superuser as the origin.
+				// Maybe once we implement an algebra for claims we will revisit this.
+				roleNames := strings.Split(wantedRoles, ",")
+				for _, rn := range roleNames {
+					roleName := strings.TrimSpace(rn)
+					found := false
+					for _, haveRole := range haveRoles {
+						if haveRole == roleName {
+							found = true
+							break
+						}
+					}
+					if !found {
+						res := &models.Error{
+							Type:  c.Request.Method,
+							Model: "users",
+							Key:   c.Param(`name`),
+							Code:  http.StatusNotAcceptable,
+						}
+						res.Errorf("Role %s not assigned to user", roleName)
+						c.JSON(res.Code, res)
+						return
+					}
+				}
+				claims.AddRoles(roleNames...)
+			} else {
+				claims.AddRoles(haveRoles...)
 			}
-			action, _ := c.GetQuery("action")
-			if action == "" {
-				action = "*"
-			}
-			specific, _ := c.GetQuery("specific")
-			if specific == "" {
-				specific = "*"
-			}
-
-			claims := backend.NewClaim(c.Param(`name`), grantorName, ttl).
-				Add(scope, action, specific).
-				AddSecrets(grantorSecret, userSecret, "")
+			claims.AddSecrets(grantorSecret, userSecret, "")
 
 			if t, err := f.dt.SealClaims(claims); err != nil {
 				ne, ok := err.(*models.Error)
