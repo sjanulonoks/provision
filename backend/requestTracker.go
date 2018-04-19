@@ -120,6 +120,10 @@ func (rt *RequestTracker) Index(name string) *index.Index {
 
 func (rt *RequestTracker) Do(thunk func(Stores)) {
 	rt.Lock()
+	if rt.d != nil {
+		rt.Unlock()
+		rt.Panicf("Recursive lock of request tracker!")
+	}
 	d, unlocker := rt.dt.lockEnts(rt.locks...)
 	rt.d = d
 	rt.Unlock()

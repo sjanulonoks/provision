@@ -568,13 +568,13 @@ func (f *Frontend) getAuthUser(c *gin.Context) string {
 //
 // THIS CAN BE CALLED UNDER LOCKS, but will not validate the secrets.
 //
-func (f *Frontend) assureClaimMatch(c *gin.Context, claim interface{}, scope, action, specific string) bool {
+func (f *Frontend) assureClaimMatch(rt *backend.RequestTracker, claim interface{}, scope, action, specific string) bool {
 	drpClaim, ok := claim.(*backend.DrpCustomClaims)
 	if !ok {
 		f.Logger.Warnf("Request with bad claims")
 		return false
 	}
-	if drpClaim.Match(scope, action, specific) {
+	if drpClaim.Match(rt, scope, action, specific) {
 		f.Logger.Debugf("Claims ok: '%s' '%s' '%s'", scope, action, specific)
 		return true
 	}
@@ -586,7 +586,8 @@ func (f *Frontend) assureClaimMatch(c *gin.Context, claim interface{}, scope, ac
 // THIS MUST NOT BE CALLED UNDER LOCKS!
 //
 func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope, action, specific string) bool {
-	if !f.assureClaimMatch(c, claim, scope, action, specific) {
+	roleRT := f.rt(c, (&backend.Role{}).Locks("get")...)
+	if !f.assureClaimMatch(roleRT, claim, scope, action, specific) {
 		return false
 	}
 

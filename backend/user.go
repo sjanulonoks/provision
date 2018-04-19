@@ -85,6 +85,17 @@ func (u *User) Validate() {
 	u.User.Validate()
 	u.AddError(index.CheckUnique(u, u.rt.stores("users").Items()))
 	u.SetValid()
+	for _, rName := range u.Roles {
+		r := u.rt.Find("roles", rName)
+		if r == nil {
+			u.Errorf("Role %s does not exist", rName)
+		} else {
+			role := AsRole(r)
+			if !role.Available {
+				u.Errorf("Role %s is not available", rName)
+			}
+		}
+	}
 	u.SetAvailable()
 }
 
@@ -120,9 +131,9 @@ func (u *User) OnLoad() error {
 
 var userLockMap = map[string][]string{
 	"get":     []string{"users"},
-	"create":  []string{"users"},
-	"update":  []string{"users"},
-	"patch":   []string{"users"},
+	"create":  []string{"users", "roles"},
+	"update":  []string{"users", "roles"},
+	"patch":   []string{"users", "roles"},
 	"delete":  []string{"users"},
 	"actions": []string{"users", "profiles", "params"},
 }
