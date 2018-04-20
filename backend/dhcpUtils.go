@@ -15,6 +15,67 @@ import (
 // midlayer must NAK the request.
 type LeaseNAK error
 
+func findViaReservation(rt *RequestTracker,
+	strat, token string,
+	req net.IP, fake bool) (lease *Lease, reservation *Reservation, ok bool) {
+	leases, reservations := rt.d("leases"), rt.d("reservations")
+	for _, i := range reservations.Items() {
+		reservation = AsReservation(i)
+		if reservation.Token == token && reservation.Strategy == strat {
+			break
+		}
+		reservation = nil
+	}
+	if reservation == nil {
+		return
+	}
+	if fake {
+		return nil, reservation, true
+	}
+	// We found a reservation for this strategy/token
+	// combination, see if we can create a lease using it.
+	ok = false
+	if found := leases.Find(reservation.Key()); found != nil {
+		ok = true
+		// We found a lease for this IP.
+		lease = AsLease(found)
+		if lease.Token == reservation.Token &&
+			lease.Strategy == reservation.Strategy {
+			// This is our lease.  Renew it.
+			rt.Switch("dhcp").Infof("Reservation for %s has a lease, using it.", lease.Addr.String())
+			return
+		}
+		if lease.Expired() {
+			// The lease has expired.  Take it over
+			rt.Switch("dhcp").Infof("Reservation for %s is taking over an expired lease", lease.Addr.String())
+			lease.Token = token
+			lease.Strategy = strat
+			return
+		}
+		// The lease has not expired, and it is not ours.
+		// We have no choice but to fall through to subnet code until
+		// the current lease has expired.
+		rt.Switch("dhcp").Infof("Reservation %s (%s:%s): A lease exists for that address, has been handed out to %s:%s",
+			reservation.Addr,
+			reservation.Strategy,
+			reservation.Token,
+			lease.Strategy,
+			lease.Token)
+		lease = nil
+		return
+	}
+	// We did not find a lease for this IP, and findLease has already guaranteed that
+	// either there is no lease for this token or that the old lease has been NAK'ed.
+	// We are free to create a new lease for this Reservation.
+	lease = &Lease{}
+	Fill(lease)
+	lease.Addr = reservation.Addr
+	lease.Strategy = reservation.Strategy
+	lease.Token = reservation.Token
+	lease.State = "OFFER"
+	return
+}
+
 func findLease(rt *RequestTracker, strat, token string, req net.IP) (lease *Lease, err error) {
 	reservations, leases := rt.d("reservations"), rt.d("leases")
 	hexreq := models.Hexaddr(req.To4())
@@ -31,23 +92,38 @@ func findLease(rt *RequestTracker, strat, token string, req net.IP) (lease *Leas
 		lease = nil
 		return
 	}
-	// This is the lease we want, but if there is a conflicting reservation we
-	// may force the client to give it up.
-	if rfound := reservations.Find(lease.Key()); rfound != nil {
-		reservation := AsReservation(rfound)
-		if reservation.Strategy != lease.Strategy ||
-			reservation.Token != lease.Token {
-			lease.Invalidate()
-			rt.Save(lease)
-			err = LeaseNAK(fmt.Errorf("Reservation %s (%s:%s conflicts with %s:%s",
-				reservation.Addr,
-				reservation.Strategy,
-				reservation.Token,
-				lease.Strategy,
-				lease.Token))
-			lease = nil
-			return
+	_, reservation, _ := findViaReservation(rt, strat, token, req, true)
+	if reservation == nil {
+		// This is the lease we want, but if there is a conflicting reservation we
+		// may force the client to give it up.
+		if rfound := reservations.Find(lease.Key()); rfound != nil {
+			reservation = AsReservation(rfound)
+			if reservation.Strategy != lease.Strategy ||
+				reservation.Token != lease.Token {
+				lease.Invalidate()
+				rt.Save(lease)
+				err = LeaseNAK(fmt.Errorf("Reservation %s (%s:%s) conflicts with %s:%s",
+					reservation.Addr,
+					reservation.Strategy,
+					reservation.Token,
+					lease.Strategy,
+					lease.Token))
+				lease = nil
+				return
+			}
 		}
+	} else if !reservation.Addr.Equal(lease.Addr) {
+		// Someone reserved a different IP address for us.  The client needs to give up
+		// current lease
+		lease.Invalidate()
+		rt.Save(lease)
+		err = LeaseNAK(fmt.Errorf("Reservation %s (%s:%s) changed our address from %s",
+			reservation.Addr,
+			reservation.Strategy,
+			reservation.Token,
+			lease.Addr))
+		lease = nil
+		return
 	}
 	lease.Strategy = strat
 	lease.Token = token
@@ -103,78 +179,6 @@ func FindLease(rt *RequestTracker,
 		lease.State = "ACK"
 		rt.Save(lease)
 	})
-	return
-}
-
-func findViaReservation(rt *RequestTracker,
-	strat, token string,
-	req net.IP, fake bool) (lease *Lease, reservation *Reservation, ok bool) {
-	leases, reservations := rt.d("leases"), rt.d("reservations")
-	if req != nil && req.IsGlobalUnicast() {
-		hex := models.Hexaddr(req)
-		ok := reservations.Find(hex)
-		if ok != nil {
-			reservation = AsReservation(ok)
-			if reservation.Token != token || reservation.Strategy != strat {
-				reservation = nil
-			}
-		}
-	} else {
-		for _, i := range reservations.Items() {
-			reservation = AsReservation(i)
-			if reservation.Token == token && reservation.Strategy == strat {
-				break
-			}
-			reservation = nil
-		}
-	}
-	if reservation == nil {
-		return
-	}
-	if fake {
-		return nil, reservation, true
-	}
-	// We found a reservation for this strategy/token
-	// combination, see if we can create a lease using it.
-	ok = false
-	if found := leases.Find(reservation.Key()); found != nil {
-		ok = true
-		// We found a lease for this IP.
-		lease = AsLease(found)
-		if lease.Token == reservation.Token &&
-			lease.Strategy == reservation.Strategy {
-			// This is our lease.  Renew it.
-			rt.Switch("dhcp").Infof("Reservation for %s has a lease, using it.", lease.Addr.String())
-			return
-		}
-		if lease.Expired() {
-			// The lease has expired.  Take it over
-			rt.Switch("dhcp").Infof("Reservation for %s is taking over an expired lease", lease.Addr.String())
-			lease.Token = token
-			lease.Strategy = strat
-			return
-		}
-		// The lease has not expired, and it is not ours.
-		// We have no choice but to fall through to subnet code until
-		// the current lease has expired.
-		rt.Switch("dhcp").Infof("Reservation %s (%s:%s): A lease exists for that address, has been handed out to %s:%s",
-			reservation.Addr,
-			reservation.Strategy,
-			reservation.Token,
-			lease.Strategy,
-			lease.Token)
-		lease = nil
-		return
-	}
-	// We did not find a lease for this IP, and findLease has already guaranteed that
-	// either there is no lease for this token or that the old lease has been NAK'ed.
-	// We are free to create a new lease for this Reservation.
-	lease = &Lease{}
-	Fill(lease)
-	lease.Addr = reservation.Addr
-	lease.Strategy = reservation.Strategy
-	lease.Token = reservation.Token
-	lease.State = "OFFER"
 	return
 }
 
