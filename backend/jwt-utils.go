@@ -245,7 +245,7 @@ func (d *DrpCustomClaims) AddSecrets(user, grantor, machine string) *DrpCustomCl
 
 // AddRawClaim adds a discrete Claim to our custom Token class.
 func (d *DrpCustomClaims) AddRawClaim(scope, action, specific string) *DrpCustomClaims {
-	d.DrpClaims = append(d.DrpClaims, models.Claim{scope, action, specific})
+	d.DrpClaims = append(d.DrpClaims, models.Claim{Scope: scope, Action: action, Specific: specific})
 	return d
 }
 
