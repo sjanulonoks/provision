@@ -16,6 +16,7 @@ type ltf struct {
 }
 
 func (l *ltf) find(t *testing.T, rt *RequestTracker) {
+	t.Helper()
 	res, _, _, err := FindLease(rt, l.strat, l.token, l.req)
 	if l.found {
 		if res == nil {
@@ -55,12 +56,63 @@ func TestDHCPRenew(t *testing.T) {
 	dt := mkDT(nil)
 	rt := dt.Request(dt.Logger, "subnets", "reservations", "leases")
 	startObjs := []crudTest{
-		{"Initial Subnet", rt.Create, &models.Subnet{Enabled: true, Name: "sn", Subnet: "192.168.124.0/24", ActiveStart: net.ParseIP("192.168.124.80"), ActiveEnd: net.ParseIP("192.168.124.254"), ActiveLeaseTime: 60, ReservedLeaseTime: 7200, Strategy: "mac"}, true},
-		{"Initial Standalone Reservation", rt.Create, &models.Reservation{Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"}, true},
-		{"Valid Subnet Lease", rt.Create, &models.Lease{Addr: net.ParseIP("192.168.124.80"), Strategy: "mac", Token: "subn1", ExpireTime: time.Now().Add(60 * time.Second)}, true},
-		{"Valid Reservation Lease", rt.Create, &models.Lease{Addr: net.ParseIP("192.168.123.10"), Strategy: "mac", Token: "res1", ExpireTime: time.Now().Add(2 * time.Hour)}, true},
-		{"Conflicting Reservation Lease", rt.Create, &models.Lease{Addr: net.ParseIP("192.168.124.81"), Strategy: "mac", Token: "subn2", ExpireTime: time.Now().Add(2 * time.Hour)}, true},
-		{"Initial Conflicting Reservation", rt.Create, &models.Reservation{Addr: net.ParseIP("192.168.124.81"), Token: "res2", Strategy: "mac"}, true},
+		{
+			"Initial Subnet",
+			rt.Create,
+			&models.Subnet{
+				Enabled:           true,
+				Name:              "sn",
+				Subnet:            "192.168.124.0/24",
+				ActiveStart:       net.ParseIP("192.168.124.80"),
+				ActiveEnd:         net.ParseIP("192.168.124.254"),
+				ActiveLeaseTime:   60,
+				ReservedLeaseTime: 7200,
+				Strategy:          "mac",
+			},
+			true,
+		},
+		{
+			"Initial Standalone Reservation",
+			rt.Create,
+			&models.Reservation{Addr: net.ParseIP("192.168.123.10"), Token: "res1", Strategy: "mac"},
+			true,
+		},
+		{
+			"Valid Subnet Lease",
+			rt.Create,
+			&models.Lease{Addr: net.ParseIP("192.168.124.80"), Strategy: "mac", Token: "subn1", ExpireTime: time.Now().Add(60 * time.Second)},
+			true,
+		},
+		{
+			"Valid Reservation Lease",
+			rt.Create,
+			&models.Lease{Addr: net.ParseIP("192.168.123.10"), Strategy: "mac", Token: "res1", ExpireTime: time.Now().Add(2 * time.Hour)},
+			true,
+		},
+		{
+			"Conflicting Reservation Lease",
+			rt.Create,
+			&models.Lease{Addr: net.ParseIP("192.168.124.81"), Strategy: "mac", Token: "subn2", ExpireTime: time.Now().Add(2 * time.Hour)},
+			true,
+		},
+		{
+			"Overridden Reservation Lease",
+			rt.Create,
+			&models.Lease{Addr: net.ParseIP("192.168.124.82"), Strategy: "mac", Token: "res3", ExpireTime: time.Now().Add(60 * time.Second)},
+			true,
+		},
+		{
+			"Initial Conflicting Reservation",
+			rt.Create,
+			&models.Reservation{Addr: net.ParseIP("192.168.124.81"), Token: "res2", Strategy: "mac"},
+			true,
+		},
+		{
+			"Initial Overriding Reservation",
+			rt.Create,
+			&models.Reservation{Addr: net.ParseIP("192.168.124.83"), Token: "res3", Strategy: "mac"},
+			true,
+		},
 	}
 	for _, obj := range startObjs {
 		obj.Test(t, rt)
@@ -71,6 +123,7 @@ func TestDHCPRenew(t *testing.T) {
 		{"Fail to renew unknown lease using IP address in subnet", "mac", "res1", net.ParseIP("192.168.124.90"), false, true},
 		{"Fail to renew known lease from wrong token", "mac", "subn8", net.ParseIP("192.168.124.80"), false, true},
 		{"Fail to renew known lease from wrong address", "mac", "subn2", net.ParseIP("192.168.124.81"), false, true},
+		{"Fail to renew lease overridden by new reserved address", "mac", "res3", net.ParseIP("192.168.124.82"), false, true},
 	}
 	for _, l := range ltfs {
 		l.find(t, rt)
@@ -129,7 +182,7 @@ func TestDHCPCreateReservationOnly(t *testing.T) {
 		{"Create lease from reservation Res1", "mac", "res1", nil, nil, true, net.ParseIP("192.168.123.10")},
 		{"Attempt to create from wrong token for Res1", "mac", "resn", net.ParseIP("192.168.123.10"), nil, false, nil},
 		{"Renew created lease for Res1", "mac", "res1", net.ParseIP("192.168.123.10"), nil, true, net.ParseIP("192.168.123.10")},
-		{"Attempt to crate with wrong requested addr for Res1", "mac", "res1", net.ParseIP("192.168.123.11"), nil, false, nil},
+		{"Override requested address due to reservation", "mac", "res1", net.ParseIP("192.168.123.11"), nil, true, net.ParseIP("192.168.123.10")},
 		{"Recreate with no requested address for Res1", "mac", "res1", nil, nil, true, net.ParseIP("192.168.123.10")},
 		{"Attempt to create with no reservation", "mac", "resn", nil, nil, false, nil},
 		{"Create lease from reservation Res2", "mac", "res2", nil, nil, true, net.ParseIP("192.168.124.10")},
