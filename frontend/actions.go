@@ -50,7 +50,7 @@ func (f *Frontend) makeActionEndpoints(cmdSet string, obj models.Model, idKey st
 	}
 	idrtkeyok := func(c *gin.Context, op string) (string, *backend.RequestTracker, string, bool) {
 		if op == "" {
-			op = c.Param("cmd")
+			op = "action:" + c.Param("cmd")
 		}
 		id := c.Param(idKey)
 		if id == "" {
@@ -59,7 +59,7 @@ func (f *Frontend) makeActionEndpoints(cmdSet string, obj models.Model, idKey st
 		return id,
 			f.rt(c, obj.(Lockable).Locks("actions")...),
 			c.Param("cmd"),
-			f.assureAuth(c, cmdSet, op, id)
+			f.assureSimpleAuth(c, cmdSet, op, id)
 	}
 
 	return /* allActions */ func(c *gin.Context) {

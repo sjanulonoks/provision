@@ -309,7 +309,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 				c.JSON(err.Code, err)
 				return
 			}
-			if !f.assureAuth(c, "users", "token", userName) {
+			if !f.assureSimpleAuth(c, "users", "token", userName) {
 				return
 			}
 			sttl, _ := c.GetQuery("ttl")
@@ -329,35 +329,52 @@ func (f *Frontend) InitUserApi(drpid string) {
 				}
 				ttl = time.Second * time.Duration(ttl64)
 			}
-			claims := backend.NewClaim(c.Param(`name`), grantorName, ttl)
+			claims := backend.NewClaim(userName, grantorName, ttl)
 			wantedRoles, _ := c.GetQuery("roles")
+			var res *models.Error
 			if wantedRoles != "" {
-				// Be very stupid for now and assume are roles are disjoint even though
-				// they are really partially ordered with superuser as the origin.
-				// Maybe once we implement an algebra for claims we will revisit this.
-				roleNames := strings.Split(wantedRoles, ",")
-				for _, rn := range roleNames {
-					roleName := strings.TrimSpace(rn)
-					found := false
-					for _, haveRole := range haveRoles {
-						if haveRole == roleName {
-							found = true
-							break
+				rt.Do(func(d backend.Stores) {
+					uberRole := &models.Role{}
+					for _, r := range haveRoles {
+						if robj := rt.Find("roles", r); robj != nil {
+							uberRole.Claims = append(uberRole.Claims, robj.(*backend.Role).Claims...)
+						} else {
+							rt.Errorf("User %s has missing role %s", userName, r)
 						}
 					}
-					if !found {
-						res := &models.Error{
-							Type:  c.Request.Method,
-							Model: "users",
-							Key:   c.Param(`name`),
-							Code:  http.StatusNotAcceptable,
+					roleNames := strings.Split(wantedRoles, ",")
+					for i := range roleNames {
+						roleName := strings.TrimSpace(roleNames[i])
+						roleNames[i] = roleName
+						if robj := rt.Find("roles", roleName); robj == nil {
+							res = &models.Error{
+								Type:  c.Request.Method,
+								Model: "users",
+								Key:   userName,
+								Code:  http.StatusNotAcceptable,
+							}
+							res.Errorf("Role %s missing", roleName)
+							return
+						} else {
+							role := robj.(*backend.Role)
+							if !uberRole.Contains(role.Role) {
+								res = &models.Error{
+									Type:  c.Request.Method,
+									Model: "users",
+									Key:   userName,
+									Code:  http.StatusForbidden,
+								}
+								res.Errorf("Role %s is not allowed", roleName)
+								return
+							}
 						}
-						res.Errorf("Role %s not assigned to user", roleName)
-						c.JSON(res.Code, res)
-						return
 					}
+					claims.AddRoles(roleNames...)
+				})
+				if res != nil {
+					c.JSON(res.Code, res)
+					return
 				}
-				claims.AddRoles(roleNames...)
 			} else {
 				claims.AddRoles(haveRoles...)
 			}
@@ -438,7 +455,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name/password",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "users", "password", c.Param("name")) {
+			if !f.assureSimpleAuth(c, "users", "password", c.Param("name")) {
 				return
 			}
 			var userPassword models.UserPassword

@@ -36,7 +36,7 @@ func (f *Frontend) InitPrefApi() {
 	//        403: NoContentResponse
 	f.ApiGroup.GET("/prefs",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "prefs", "list", "") {
+			if !f.assureSimpleAuth(c, "prefs", "list", "") {
 				return
 			}
 			c.JSON(http.StatusOK, f.dt.Prefs())
@@ -69,7 +69,7 @@ func (f *Frontend) InitPrefApi() {
 			for k := range prefs {
 				switch k {
 				case "baseTokenSecret":
-					if !f.assureAuth(c, "prefs", "post", k) {
+					if !f.assureSimpleAuth(c, "prefs", "post", k) {
 						return
 					}
 					if len(prefs[k]) != 32 {
@@ -77,11 +77,11 @@ func (f *Frontend) InitPrefApi() {
 					}
 				case "defaultBootEnv", "unknownBootEnv", "defaultStage", "defaultWorkflow", "systemGrantorSecret",
 					"debugRenderer", "debugDhcp", "debugBootEnv", "debugFrontend", "debugPlugins", "logLevel":
-					if !f.assureAuth(c, "prefs", "post", k) {
+					if !f.assureSimpleAuth(c, "prefs", "post", k) {
 						return
 					}
 				case "knownTokenTimeout", "unknownTokenTimeout":
-					if !f.assureAuth(c, "prefs", "post", k) {
+					if !f.assureSimpleAuth(c, "prefs", "post", k) {
 						return
 					}
 					if _, e := strconv.Atoi(prefs[k]); e != nil {

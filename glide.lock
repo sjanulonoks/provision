@@ -105,7 +105,7 @@ imports:
 - name: github.com/VictorLowther/godmi
   version: e96629ef451766733662a029d6caebbc6f245a1b
 - name: github.com/VictorLowther/jsonpatch2
-  version: 728f2fee2a186b5764d9c9a8fa904279a22b1960
+  version: a3386fdb359634d937f41d6f66af3df4d25c5ae4
   subpackages:
   - utils
 - name: github.com/vishvananda/netlink

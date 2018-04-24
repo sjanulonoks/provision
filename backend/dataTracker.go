@@ -128,7 +128,7 @@ exit
 		}
 		superUser = &models.Role{
 			Name:   "superuser",
-			Claims: []models.Claim{{Scope: "*", Action: "*", Specific: "*"}},
+			Claims: []*models.Claim{{Scope: "*", Action: "*", Specific: "*"}},
 		}
 	)
 	res, _ := store.Open("memory:///")

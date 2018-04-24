@@ -3,7 +3,6 @@ package frontend
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -103,206 +102,6 @@ func (d DefaultAuthSource) GetUser(f *Frontend, c *gin.Context, username string)
 func NewDefaultAuthSource(dt *backend.DataTracker) (das AuthSource) {
 	das = DefaultAuthSource{dt: dt}
 	return
-}
-
-func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
-	getAll, getOne, patchThem, setThem, setOne, deleteOne func(c *gin.Context)) {
-	trimmer := func(s string) string {
-		return strings.TrimLeft(s, `/`)
-	}
-	aggregator := func(c *gin.Context) bool {
-		return c.Query("aggregate") == "true"
-	}
-	item404 := func(c *gin.Context, found bool, key, line string) bool {
-		if !found {
-			err := &models.Error{
-				Code:  http.StatusNotFound,
-				Type:  c.Request.Method,
-				Model: obj.Prefix(),
-				Key:   key,
-			}
-			err.Errorf("Not Found")
-			c.JSON(err.Code, err)
-		}
-		return !found
-	}
-	idrtkeyok := func(c *gin.Context, op string) (string, *backend.RequestTracker, string, bool) {
-		id := c.Param(idKey)
-		return id,
-			f.rt(c, obj.(Lockable).Locks(op)...),
-			trimmer(c.Param("key")),
-			f.assureAuth(c, obj.Prefix(), op, id)
-	}
-	return /* getAll */ func(c *gin.Context) {
-			id, rt, _, ok := idrtkeyok(c, "get")
-			if !ok {
-				return
-			}
-			var params map[string]interface{}
-			var found bool
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob != nil {
-					params, found = rt.GetParams(ob.(models.Paramer), aggregator(c)), true
-				}
-			})
-			if !item404(c, found, id, "Params") {
-				c.JSON(http.StatusOK, params)
-			}
-		},
-		/* getOne */ func(c *gin.Context) {
-			id, rt, key, ok := idrtkeyok(c, "get")
-			if !ok {
-				return
-			}
-			var found bool
-			var val interface{}
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob != nil {
-					found = true
-					val, _ = rt.GetParam(ob.(models.Paramer), key, aggregator(c))
-				}
-			})
-			if !item404(c, found, id, "Param") {
-				c.JSON(http.StatusOK, val)
-			}
-		},
-		/* patchThem */ func(c *gin.Context) {
-			id, rt, _, ok := idrtkeyok(c, "update")
-			if !ok {
-				return
-			}
-			var patch jsonpatch2.Patch
-			if !assureDecode(c, &patch) {
-				return
-			}
-			rt.Tracef("Patching %s:%s with %#v", obj.Prefix(), id, patch)
-			var res map[string]interface{}
-			var found bool
-			var patchErr *models.Error
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob == nil {
-					return
-				}
-				params := ob.(models.Paramer).GetParams()
-				rt.Tracef("Object %s:%s exists, has params %#v", obj.Prefix(), id, params)
-				if params == nil {
-					params = map[string]interface{}{}
-				}
-
-				found = true
-				patchErr = &models.Error{
-					Code:  http.StatusConflict,
-					Type:  c.Request.Method,
-					Model: obj.Prefix(),
-					Key:   id,
-				}
-				buf, err := json.Marshal(params)
-				if err != nil {
-					patchErr.AddError(err)
-					return
-				}
-				patched, err, loc := patch.Apply(buf)
-				if err != nil {
-					patchErr.Errorf("Patch failed to apply at line %d", loc)
-					patchErr.AddError(err)
-					return
-				}
-				if err := json.Unmarshal(patched, &res); err != nil {
-					patchErr.AddError(err)
-				}
-				if !patchErr.ContainsError() {
-					patchErr.AddError(rt.SetParams(ob.(models.Paramer), res))
-				}
-			})
-			if !item404(c, found, id, "Params") {
-				if patchErr.ContainsError() {
-					c.JSON(patchErr.Code, patchErr)
-				} else {
-					c.JSON(http.StatusOK, res)
-				}
-			}
-		},
-		/* setThem */ func(c *gin.Context) {
-			id, rt, _, ok := idrtkeyok(c, "update")
-			if !ok {
-				return
-			}
-			var replacement map[string]interface{}
-			if !assureDecode(c, &replacement) {
-				return
-			}
-			var found bool
-			var err error
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob == nil {
-					return
-				}
-				found = true
-				err = rt.SetParams(ob.(models.Paramer), replacement)
-			})
-			if !item404(c, found, id, "Params") {
-				if err != nil {
-					c.JSON(err.(*models.Error).Code, err)
-				} else {
-					c.JSON(http.StatusOK, replacement)
-				}
-			}
-		},
-		/* setOne */ func(c *gin.Context) {
-			id, rt, key, ok := idrtkeyok(c, "update")
-			if !ok {
-				return
-			}
-			var replacement interface{}
-			if !assureDecode(c, &replacement) {
-				return
-			}
-			var found bool
-			var err error
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob == nil {
-					return
-				}
-				found = true
-				err = rt.SetParam(ob.(models.Paramer), key, replacement)
-			})
-			if !item404(c, found, id, "Params") {
-				if err != nil {
-					c.JSON(err.(*models.Error).Code, err)
-				} else {
-					c.JSON(http.StatusOK, replacement)
-				}
-			}
-		},
-		/* deleteOne */ func(c *gin.Context) {
-			id, rt, key, ok := idrtkeyok(c, "update")
-			if !ok {
-				return
-			}
-			var found bool
-			var val interface{}
-			var err error
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob == nil {
-					return
-				}
-				found = true
-				val, err = rt.DelParam(ob.(models.Paramer), key)
-			})
-			if !item404(c, found, id, "Params") {
-				if err != nil {
-					c.JSON(err.(*models.Error).Code, err)
-				} else {
-					c.JSON(http.StatusOK, val)
-				}
-			}
-		}
 }
 
 func (fe *Frontend) userAuth() gin.HandlerFunc {
@@ -568,26 +367,36 @@ func (f *Frontend) getAuthUser(c *gin.Context) string {
 //
 // THIS CAN BE CALLED UNDER LOCKS, but will not validate the secrets.
 //
-func (f *Frontend) assureClaimMatch(rt *backend.RequestTracker, claim interface{}, scope, action, specific string) bool {
-	drpClaim, ok := claim.(*backend.DrpCustomClaims)
+func (f *Frontend) assureClaimMatch(rt *backend.RequestTracker,
+	claimFromRequest interface{},
+	role *models.Role) (ok bool, matchedRole models.Role) {
+	drpClaim, ok := claimFromRequest.(*backend.DrpCustomClaims)
 	if !ok {
 		f.Logger.Warnf("Request with bad claims")
-		return false
+		return false, models.Role{}
 	}
-	if drpClaim.Match(rt, scope, action, specific) {
-		f.Logger.Debugf("Claims ok: '%s' '%s' '%s'", scope, action, specific)
-		return true
+	ok, matchedRole = drpClaim.Match(rt, role)
+	if ok {
+		f.Logger.Debugf("Claims ok: %v", role.Claims)
+	} else {
+		f.Logger.Debugf("Claims failed: %v", role.Claims)
 	}
-	f.Logger.Debugf("Claims failed: '%s' '%s' '%s'", scope, action, specific)
-	return false
+	return
 }
 
 //
 // THIS MUST NOT BE CALLED UNDER LOCKS!
 //
-func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope, action, specific string) bool {
+func (f *Frontend) assureAuthWithClaim(c *gin.Context,
+	role *models.Role) bool {
+	claim, ok := c.Get("DRP-CLAIM")
+	if !ok {
+		f.rt(c).Auditf("Failed to get claim from %s", c.ClientIP())
+		return false
+	}
 	roleRT := f.rt(c, (&backend.Role{}).Locks("get")...)
-	if !f.assureClaimMatch(roleRT, claim, scope, action, specific) {
+	ok, matchedClaim := f.assureClaimMatch(roleRT, claim, role)
+	if !ok {
 		return false
 	}
 
@@ -633,26 +442,54 @@ func (f *Frontend) assureAuthWithClaim(c *gin.Context, claim interface{}, scope,
 			return false
 		}
 	}
-	return drpClaim.ValidateSecrets(grantorSecret, userSecret, machineSecret)
+	if !drpClaim.ValidateSecrets(grantorSecret, userSecret, machineSecret) {
+		return false
+	}
+	c.Set(`matchedClaim`, &matchedClaim)
+	return true
+}
+
+func (f *Frontend) assureAuth(c *gin.Context, role *models.Role, scope, action, specific string) bool {
+	if f.assureAuthWithClaim(c, role) {
+		return true
+	}
+	f.rt(c).Auditf("Failed auth '%s' '%s' '%s' - %s",
+		scope, action, specific, c.ClientIP())
+	res := &models.Error{
+		Type: "AUTH",
+		Code: http.StatusForbidden,
+	}
+	res.Errorf("Cannot access %s", c.Request.URL.String())
+	res.Errorf("Claims: %#v", role.Claims)
+	c.AbortWithStatusJSON(res.Code, res)
+	return false
 }
 
 //
 // THIS MUST NOT BE CALLED UNDER LOCKS!
 //
-func (f *Frontend) assureAuth(c *gin.Context, scope, action, specific string) bool {
-	obj, ok := c.Get("DRP-CLAIM")
-	if !ok || !f.assureAuthWithClaim(c, obj, scope, action, specific) {
-		f.rt(c).Auditf("Failed auth %s - %s %s %s - %s", obj.(*backend.DrpCustomClaims).Id,
-			scope, action, specific, c.ClientIP())
-		res := &models.Error{
-			Type: "AUTH",
-			Code: http.StatusForbidden,
+func (f *Frontend) assureSimpleAuth(c *gin.Context, scope, action, specific string) bool {
+	role := models.MakeRole("", scope, action, specific)
+	return f.assureAuth(c, role, scope, action, specific)
+}
+
+func (f *Frontend) assureAuthUpdate(c *gin.Context,
+	scope, action, specific string,
+	patch jsonpatch2.Patch) bool {
+	claims := []string{}
+	for _, line := range patch {
+		switch line.Op {
+		case "test":
+			continue
+		case "move":
+			claims = append(claims, scope, "update:"+line.From, specific)
+			fallthrough
+		default:
+			claims = append(claims, scope, "update:"+line.Path, specific)
 		}
-		res.Errorf("Cannot access %s with claims %s %s %s", c.Request.URL.String(), scope, action, specific)
-		c.AbortWithStatusJSON(res.Code, res)
-		return false
 	}
-	return true
+	role := models.MakeRole("", claims...)
+	return f.assureAuth(c, role, scope, action, specific)
 }
 
 func assureDecode(c *gin.Context, val interface{}) bool {
@@ -817,7 +654,7 @@ func jsonError(c *gin.Context, err error, code int, base string) {
 
 func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 	backend.Fill(ref)
-	if !f.assureAuth(c, ref.Prefix(), "list", "") {
+	if !f.assureSimpleAuth(c, ref.Prefix(), "list", "") {
 		return
 	}
 	res := &models.Error{
@@ -911,7 +748,7 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	})
 	if res != nil {
 		aref, _ := res.(backend.AuthSaver)
-		if !f.assureAuth(c, prefix, "get", aref.AuthKey()) {
+		if !f.assureSimpleAuth(c, prefix, "get", aref.AuthKey()) {
 			return
 		}
 		s, ok := res.(Sanitizable)
@@ -939,7 +776,7 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 	if !assureDecode(c, val) {
 		return
 	}
-	if !f.assureAuth(c, val.Prefix(), "create", "") {
+	if !f.assureSimpleAuth(c, val.Prefix(), "create", "") {
 		return
 	}
 	var err error
@@ -979,7 +816,7 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 		}
 	})
 
-	if authKey != "" && !f.assureAuth(c, ref.Prefix(), "patch", authKey) {
+	if authKey != "" && !f.assureAuthUpdate(c, ref.Prefix(), "patch", authKey, patch) {
 		return
 	}
 
@@ -1017,15 +854,20 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 		return
 	}
 	var err error
+	var patch jsonpatch2.Patch
 	authKey := ""
 	rt := f.rt(c, ref.(Lockable).Locks("update")...)
 	rt.Do(func(d backend.Stores) {
 		tref := rt.Find(ref.Prefix(), ref.Key())
 		if tref != nil {
+			patch, err = models.GenPatch(tref, ref, false)
 			authKey = tref.(backend.AuthSaver).AuthKey()
 		}
 	})
-	if !f.assureAuth(c, ref.Prefix(), "update", authKey) {
+	if err != nil {
+		jsonError(c, err, http.StatusBadRequest, "")
+	}
+	if !f.assureAuthUpdate(c, ref.Prefix(), "update", authKey, patch) {
 		return
 	}
 	var res models.Model
@@ -1067,7 +909,7 @@ func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, key string) {
 		return
 	}
 
-	if !f.assureAuth(c, ref.Prefix(), "delete", res.(backend.AuthSaver).AuthKey()) {
+	if !f.assureSimpleAuth(c, ref.Prefix(), "delete", res.(backend.AuthSaver).AuthKey()) {
 		return
 	}
 	rt.Do(func(d backend.Stores) {

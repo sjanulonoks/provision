@@ -123,7 +123,7 @@ func (f *Frontend) InitContentApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/contents",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "contents", "list", "") {
+			if !f.assureSimpleAuth(c, "contents", "list", "") {
 				return
 			}
 
@@ -165,7 +165,7 @@ func (f *Frontend) InitContentApi() {
 	f.ApiGroup.GET("/contents/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
-			if !f.assureAuth(c, "contents", "get", name) {
+			if !f.assureSimpleAuth(c, "contents", "get", name) {
 				return
 			}
 			rt := f.rt(c)
@@ -212,7 +212,7 @@ func (f *Frontend) InitContentApi() {
 			if !assureDecode(c, content) {
 				return
 			}
-			if !f.assureAuth(c, "contents", "create", content.AuthKey()) {
+			if !f.assureSimpleAuth(c, "contents", "create", content.AuthKey()) {
 				return
 			}
 			name := content.Meta.Name
@@ -279,7 +279,7 @@ func (f *Frontend) InitContentApi() {
 			if !assureDecode(c, content) {
 				return
 			}
-			if !f.assureAuth(c, "contents", "update", content.AuthKey()) {
+			if !f.assureSimpleAuth(c, "contents", "update", content.AuthKey()) {
 				return
 			}
 			name := c.Param(`name`)
@@ -348,7 +348,7 @@ func (f *Frontend) InitContentApi() {
 	f.ApiGroup.DELETE("/contents/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
-			if !f.assureAuth(c, "contents", "delete", name) {
+			if !f.assureSimpleAuth(c, "contents", "delete", name) {
 				return
 			}
 			res := &models.Error{

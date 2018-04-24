@@ -165,32 +165,35 @@ func (gc *GrantorClaims) Validate(grantor, user, machine string) bool {
 // DrpCustomClaims is a JWT token that contains a list of all the
 // things this token allows access to.
 type DrpCustomClaims struct {
-	DrpClaims     []models.Claim `json:"drp_claims"`
+	DrpClaims     []*models.Claim `json:"drp_claims"`
 	DrpRoles      []string
 	GrantorClaims GrantorClaims `json:"grantor_claims"`
 	jwt.StandardClaims
 }
 
 // Match tests all the claims in this Token to find one that matches.
-func (d *DrpCustomClaims) Match(rt *RequestTracker, scope, action, specific string) bool {
-	for _, claim := range d.DrpClaims {
-		if claim.Match(scope, action, specific) {
-			return true
-		}
+func (d *DrpCustomClaims) Match(rt *RequestTracker,
+	role *models.Role) (ok bool, matchedRole models.Role) {
+	matchedRole = models.Role{Claims: d.DrpClaims, Name: "synthetic"}
+	if matchedRole.Contains(role) {
+		return true, matchedRole
 	}
-	res := false
 	rt.Do(func(q Stores) {
 		for _, rName := range d.DrpRoles {
 			if r := rt.Find("roles", rName); r != nil {
-				role := AsRole(r)
-				if role.Match(scope, action, specific) {
-					res = true
+				r2 := AsRole(r)
+				matchedRole = *r2.Role
+				if matchedRole.Contains(role) {
+					ok = true
 					return
 				}
 			}
 		}
 	})
-	return res
+	if !ok {
+		matchedRole = models.Role{}
+	}
+	return
 }
 
 func (d *DrpCustomClaims) HasGrantorId() bool {
@@ -219,7 +222,7 @@ func (d *DrpCustomClaims) ValidateSecrets(grantor, user, machine string) bool {
 // NewClaim creates a new, unsigned Token that doesn't allow access to anything.
 // You must call Seal() to turn this into a signed JWT token.
 func NewClaim(user, grantor string, ttl time.Duration) *DrpCustomClaims {
-	res := &DrpCustomClaims{DrpClaims: []models.Claim{}, DrpRoles: []string{}}
+	res := &DrpCustomClaims{DrpClaims: []*models.Claim{}, DrpRoles: []string{}}
 	res.IssuedAt = time.Now().Unix()
 	res.ExpiresAt = time.Now().Add(ttl).Unix()
 	res.Issuer = "digitalrebar provision"
@@ -245,7 +248,7 @@ func (d *DrpCustomClaims) AddSecrets(user, grantor, machine string) *DrpCustomCl
 
 // AddRawClaim adds a discrete Claim to our custom Token class.
 func (d *DrpCustomClaims) AddRawClaim(scope, action, specific string) *DrpCustomClaims {
-	d.DrpClaims = append(d.DrpClaims, models.Claim{Scope: scope, Action: action, Specific: specific})
+	d.DrpClaims = append(d.DrpClaims, &models.Claim{Scope: scope, Action: action, Specific: specific})
 	return d
 }
 

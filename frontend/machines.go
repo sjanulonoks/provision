@@ -308,7 +308,7 @@ func (f *Frontend) InitMachineApi() {
 			if !assureDecode(c, b) {
 				return
 			}
-			if !f.assureAuth(c, b.Prefix(), "create", "") {
+			if !f.assureSimpleAuth(c, b.Prefix(), "create", "") {
 				return
 			}
 			if b.Uuid == nil || len(b.Uuid) == 0 {
