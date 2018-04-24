@@ -822,8 +822,17 @@ EOFSTAGE
       echo -n " ... "; sleep 1; echo "Bang!"
     fi
     echo ""
+    # collect UUID(s) of Machines - issue a destroy via drpcli
 
     set -x
+#    UUIDS=`cat terraform.tfstate | jq '.modules' | jq '.[].resources' | jq -r '.[].   primary.id'`
+#    for UUID in $UUIDS
+#    do
+#      ( $DRPCLI machines exists $UUID > /dev/null 2>&1 )        \
+#        && $DRPCLI machines destroy $UUID                       \
+#        || echo "UUID '$UUID' is not a machine, not destroying"
+#    done
+
     terraform destroy -force
 
     rm -f ${SSH_DRP_KEY} ${SSH_DRP_KEY}.pub
