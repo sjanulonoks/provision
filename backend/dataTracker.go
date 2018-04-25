@@ -126,10 +126,7 @@ exit
 				"title": "Digital Rebar Provision",
 			},
 		}
-		superUser = &models.Role{
-			Name:   "superuser",
-			Claims: []*models.Claim{{Scope: "*", Action: "*", Specific: "*"}},
-		}
+		superUser = models.MakeRole("superuser", "*", "*", "*")
 	)
 	res, _ := store.Open("memory:///")
 	bootEnvs, _ := res.MakeSub("bootenvs")

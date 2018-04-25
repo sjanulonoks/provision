@@ -97,14 +97,15 @@ func (r *Role) OnLoad() error {
 }
 
 func (r *Role) BeforeDelete() error {
+	e := &models.Error{Code: 409, Type: StillInUseError, Model: r.Prefix(), Key: r.Key()}
 	for _, u := range r.rt.d("users").Items() {
 		user := AsUser(u)
 		for _, name := range user.Roles {
 			if name == r.Name {
-				r.Errorf("In use by User %s", user.Name)
+				e.Errorf("In use by User %s", user.Name)
 				break
 			}
 		}
 	}
-	return r.HasError()
+	return e.HasError()
 }
