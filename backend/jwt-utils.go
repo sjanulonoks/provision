@@ -173,10 +173,10 @@ type DrpCustomClaims struct {
 
 // Match tests all the claims in this Token to find one that matches.
 func (d *DrpCustomClaims) Match(rt *RequestTracker,
-	role *models.Role) (ok bool, matchedRole models.Role) {
-	matchedRole = models.Role{Claims: d.DrpClaims, Name: "synthetic"}
+	role *models.Role) (ok bool) {
+	matchedRole := models.Role{Claims: d.DrpClaims, Name: "synthetic"}
 	if matchedRole.Contains(role) {
-		return true, matchedRole
+		return true
 	}
 	rt.Do(func(q Stores) {
 		for _, rName := range d.DrpRoles {
@@ -193,7 +193,7 @@ func (d *DrpCustomClaims) Match(rt *RequestTracker,
 	if !ok {
 		matchedRole = models.Role{}
 	}
-	return
+	return ok
 }
 
 func (d *DrpCustomClaims) HasGrantorId() bool {

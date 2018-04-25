@@ -154,7 +154,7 @@ func (fe *Frontend) userAuth() gin.HandlerFunc {
 				c.AbortWithStatus(http.StatusForbidden)
 				return
 			}
-			t := backend.NewClaim(string(userpass[0]), string(userpass[0]), 30).AddRawClaim("*", "*", "*")
+			t := user.GenClaim(string(userpass[0]), 30)
 			fe.rt(c).Auditf("Authenticated user %s from %s", userpass[0], c.ClientIP())
 			c.Set("DRP-CLAIM", t)
 		} else if hdrParts[0] == "Bearer" {
@@ -375,8 +375,7 @@ func (f *Frontend) assureClaimMatch(rt *backend.RequestTracker,
 		f.Logger.Warnf("Request with bad claims")
 		return false, models.Role{}
 	}
-	ok, matchedRole = drpClaim.Match(rt, role)
-	if ok {
+	if drpClaim.Match(rt, role) {
 		f.Logger.Debugf("Claims ok: %v", role.Claims)
 	} else {
 		f.Logger.Debugf("Claims failed: %v", role.Claims)

@@ -283,34 +283,11 @@ func (f *Frontend) InitUserApi(drpid string) {
 		func(c *gin.Context) {
 			ref := &backend.User{}
 			var userName, grantorName, userSecret, grantorSecret string
-			haveRoles := []string{}
+			var claim *backend.DrpCustomClaims
 			var err *models.Error
-			rt := f.rt(c, ref.Locks("get")...)
-			rt.Do(func(d backend.Stores) {
-				err = &models.Error{
-					Type:  c.Request.Method,
-					Code:  http.StatusNotFound,
-					Model: "users",
-					Key:   c.Param("name"),
-				}
-				u := rt.Find("users", c.Param("name"))
-				g := rt.Find("users", f.getAuthUser(c))
-				if u == nil || g == nil {
-					err.Errorf("Not Found")
-					return
-				}
-				uobj := backend.AsUser(u)
-				gobj := backend.AsUser(g)
-				userName, userSecret, haveRoles = uobj.Name, uobj.Secret, uobj.Roles
-				grantorName, grantorSecret = gobj.Name, gobj.Secret
-				err = nil
-			})
-			if err != nil {
-				c.JSON(err.Code, err)
-				return
-			}
-			if !f.assureSimpleAuth(c, "users", "token", userName) {
-				return
+			wantedRoles := []string{}
+			if w, h := c.GetQuery("roles"); h {
+				wantedRoles = strings.Split(w, ",")
 			}
 			sttl, _ := c.GetQuery("ttl")
 			ttl := time.Hour
@@ -329,58 +306,37 @@ func (f *Frontend) InitUserApi(drpid string) {
 				}
 				ttl = time.Second * time.Duration(ttl64)
 			}
-			claims := backend.NewClaim(userName, grantorName, ttl)
-			wantedRoles, _ := c.GetQuery("roles")
-			var res *models.Error
-			if wantedRoles != "" {
-				rt.Do(func(d backend.Stores) {
-					uberRole := &models.Role{}
-					for _, r := range haveRoles {
-						if robj := rt.Find("roles", r); robj != nil {
-							uberRole.Claims = append(uberRole.Claims, robj.(*backend.Role).Claims...)
-						} else {
-							rt.Errorf("User %s has missing role %s", userName, r)
-						}
-					}
-					roleNames := strings.Split(wantedRoles, ",")
-					for i := range roleNames {
-						roleName := strings.TrimSpace(roleNames[i])
-						roleNames[i] = roleName
-						if robj := rt.Find("roles", roleName); robj == nil {
-							res = &models.Error{
-								Type:  c.Request.Method,
-								Model: "users",
-								Key:   userName,
-								Code:  http.StatusNotAcceptable,
-							}
-							res.Errorf("Role %s missing", roleName)
-							return
-						} else {
-							role := robj.(*backend.Role)
-							if !uberRole.Contains(role.Role) {
-								res = &models.Error{
-									Type:  c.Request.Method,
-									Model: "users",
-									Key:   userName,
-									Code:  http.StatusForbidden,
-								}
-								res.Errorf("Role %s is not allowed", roleName)
-								return
-							}
-						}
-					}
-					claims.AddRoles(roleNames...)
-				})
-				if res != nil {
-					c.JSON(res.Code, res)
+			rt := f.rt(c, ref.Locks("get")...)
+			rt.Do(func(d backend.Stores) {
+				err = &models.Error{
+					Type:  c.Request.Method,
+					Code:  http.StatusNotFound,
+					Model: "users",
+					Key:   c.Param("name"),
+				}
+				u := rt.Find("users", c.Param("name"))
+				g := rt.Find("users", f.getAuthUser(c))
+				if u == nil || g == nil {
+					err.Errorf("Not Found")
 					return
 				}
-			} else {
-				claims.AddRoles(haveRoles...)
+				uobj := backend.AsUser(u)
+				gobj := backend.AsUser(g)
+				userName, userSecret = uobj.Name, uobj.Secret
+				grantorName, grantorSecret = gobj.Name, gobj.Secret
+				claim = uobj.GenClaim(grantorName, ttl, wantedRoles...)
+				err = nil
+			})
+			if err != nil {
+				c.JSON(err.Code, err)
+				return
 			}
-			claims.AddSecrets(grantorSecret, userSecret, "")
+			if !f.assureSimpleAuth(c, "users", "token", userName) {
+				return
+			}
+			claim.AddSecrets(grantorSecret, userSecret, "")
 
-			if t, err := f.dt.SealClaims(claims); err != nil {
+			if t, err := f.dt.SealClaims(claim); err != nil {
 				ne, ok := err.(*models.Error)
 				if ok {
 					c.JSON(ne.Code, ne)

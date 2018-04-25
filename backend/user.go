@@ -1,6 +1,9 @@
 package backend
 
 import (
+	"strings"
+	"time"
+
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
@@ -97,6 +100,35 @@ func (u *User) Validate() {
 		}
 	}
 	u.SetAvailable()
+}
+
+func (u *User) GenClaim(grantor string, ttl time.Duration, wantedRoles ...string) *DrpCustomClaims {
+	claim := NewClaim(u.Name, grantor, ttl)
+	if len(wantedRoles) == 0 {
+		claim.AddRoles(u.Roles...)
+		return claim
+	}
+	uberRole := &models.Role{}
+	for _, r := range u.Roles {
+		if robj := u.rt.Find("roles", r); robj != nil {
+			uberRole.Claims = append(uberRole.Claims, robj.(*Role).Claims...)
+		} else {
+			u.rt.Errorf("User %s has missing role %s", u.Name, r)
+		}
+	}
+	for i := range wantedRoles {
+		r := strings.TrimSpace(wantedRoles[i])
+		if robj := u.rt.Find("roles", r); robj == nil {
+			continue
+		} else {
+			role := AsRole(robj)
+			if !uberRole.Contains(role.Role) {
+				continue
+			}
+		}
+		claim.AddRoles(r)
+	}
+	return claim
 }
 
 func (u *User) BeforeSave() error {
