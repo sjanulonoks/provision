@@ -104,6 +104,8 @@ func (u *User) Validate() {
 
 func (u *User) GenClaim(grantor string, ttl time.Duration, wantedRoles ...string) *DrpCustomClaims {
 	claim := NewClaim(u.Name, grantor, ttl)
+	// Users always have the right to get a token and change their password.
+	claim.AddRawClaim("users", "token,password,get", u.Name)
 	if len(wantedRoles) == 0 {
 		claim.AddRoles(u.Roles...)
 		return claim
