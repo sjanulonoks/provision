@@ -282,6 +282,7 @@ func NewFrontend(
 	me.ApiGroup = apiGroup
 
 	me.InitIndexApi()
+	me.InitRoleApi()
 	me.InitWebSocket()
 	me.InitBootEnvApi()
 	me.InitStageApi()
