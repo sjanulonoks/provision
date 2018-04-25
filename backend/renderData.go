@@ -532,7 +532,6 @@ func (r *RenderData) GenerateToken() string {
 			AddRawClaim("stages", "get", "*").
 			AddRawClaim("jobs", "create", r.Machine.Key()).
 			AddRawClaim("jobs", "get", r.Machine.Key()).
-			AddRawClaim("jobs", "patch", r.Machine.Key()).
 			AddRawClaim("jobs", "update", r.Machine.Key()).
 			AddRawClaim("jobs", "actions", r.Machine.Key()).
 			AddRawClaim("jobs", "log", r.Machine.Key()).
@@ -566,7 +565,6 @@ func (r *RenderData) GenerateInfiniteToken() string {
 		AddRawClaim("stages", "get", "*").
 		AddRawClaim("jobs", "create", r.Machine.Key()).
 		AddRawClaim("jobs", "get", r.Machine.Key()).
-		AddRawClaim("jobs", "patch", r.Machine.Key()).
 		AddRawClaim("jobs", "update", r.Machine.Key()).
 		AddRawClaim("jobs", "actions", r.Machine.Key()).
 		AddRawClaim("jobs", "log", r.Machine.Key()).
@@ -611,7 +609,6 @@ func (r *RenderData) GenerateProfileToken(profile string, duration int) string {
 	t, _ := NewClaim(r.Machine.Key(), grantor, ttl).
 		AddRawClaim("profiles", "get", profile).
 		AddRawClaim("profiles", "update", profile).
-		AddRawClaim("profiles", "patch", profile).
 		AddMachine(r.Machine.Key()).
 		AddSecrets("", grantorSecret, r.Machine.Secret).
 		Seal(r.rt.dt.tokenManager)

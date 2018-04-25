@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/digitalrebar/provision/models"
 )
 
 func TestRandString(t *testing.T) {
@@ -36,7 +37,7 @@ func TestJWTUtils(t *testing.T) {
 	}
 
 	jwtManager = NewJwtManager([]byte(randString(32)))
-	s, e := NewClaim("fred", "fred", 30).AddRawClaim("*", "a", "m").Seal(jwtManager)
+	s, e := NewClaim("fred", "fred", 30).AddRawClaim("*", "get", "m").Seal(jwtManager)
 	if e != nil {
 		t.Errorf("Failed to sign token: %v\n", e)
 	}
@@ -47,12 +48,12 @@ func TestJWTUtils(t *testing.T) {
 		if drpClaim.Id != "fred" {
 			t.Errorf("Claim ID doesn't match: %v %v\n", "fred", drpClaim.Id)
 		}
-		if !drpClaim.Match(rt, "all", "a", "m") {
-			t.Errorf("Claim Scope doesn't match: %v %v\n", []string{"all", "a", "m"}, drpClaim)
+		if !drpClaim.Match(rt, models.MakeRole("", "bootenvs", "get", "m")) {
+			t.Errorf("Claim Scope doesn't match: %v %v\n", []string{"bootenvs", "get", "m"}, drpClaim)
 		}
 	}
 
-	s, e = NewClaim("fred", "fred", 1).AddRawClaim("*", "m", "a").Seal(jwtManager)
+	s, e = NewClaim("fred", "fred", 1).AddRawClaim("*", "get", "a").Seal(jwtManager)
 	if e != nil {
 		t.Errorf("Failed to sign token: %v\n", e)
 	}
