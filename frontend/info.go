@@ -50,6 +50,7 @@ func (f *Frontend) GetInfo(c *gin.Context, drpid string) (*models.Info, *models.
 			"workflows",
 			"default-workflow",
 			"http-range-header",
+			"roles",
 		},
 	}
 
