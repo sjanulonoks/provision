@@ -275,6 +275,24 @@ func NewFrontend(
 	}))
 
 	mgmtApi.Use(location.Default())
+	mgmtApi.NoMethod(func(c *gin.Context) {
+		err := &models.Error{
+			Code: http.StatusMethodNotAllowed,
+			Type: c.Request.Method,
+			Key:  c.Request.URL.String(),
+		}
+		err.Errorf("Method not allowed")
+		c.JSON(err.Code, err)
+	})
+	mgmtApi.NoRoute(func(c *gin.Context) {
+		err := &models.Error{
+			Code: http.StatusNotFound,
+			Type: c.Request.Method,
+			Key:  c.Request.URL.String(),
+		}
+		err.Errorf("No route")
+		c.JSON(err.Code, err)
+	})
 	me.MgmtApi = mgmtApi
 
 	apiGroup := mgmtApi.Group("/api/v3")
@@ -370,18 +388,19 @@ func (f *Frontend) getAuthUser(c *gin.Context) string {
 //
 func (f *Frontend) assureClaimMatch(rt *backend.RequestTracker,
 	claimFromRequest interface{},
-	role *models.Role) (ok bool, matchedRole models.Role) {
+	role *models.Role) bool {
 	drpClaim, ok := claimFromRequest.(*backend.DrpCustomClaims)
 	if !ok {
 		f.Logger.Warnf("Request with bad claims")
-		return false, models.Role{}
+		return false
 	}
 	if drpClaim.Match(rt, role) {
 		f.Logger.Debugf("Claims ok: %v", role.Claims)
+		return true
 	} else {
 		f.Logger.Debugf("Claims failed: %v", role.Claims)
+		return false
 	}
-	return
 }
 
 //
@@ -395,8 +414,7 @@ func (f *Frontend) assureAuthWithClaim(c *gin.Context,
 		return false
 	}
 	roleRT := f.rt(c, (&backend.Role{}).Locks("get")...)
-	ok, matchedClaim := f.assureClaimMatch(roleRT, claim, role)
-	if !ok {
+	if !f.assureClaimMatch(roleRT, claim, role) {
 		return false
 	}
 
@@ -445,7 +463,6 @@ func (f *Frontend) assureAuthWithClaim(c *gin.Context,
 	if !drpClaim.ValidateSecrets(grantorSecret, userSecret, machineSecret) {
 		return false
 	}
-	c.Set(`matchedClaim`, &matchedClaim)
 	return true
 }
 
@@ -460,7 +477,7 @@ func (f *Frontend) assureAuth(c *gin.Context, role *models.Role, scope, action, 
 		Code: http.StatusForbidden,
 	}
 	res.Errorf("Cannot access %s", c.Request.URL.String())
-	res.Errorf("Claims: %#v", role.Claims)
+	res.Errorf("Requires: %s %s %s", scope, action, specific)
 	c.AbortWithStatusJSON(res.Code, res)
 	return false
 }

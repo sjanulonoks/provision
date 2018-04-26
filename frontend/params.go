@@ -105,6 +105,7 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 					authed = f.assureSimpleAuth(c, obj.Prefix(), "update", id)
 					return
 				}
+				authed = true
 				orig := models.Clone(ob).(models.Paramer)
 				changed := models.Clone(ob).(models.Paramer)
 				params := orig.GetParams()
@@ -247,6 +248,7 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 						Model: "params",
 						Key:   key,
 					}
+					err.Errorf("Not Found")
 				}
 			})
 			if !authed {

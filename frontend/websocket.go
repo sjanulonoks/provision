@@ -57,7 +57,7 @@ func (f *Frontend) filterFunction(emap []string, claim interface{}, e *models.Ev
 	// Make sure we are authorized to see this event.
 	if matched {
 		roleRT := f.rt(nil, (&backend.Role{}).Locks("get")...)
-		matched, _ = f.assureClaimMatch(roleRT, claim, models.MakeRole("", e.Type, e.Action, e.Key))
+		matched = f.assureClaimMatch(roleRT, claim, models.MakeRole("", e.Type, e.Action, e.Key))
 	}
 	return matched
 }
