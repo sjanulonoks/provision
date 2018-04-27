@@ -110,25 +110,25 @@ func (u *User) GenClaim(grantor string, ttl time.Duration, wantedRoles ...string
 		claim.AddRoles(u.Roles...)
 		return claim
 	}
-	uberRole := &models.Role{}
+	haveRoles := []*Role{}
 	for _, r := range u.Roles {
 		if robj := u.rt.Find("roles", r); robj != nil {
-			uberRole.Claims = append(uberRole.Claims, robj.(*Role).Claims...)
+			haveRoles = append(haveRoles, robj.(*Role))
 		} else {
 			u.rt.Errorf("User %s has missing role %s", u.Name, r)
 		}
 	}
 	for i := range wantedRoles {
 		r := strings.TrimSpace(wantedRoles[i])
-		if robj := u.rt.Find("roles", r); robj == nil {
-			continue
-		} else {
-			role := AsRole(robj)
-			if !uberRole.Contains(role.Role) {
-				continue
+		if robj := u.rt.Find("roles", r); robj != nil {
+			for _, test := range haveRoles {
+				role := AsRole(robj)
+				if test.Role.Contains(role.Role) {
+					claim.AddRoles(r)
+					break
+				}
 			}
 		}
-		claim.AddRoles(r)
 	}
 	return claim
 }
