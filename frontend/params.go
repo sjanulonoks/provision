@@ -40,7 +40,12 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 	}
 	updater := func(c *gin.Context,
 		rt *backend.RequestTracker,
-		orig, changed models.Paramer) (authed bool, err *models.Error) {
+		orig, changed models.Paramer,
+		id string, startErr *models.Error) (authed bool, err *models.Error) {
+		if orig == nil || startErr != nil && startErr.ContainsError() {
+			authed = f.assureSimpleAuth(c, obj.Prefix(), "update", id)
+			return authed, startErr
+		}
 		err = &models.Error{Code: 422, Type: backend.ValidationError, Model: orig.Prefix(), Key: orig.Key()}
 		patch, patchErr := models.GenPatch(orig, changed, false)
 		if patchErr != nil {
@@ -50,8 +55,10 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 		if !f.assureAuthUpdate(c, changed.Prefix(), "update", changed.Key(), patch) {
 			return false, err
 		}
-		_, updateErr := rt.Update(changed)
-		err.AddError(updateErr)
+		rt.Do(func(d backend.Stores) {
+			_, updateErr := rt.Update(changed)
+			err.AddError(updateErr)
+		})
 		return true, err
 	}
 	return /* getAll */ func(c *gin.Context) {
@@ -99,15 +106,14 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 			var res map[string]interface{}
 			var authed, found bool
 			var patchErr *models.Error
+			var changed, orig models.Paramer
 			rt.Do(func(d backend.Stores) {
 				ob := rt.Find(obj.Prefix(), id)
 				if ob == nil {
-					authed = f.assureSimpleAuth(c, obj.Prefix(), "update", id)
 					return
 				}
-				authed = true
-				orig := models.Clone(ob).(models.Paramer)
-				changed := models.Clone(ob).(models.Paramer)
+				orig = models.Clone(ob).(models.Paramer)
+				changed = models.Clone(ob).(models.Paramer)
 				params := orig.GetParams()
 				rt.Tracef("Object %s:%s exists, has params %#v", orig.Prefix(), id, params)
 				if params == nil {
@@ -124,12 +130,14 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 				buf, err := json.Marshal(params)
 				if err != nil {
 					patchErr.AddError(err)
+					orig, changed = nil, nil
 					return
 				}
 				patched, err, loc := patch.Apply(buf)
 				if err != nil {
 					patchErr.Errorf("Patch failed to apply at line %d", loc)
 					patchErr.AddError(err)
+					orig, changed = nil, nil
 					return
 				}
 				if err := json.Unmarshal(patched, &res); err != nil {
@@ -137,12 +145,11 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 				}
 				if !patchErr.ContainsError() {
 					changed.SetParams(res)
-					authed, err = updater(c, rt, orig, changed)
-					if err != nil {
-						patchErr.AddError(err)
-					}
+				} else {
+					orig, changed = nil, nil
 				}
 			})
+			authed, patchErr = updater(c, rt, orig, changed, id, patchErr)
 			if !authed {
 				return
 			}
@@ -163,18 +170,19 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 			}
 			var authed, found bool
 			var err *models.Error
+			var changed, orig models.Paramer
 			rt.Do(func(d backend.Stores) {
 				ob := rt.Find(obj.Prefix(), id)
 				if ob == nil {
 					authed = f.assureSimpleAuth(c, obj.Prefix(), "update", id)
 					return
 				}
-				changed := models.Clone(ob).(models.Paramer)
-				orig := models.Clone(ob).(models.Paramer)
+				changed = models.Clone(ob).(models.Paramer)
+				orig = models.Clone(ob).(models.Paramer)
 				found = true
 				changed.SetParams(replacement)
-				authed, err = updater(c, rt, orig, changed)
 			})
+			authed, err = updater(c, rt, orig, changed, id, nil)
 			if !authed {
 				return
 			}
@@ -195,20 +203,20 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 			}
 			var authed, found bool
 			var err *models.Error
+			var changed, orig models.Paramer
 			rt.Do(func(d backend.Stores) {
 				ob := rt.Find(obj.Prefix(), id)
 				if ob == nil {
-					authed = f.assureSimpleAuth(c, obj.Prefix(), "update", id)
 					return
 				}
 				found = true
-				changed := models.Clone(ob).(models.Paramer)
-				orig := models.Clone(ob).(models.Paramer)
+				changed = models.Clone(ob).(models.Paramer)
+				orig = models.Clone(ob).(models.Paramer)
 				params := orig.GetParams()
 				params[key] = replacement
 				changed.SetParams(params)
-				authed, err = updater(c, rt, orig, changed)
 			})
+			authed, err = updater(c, rt, orig, changed, id, nil)
 			if !authed {
 				return
 			}
@@ -226,22 +234,18 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 			var authed, found bool
 			var val interface{}
 			var err *models.Error
+			var orig, changed models.Paramer
 			rt.Do(func(d backend.Stores) {
 				ob := rt.Find(obj.Prefix(), id)
 				if ob == nil {
-					authed = f.assureSimpleAuth(c, obj.Prefix(), "update", id)
 					return
 				}
-				found = true
-				changed := models.Clone(ob).(models.Paramer)
-				orig := models.Clone(ob).(models.Paramer)
+				changed = models.Clone(ob).(models.Paramer)
+				orig = models.Clone(ob).(models.Paramer)
 				params := orig.GetParams()
-				valFound := false
-				val, valFound = params[key]
-				delete(params, key)
-				changed.SetParams(params)
-				authed, err = updater(c, rt, orig, changed)
-				if !valFound {
+				val, found = params[key]
+				if !found {
+					changed, orig = nil, nil
 					err = &models.Error{
 						Code:  http.StatusNotFound,
 						Type:  "DELETE",
@@ -249,8 +253,12 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 						Key:   key,
 					}
 					err.Errorf("Not Found")
+					return
 				}
+				delete(params, key)
+				changed.SetParams(params)
 			})
+			authed, err = updater(c, rt, orig, changed, id, err)
 			if !authed {
 				return
 			}
