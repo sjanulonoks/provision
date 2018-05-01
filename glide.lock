@@ -1,5 +1,5 @@
-hash: e5158e4f5d9b79afe806f75dcd1798869ac7665113daae66d466ce0793c83bc2
-updated: 2018-02-20T12:03:13.950432409-06:00
+hash: 8e35b400bfbd2bb7ac39cc8da3634efefb9303bbc9aa5c466e9c61fa3b8d0191
+updated: 2018-05-01T14:59:55.808393722-05:00
 imports:
 - name: github.com/armon/go-metrics
   version: 7aa49fde808223f8dadfdbfd3a20ff6c19e5f9ec
@@ -140,6 +140,10 @@ imports:
   version: 37707fdb30a5b38865cfb95e5aab41707daec7fd
   subpackages:
   - unix
+- name: golang.org/x/tools
+  version: 5c8013c5617234a9515f1b1379aba7e03e846479
+  subpackages:
+  - cover
 - name: gopkg.in/go-playground/validator.v8
   version: 5f1438d3fca68893a817e4a66806cea46a9e4ebf
 - name: gopkg.in/mgo.v2
@@ -150,6 +154,6 @@ imports:
 - name: gopkg.in/olahol/melody.v1
   version: d521390733761fe1db13de575c253afd5c743085
 - name: gopkg.in/yaml.v2
-  version: d670f9405373e636a5a2765eea47fac0c9bc91a4
+  version: 5420a8b6744d3b0345ab293f6fcba19c978f1183
   repo: https://github.com/go-yaml/yaml
 testImports: []
