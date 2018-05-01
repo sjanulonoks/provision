@@ -541,3 +541,5 @@ case $1 in
      *)
          echo "Unknown action \"$1\". Please use 'install' or 'remove'";;
 esac
+
+exit 0
