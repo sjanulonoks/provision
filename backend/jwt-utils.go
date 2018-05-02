@@ -171,29 +171,29 @@ type DrpCustomClaims struct {
 	jwt.StandardClaims
 }
 
-// Match tests all the claims in this Token to find one that matches.
-func (d *DrpCustomClaims) Match(rt *RequestTracker,
-	role *models.Role) (ok bool) {
-	matchedRole := models.Role{Claims: d.DrpClaims, Name: "synthetic"}
-	if matchedRole.Contains(role) {
-		return true
+func (d *DrpCustomClaims) ClaimsList(rt *RequestTracker) []models.Claims {
+	res := []models.Claims{}
+	if len(d.DrpClaims) > 0 {
+		res = append(res, (&models.Role{Claims: d.DrpClaims}).Compile())
 	}
-	rt.Do(func(q Stores) {
+	if len(d.DrpRoles) > 0 {
 		for _, rName := range d.DrpRoles {
-			if r := rt.Find("roles", rName); r != nil {
-				r2 := AsRole(r)
-				matchedRole = *r2.Role
-				if matchedRole.Contains(role) {
-					ok = true
-					return
-				}
+			if r := rt.find("roles", rName); r != nil {
+				res = append(res, AsRole(r).CompiledClaims())
 			}
 		}
-	})
-	if !ok {
-		matchedRole = models.Role{}
 	}
-	return ok
+	return res
+}
+
+func (d *DrpCustomClaims) match(rt *RequestTracker, r *models.Role) bool {
+	wantedClaim := r.Compile()
+	for _, authedClaim := range d.ClaimsList(rt) {
+		if authedClaim.Contains(wantedClaim) {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *DrpCustomClaims) HasGrantorId() bool {

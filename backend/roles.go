@@ -9,12 +9,20 @@ import (
 type Role struct {
 	*models.Role
 	validate
+	cachedClaims models.Claims
 }
 
 func (r *Role) SaveClean() store.KeySaver {
 	mod := *r.Role
 	mod.ClearValidation()
 	return ModelToBackend(&mod)
+}
+
+func (r *Role) CompiledClaims() models.Claims {
+	if r.cachedClaims == nil {
+		r.cachedClaims = r.Role.Compile()
+	}
+	return r.cachedClaims
 }
 
 func AsRole(r models.Model) *Role {
@@ -88,6 +96,10 @@ func (r *Role) BeforeSave() error {
 		return r.MakeError(422, ValidationError, r)
 	}
 	return nil
+}
+
+func (r *Role) AfterSave() {
+	r.cachedClaims = nil
 }
 
 func (r *Role) OnLoad() error {

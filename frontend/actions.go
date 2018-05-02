@@ -35,19 +35,6 @@ func (f *Frontend) makeActionEndpoints(cmdSet string, obj models.Model, idKey st
 	plugin := func(c *gin.Context) string {
 		return c.Query("plugin")
 	}
-	item404 := func(c *gin.Context, found bool, id, line string) bool {
-		if !found {
-			err := &models.Error{
-				Code:  http.StatusNotFound,
-				Type:  c.Request.Method,
-				Model: cmdSet,
-				Key:   id,
-			}
-			err.Errorf("%s: Not Found", line)
-			c.JSON(err.Code, err)
-		}
-		return !found
-	}
 	idrtkeyok := func(c *gin.Context, op string) (string, *backend.RequestTracker, string, bool) {
 		if op == "" {
 			op = "action:" + c.Param("cmd")
@@ -68,73 +55,64 @@ func (f *Frontend) makeActionEndpoints(cmdSet string, obj models.Model, idKey st
 				return
 			}
 			actions := []models.AvailableAction{}
-			var found bool
-			rt.Do(func(d backend.Stores) {
-				ref := rt.Find(obj.Prefix(), id)
-				if ref != nil {
-					found = true
-					p := plugin(c)
-					for _, laa := range f.pc.Actions.List(cmdSet) {
-						for _, aa := range laa {
-							if p != "" && p != aa.Plugin.Plugin.Name {
-								continue
-							}
-							ma := &models.Action{
-								Model:   ref,
-								Command: aa.Command,
-								Plugin:  aa.Plugin.Plugin.Name,
-								Params:  map[string]interface{}{},
-							}
-							if _, err := validateAction(f, rt, cmdSet, id, ma); err == nil {
-								actions = append(actions, aa.AvailableAction)
-								break
-							}
-						}
+			ref := f.Find(c, rt, obj.Prefix(), id)
+			if ref == nil {
+				return
+			}
+			p := plugin(c)
+			for _, laa := range f.pc.Actions.List(cmdSet) {
+				for _, aa := range laa {
+					if p != "" && p != aa.Plugin.Plugin.Name {
+						continue
+					}
+					ma := &models.Action{
+						Model:   ref,
+						Command: aa.Command,
+						Plugin:  aa.Plugin.Plugin.Name,
+						Params:  map[string]interface{}{},
+					}
+					if _, err := validateAction(f, rt, cmdSet, id, ma); err == nil {
+						actions = append(actions, aa.AvailableAction)
+						break
 					}
 				}
-			})
-			if !item404(c, found, id, "actions") {
-				c.JSON(http.StatusOK, actions)
 			}
+			c.JSON(http.StatusOK, actions)
 		},
 		/* oneAction */ func(c *gin.Context) {
 			id, rt, cmd, ok := idrtkeyok(c, "")
 			if !ok {
 				return
 			}
-			p := plugin(c)
-			action := models.AvailableAction{}
-			var found bool
-			var err *models.Error
-			rt.Do(func(d backend.Stores) {
-				ref := rt.Find(obj.Prefix(), id)
-				if ref != nil {
-					laa, _ := f.pc.Actions.Get(cmdSet, cmd)
-					for _, aa := range laa {
-						if p != "" && p != aa.Plugin.Plugin.Name {
-							continue
-						}
-						ma := &models.Action{
-							Model:   ref,
-							Command: aa.Command,
-							Plugin:  aa.Plugin.Plugin.Name,
-							Params:  map[string]interface{}{},
-						}
-						if _, err = validateAction(f, rt, cmdSet, id, ma); err == nil {
-							action = aa.AvailableAction
-							found = true
-							break
-						}
-					}
-				}
-			})
-			if err != nil {
-				c.JSON(err.Code, err)
+			ref := f.Find(c, rt, obj.Prefix(), id)
+			if ref == nil {
 				return
 			}
-			if !item404(c, found, id, cmd) {
-				c.JSON(http.StatusOK, action)
+			err := &models.Error{
+				Code:  http.StatusNotFound,
+				Model: obj.Prefix(),
+				Key:   id,
+				Type:  c.Request.Method,
 			}
+			err.Errorf("%s: Not Found", cmd)
+			p := plugin(c)
+			laa, _ := f.pc.Actions.Get(cmdSet, cmd)
+			for _, aa := range laa {
+				if p != "" && p != aa.Plugin.Plugin.Name {
+					continue
+				}
+				ma := &models.Action{
+					Model:   ref,
+					Command: aa.Command,
+					Plugin:  aa.Plugin.Plugin.Name,
+					Params:  map[string]interface{}{},
+				}
+				if _, err = validateAction(f, rt, cmdSet, id, ma); err == nil {
+					c.JSON(http.StatusOK, aa.AvailableAction)
+					return
+				}
+			}
+			c.AbortWithStatusJSON(err.Code, err)
 		},
 		/* runAction */ func(c *gin.Context) {
 			var val map[string]interface{}
@@ -145,32 +123,21 @@ func (f *Frontend) makeActionEndpoints(cmdSet string, obj models.Model, idKey st
 			if !ok {
 				return
 			}
-			var ma *models.Action
-			var err *models.Error
-			var found bool
-			rt.Do(func(d backend.Stores) {
-				ref := rt.Find(obj.Prefix(), id)
-				if ref != nil {
-					found = true
-					res := &models.Action{
-						Model:   ref,
-						Plugin:  plugin(c),
-						Command: cmd,
-						Params:  val}
-					if ma, err = validateAction(f, rt, cmdSet, id, res); err != nil {
-						err.Type = "INVOKE"
-						return
-					}
-				}
-			})
+			ref := f.Find(c, rt, obj.Prefix(), id)
+			if ref == nil {
+				return
+			}
+			res := &models.Action{
+				Model:   ref,
+				Plugin:  plugin(c),
+				Command: cmd,
+				Params:  val}
+			ma, err := validateAction(f, rt, cmdSet, id, res)
 			if err != nil {
+				err.Type = "INVOKE"
 				c.JSON(err.Code, err)
 				return
 			}
-			if item404(c, found, id, cmd) {
-				return
-			}
-
 			rt.Publish(cmdSet, cmd, id, ma)
 			retval, runErr := f.pc.Actions.Run(rt, cmdSet, ma)
 			if runErr != nil {
@@ -304,10 +271,11 @@ func validateAction(f *Frontend,
 			Model: ob,
 			Key:   id,
 		}
+		rt.Do(func(_ backend.Stores) {
+			validateActionParameters(f, rt, ma, aa, err)
+		})
 
-		validateActionParameters(f, rt, ma, aa, err)
-
-		if err.HasError() == nil {
+		if !err.ContainsError() {
 			ma.Plugin = aa.Plugin.Plugin.Name
 			return ma, nil
 		}

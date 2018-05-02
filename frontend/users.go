@@ -315,7 +315,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 					Key:   c.Param("name"),
 				}
 				u := rt.Find("users", c.Param("name"))
-				g := rt.Find("users", f.getAuthUser(c))
+				g := rt.Find("users", f.getAuth(c).currentUser.Name)
 				if u == nil || g == nil {
 					err.Errorf("Not Found")
 					return

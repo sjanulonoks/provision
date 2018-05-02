@@ -1,8 +1,6 @@
 package frontend
 
 import (
-	"net/http"
-
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
@@ -308,35 +306,10 @@ func (f *Frontend) InitMachineApi() {
 			if !assureDecode(c, b) {
 				return
 			}
-			if !f.assureSimpleAuth(c, b.Prefix(), "create", "") {
-				return
-			}
 			if b.Uuid == nil || len(b.Uuid) == 0 {
 				b.Uuid = uuid.NewRandom()
 			}
-			var res models.Model
-			var err error
-			rt := f.rt(c, b.Locks("create")...)
-			rt.Do(func(d backend.Stores) {
-				_, err = rt.Create(b)
-				if err == nil {
-					res = models.Clone(b)
-				}
-			})
-			if err != nil {
-				be, ok := err.(*models.Error)
-				if ok {
-					c.JSON(be.Code, be)
-				} else {
-					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				s, ok := models.Model(res).(Sanitizable)
-				if ok {
-					res = s.Sanitize()
-				}
-				c.JSON(http.StatusCreated, res)
-			}
+			f.create(c, b)
 		})
 
 	// swagger:route GET /machines/{uuid} Machines getMachine

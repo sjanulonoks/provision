@@ -1,8 +1,6 @@
 package frontend
 
 import (
-	"net/http"
-
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
@@ -216,9 +214,6 @@ func (f *Frontend) InitTaskApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.POST("/tasks",
 		func(c *gin.Context) {
-			// We don't use f.Create() because we need to be able to assign random
-			// UUIDs to new Tasks without forcing the client to do so, yet allow them
-			// for testing purposes amd if they alrady have a UUID scheme for tasks.
 			b := &backend.Task{}
 			if !assureDecode(c, b) {
 				return
@@ -228,28 +223,7 @@ func (f *Frontend) InitTaskApi() {
 			if !b.HasFeature("original-exit-codes") && !b.HasFeature("sane-exit-codes") {
 				b.AddFeature("sane-exit-codes")
 			}
-			var res models.Model
-			var err error
-			rt := f.rt(c, b.Locks("create")...)
-			rt.Do(func(d backend.Stores) {
-				_, err = rt.Create(b)
-			})
-			if err != nil {
-				be, ok := err.(*models.Error)
-				if ok {
-					c.JSON(be.Code, be)
-				} else {
-					c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, err.Error()))
-				}
-			} else {
-				s, ok := models.Model(b).(Sanitizable)
-				if ok {
-					res = s.Sanitize()
-				} else {
-					res = b
-				}
-				c.JSON(http.StatusCreated, res)
-			}
+			f.create(c, b)
 		})
 
 	// swagger:route GET /tasks/{name} Tasks getTask

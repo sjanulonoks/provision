@@ -48,7 +48,7 @@ func TestJWTUtils(t *testing.T) {
 		if drpClaim.Id != "fred" {
 			t.Errorf("Claim ID doesn't match: %v %v\n", "fred", drpClaim.Id)
 		}
-		if !drpClaim.Match(rt, models.MakeRole("", "bootenvs", "get", "m")) {
+		if !drpClaim.match(rt, models.MakeRole("", "bootenvs", "get", "m")) {
 			t.Errorf("Claim Scope doesn't match: %v %v\n", []string{"bootenvs", "get", "m"}, drpClaim)
 		}
 	}

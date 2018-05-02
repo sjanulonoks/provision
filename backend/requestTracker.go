@@ -97,6 +97,10 @@ func (rt *RequestTracker) find(prefix, key string) models.Model {
 	return s.Find(key)
 }
 
+func (rt *RequestTracker) RawFind(prefix, key string) models.Model {
+	return rt.find(prefix, key)
+}
+
 func (rt *RequestTracker) Find(prefix, key string) models.Model {
 	res := rt.find(prefix, key)
 	if res != nil {
@@ -463,12 +467,20 @@ func (rt *RequestTracker) SealClaims(claims *DrpCustomClaims) (string, error) {
 	return rt.dt.SealClaims(claims)
 }
 
-func (rt *RequestTracker) MachineForMac(mac string) *Machine {
+func (rt *RequestTracker) MacToMachineUUID(mac string) string {
 	rt.dt.macAddrMux.RLock()
 	defer rt.dt.macAddrMux.RUnlock()
-	m := rt.Find("machines", rt.dt.macAddrMap[mac])
+	return rt.dt.macAddrMap[mac]
+}
+
+func (rt *RequestTracker) MachineForMac(mac string) *Machine {
+	m := rt.Find("machines", rt.MacToMachineUUID(mac))
 	if m != nil {
 		return AsMachine(m)
 	}
 	return nil
+}
+
+func (rt *RequestTracker) Prefs() map[string]string {
+	return rt.dt.Prefs()
 }
