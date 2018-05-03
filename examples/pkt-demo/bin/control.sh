@@ -70,6 +70,8 @@ DRP_OS=${DRP_OS:-"linux"}
 DRP_ARCH=${DRP_ARCH:-"amd64"}
 #CREDS=${CREDS:-"--username=rocketskates --password=r0cketsk8ts"}
 export RS_KEY=${RS_KEY:-"rocketskates:r0cketsk8ts"}
+export TF_VARS=TF_VARS
+touch $TF_VARS
 
 _machines=`grep '^variable "machines_os' vars.tf | cut -d '"' -f 4`
 case $_machines in
@@ -284,11 +286,13 @@ case $1 in
   set-drp-endpoint)
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
-    ( sed -i.bak 's+\(^chain http://\)\(.*\)\(/default.ipxe.*$\)+\1'${ADDR}':8091\3+g' drp-machines.tf ) \
+    iPXE="http://${ADDR}:8091/default.ipxe"
+
+    ( sed -i.bak 's+\(^.*variable "machines_data" { default = "\).*\(" }\)$+\1'${iPXE}'\2+g' drp-machines.tf ) \
       && echo "DRP endpoint set in 'drp-machines.tf' successfully: " \
       || xiterr 1 "DRP endpoint set FAILED for 'drp-machines.tf'"
-    _chain=`cprintf $cyan $(grep "^chain " drp-machines.tf)`
-    echo "  ipxe -->  $_chain"
+    _ipxe=`cprintf $cyan "${iPXE}"`
+    echo "  ipxe -->  $_ipxe"
     xit $?
     ;;
 
@@ -315,6 +319,29 @@ case $1 in
 
     ;;
 
+  get-task-library)
+    # community content is installed via install.sh of DRP - unless "--nocontent" is specified
+    # we prefix with "000-" because we want to force it to sort first in the directory for 
+    # applying multiple content blobs - CC needs to be first
+    rm -rf dr-provision-install/task-library-content.*
+    mkdir -p dr-provision-install
+    cd dr-provision-install
+
+    # community contents
+    $CURL \
+      https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/task-library${RACKN_AUTH} \
+      -o task-library-content.yaml
+#    $CURL \
+#      https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/task-library.sha256${RACKN_AUTH} \
+#      -o task-library-content.sha256
+#    sed -i 's/ \(task-library\)\(.yaml\)$/ \1-content\2/' task-library-content.sha256
+#
+#    check_sum task-library-content.sha256
+    cd ..
+
+    ;;
+
+  # get-drp-plugins only works with 3.2.x and newer plugins - prior to that
   # get-drp-plugins only works with 3.2.x and newer plugins - prior to that
   # plugin_provider and plugin_content were two separate pieces - now they are
   # a single piece, and the plugin installs it's associated content on upload
@@ -375,7 +402,7 @@ case $1 in
     [[ -z "$2" ]] && xiterr 1 "Need DRP endpoint ID as argument 2"
     ADDR=`$0 get-address $2`
 
-    for ACTION in get-drp-cc get-drp-plugins drp-setup drp-setup-demo; 
+    for ACTION in get-drp-cc get-task-library get-drp-plugins drp-setup drp-setup-demo; 
     do 
       echo "running ACTION:  $ACTION"
       ./bin/control.sh $ACTION $2
@@ -399,7 +426,7 @@ case $1 in
     ADDR=`$0 get-address $2`
 
     # drp-setup drp-setup-demo; 
-    for ACTION in get-drp-cc get-drp-krib-content get-drp-plugins drp-setup drp-setup-krib-live
+    for ACTION in get-drp-cc get-task-library get-drp-krib-content get-drp-plugins drp-setup drp-setup-krib-live
     do 
       echo "running ACTION:  $ACTION"
       ./bin/control.sh $ACTION $2
@@ -424,7 +451,7 @@ case $1 in
   # where drp-setup will pick it up and install it for us
   get-drp-krib-content)
 
-    curl -s https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/krib \
+    curl -s https://qww9e4paf1.execute-api.us-west-2.amazonaws.com/main/catalog/content/krib${RACKN_AUTH} \
       -o dr-provision-install/drp-krib-content.json
     ;;
 
@@ -658,18 +685,30 @@ EOFPLUGIN
 
     # no longer support older endpoints
     NEW="yes"
+    WF_NAME="discover-install-workflow"
 
-    GLOBAL="private-content/stagemap-param.json"
-    cat <<EOFPARAM > $GLOBAL
-      {
-        "discover": "packet-discover:Success",
-        "packet-discover": "${MACHINES_OS}:Reboot",
-        "${MACHINES_OS}": "packet-ssh-keys:Success",
-        "packet-ssh-keys": "complete-nowait:Success"
-      }
-EOFPARAM
-
-      $DRPCLI $ENDPOINT profiles set global param change-stage/map to - < $GLOBAL
+    WORKFLOW="private-content/workflow-${MACHINES_OS}.json"
+    cat <<EOFWF > $WORKFLOW
+    {
+      "Name": "$WF_NAME",
+      "Description": "discover and ${MACHINES_OS} workflow",
+      "Meta": {
+        "color": "green",
+        "icon": "linux",
+        "title": "discover and ${MACHINES_OS} workflow"
+      },
+      "Stages": [
+        "discover",
+        "packet-discover",
+        "${MACHINES_OS}",
+        "packet-ssh-keys",
+        "runner-service",
+        "complete"
+      ]
+    }
+EOFWF
+      $DRPCLI $ENDPOINT workflows create - < $WORKFLOW
+      $DRPCLI $ENDPOINT prefs set defaultWorkflow $WF_NAME
 
   ;;
 
@@ -753,39 +792,41 @@ EOFKRIB
     # filter out the BootEnvs that aren't operating systems
     # we also filter out MACHINE_OS because we install it by
     # default in the 'drp-setup' stage - don't re-install
-    FILTER="discovery|sledgehammer|ignore|local|$MACHINE_OS"
+    #FILTER="discovery|sledgehammer|ignore|local|$MACHINE_OS"
+    FILTER="discovery|sledgehammer|ignore|local"
 
     MACHINE_OSES=`$DRPCLI $ENDPOINT bootenvs list \
       | jq -r '.[].Name' | egrep -v $FILTER`
 
     for MOS in MACHINE_OSES
     do
-      PROFILE=stagemap-$MOS
-      MAP="private-content/stagemap-create-$MOS.json"
+      WF="private-content/workflow-$MOS.json"
 
-      cat <<EOFSTAGE > ${MAP}
-        {{
-        "Available": true,
-        "Description": "Stagemap for '${MOS}' BootEnv",
-        "Name": "${MOS}",
-        "Params": {
-            "change-stage/map": {
-              "discover": "packet-discover:Success",
-              "packet-discover": "${MOS}:Reboot",
-              "packet-ssh-keys": "complete-nowait:Success",
-              "${MOS}": "packet-ssh-keys:Success"
-          }
-        }
+      cat <<EOFWF > ${WF}
+      {
+        "Name": "workflow-$MOS",
+        "Description": "${MOS} workflow",
+        "Meta": {
+          "color": "green",
+          "icon": "linux",
+          "title": "${MOS} workflow"
+        },
+        "Stages": [
+          "${MACHINES_OS}",
+          "packet-ssh-keys",
+          "runner-service",
+          "complete"
+        ]
       }
-EOFSTAGE
+EOFWF
 
-      # inject our stagemap now
-      if ( $DRPCLI $ENDPOINT profiles exists ${MOS} > /dev/null 2>&1 )
+      # inject our workflow now
+      if ( $DRPCLI $ENDPOINT workflows exists workflow-${MOS} > /dev/null 2>&1 )
       then
-        $DRPCLI $ENDPOINT profiles destroy ${MOS}
+        $DRPCLI $ENDPOINT workflows destroy workflow-${MOS}
       fi
 
-      $DRPCLI $ENDPOINT profiles create - < ${MAP}
+      $DRPCLI $ENDPOINT workflows create - < ${WF}
 
     done
     ;;
@@ -824,12 +865,13 @@ EOFSTAGE
     echo ""
 
     set -x
+    [[ -r $TF_VARS ]] && source $TF_VARS
     terraform destroy -force
 
     rm -f ${SSH_DRP_KEY} ${SSH_DRP_KEY}.pub
     rm -f ${SSH_MACHINES_KEY} ${SSH_MACHINES_KEY}.pub
     rm -rf drpcli dr-provision-install
-    rm -rf tmp 
+    rm -rf tmp $TF_VARS student-mappings.txt
     rm -rf bin/terraform bin/drpcli bin/dr-provision bin/terraform-provider-packet bin/yq
 
     sed -i.bak                                                           \
@@ -842,8 +884,8 @@ EOFSTAGE
       -e 's/\(^.*project_id.*"\)\(.*\)\(".*$\)/\1insert_project_id_here\3/g'  \
       vars.tf
 
-    sed -i.bak                                                                          \
-      's+\(^chain http://\)\(.*\)\(/default.ipxe\)+\1drp_endpoint_address_and_port\3+g' \
+    sed -i.bak                                                                \
+      's+\(^.*default.*= "\)\(/default.ipxe"\)$+\1drp_endpoint_information+g' \
       drp-machines.tf
 
     find private-content/ -type f | grep -v "/secrets$" | xargs rm -rf 

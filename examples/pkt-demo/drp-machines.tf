@@ -16,13 +16,10 @@ resource "packet_ssh_key" "machines-ssh-key" {
   public_key = "${file("${var.cluster_name}-${var.machines_ssh_public_key_path}")}"
 }
 
-variable "machines_data" {
-default =<<EOF
-#!ipxe
-chain http://drp_endpoint_address_and_port/default.ipxe
-EOF
-// example: chain http://147.75.108.41:8091/default.ipxe
-}
+// the drp_endpoint_address_information will be filled in by the control.sh
+// tool with the correct DRP endpoint details (full ipxe url)
+// DO NOT MODIFY this line in any way
+variable "machines_data" { default = "drp_endpoint_information" }
 
 resource "packet_device" "drp-machines" {
   hostname         = "${format("${var.cluster_name}-machines-${var.packet_facility}-%02d", count.index + 1)}"
@@ -33,6 +30,6 @@ resource "packet_device" "drp-machines" {
   facility         = "${var.packet_facility}"
   project_id       = "${var.packet_project_id}"
   billing_cycle    = "${var.billing_cycle}"
-  user_data        = "${var.machines_data}"
+  ipxe_script_url  = "${var.machines_data}"
 }
 
