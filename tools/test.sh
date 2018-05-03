@@ -22,20 +22,15 @@ else
     PATH=`pwd`/bin/linux/amd64:$PATH
 fi
 
-for d in $(go list ./... 2>/dev/null | grep -v cmds | grep -v vendor | grep -v github.com/digitalrebar/provision/client  | grep -v github.com/digitalrebar/provision/genmodels) ; do
-    tdir=$PWD
-    dir=${d//github.com\/digitalrebar\/provision}
-    echo "----------- TESTING $dir -----------"
-    rm -f test.bin
-    go test -o test.bin -c -race -covermode=atomic -coverpkg=$packages "$d"
-    if [ -e test.bin ] ; then
-        (cd .$dir; time "$tdir/test.bin" -test.coverprofile="$tdir/profile.out")
-        rm -f test.bin
-    fi
-
-    if [ -f profile.out ]; then
-        grep -h -v "^mode:" profile.out >> coverage.txt
-        rm profile.out
-    fi
+i=0
+for d in $(go list ./... 2>/dev/null | grep -v cmds) ; do
+    echo "----------- TESTING $d -----------"
+    time go test -race -covermode=atomic -coverpkg=$packages -coverprofile="profile$i.out" "$d" || FAILED=true
+    i=$((i+1))
 done
-
+go run tools/mergeProfiles.go profile*.out >coverage.txt
+rm profile*.out
+if [[ $FAILED ]]; then
+    echo "FAILED"
+    exit 1
+fi
