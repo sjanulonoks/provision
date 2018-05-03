@@ -297,7 +297,7 @@ func (pc *PluginController) startPlugin(mp models.Model) {
 		}
 
 		claims := backend.NewClaim(plugin.Name, "system", time.Hour*1000000).
-			Add("*", "*", "*").
+			AddRawClaim("*", "*", "*").
 			AddSecrets("", "", "")
 		token, _ := rt.SealClaims(claims)
 		ppath := pc.pluginDir + "/" + pp.Name

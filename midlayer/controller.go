@@ -270,7 +270,7 @@ func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, pro
 
 	// Setup env vars to run plugin - auth should be parameters.
 	claims := backend.NewClaim(provider, "system", time.Hour*1).
-		Add("*", "*", "*").
+		AddRawClaim("*", "*", "*").
 		AddSecrets("", "", "")
 	token, _ := rt.SealClaims(claims)
 	apiURL := rt.ApiURL(net.ParseIP("0.0.0.0"))

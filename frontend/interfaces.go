@@ -43,7 +43,7 @@ func (f *Frontend) InitInterfaceApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/interfaces",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "interfaces", "list", "") {
+			if !f.assureSimpleAuth(c, "interfaces", "list", "") {
 				return
 			}
 			intfs, err := f.dt.GetInterfaces()
@@ -74,7 +74,7 @@ func (f *Frontend) InitInterfaceApi() {
 	f.ApiGroup.GET("/interfaces/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
-			if !f.assureAuth(c, "interfaces", "get", name) {
+			if !f.assureSimpleAuth(c, "interfaces", "get", name) {
 				return
 			}
 			err := &models.Error{

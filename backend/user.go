@@ -1,6 +1,9 @@
 package backend
 
 import (
+	"strings"
+	"time"
+
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
@@ -85,7 +88,49 @@ func (u *User) Validate() {
 	u.User.Validate()
 	u.AddError(index.CheckUnique(u, u.rt.stores("users").Items()))
 	u.SetValid()
+	for _, rName := range u.Roles {
+		r := u.rt.Find("roles", rName)
+		if r == nil {
+			u.Errorf("Role %s does not exist", rName)
+		} else {
+			role := AsRole(r)
+			if !role.Available {
+				u.Errorf("Role %s is not available", rName)
+			}
+		}
+	}
 	u.SetAvailable()
+}
+
+func (u *User) GenClaim(grantor string, ttl time.Duration, wantedRoles ...string) *DrpCustomClaims {
+	claim := NewClaim(u.Name, grantor, ttl)
+	// Users always have the right to get a token and change their password.
+	claim.AddRawClaim("users", "token,password,get", u.Name)
+	if len(wantedRoles) == 0 {
+		claim.AddRoles(u.Roles...)
+		return claim
+	}
+	haveRoles := []*Role{}
+	for _, r := range u.Roles {
+		if robj := u.rt.Find("roles", r); robj != nil {
+			haveRoles = append(haveRoles, robj.(*Role))
+		} else {
+			u.rt.Errorf("User %s has missing role %s", u.Name, r)
+		}
+	}
+	for i := range wantedRoles {
+		r := strings.TrimSpace(wantedRoles[i])
+		if robj := u.rt.Find("roles", r); robj != nil {
+			for _, test := range haveRoles {
+				role := AsRole(robj)
+				if test.Role.Contains(role.Role) {
+					claim.AddRoles(r)
+					break
+				}
+			}
+		}
+	}
+	return claim
 }
 
 func (u *User) BeforeSave() error {
@@ -119,12 +164,12 @@ func (u *User) OnLoad() error {
 }
 
 var userLockMap = map[string][]string{
-	"get":     []string{"users"},
-	"create":  []string{"users"},
-	"update":  []string{"users"},
-	"patch":   []string{"users"},
+	"get":     []string{"users", "roles"},
+	"create":  []string{"users", "roles"},
+	"update":  []string{"users", "roles"},
+	"patch":   []string{"users", "roles"},
 	"delete":  []string{"users"},
-	"actions": []string{"users", "profiles", "params"},
+	"actions": []string{"users", "roles", "profiles", "params"},
 }
 
 func (u *User) Locks(action string) []string {

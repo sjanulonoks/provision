@@ -126,22 +126,27 @@ exit
 				"title": "Digital Rebar Provision",
 			},
 		}
+		superUser = models.MakeRole("superuser", "*", "*", "*")
 	)
 	res, _ := store.Open("memory:///")
 	bootEnvs, _ := res.MakeSub("bootenvs")
 	stages, _ := res.MakeSub("stages")
+	roles, _ := res.MakeSub("roles")
 	localBoot.ClearValidation()
 	ignoreBoot.ClearValidation()
 	noneStage.ClearValidation()
 	localStage.ClearValidation()
+	superUser.ClearValidation()
 	localBoot.Fill()
 	ignoreBoot.Fill()
 	noneStage.Fill()
 	localStage.Fill()
+	superUser.Fill()
 	bootEnvs.Save("local", localBoot)
 	bootEnvs.Save("ignore", ignoreBoot)
 	stages.Save("none", noneStage)
 	stages.Save("local", localStage)
+	roles.Save("superuser", superUser)
 	res.(*store.Memory).SetMetaData(map[string]string{
 		"Name":        "BasicStore",
 		"Description": "Default objects that must be present",
@@ -247,6 +252,10 @@ func Fill(t store.KeySaver) {
 		if obj.Workflow == nil {
 			obj.Workflow = &models.Workflow{}
 		}
+	case *Role:
+		if obj.Role == nil {
+			obj.Role = &models.Role{}
+		}
 	default:
 		panic(fmt.Sprintf("Unknown backend model %T", t))
 	}
@@ -286,6 +295,8 @@ func ModelToBackend(m models.Model) store.KeySaver {
 		return &User{User: obj}
 	case *models.Workflow:
 		return &Workflow{Workflow: obj}
+	case *models.Role:
+		return &Role{Role: obj}
 	default:
 		panic(fmt.Sprintf("Unknown model %T", m))
 	}
@@ -461,6 +472,16 @@ func toBackend(m models.Model, rt *RequestTracker) store.KeySaver {
 		res.Workflow = obj
 		res.rt = rt
 		return &res
+	case *models.Role:
+		var res Role
+		if ours != nil {
+			res = *ours.(*Role)
+		} else {
+			res = Role{}
+		}
+		res.Role = obj
+		res.rt = rt
+		return &res
 
 	default:
 		log.Panicf("Unknown model %T", m)
@@ -550,6 +571,7 @@ type Stores func(string) *Store
 
 func allKeySavers() []models.Model {
 	return []models.Model{
+		&Role{},
 		&Pref{},
 		&Param{},
 		&User{},
@@ -805,7 +827,16 @@ func NewDataTracker(backend store.Store,
 		}
 	})
 	// Create minimal content.
-	rt := res.Request(res.Logger, "stages", "bootenvs", "preferences", "users", "machines", "profiles", "params", "workflows")
+	rt := res.Request(res.Logger,
+		"stages",
+		"bootenvs",
+		"preferences",
+		"users",
+		"machines",
+		"profiles",
+		"params",
+		"workflows",
+		"roles")
 	rt.Do(func(d Stores) {
 		// Load the prefs - overriding defaults.
 		savePrefs := false
@@ -869,10 +900,20 @@ func NewDataTracker(backend store.Store,
 			user := &User{}
 			Fill(user)
 			user.Name = "rocketskates"
+			user.Roles = []string{"superuser"}
 			if err := user.ChangePassword(rt, "r0cketsk8ts"); err != nil {
 				logger.Fatalf("Failed to create rocketskates user: %v", err)
 			}
 			rt.Create(user)
+		} else {
+			user := rt.Find("users", "rocketskates")
+			if user != nil {
+				u := AsUser(user)
+				if u.Roles == nil || len(u.Roles) == 0 {
+					u.Roles = []string{"superuser"}
+					rt.Save(u)
+				}
+			}
 		}
 		machines := d("machines")
 		for _, obj := range machines.Items() {

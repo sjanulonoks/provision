@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/VictorLowther/jsonpatch2"
@@ -71,22 +72,13 @@ type UserTokenQueryTTLParameter struct {
 	TTL int `json:"ttl"`
 }
 
+// UserTokenQueryRolesParameter is used to restrict the requested
+// token to a subset of the Roles that a User has.
+//
 // swagger:parameters getUserToken
-type UserTokenQueryScopeParameter struct {
+type UserTokenQueryRolesParameter struct {
 	// in: query
-	Scope string `json:"scope"`
-}
-
-// swagger:parameters getUserToken
-type UserTokenQueryActionParameter struct {
-	// in: query
-	Action string `json:"action"`
-}
-
-// swagger:parameters getUserToken
-type UserTokenQuerySpecificParameter struct {
-	// in: query
-	Specific string `json:"specific"`
+	Roles string `json:"roles"`
 }
 
 // UserListPathParameter used to limit lists of User by path options
@@ -291,33 +283,11 @@ func (f *Frontend) InitUserApi(drpid string) {
 		func(c *gin.Context) {
 			ref := &backend.User{}
 			var userName, grantorName, userSecret, grantorSecret string
+			var claim *backend.DrpCustomClaims
 			var err *models.Error
-			rt := f.rt(c, ref.Locks("get")...)
-			rt.Do(func(d backend.Stores) {
-				err = &models.Error{
-					Type:  c.Request.Method,
-					Code:  http.StatusNotFound,
-					Model: "users",
-					Key:   c.Param("name"),
-				}
-				u := rt.Find("users", c.Param("name"))
-				g := rt.Find("users", f.getAuthUser(c))
-				if u == nil || g == nil {
-					err.Errorf("Not Found")
-					return
-				}
-				uobj := backend.AsUser(u)
-				gobj := backend.AsUser(g)
-				userName, userSecret = uobj.Name, uobj.Secret
-				grantorName, grantorSecret = gobj.Name, gobj.Secret
-				err = nil
-			})
-			if err != nil {
-				c.JSON(err.Code, err)
-				return
-			}
-			if !f.assureAuth(c, "users", "token", userName) {
-				return
+			wantedRoles := []string{}
+			if w, h := c.GetQuery("roles"); h {
+				wantedRoles = strings.Split(w, ",")
 			}
 			sttl, _ := c.GetQuery("ttl")
 			ttl := time.Hour
@@ -336,24 +306,37 @@ func (f *Frontend) InitUserApi(drpid string) {
 				}
 				ttl = time.Second * time.Duration(ttl64)
 			}
-			scope, _ := c.GetQuery("scope")
-			if scope == "" {
-				scope = "*"
+			rt := f.rt(c, ref.Locks("get")...)
+			rt.Do(func(d backend.Stores) {
+				err = &models.Error{
+					Type:  c.Request.Method,
+					Code:  http.StatusNotFound,
+					Model: "users",
+					Key:   c.Param("name"),
+				}
+				u := rt.Find("users", c.Param("name"))
+				g := rt.Find("users", f.getAuthUser(c))
+				if u == nil || g == nil {
+					err.Errorf("Not Found")
+					return
+				}
+				uobj := backend.AsUser(u)
+				gobj := backend.AsUser(g)
+				userName, userSecret = uobj.Name, uobj.Secret
+				grantorName, grantorSecret = gobj.Name, gobj.Secret
+				claim = uobj.GenClaim(grantorName, ttl, wantedRoles...)
+				err = nil
+			})
+			if err != nil {
+				c.JSON(err.Code, err)
+				return
 			}
-			action, _ := c.GetQuery("action")
-			if action == "" {
-				action = "*"
+			if !f.assureSimpleAuth(c, "users", "token", userName) {
+				return
 			}
-			specific, _ := c.GetQuery("specific")
-			if specific == "" {
-				specific = "*"
-			}
+			claim.AddSecrets(grantorSecret, userSecret, "")
 
-			claims := backend.NewClaim(c.Param(`name`), grantorName, ttl).
-				Add(scope, action, specific).
-				AddSecrets(grantorSecret, userSecret, "")
-
-			if t, err := f.dt.SealClaims(claims); err != nil {
+			if t, err := f.dt.SealClaims(claim); err != nil {
 				ne, ok := err.(*models.Error)
 				if ok {
 					c.JSON(ne.Code, ne)
@@ -428,7 +411,7 @@ func (f *Frontend) InitUserApi(drpid string) {
 	//       422: ErrorResponse
 	f.ApiGroup.PUT("/users/:name/password",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "users", "password", c.Param("name")) {
+			if !f.assureSimpleAuth(c, "users", "password", c.Param("name")) {
 				return
 			}
 			var userPassword models.UserPassword

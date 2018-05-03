@@ -66,7 +66,7 @@ func (f *Frontend) InitIndexApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/indexes",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "indexes", "list", "") {
+			if !f.assureSimpleAuth(c, "indexes", "list", "") {
 				return
 			}
 			res := map[string]map[string]index.Maker{}
@@ -95,7 +95,7 @@ func (f *Frontend) InitIndexApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/indexes/:prefix",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "indexes", "get", "") {
+			if !f.assureSimpleAuth(c, "indexes", "get", "") {
 				return
 			}
 			m, err := models.New(c.Param("prefix"))
@@ -132,7 +132,7 @@ func (f *Frontend) InitIndexApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/indexes/:prefix/:param",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "indexes", "get", "") {
+			if !f.assureSimpleAuth(c, "indexes", "get", "") {
 				return
 			}
 			prefix := c.Param("prefix")

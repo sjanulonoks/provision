@@ -88,6 +88,7 @@ func TestRenderData(t *testing.T) {
 		"tasks",
 		"preferences",
 		"workflows")
+	claimrt := dt.Request(dt.Logger, "roles")
 	var machine *Machine
 	var paramWithDefault *Param
 	var defaultBootEnv, nothingBootEnv, badBootEnv *BootEnv
@@ -334,10 +335,10 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GetToken should return a good claim. %v\n", e)
 		}
-		if !claim.Match("machines", "create", "anything") {
+		if !claim.Match(claimrt, models.MakeRole("", "machines", "create", "anything")) {
 			t.Errorf("Unknown token should match: machines/create/*\n")
 		}
-		if !claim.Match("machines", "get", "anything") {
+		if !claim.Match(claimrt, models.MakeRole("", "machines", "get", "anything")) {
 			t.Errorf("Unknown token should match: machines/get/*\n")
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 600 {
@@ -364,14 +365,14 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GetToken should return a good claim. %v\n", e)
 		}
-		if !claim.Match("machines", "create", "anything") {
+		if !claim.Match(claimrt, models.MakeRole("", "machines", "create", "anything")) {
 			t.Errorf("Unknown token should match: machines/create/*\n")
 		}
-		if !claim.Match("machines", "get", "anything") {
+		if !claim.Match(claimrt, models.MakeRole("", "machines", "get", "anything")) {
 			t.Errorf("Unknown token should match: machines/get/*\n")
 		}
-		if claim.Match("machines", "patch", "anything") {
-			t.Errorf("Unknown token should NOT match: machines/patch/*\n")
+		if claim.Match(claimrt, models.MakeRole("", "machines", "update", "anything")) {
+			t.Errorf("Unknown token should NOT match: machines/update/*\n")
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 50 {
 			t.Errorf("Unknown token timeout should be 50, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
@@ -502,20 +503,20 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GetToken should return a good claim. %v\n", e)
 		}
-		if claim.Match("machines", "create", "anything") {
+		if claim.Match(claimrt, models.MakeRole("", "machines", "create", "anything")) {
 			t.Errorf("Known token should NOT match: machines/create/*\n")
 		}
-		if claim.Match("machines", "get", "anything") {
+		if claim.Match(claimrt, models.MakeRole("", "machines", "get", "anything")) {
 			t.Errorf("Known token should NOT match: machines/get/*\n")
 		}
-		if claim.Match("machines", "patch", "anything") {
-			t.Errorf("Known token should NOT match: machines/patch/*\n")
+		if claim.Match(claimrt, models.MakeRole("", "machines", "update", "anything")) {
+			t.Errorf("Known token should NOT match: machines/update/*\n")
 		}
-		if !claim.Match("machines", "get", machine.Key()) {
+		if !claim.Match(claimrt, models.MakeRole("", "machines", "get", machine.Key())) {
 			t.Errorf("Known token should match: machines/get/%s\n", machine.Key())
 		}
-		if !claim.Match("machines", "patch", machine.Key()) {
-			t.Errorf("Known token should match: machines/patch/%s\n", machine.Key())
+		if !claim.Match(claimrt, models.MakeRole("", "machines", "update", machine.Key())) {
+			t.Errorf("Known token should match: machines/update/%s\n", machine.Key())
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 3600 {
 			t.Errorf("Known token timeout should be 3600, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
@@ -554,20 +555,20 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GetToken should return a good claim. %v\n", e)
 		}
-		if claim.Match("machines", "create", "anything") {
+		if claim.Match(claimrt, models.MakeRole("", "machines", "create", "anything")) {
 			t.Errorf("Known token should NOT match: machines/create/*\n")
 		}
-		if claim.Match("machines", "get", "anything") {
+		if claim.Match(claimrt, models.MakeRole("", "machines", "get", "anything")) {
 			t.Errorf("Known token should NOT match: machines/get/*\n")
 		}
-		if claim.Match("machines", "patch", "anything") {
-			t.Errorf("Known token should NOT match: machines/patch/*\n")
+		if claim.Match(claimrt, models.MakeRole("", "machines", "update", "anything")) {
+			t.Errorf("Known token should NOT match: machines/update/*\n")
 		}
-		if !claim.Match("machines", "get", machine.Key()) {
+		if !claim.Match(claimrt, models.MakeRole("", "machines", "get", machine.Key())) {
 			t.Errorf("Known token should match: machines/get/%s\n", machine.Key())
 		}
-		if !claim.Match("machines", "patch", machine.Key()) {
-			t.Errorf("Known token should match: machines/patch/%s\n", machine.Key())
+		if !claim.Match(claimrt, models.MakeRole("", "machines", "update", machine.Key())) {
+			t.Errorf("Known token should match: machines/update/%s\n", machine.Key())
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 50 {
 			t.Errorf("Known token timeout should be 50, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
@@ -603,20 +604,20 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GetToken should return a good claim. %v\n", e)
 		}
-		if claim.Match("machines", "create", "anything") {
+		if claim.Match(claimrt, models.MakeRole("", "machines", "create", "anything")) {
 			t.Errorf("Known token should NOT match: machines/create/*\n")
 		}
-		if claim.Match("machines", "get", "anything") {
+		if claim.Match(claimrt, models.MakeRole("", "machines", "get", "anything")) {
 			t.Errorf("Known token should NOT match: machines/get/*\n")
 		}
-		if claim.Match("machines", "patch", "anything") {
-			t.Errorf("Known token should NOT match: machines/patch/*\n")
+		if claim.Match(claimrt, models.MakeRole("", "machines", "update", "anything")) {
+			t.Errorf("Known token should NOT match: machines/update/*\n")
 		}
-		if !claim.Match("machines", "get", machine.Key()) {
+		if !claim.Match(claimrt, models.MakeRole("", "machines", "get", machine.Key())) {
 			t.Errorf("Known token should match: machines/get/%s\n", machine.Key())
 		}
-		if !claim.Match("machines", "patch", machine.Key()) {
-			t.Errorf("Known token should match: machines/patch/%s\n", machine.Key())
+		if !claim.Match(claimrt, models.MakeRole("", "machines", "update", machine.Key())) {
+			t.Errorf("Known token should match: machines/update/%s\n", machine.Key())
 		}
 		if claim.ExpiresAt-claim.IssuedAt <= 100000 {
 			t.Errorf("Known token timeout should > 100000, but was %v\n", claim.ExpiresAt-claim.IssuedAt)
@@ -657,10 +658,10 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GenerateProfileToken should return a good claim. %v, %s\n", e, s)
 		}
-		if !claim.Match("profiles", "patch", "test") {
-			t.Errorf("ProfileToken should match patch/test")
+		if !claim.Match(claimrt, models.MakeRole("", "profiles", "update", "test")) {
+			t.Errorf("ProfileToken should match update/test")
 		}
-		if !claim.Match("profiles", "update", "test") {
+		if !claim.Match(claimrt, models.MakeRole("", "profiles", "update", "test")) {
 			t.Errorf("ProfileToken should match update/test")
 		}
 		if claim.ExpiresAt-claim.IssuedAt != 30 {
@@ -697,10 +698,10 @@ func TestRenderData(t *testing.T) {
 		if e != nil {
 			t.Errorf("GenerateProfileToken should return a good claim. %v, %s\n", e, s)
 		}
-		if !claim.Match("profiles", "patch", "test") {
-			t.Errorf("ProfileToken should match patch/test")
+		if !claim.Match(claimrt, models.MakeRole("", "profiles", "update", "test")) {
+			t.Errorf("ProfileToken should match update/test")
 		}
-		if !claim.Match("profiles", "update", "test") {
+		if !claim.Match(claimrt, models.MakeRole("", "profiles", "update", "test")) {
 			t.Errorf("ProfileToken should match update/test")
 		}
 		if claim.ExpiresAt-claim.IssuedAt < 100000 {

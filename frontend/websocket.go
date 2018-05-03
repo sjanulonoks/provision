@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/digitalrebar/logger"
+	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/olahol/melody.v1"
@@ -55,7 +56,8 @@ func (f *Frontend) filterFunction(emap []string, claim interface{}, e *models.Ev
 
 	// Make sure we are authorized to see this event.
 	if matched {
-		matched = f.assureClaimMatch(nil, claim, e.Type, e.Action, e.Key)
+		roleRT := f.rt(nil, (&backend.Role{}).Locks("get")...)
+		matched = f.assureClaimMatch(roleRT, claim, models.MakeRole("", e.Type, e.Action, e.Key))
 	}
 	return matched
 }

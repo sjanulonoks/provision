@@ -517,8 +517,8 @@ func (r *RenderData) GenerateToken() string {
 			ttl = time.Second * time.Duration(mttl)
 		}
 		t, _ = NewClaim("general", grantor, ttl).
-			Add("machines", "create", "*").
-			Add("machines", "get", "*").
+			AddRawClaim("machines", "create", "*").
+			AddRawClaim("machines", "get", "*").
 			AddSecrets("", grantorSecret, "").
 			Seal(r.rt.dt.tokenManager)
 	} else {
@@ -528,19 +528,18 @@ func (r *RenderData) GenerateToken() string {
 			ttl = time.Second * time.Duration(mttl)
 		}
 		t, _ = NewClaim(r.Machine.Key(), grantor, ttl).
-			Add("machines", "*", r.Machine.Key()).
-			Add("stages", "get", "*").
-			Add("jobs", "create", r.Machine.Key()).
-			Add("jobs", "get", r.Machine.Key()).
-			Add("jobs", "patch", r.Machine.Key()).
-			Add("jobs", "update", r.Machine.Key()).
-			Add("jobs", "actions", r.Machine.Key()).
-			Add("jobs", "log", r.Machine.Key()).
-			Add("tasks", "get", "*").
-			Add("info", "get", "*").
-			Add("events", "post", "*").
-			Add("reservations", "create", "*").
-			Add("reservations", "*", models.Hexaddr(r.Machine.Address)).
+			AddRawClaim("machines", "*", r.Machine.Key()).
+			AddRawClaim("stages", "get", "*").
+			AddRawClaim("jobs", "create", r.Machine.Key()).
+			AddRawClaim("jobs", "get", r.Machine.Key()).
+			AddRawClaim("jobs", "update", r.Machine.Key()).
+			AddRawClaim("jobs", "actions", r.Machine.Key()).
+			AddRawClaim("jobs", "log", r.Machine.Key()).
+			AddRawClaim("tasks", "get", "*").
+			AddRawClaim("info", "get", "*").
+			AddRawClaim("events", "post", "*").
+			AddRawClaim("reservations", "create", "*").
+			AddRawClaim("reservations", "*", models.Hexaddr(r.Machine.Address)).
 			AddMachine(r.Machine.Key()).
 			AddSecrets("", grantorSecret, r.Machine.Secret).
 			Seal(r.rt.dt.tokenManager)
@@ -562,19 +561,18 @@ func (r *RenderData) GenerateInfiniteToken() string {
 
 	ttl := time.Hour * 24 * 7 * 52 * 3
 	t, _ := NewClaim(r.Machine.Key(), grantor, ttl).
-		Add("machines", "*", r.Machine.Key()).
-		Add("stages", "get", "*").
-		Add("jobs", "create", r.Machine.Key()).
-		Add("jobs", "get", r.Machine.Key()).
-		Add("jobs", "patch", r.Machine.Key()).
-		Add("jobs", "update", r.Machine.Key()).
-		Add("jobs", "actions", r.Machine.Key()).
-		Add("jobs", "log", r.Machine.Key()).
-		Add("tasks", "get", "*").
-		Add("info", "get", "*").
-		Add("events", "post", "*").
-		Add("reservations", "create", "*").
-		Add("reservations", "*", models.Hexaddr(r.Machine.Address)).
+		AddRawClaim("machines", "*", r.Machine.Key()).
+		AddRawClaim("stages", "get", "*").
+		AddRawClaim("jobs", "create", r.Machine.Key()).
+		AddRawClaim("jobs", "get", r.Machine.Key()).
+		AddRawClaim("jobs", "update", r.Machine.Key()).
+		AddRawClaim("jobs", "actions", r.Machine.Key()).
+		AddRawClaim("jobs", "log", r.Machine.Key()).
+		AddRawClaim("tasks", "get", "*").
+		AddRawClaim("info", "get", "*").
+		AddRawClaim("events", "post", "*").
+		AddRawClaim("reservations", "create", "*").
+		AddRawClaim("reservations", "*", models.Hexaddr(r.Machine.Address)).
 		AddMachine(r.Machine.Key()).
 		AddSecrets("", grantorSecret, r.Machine.Secret).
 		Seal(r.rt.dt.tokenManager)
@@ -609,9 +607,8 @@ func (r *RenderData) GenerateProfileToken(profile string, duration int) string {
 	ttl := time.Second * time.Duration(duration)
 
 	t, _ := NewClaim(r.Machine.Key(), grantor, ttl).
-		Add("profiles", "get", profile).
-		Add("profiles", "update", profile).
-		Add("profiles", "patch", profile).
+		AddRawClaim("profiles", "get", profile).
+		AddRawClaim("profiles", "update", profile).
 		AddMachine(r.Machine.Key()).
 		AddSecrets("", grantorSecret, r.Machine.Secret).
 		Seal(r.rt.dt.tokenManager)

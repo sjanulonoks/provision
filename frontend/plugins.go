@@ -251,7 +251,7 @@ func (f *Frontend) InitPluginApi() {
 			if !assureDecode(c, b) {
 				return
 			}
-			if !f.assureAuth(c, b.Prefix(), "create", "") {
+			if !f.assureSimpleAuth(c, b.Prefix(), "create", "") {
 				return
 			}
 			var err error

@@ -57,7 +57,7 @@ func (f *Frontend) InitPluginProviderApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/plugin_providers",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "plugin_providers", "list", "") {
+			if !f.assureSimpleAuth(c, "plugin_providers", "list", "") {
 				return
 			}
 			c.JSON(http.StatusOK, f.pc.GetPluginProviders())
@@ -78,7 +78,7 @@ func (f *Frontend) InitPluginProviderApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.HEAD("/plugin_providers",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "plugin_providers", "list", "") {
+			if !f.assureSimpleAuth(c, "plugin_providers", "list", "") {
 				return
 			}
 			pp := f.pc.GetPluginProviders()
@@ -105,7 +105,7 @@ func (f *Frontend) InitPluginProviderApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/plugin_providers/:name",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "plugin_providers", "get", c.Param(`name`)) {
+			if !f.assureSimpleAuth(c, "plugin_providers", "get", c.Param(`name`)) {
 				return
 			}
 
@@ -138,7 +138,7 @@ func (f *Frontend) InitPluginProviderApi() {
 	//       404: NoContentResponse
 	f.ApiGroup.HEAD("/plugin_providers/:name",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "plugin_providers", "get", c.Param(`name`)) {
+			if !f.assureSimpleAuth(c, "plugin_providers", "get", c.Param(`name`)) {
 				return
 			}
 			pp := f.pc.GetPluginProvider(c.Param(`name`))
@@ -170,7 +170,7 @@ func (f *Frontend) InitPluginProviderApi() {
 	//       507: ErrorResponse
 	f.ApiGroup.POST("/plugin_providers/:name",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "plugin_providers", "post", c.Param(`name`)) {
+			if !f.assureSimpleAuth(c, "plugin_providers", "post", c.Param(`name`)) {
 				return
 			}
 			answer, err := f.pc.UploadPluginProvider(c, f.FileRoot, c.Param(`name`))
@@ -196,7 +196,7 @@ func (f *Frontend) InitPluginProviderApi() {
 	f.ApiGroup.DELETE("/plugin_providers/:name",
 		func(c *gin.Context) {
 			name := c.Param(`name`)
-			if !f.assureAuth(c, "plugin_providers", "delete", name) {
+			if !f.assureSimpleAuth(c, "plugin_providers", "delete", name) {
 				return
 			}
 			if err := f.pc.RemovePluginProvider(name); err != nil {

@@ -295,7 +295,7 @@ func (f *Frontend) InitJobApi() {
 				c.JSON(http.StatusBadRequest, models.NewError(c.Request.Method, http.StatusBadRequest, "Create request must have Machine field"))
 				return
 			}
-			if !f.assureAuth(c, "jobs", "create", b.AuthKey()) {
+			if !f.assureSimpleAuth(c, "jobs", "create", b.AuthKey()) {
 				return
 			}
 			if b.Uuid == nil || len(b.Uuid) == 0 {
@@ -623,7 +623,7 @@ func (f *Frontend) InitJobApi() {
 				return
 			}
 
-			if !f.assureAuth(c, "jobs", "actions", j.AuthKey()) {
+			if !f.assureSimpleAuth(c, "jobs", "actions", j.AuthKey()) {
 				return
 			}
 			actions, err := j.RenderActions(rt)
@@ -679,7 +679,7 @@ func (f *Frontend) InitJobApi() {
 				return
 			}
 
-			if !f.assureAuth(c, "jobs", "log", j.AuthKey()) {
+			if !f.assureSimpleAuth(c, "jobs", "log", j.AuthKey()) {
 				return
 			}
 
@@ -738,7 +738,7 @@ func (f *Frontend) InitJobApi() {
 				return
 			}
 
-			if !f.assureAuth(c, "jobs", "log", j.AuthKey()) {
+			if !f.assureSimpleAuth(c, "jobs", "log", j.AuthKey()) {
 				return
 			}
 

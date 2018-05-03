@@ -50,6 +50,7 @@ func (f *Frontend) GetInfo(c *gin.Context, drpid string) (*models.Info, *models.
 			"workflows",
 			"default-workflow",
 			"http-range-header",
+			"roles",
 		},
 	}
 
@@ -95,7 +96,7 @@ func (f *Frontend) InitInfoApi(drpid string) {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/info",
 		func(c *gin.Context) {
-			if !f.assureAuth(c, "info", "get", "") {
+			if !f.assureSimpleAuth(c, "info", "get", "") {
 				return
 			}
 			info, err := f.GetInfo(c, drpid)
