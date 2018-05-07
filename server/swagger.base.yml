@@ -29,9 +29,11 @@ tags:
   - name: Machines
   - name: Profiles
   - name: Users
+  - name: Roles
   - name: Params
   - name: Tasks
   - name: Jobs
+  - name: Logs
   - name: Plugins
   - name: PluginProviders
   - name: Indexes
