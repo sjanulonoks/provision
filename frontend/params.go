@@ -57,7 +57,7 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 			patchErr.AddError(err)
 		} else {
 			rt.Do(func(_ backend.Stores) {
-				_, err := rt.Patch(changed, id, patch)
+				_, err := rt.Patch(changed, changed.Key(), patch)
 				patchErr.AddError(err)
 			})
 		}
