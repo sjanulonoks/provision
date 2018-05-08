@@ -99,16 +99,8 @@ func AsProfiles(o []models.Model) []*Profile {
 func (p *Profile) Validate() {
 	p.Profile.Validate()
 	p.AddError(index.CheckUnique(p, p.rt.stores("profiles").Items()))
+	ValidateParams(p.rt, p, p.Params)
 	p.SetValid()
-	params := p.rt.stores("params")
-	for k, v := range p.Params {
-		if pIdx := params.Find(k); pIdx != nil {
-			param := AsParam(pIdx)
-			if err := param.ValidateValue(v); err != nil {
-				p.Errorf("Key '%s': invalid val '%s': %v", k, v, err)
-			}
-		}
-	}
 	p.SetAvailable()
 }
 
