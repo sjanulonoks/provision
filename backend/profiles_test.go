@@ -67,7 +67,7 @@ func TestProfilesValidation(t *testing.T) {
 					"Bool": "true",
 				},
 			},
-			true,
+			false,
 		},
 	}
 	for _, test := range tests {
