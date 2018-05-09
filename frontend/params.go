@@ -19,255 +19,170 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 	aggregator := func(c *gin.Context) bool {
 		return c.Query("aggregate") == "true"
 	}
-	item404 := func(c *gin.Context, found bool, key, line string) bool {
-		if !found {
-			err := &models.Error{
-				Code:  http.StatusNotFound,
-				Type:  c.Request.Method,
-				Model: obj.Prefix(),
-				Key:   key,
-			}
-			err.Errorf("Not Found")
-			c.JSON(err.Code, err)
-		}
-		return !found
-	}
-	idrtkeyok := func(c *gin.Context, op string) (string, *backend.RequestTracker, string) {
+	idrtkey := func(c *gin.Context, op string) (string, *backend.RequestTracker, string) {
 		id := c.Param(idKey)
 		return id,
 			f.rt(c, obj.(Lockable).Locks(op)...),
 			trimmer(c.Param("key"))
 	}
-	updater := func(c *gin.Context,
+	mutator := func(c *gin.Context,
 		rt *backend.RequestTracker,
-		orig, changed models.Paramer,
-		id string, startErr *models.Error) (authed bool, err *models.Error) {
-		if orig == nil || startErr != nil && startErr.ContainsError() {
-			authed = f.assureSimpleAuth(c, obj.Prefix(), "update", id)
-			return authed, startErr
+		id string,
+		mutfunc func(map[string]interface{}) (map[string]interface{}, *models.Error)) map[string]interface{} {
+		ob := f.Find(c, rt, obj.Prefix(), id)
+		if ob == nil {
+			return nil
 		}
-		err = &models.Error{Code: 422, Type: backend.ValidationError, Model: orig.Prefix(), Key: orig.Key()}
-		patch, patchErr := models.GenPatch(orig, changed, false)
-		if patchErr != nil {
-			err.AddError(patchErr)
-			return true, err
+		orig := models.Clone(ob).(models.Paramer)
+		changed := models.Clone(ob).(models.Paramer)
+		params := orig.GetParams()
+		rt.Tracef("Object %s:%s exists, has params %#v", orig.Prefix(), id, params)
+		if params == nil {
+			params = map[string]interface{}{}
 		}
-		if !f.assureAuthUpdate(c, changed.Prefix(), "update", changed.Key(), patch) {
-			return false, err
+		newParams, muterr := mutfunc(params)
+		if muterr != nil {
+			c.AbortWithStatusJSON(muterr.Code, muterr)
+			return nil
 		}
-		rt.Do(func(d backend.Stores) {
-			_, updateErr := rt.Update(changed)
-			err.AddError(updateErr)
-		})
-		return true, err
+		changed.SetParams(newParams)
+		patchErr := &models.Error{
+			Code:  http.StatusConflict,
+			Type:  c.Request.Method,
+			Model: obj.Prefix(),
+			Key:   id,
+		}
+		patch, err := models.GenPatch(orig, changed, false)
+		if err != nil {
+			patchErr.AddError(err)
+		} else {
+			rt.Do(func(_ backend.Stores) {
+				_, err := rt.Patch(changed, changed.Key(), patch)
+				patchErr.AddError(err)
+			})
+		}
+		if patchErr.ContainsError() {
+			c.AbortWithStatusJSON(patchErr.Code, patchErr)
+			return nil
+		}
+		return newParams
 	}
 	return /* getAll */ func(c *gin.Context) {
-			id, rt, _ := idrtkeyok(c, "get")
+			id, rt, _ := idrtkey(c, "get")
 			if !f.assureSimpleAuth(c, obj.Prefix(), "get", id) {
 				return
 			}
 			var params map[string]interface{}
-			var found bool
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob != nil {
-					params, found = rt.GetParams(ob.(models.Paramer), aggregator(c)), true
-				}
-			})
-			if !item404(c, found, id, "Params") {
-				c.JSON(http.StatusOK, params)
+			ob := f.Find(c, rt, obj.Prefix(), id)
+			if ob == nil {
+				return
 			}
+			rt.Do(func(_ backend.Stores) {
+				params = rt.GetParams(ob.(models.Paramer), aggregator(c))
+			})
+			c.JSON(http.StatusOK, params)
 		},
 		/* getOne */ func(c *gin.Context) {
-			id, rt, key := idrtkeyok(c, "get")
+			id, rt, key := idrtkey(c, "get")
 			if !f.assureSimpleAuth(c, obj.Prefix(), "get", id) {
 				return
 			}
-			var found bool
+			ob := f.Find(c, rt, obj.Prefix(), id)
+			if ob == nil {
+				return
+			}
 			var val interface{}
 			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob != nil {
-					found = true
-					val, _ = rt.GetParam(ob.(models.Paramer), key, aggregator(c))
-				}
+				val, _ = rt.GetParam(ob.(models.Paramer), key, aggregator(c))
 			})
-			if !item404(c, found, id, "Param") {
-				c.JSON(http.StatusOK, val)
-			}
+			c.JSON(http.StatusOK, val)
 		},
 		/* patchThem */ func(c *gin.Context) {
 			var patch jsonpatch2.Patch
 			if !assureDecode(c, &patch) {
 				return
 			}
-			id, rt, _ := idrtkeyok(c, "update")
-			rt.Tracef("Patching %s:%s with %#v", obj.Prefix(), id, patch)
-			var res map[string]interface{}
-			var authed, found bool
-			var patchErr *models.Error
-			var changed, orig models.Paramer
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob == nil {
-					return
-				}
-				orig = models.Clone(ob).(models.Paramer)
-				changed = models.Clone(ob).(models.Paramer)
-				params := orig.GetParams()
-				rt.Tracef("Object %s:%s exists, has params %#v", orig.Prefix(), id, params)
-				if params == nil {
-					params = map[string]interface{}{}
-				}
-
-				found = true
-				patchErr = &models.Error{
-					Code:  http.StatusConflict,
-					Type:  c.Request.Method,
-					Model: orig.Prefix(),
-					Key:   id,
-				}
-				buf, err := json.Marshal(params)
-				if err != nil {
-					patchErr.AddError(err)
-					orig, changed = nil, nil
-					return
-				}
-				patched, err, loc := patch.Apply(buf)
-				if err != nil {
-					patchErr.Errorf("Patch failed to apply at line %d", loc)
-					patchErr.AddError(err)
-					orig, changed = nil, nil
-					return
-				}
-				if err := json.Unmarshal(patched, &res); err != nil {
-					patchErr.AddError(err)
-				}
-				if !patchErr.ContainsError() {
-					changed.SetParams(res)
-				} else {
-					orig, changed = nil, nil
-				}
-			})
-			authed, patchErr = updater(c, rt, orig, changed, id, patchErr)
-			if !authed {
-				return
-			}
-			if item404(c, found, id, "Params") {
-				return
-			}
-			if patchErr.ContainsError() {
-				c.JSON(patchErr.Code, patchErr)
-			} else {
-				c.JSON(http.StatusOK, res)
+			id, rt, _ := idrtkey(c, "update")
+			newParams := mutator(c, rt, id,
+				func(params map[string]interface{}) (map[string]interface{}, *models.Error) {
+					patchErr := &models.Error{
+						Code:  http.StatusConflict,
+						Type:  c.Request.Method,
+						Model: obj.Prefix(),
+						Key:   id,
+					}
+					buf, err := json.Marshal(params)
+					if err != nil {
+						patchErr.AddError(err)
+						return nil, patchErr
+					}
+					patched, err, loc := patch.Apply(buf)
+					if err != nil {
+						patchErr.Errorf("Patch failed to apply at line %d", loc)
+						patchErr.AddError(err)
+						return nil, patchErr
+					}
+					var res map[string]interface{}
+					if err := json.Unmarshal(patched, &res); err != nil {
+						patchErr.AddError(err)
+						return nil, patchErr
+					}
+					return res, nil
+				})
+			if newParams != nil {
+				c.JSON(http.StatusOK, newParams)
 			}
 		},
 		/* setThem */ func(c *gin.Context) {
-			id, rt, _ := idrtkeyok(c, "update")
+			id, rt, _ := idrtkey(c, "update")
 			var replacement map[string]interface{}
 			if !assureDecode(c, &replacement) {
 				return
 			}
-			var authed, found bool
-			var err *models.Error
-			var changed, orig models.Paramer
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob == nil {
-					authed = f.assureSimpleAuth(c, obj.Prefix(), "update", id)
-					return
-				}
-				changed = models.Clone(ob).(models.Paramer)
-				orig = models.Clone(ob).(models.Paramer)
-				found = true
-				changed.SetParams(replacement)
-			})
-			authed, err = updater(c, rt, orig, changed, id, nil)
-			if !authed {
-				return
-			}
-			if item404(c, found, id, "Params") {
-				return
-			}
-			if err != nil && err.ContainsError() {
-				c.JSON(err.Code, err)
-			} else {
-				c.JSON(http.StatusOK, replacement)
+			newParams := mutator(c, rt, id,
+				func(params map[string]interface{}) (map[string]interface{}, *models.Error) {
+					return replacement, nil
+				})
+			if newParams != nil {
+				c.JSON(http.StatusOK, newParams)
 			}
 		},
 		/* setOne */ func(c *gin.Context) {
-			id, rt, key := idrtkeyok(c, "update")
+			id, rt, key := idrtkey(c, "update")
 			var replacement interface{}
 			if !assureDecode(c, &replacement) {
 				return
 			}
-			var authed, found bool
-			var err *models.Error
-			var changed, orig models.Paramer
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob == nil {
-					return
-				}
-				found = true
-				changed = models.Clone(ob).(models.Paramer)
-				orig = models.Clone(ob).(models.Paramer)
-				params := orig.GetParams()
-				params[key] = replacement
-				changed.SetParams(params)
-			})
-			authed, err = updater(c, rt, orig, changed, id, nil)
-			if !authed {
-				return
-			}
-			if item404(c, found, id, "Params") {
-				return
-			}
-			if err != nil && err.ContainsError() {
-				c.JSON(err.Code, err)
-			} else {
+			newParams := mutator(c, rt, id,
+				func(params map[string]interface{}) (map[string]interface{}, *models.Error) {
+					params[key] = replacement
+					return params, nil
+				})
+			if newParams != nil {
 				c.JSON(http.StatusOK, replacement)
 			}
 		},
 		/* deleteOne */ func(c *gin.Context) {
-			id, rt, key := idrtkeyok(c, "update")
-			var authed, found bool
+			id, rt, key := idrtkey(c, "update")
+			var found bool
 			var val interface{}
-			var err *models.Error
-			var orig, changed models.Paramer
-			rt.Do(func(d backend.Stores) {
-				ob := rt.Find(obj.Prefix(), id)
-				if ob == nil {
-					return
-				}
-				changed = models.Clone(ob).(models.Paramer)
-				orig = models.Clone(ob).(models.Paramer)
-				params := orig.GetParams()
-				val, found = params[key]
-				if !found {
-					changed, orig = nil, nil
-					err = &models.Error{
-						Code:  http.StatusNotFound,
-						Type:  "DELETE",
-						Model: "params",
-						Key:   key,
+			mutator(c, rt, id,
+				func(params map[string]interface{}) (map[string]interface{}, *models.Error) {
+					val, found = params[key]
+					if !found {
+						err := &models.Error{
+							Code:  http.StatusNotFound,
+							Type:  "DELETE",
+							Model: "params",
+							Key:   key,
+						}
+						err.Errorf("Not Found")
+						return nil, err
 					}
-					err.Errorf("Not Found")
-					return
-				}
-				delete(params, key)
-				changed.SetParams(params)
-			})
-			authed, err = updater(c, rt, orig, changed, id, err)
-			if !authed {
-				return
-			}
-			if item404(c, found, id, "Params") {
-				return
-			}
-			if err != nil && err.ContainsError() {
-				c.JSON(err.Code, err)
-			} else {
+					delete(params, key)
+					return params, nil
+				})
+			if found {
 				c.JSON(http.StatusOK, val)
 			}
 		}

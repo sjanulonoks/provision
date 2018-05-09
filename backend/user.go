@@ -15,10 +15,15 @@ import (
 type User struct {
 	*models.User
 	validate
+	activeTenant string
 }
 
 func (obj *User) SetReadOnly(b bool) {
 	obj.ReadOnly = b
+}
+
+func (u *User) Tenant() string {
+	return u.activeTenant
 }
 
 func (obj *User) SaveClean() store.KeySaver {
@@ -89,7 +94,7 @@ func (u *User) Validate() {
 	u.AddError(index.CheckUnique(u, u.rt.stores("users").Items()))
 	u.SetValid()
 	for _, rName := range u.Roles {
-		r := u.rt.Find("roles", rName)
+		r := u.rt.find("roles", rName)
 		if r == nil {
 			u.Errorf("Role %s does not exist", rName)
 		} else {
@@ -106,13 +111,14 @@ func (u *User) GenClaim(grantor string, ttl time.Duration, wantedRoles ...string
 	claim := NewClaim(u.Name, grantor, ttl)
 	// Users always have the right to get a token and change their password.
 	claim.AddRawClaim("users", "token,password,get", u.Name)
+	claim.AddRawClaim("info", "get", "")
 	if len(wantedRoles) == 0 {
 		claim.AddRoles(u.Roles...)
 		return claim
 	}
 	haveRoles := []*Role{}
 	for _, r := range u.Roles {
-		if robj := u.rt.Find("roles", r); robj != nil {
+		if robj := u.rt.find("roles", r); robj != nil {
 			haveRoles = append(haveRoles, robj.(*Role))
 		} else {
 			u.rt.Errorf("User %s has missing role %s", u.Name, r)
@@ -120,7 +126,7 @@ func (u *User) GenClaim(grantor string, ttl time.Duration, wantedRoles ...string
 	}
 	for i := range wantedRoles {
 		r := strings.TrimSpace(wantedRoles[i])
-		if robj := u.rt.Find("roles", r); robj != nil {
+		if robj := u.rt.find("roles", r); robj != nil {
 			for _, test := range haveRoles {
 				role := AsRole(robj)
 				if test.Role.Contains(role.Role) {
@@ -163,12 +169,30 @@ func (u *User) OnLoad() error {
 	return err
 }
 
+func (u *User) AfterDelete() {
+	if u.activeTenant == "" {
+		return
+	}
+	if obj := u.rt.find("tenants", u.activeTenant); obj != nil {
+		t := AsTenant(obj)
+		newUserList := []string{}
+		for _, name := range t.Users {
+			if name == u.Name {
+				continue
+			}
+			newUserList = append(newUserList, name)
+		}
+		t.Users = newUserList
+		u.rt.Save(t)
+	}
+}
+
 var userLockMap = map[string][]string{
 	"get":     []string{"users", "roles"},
 	"create":  []string{"users", "roles"},
 	"update":  []string{"users", "roles"},
 	"patch":   []string{"users", "roles"},
-	"delete":  []string{"users"},
+	"delete":  []string{"users", "tenants"},
 	"actions": []string{"users", "roles", "profiles", "params"},
 }
 

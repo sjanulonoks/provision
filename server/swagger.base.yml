@@ -30,6 +30,7 @@ tags:
   - name: Profiles
   - name: Users
   - name: Roles
+  - name: Tenants
   - name: Params
   - name: Tasks
   - name: Jobs

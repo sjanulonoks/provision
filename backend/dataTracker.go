@@ -256,6 +256,10 @@ func Fill(t store.KeySaver) {
 		if obj.Role == nil {
 			obj.Role = &models.Role{}
 		}
+	case *Tenant:
+		if obj.Tenant == nil {
+			obj.Tenant = &models.Tenant{}
+		}
 	default:
 		panic(fmt.Sprintf("Unknown backend model %T", t))
 	}
@@ -297,8 +301,10 @@ func ModelToBackend(m models.Model) store.KeySaver {
 		return &Workflow{Workflow: obj}
 	case *models.Role:
 		return &Role{Role: obj}
+	case *models.Tenant:
+		return &Tenant{Tenant: obj}
 	default:
-		panic(fmt.Sprintf("Unknown model %T", m))
+		return nil
 	}
 }
 
@@ -482,6 +488,16 @@ func toBackend(m models.Model, rt *RequestTracker) store.KeySaver {
 		res.Role = obj
 		res.rt = rt
 		return &res
+	case *models.Tenant:
+		var res Tenant
+		if ours != nil {
+			res = *ours.(*Tenant)
+		} else {
+			res = Tenant{}
+		}
+		res.Tenant = obj
+		res.rt = rt
+		return &res
 
 	default:
 		log.Panicf("Unknown model %T", m)
@@ -587,6 +603,7 @@ func allKeySavers() []models.Model {
 		&Lease{},
 		&Plugin{},
 		&Job{},
+		&Tenant{},
 	}
 }
 
@@ -601,14 +618,15 @@ func (p *DataTracker) lockEnts(ents ...string) (stores Stores, unlocker func()) 
 	sort.Sort(sort.Reverse(s))
 	sortedRes := map[string]*Store{}
 	for _, ent := range s {
-		objs, ok := p.objs[ent]
-		if !ok {
+		if _, ok := p.objs[ent]; !ok {
 			log.Panicf("Tried to reference nonexistent object type '%s'", ent)
 		}
-		sortedRes[ent] = objs
 	}
 	for _, ent := range s {
-		sortedRes[ent].Lock()
+		if _, ok := sortedRes[ent]; !ok {
+			sortedRes[ent] = p.objs[ent]
+			sortedRes[ent].Lock()
+		}
 	}
 	srMux := &sync.Mutex{}
 	return func(ref string) *Store {
@@ -623,8 +641,10 @@ func (p *DataTracker) lockEnts(ents ...string) (stores Stores, unlocker func()) 
 		func() {
 			srMux.Lock()
 			for i := len(s) - 1; i >= 0; i-- {
-				sortedRes[s[i]].Unlock()
-				delete(sortedRes, s[i])
+				if _, ok := sortedRes[s[i]]; ok {
+					sortedRes[s[i]].Unlock()
+					delete(sortedRes, s[i])
+				}
 			}
 			srMux.Unlock()
 			p.allMux.RUnlock()
@@ -906,7 +926,7 @@ func NewDataTracker(backend store.Store,
 			}
 			rt.Create(user)
 		} else {
-			user := rt.Find("users", "rocketskates")
+			user := rt.find("users", "rocketskates")
 			if user != nil {
 				u := AsUser(user)
 				if u.Roles == nil || len(u.Roles) == 0 {

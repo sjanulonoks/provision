@@ -106,6 +106,12 @@ func (f *Frontend) InitIndexApi() {
 				return
 			}
 			bm := backend.ModelToBackend(m)
+			if bm == nil {
+				c.JSON(http.StatusNotFound,
+					models.NewError(c.Request.Method, http.StatusNotFound,
+						fmt.Sprintf("index get: not found: %s", c.Param("prefix"))))
+				return
+			}
 			idxer, ok := bm.(Indexer)
 			if !ok {
 				c.JSON(http.StatusNotFound,

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/digitalrebar/logger"
-	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/models"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/olahol/melody.v1"
@@ -20,11 +19,11 @@ func (fe *Frontend) InitWebSocket() {
 	fe.melody = melody.New()
 
 	fe.ApiGroup.GET("/ws", func(c *gin.Context) {
-		claim, _ := c.Get("DRP-CLAIM")
+		auth, _ := c.Get("DRP-AUTH")
 		l, _ := c.Get("logger")
 		keys := map[string]interface{}{
-			"DRP-CLAIM": claim,
-			"logger":    l,
+			"DRP-AUTH": auth,
+			"logger":   l,
 		}
 		fe.melody.HandleRequestWithKeys(c.Writer, c.Request, keys)
 	})
@@ -35,7 +34,9 @@ func (fe *Frontend) InitWebSocket() {
 // Callers register or deregister values.
 // type.action.key = with * as wildcard spots.
 
-func (f *Frontend) filterFunction(emap []string, claim interface{}, e *models.Event) bool {
+func wsFilterFunction(emap []string,
+	auth *authBlob,
+	e *models.Event) bool {
 	// Check for an event to map.
 	matched := false
 	for _, test := range emap {
@@ -55,9 +56,8 @@ func (f *Frontend) filterFunction(emap []string, claim interface{}, e *models.Ev
 	}
 
 	// Make sure we are authorized to see this event.
-	if matched {
-		roleRT := f.rt(nil, (&backend.Role{}).Locks("get")...)
-		matched = f.assureClaimMatch(roleRT, claim, models.MakeRole("", e.Type, e.Action, e.Key))
+	if matched && auth != nil {
+		matched = auth.matchClaim(models.MakeRole("", e.Type, e.Action, e.Key).Compile())
 	}
 	return matched
 }
@@ -68,11 +68,13 @@ func (f *Frontend) Publish(e *models.Event) error {
 	} else {
 		return f.melody.BroadcastFilter(msg, func(s *melody.Session) bool {
 			var emap []string
-			var claim interface{}
+			var auth *authBlob
 			hasMap := func() bool {
 				wsLock.Lock()
 				defer wsLock.Unlock()
-				claim = s.MustGet("DRP-CLAIM")
+				if c := s.MustGet("DRP-AUTH"); c != nil {
+					auth = c.(*authBlob)
+				}
 				if val, ok := s.Get("EventMap"); !ok {
 					return false
 				} else {
@@ -87,7 +89,7 @@ func (f *Frontend) Publish(e *models.Event) error {
 			if !hasMap {
 				return false
 			}
-			return f.filterFunction(emap, claim, e)
+			return wsFilterFunction(emap, auth, e)
 		})
 	}
 }

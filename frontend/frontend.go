@@ -45,6 +45,88 @@ type Lockable interface {
 	Locks(string) []string
 }
 
+type authBlob struct {
+	f                           *Frontend
+	claim                       *backend.DrpCustomClaims
+	claimsList                  []models.Claims
+	tenantMembers               map[string]map[string]struct{}
+	currentUser, currentGrantor *models.User
+	currentMachine              *models.Machine
+	currentTenant               string
+}
+
+func (a *authBlob) tenantOK(prefix, key string) bool {
+	if a.tenantMembers == nil || a.tenantMembers[prefix] == nil {
+		return true
+	}
+	_, res := a.tenantMembers[prefix][key]
+	return res
+}
+
+func (a *authBlob) tenantSelect(scope string) index.Filter {
+	if a.tenantMembers == nil {
+		return nil
+	}
+	test := func(m models.Model) bool {
+		if a.tenantOK(m.Prefix(), m.Key()) {
+			return true
+		}
+		switch o := m.(type) {
+		case *models.Job:
+			return a.tenantOK("machines", o.Machine.String())
+		case *backend.Job:
+			return a.tenantOK("machines", o.Machine.String())
+		case *models.Lease:
+			return a.tenantOK("machines", a.f.rt(nil).MacToMachineUUID(o.Token))
+		case *backend.Lease:
+			return a.tenantOK("machines", a.f.rt(nil).MacToMachineUUID(o.Token))
+		case *models.Reservation:
+			return a.tenantOK("machines", a.f.rt(nil).MacToMachineUUID(o.Token))
+		case *backend.Reservation:
+			return a.tenantOK("machines", a.f.rt(nil).MacToMachineUUID(o.Token))
+		}
+		return false
+	}
+	return index.Select(test)
+}
+
+func (a *authBlob) Find(rt *backend.RequestTracker, prefix, key string) models.Model {
+	res := rt.Find(prefix, key)
+	if res == nil {
+		return res
+	}
+	if a.tenantOK(prefix, res.Key()) {
+		return res
+	}
+	switch prefix {
+	case "jobs":
+		j := backend.AsJob(res)
+		if a.tenantOK("machines", j.Machine.String()) {
+			return res
+		}
+	case "leases":
+		l := backend.AsLease(res)
+		if a.tenantOK("machines", rt.MacToMachineUUID(l.Token)) {
+			return res
+		}
+	case "reservations":
+		r := backend.AsReservation(res)
+		if a.tenantOK("machines", rt.MacToMachineUUID(r.Token)) {
+			return res
+		}
+	}
+	return nil
+}
+
+func (a *authBlob) matchClaim(wanted models.Claims) bool {
+	for i := range a.claimsList {
+		if a.claimsList[i].Contains(wanted) {
+			return true
+		}
+	}
+	return false
+}
+
 type Frontend struct {
 	Logger     logger.Logger
 	FileRoot   string
@@ -74,6 +156,24 @@ func (f *Frontend) l(c *gin.Context) logger.Logger {
 		}
 	}
 	return f.Logger
+}
+
+func (f *Frontend) Find(c *gin.Context, rt *backend.RequestTracker, prefix, key string) models.Model {
+	var res models.Model
+	rt.Do(func(s backend.Stores) {
+		res = f.getAuth(c).Find(rt, prefix, key)
+	})
+	if res == nil {
+		err := &models.Error{
+			Model:    prefix,
+			Key:      key,
+			Code:     http.StatusNotFound,
+			Type:     c.Request.Method,
+			Messages: []string{"Not Found"},
+		}
+		c.AbortWithStatusJSON(err.Code, err)
+	}
+	return res
 }
 
 func (f *Frontend) rt(c *gin.Context, locks ...string) *backend.RequestTracker {
@@ -129,6 +229,7 @@ func (fe *Frontend) userAuth() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
+		var token *backend.DrpCustomClaims
 		if hdrParts[0] == "Basic" {
 			hdr, err := base64.StdEncoding.DecodeString(hdrParts[1])
 			if err != nil {
@@ -154,9 +255,8 @@ func (fe *Frontend) userAuth() gin.HandlerFunc {
 				c.AbortWithStatus(http.StatusForbidden)
 				return
 			}
-			t := user.GenClaim(string(userpass[0]), 30)
+			token = user.GenClaim(string(userpass[0]), 30)
 			fe.rt(c).Auditf("Authenticated user %s from %s", userpass[0], c.ClientIP())
-			c.Set("DRP-CLAIM", t)
 		} else if hdrParts[0] == "Bearer" {
 			t, err := fe.dt.GetToken(string(hdrParts[1]))
 			if err != nil {
@@ -165,9 +265,48 @@ func (fe *Frontend) userAuth() gin.HandlerFunc {
 				c.AbortWithStatus(http.StatusForbidden)
 				return
 			}
-			c.Set("DRP-CLAIM", t)
+			token = t
 		}
-		c.Next()
+		auth := &authBlob{claim: token}
+		valid := true
+		rt := fe.rt(c, "users", "roles", "tenants", "machines")
+		rt.Do(func(stores backend.Stores) {
+			var userSecret, grantorSecret, machineSecret string
+			if u := rt.RawFind("users", token.GrantorClaims.UserId); u != nil {
+				auth.currentUser = models.Clone(backend.AsUser(u)).(*models.User)
+				userSecret = auth.currentUser.Secret
+				auth.currentTenant = backend.AsUser(u).Tenant()
+			}
+			if token.GrantorClaims.GrantorId == "secret" {
+				grantorSecret = rt.Prefs()["systemGrantorSecret"]
+			} else if u := rt.Find("users", token.GrantorClaims.GrantorId); u != nil {
+				auth.currentGrantor = backend.AsUser(u).User
+				grantorSecret = auth.currentGrantor.Secret
+			}
+			if m := rt.Find("machines", token.GrantorClaims.MachineUuid); m != nil {
+				auth.currentMachine = backend.AsMachine(m).Machine
+				machineSecret = auth.currentMachine.Secret
+			}
+			if !token.ValidateSecrets(grantorSecret, userSecret, machineSecret) {
+				valid = false
+				return
+			}
+			auth.claimsList = token.ClaimsList(rt)
+			if t := rt.RawFind("tenants", auth.currentTenant); t != nil {
+				auth.tenantMembers = backend.AsTenant(t).ExpandedMembers()
+			}
+		})
+		if valid {
+			c.Set("DRP-AUTH", auth)
+			c.Next()
+			return
+		}
+		err := &models.Error{
+			Type: "AUTH",
+			Code: http.StatusForbidden,
+		}
+		err.Errorf("Validation failed")
+		c.AbortWithStatusJSON(err.Code, err)
 	}
 }
 
@@ -325,6 +464,7 @@ func NewFrontend(
 	me.InitWorkflowApi()
 	me.InitEventApi()
 	me.InitContentApi()
+	me.InitTenantApi()
 	me.InitSystemApi()
 
 	if EmbeddedAssetsServerFunc != nil {
@@ -354,6 +494,14 @@ func NewFrontend(
 	return
 }
 
+func (f *Frontend) getAuth(c *gin.Context) *authBlob {
+	b, ok := c.Get("DRP-AUTH")
+	if !ok {
+		f.l(c).Panicf("Missing auth!")
+	}
+	return b.(*authBlob)
+}
+
 func testContentType(c *gin.Context, ct string) bool {
 	ct = strings.ToUpper(ct)
 	test := strings.ToUpper(c.ContentType())
@@ -371,103 +519,10 @@ func assureContentType(c *gin.Context, ct string) bool {
 	return false
 }
 
-func (f *Frontend) getAuthUser(c *gin.Context) string {
-	obj, ok := c.Get("DRP-CLAIM")
-	if !ok {
-		return ""
-	}
-	drpClaim, ok := obj.(*backend.DrpCustomClaims)
-	if !ok {
-		return ""
-	}
-	return drpClaim.Id
-}
-
-//
-// THIS CAN BE CALLED UNDER LOCKS, but will not validate the secrets.
-//
-func (f *Frontend) assureClaimMatch(rt *backend.RequestTracker,
-	claimFromRequest interface{},
-	role *models.Role) bool {
-	drpClaim, ok := claimFromRequest.(*backend.DrpCustomClaims)
-	if !ok {
-		f.Logger.Warnf("Request with bad claims")
-		return false
-	}
-	if drpClaim.Match(rt, role) {
-		f.Logger.Debugf("Claims ok: %v", role.Claims)
-		return true
-	} else {
-		f.Logger.Debugf("Claims failed: %v", role.Claims)
-		return false
-	}
-}
-
-//
-// THIS MUST NOT BE CALLED UNDER LOCKS!
-//
-func (f *Frontend) assureAuthWithClaim(c *gin.Context,
-	role *models.Role) bool {
-	claim, ok := c.Get("DRP-CLAIM")
-	if !ok {
-		f.rt(c).Auditf("Failed to get claim from %s", c.ClientIP())
-		return false
-	}
-	roleRT := f.rt(c, (&backend.Role{}).Locks("get")...)
-	if !f.assureClaimMatch(roleRT, claim, role) {
-		return false
-	}
-
-	userSecret := ""
-	grantorSecret := ""
-	machineSecret := ""
-	userRef := &backend.User{}
-	machineRef := &backend.Machine{}
-	userRT := f.rt(c, userRef.Locks("get")...)
-	machineRT := f.rt(c, machineRef.Locks("get")...)
-	drpClaim := claim.(*backend.DrpCustomClaims)
-	if drpClaim.HasUserId() {
-		userRT.Do(func(d backend.Stores) {
-			userRT.Debugf("claim has user id %v", drpClaim.UserId())
-			if obj := userRT.Find("users", drpClaim.UserId()); obj != nil {
-				userSecret = backend.AsUser(obj).Secret
-			}
-		})
-	}
-	if drpClaim.HasGrantorId() {
-		if drpClaim.GrantorId() != "system" {
-			userRT.Do(func(d backend.Stores) {
-				userRT.Debugf("claim has user id %v", drpClaim.UserId())
-				if obj := userRT.Find("users", drpClaim.UserId()); obj != nil {
-					grantorSecret = backend.AsUser(obj).Secret
-				}
-			})
-		} else {
-			prefs := f.dt.Prefs()
-			if ss, ok := prefs["systemGrantorSecret"]; ok {
-				grantorSecret = ss
-			}
-		}
-	}
-	if drpClaim.HasMachineUuid() {
-		machineRT.Do(func(d backend.Stores) {
-			machineRT.Debugf("claim has user id %v", drpClaim.MachineUuid())
-			if obj := machineRT.Find("machines", drpClaim.MachineUuid()); obj != nil {
-				machineSecret = backend.AsMachine(obj).Secret
-			}
-		})
-		if machineSecret == "" {
-			return false
-		}
-	}
-	if !drpClaim.ValidateSecrets(grantorSecret, userSecret, machineSecret) {
-		return false
-	}
-	return true
-}
-
-func (f *Frontend) assureAuth(c *gin.Context, role *models.Role, scope, action, specific string) bool {
-	if f.assureAuthWithClaim(c, role) {
+func (f *Frontend) assureAuth(c *gin.Context,
+	wantsClaims models.Claims,
+	scope, action, specific string) bool {
+	if f.getAuth(c).matchClaim(wantsClaims) {
 		return true
 	}
 	f.rt(c).Auditf("Failed auth '%s' '%s' '%s' - %s",
@@ -486,8 +541,8 @@ func (f *Frontend) assureAuth(c *gin.Context, role *models.Role, scope, action, 
 // THIS MUST NOT BE CALLED UNDER LOCKS!
 //
 func (f *Frontend) assureSimpleAuth(c *gin.Context, scope, action, specific string) bool {
-	role := models.MakeRole("", scope, action, specific)
-	return f.assureAuth(c, role, scope, action, specific)
+	wantsClaims := models.MakeRole("", scope, action, specific).Compile()
+	return f.assureAuth(c, wantsClaims, scope, action, specific)
 }
 
 func (f *Frontend) assureAuthUpdate(c *gin.Context,
@@ -505,8 +560,8 @@ func (f *Frontend) assureAuthUpdate(c *gin.Context,
 			claims = append(claims, scope, "update:"+line.Path, specific)
 		}
 	}
-	role := models.MakeRole("", claims...)
-	return f.assureAuth(c, role, scope, action, specific)
+	wantsClaims := models.MakeRole("", claims...).Compile()
+	return f.assureAuth(c, wantsClaims, scope, action, specific)
 }
 
 func assureDecode(c *gin.Context, val interface{}) bool {
@@ -689,6 +744,9 @@ func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 			res.AddError(err)
 			return
 		}
+		if tf := f.getAuth(c).tenantSelect(ref.Prefix()); tf != nil {
+			filters = append(filters, tf)
+		}
 
 		mainIndex := &d(ref.Prefix()).Index
 		c.Header("X-DRP-LIST-TOTAL-COUNT", fmt.Sprintf("%d", mainIndex.Count()))
@@ -742,66 +800,54 @@ func (f *Frontend) List(c *gin.Context, ref store.KeySaver) {
 func (f *Frontend) Exists(c *gin.Context, ref store.KeySaver, key string) {
 	backend.Fill(ref)
 	prefix := ref.Prefix()
-	var found bool
 	rt := f.rt(c, ref.(Lockable).Locks("get")...)
-	rt.Do(func(d backend.Stores) {
-		found = rt.Find(prefix, key) != nil
-	})
-	if found {
+	if f.Find(c, rt, prefix, key) != nil {
 		c.Status(http.StatusOK)
-	} else {
-		c.Status(http.StatusNotFound)
 	}
 }
 
 func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	backend.Fill(ref)
 	prefix := ref.Prefix()
-	var err error
 	var res models.Model
 	rt := f.rt(c, ref.(Lockable).Locks("get")...)
-	rt.Do(func(d backend.Stores) {
-		res = rt.Find(prefix, key)
-	})
-	if res != nil {
-		aref, _ := res.(backend.AuthSaver)
-		if !f.assureSimpleAuth(c, prefix, "get", aref.AuthKey()) {
-			return
-		}
-		s, ok := res.(Sanitizable)
-		if ok {
-			res = s.Sanitize()
-		}
-		c.JSON(http.StatusOK, res)
-	} else {
-		rerr := &models.Error{
-			Code:  http.StatusNotFound,
-			Type:  c.Request.Method,
-			Model: prefix,
-			Key:   key,
-		}
-		rerr.Errorf("Not Found")
-		if err != nil {
-			rerr.AddError(err)
-		}
-		c.JSON(rerr.Code, rerr)
-	}
-}
-
-func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
-	backend.Fill(val)
-	if !assureDecode(c, val) {
+	res = f.Find(c, rt, prefix, key)
+	if res == nil {
 		return
 	}
+	aref, _ := res.(backend.AuthSaver)
+	if !f.assureSimpleAuth(c, prefix, "get", aref.AuthKey()) {
+		return
+	}
+	s, ok := res.(Sanitizable)
+	if ok {
+		res = s.Sanitize()
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func (f *Frontend) create(c *gin.Context, val store.KeySaver) {
 	if !f.assureSimpleAuth(c, val.Prefix(), "create", "") {
 		return
 	}
 	var err error
 	var res models.Model
-	rt := f.rt(c, val.(Lockable).Locks("create")...)
+	tenant := f.getAuth(c).currentTenant
+	locks := val.(Lockable).Locks("create")
+	if tenant != "" {
+		locks = append(locks, "tenants")
+	}
+	rt := f.rt(c, locks...)
 	rt.Do(func(d backend.Stores) {
 		_, err = rt.Create(val)
 		if err == nil {
+			if tenant != "" {
+				t2 := backend.AsTenant(rt.RawFind("tenants", tenant))
+				if t2.Members[val.Prefix()] != nil {
+					t2.Members[val.Prefix()] = append(t2.Members[val.Prefix()], val.Key())
+					rt.Save(t2)
+				}
+			}
 			res = models.Clone(val)
 		}
 	})
@@ -816,6 +862,14 @@ func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
 	}
 }
 
+func (f *Frontend) Create(c *gin.Context, val store.KeySaver) {
+	backend.Fill(val)
+	if !assureDecode(c, val) {
+		return
+	}
+	f.create(c, val)
+}
+
 func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	backend.Fill(ref)
 	patch := make(jsonpatch2.Patch, 0)
@@ -826,13 +880,11 @@ func (f *Frontend) Patch(c *gin.Context, ref store.KeySaver, key string) {
 	var tref models.Model
 	authKey := ""
 	rt := f.rt(c, ref.(Lockable).Locks("update")...)
-	rt.Do(func(d backend.Stores) {
-		tref = rt.Find(ref.Prefix(), key)
-		if tref != nil {
-			authKey = tref.(backend.AuthSaver).AuthKey()
-		}
-	})
-
+	tref = f.Find(c, rt, ref.Prefix(), key)
+	if tref == nil {
+		return
+	}
+	authKey = tref.(backend.AuthSaver).AuthKey()
 	if authKey != "" && !f.assureAuthUpdate(c, ref.Prefix(), "patch", authKey, patch) {
 		return
 	}
@@ -874,13 +926,12 @@ func (f *Frontend) Update(c *gin.Context, ref store.KeySaver, key string) {
 	var patch jsonpatch2.Patch
 	authKey := ""
 	rt := f.rt(c, ref.(Lockable).Locks("update")...)
-	rt.Do(func(d backend.Stores) {
-		tref := rt.Find(ref.Prefix(), ref.Key())
-		if tref != nil {
-			patch, err = models.GenPatch(tref, ref, false)
-			authKey = tref.(backend.AuthSaver).AuthKey()
-		}
-	})
+	tref := f.Find(c, rt, ref.Prefix(), ref.Key())
+	if tref == nil {
+		return
+	}
+	patch, err = models.GenPatch(tref, ref, false)
+	authKey = tref.(backend.AuthSaver).AuthKey()
 	if err != nil {
 		jsonError(c, err, http.StatusBadRequest, "")
 	}
@@ -907,30 +958,39 @@ func (f *Frontend) Remove(c *gin.Context, ref store.KeySaver, key string) {
 	backend.Fill(ref)
 	var err error
 	var res models.Model
-	rt := f.rt(c, ref.(Lockable).Locks("delete")...)
-	rt.Do(func(d backend.Stores) {
-		res = rt.Find(ref.Prefix(), key)
-		if res == nil {
-			err = &models.Error{
-				Type:     "DELETE",
-				Code:     http.StatusNotFound,
-				Key:      key,
-				Model:    ref.Prefix(),
-				Messages: []string{"Not Found"},
-			}
-		}
-	})
-
-	if err != nil {
-		c.JSON(err.(*models.Error).Code, err)
+	locks := ref.(Lockable).Locks("delete")
+	locks = append(locks, "tenants")
+	rt := f.rt(c, locks...)
+	res = f.Find(c, rt, ref.Prefix(), key)
+	if res == nil {
 		return
 	}
-
 	if !f.assureSimpleAuth(c, ref.Prefix(), "delete", res.(backend.AuthSaver).AuthKey()) {
 		return
 	}
 	rt.Do(func(d backend.Stores) {
 		_, err = rt.Remove(res)
+		if err != nil {
+			return
+		}
+		for _, tobj := range d("tenants").Items() {
+			t := backend.AsTenant(tobj)
+			if t.Members[ref.Prefix()] == nil {
+				continue
+			}
+			tenantMembers := t.ExpandedMembers()
+			if _, ok := tenantMembers[ref.Prefix()][key]; !ok {
+				continue
+			}
+			newMembers := []string{}
+			for _, k := range t.Members[ref.Prefix()] {
+				if k != key {
+					newMembers = append(newMembers, k)
+				}
+			}
+			t.Members[ref.Prefix()] = newMembers
+			rt.Save(t)
+		}
 	})
 
 	if err != nil {
