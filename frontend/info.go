@@ -3,7 +3,6 @@ package frontend
 import (
 	"net"
 	"net/http"
-	"runtime"
 
 	"github.com/digitalrebar/provision"
 	"github.com/digitalrebar/provision/backend"
@@ -21,8 +20,6 @@ type InfoResponse struct {
 
 func (f *Frontend) GetInfo(c *gin.Context, drpid string) (*models.Info, *models.Error) {
 	i := &models.Info{
-		Arch:               runtime.GOARCH,
-		Os:                 runtime.GOOS,
 		Version:            provision.RS_VERSION,
 		Id:                 drpid,
 		ApiPort:            f.ApiPort,
@@ -34,25 +31,8 @@ func (f *Frontend) GetInfo(c *gin.Context, drpid string) (*models.Info, *models.
 		DhcpEnabled:        !f.NoDhcp,
 		ProvisionerEnabled: !f.NoProv,
 		BinlEnabled:        !f.NoBinl,
-		Stats:              make([]models.Stat, 0, 0),
-		Features: []string{
-			"api-v3",
-			"sane-exit-codes",
-			"common-blob-size",
-			"change-stage-map",
-			"job-exit-states",
-			"package-repository-handling",
-			"profileless-machine",
-			"threaded-log-levels",
-			"plugin-v2",
-			"fsm-runner",
-			"plugin-v2-safe-config",
-			"workflows",
-			"default-workflow",
-			"http-range-header",
-			"roles",
-		},
 	}
+	i.Fill()
 
 	res := &models.Error{
 		Code:  http.StatusInternalServerError,
