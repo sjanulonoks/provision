@@ -129,6 +129,17 @@ func (p *Param) ValidateValue(val interface{}) error {
 	return e
 }
 
+func ValidateParams(rt *RequestTracker, e models.ErrorAdder, params map[string]interface{}) {
+	for k, v := range params {
+		if pIdx := rt.find("params", k); pIdx != nil {
+			param := AsParam(pIdx)
+			if err := param.ValidateValue(v); err != nil {
+				e.Errorf("Key '%s': invalid val '%v': %v", k, v, err)
+			}
+		}
+	}
+}
+
 var paramLockMap = map[string][]string{
 	"get":     []string{"params"},
 	"create":  []string{"params", "profiles"},

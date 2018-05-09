@@ -464,6 +464,7 @@ func (n *Machine) Validate() {
 			}
 		}
 	}
+	ValidateParams(n.rt, n, n.Params)
 	n.SetValid()
 	if n.Address != nil && !n.Address.IsUnspecified() {
 		others, err := index.All(
@@ -505,7 +506,6 @@ func (n *Machine) Validate() {
 			}
 		}
 	}
-
 	workflows := n.rt.stores("workflows")
 	// Validate workflow
 	if n.Workflow != "" {
