@@ -304,7 +304,7 @@ func ModelToBackend(m models.Model) store.KeySaver {
 	case *models.Tenant:
 		return &Tenant{Tenant: obj}
 	default:
-		panic(fmt.Sprintf("Unknown model %T", m))
+		return nil
 	}
 }
 
