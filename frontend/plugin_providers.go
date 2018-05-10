@@ -57,10 +57,16 @@ func (f *Frontend) InitPluginProviderApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/plugin_providers",
 		func(c *gin.Context) {
-			if !f.assureSimpleAuth(c, "plugin_providers", "list", "") {
-				return
+			res := []*models.PluginProvider{}
+			if f.getAuth(c).matchClaim(models.MakeRole("", "plugin_providers", "list", "").Compile()) {
+				pps := f.pc.GetPluginProviders()
+				for _, pp := range pps {
+					if f.getAuth(c).tenantOK("plugin_providers", pp.Name) {
+						res = append(res, pp)
+					}
+				}
 			}
-			c.JSON(http.StatusOK, f.pc.GetPluginProviders())
+			c.JSON(http.StatusOK, res)
 		})
 
 	// swagger:route HEAD /plugin_providers PluginProviders headPluginProviders
