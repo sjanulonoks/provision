@@ -527,12 +527,24 @@ func (f *Frontend) assureAuth(c *gin.Context,
 	}
 	f.rt(c).Auditf("Failed auth '%s' '%s' '%s' - %s",
 		scope, action, specific, c.ClientIP())
-	res := &models.Error{
-		Type: "AUTH",
-		Code: http.StatusForbidden,
+	var res *models.Error
+	switch action {
+	case "get":
+		res = &models.Error{
+			Model: scope,
+			Key:   specific,
+			Type:  c.Request.Method,
+			Code:  http.StatusNotFound,
+		}
+		res.Errorf("Not Found")
+	default:
+		res := &models.Error{
+			Type: "AUTH",
+			Code: http.StatusForbidden,
+		}
+		res.Errorf("Cannot access %s", c.Request.URL.String())
+		res.Errorf("Requires: %s %s %s", scope, action, specific)
 	}
-	res.Errorf("Cannot access %s", c.Request.URL.String())
-	res.Errorf("Requires: %s %s %s", scope, action, specific)
 	c.AbortWithStatusJSON(res.Code, res)
 	return false
 }
@@ -724,9 +736,22 @@ func jsonError(c *gin.Context, err error, code int, base string) {
 	}
 }
 
+func (f *Frontend) emptyList(c *gin.Context, statsOnly bool) {
+	c.Header("X-DRP-LIST-TOTAL-COUNT", "0")
+	c.Header("X-DRP-LIST-COUNT", "0")
+	if statsOnly {
+		c.Status(http.StatusOK)
+	} else {
+		c.JSON(http.StatusOK, []models.Model{})
+	}
+}
+
 func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 	backend.Fill(ref)
-	if !f.assureSimpleAuth(c, ref.Prefix(), "list", "") {
+	arr := []models.Model{}
+	var totalCount, count int
+	if !f.getAuth(c).matchClaim(models.MakeRole("", ref.Prefix(), "list", "").Compile()) {
+		f.emptyList(c, statsOnly)
 		return
 	}
 	res := &models.Error{
@@ -735,7 +760,7 @@ func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 		Model: ref.Prefix(),
 	}
 	var err error
-	arr := []models.Model{}
+
 	rt := f.rt(c, ref.(Lockable).Locks("get")...)
 	rt.Do(func(d backend.Stores) {
 		var filters []index.Filter
@@ -744,20 +769,19 @@ func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 			res.AddError(err)
 			return
 		}
-		if tf := f.getAuth(c).tenantSelect(ref.Prefix()); tf != nil {
-			filters = append(filters, tf)
-		}
-
 		mainIndex := &d(ref.Prefix()).Index
-		c.Header("X-DRP-LIST-TOTAL-COUNT", fmt.Sprintf("%d", mainIndex.Count()))
+		if tf := f.getAuth(c).tenantSelect(ref.Prefix()); tf != nil {
+			mainIndex, _ = tf(mainIndex)
+		}
+		totalCount = mainIndex.Count()
 
 		idx, err := index.All(filters...)(mainIndex)
 		if err != nil {
 			res.AddError(err)
 			return
 		}
+		count = idx.Count()
 
-		c.Header("X-DRP-LIST-COUNT", fmt.Sprintf("%d", idx.Count()))
 		if statsOnly {
 			return
 		}
@@ -780,7 +804,8 @@ func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 		c.JSON(res.Code, res)
 		return
 	}
-
+	c.Header("X-DRP-LIST-TOTAL-COUNT", fmt.Sprintf("%d", totalCount))
+	c.Header("X-DRP-LIST-COUNT", fmt.Sprintf("%d", count))
 	if statsOnly {
 		c.Status(http.StatusOK)
 	} else {
