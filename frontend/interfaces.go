@@ -43,17 +43,23 @@ func (f *Frontend) InitInterfaceApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/interfaces",
 		func(c *gin.Context) {
-			if !f.assureSimpleAuth(c, "interfaces", "list", "") {
-				return
+			res := []*models.Interface{}
+			if f.getAuth(c).matchClaim(models.MakeRole("", "interfaces", "list", "").Compile()) {
+				var err error
+				intfs, err := f.dt.GetInterfaces()
+				if err != nil {
+					c.JSON(http.StatusInternalServerError,
+						models.NewError(c.Request.Method, http.StatusInternalServerError,
+							fmt.Sprintf("interfaces list: %v", err)))
+					return
+				}
+				for _, intf := range intfs {
+					if f.getAuth(c).tenantOK("interfaces", intf.Name) {
+						res = append(res, intf)
+					}
+				}
 			}
-			intfs, err := f.dt.GetInterfaces()
-			if err != nil {
-				c.JSON(http.StatusInternalServerError,
-					models.NewError(c.Request.Method, http.StatusInternalServerError,
-						fmt.Sprintf("interfaces list: %v", err)))
-				return
-			}
-			c.JSON(http.StatusOK, intfs)
+			c.JSON(http.StatusOK, res)
 		})
 
 	// swagger:route GET /interfaces/{name} Interfaces getInterface
