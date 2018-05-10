@@ -177,7 +177,10 @@ func (f *Frontend) Find(c *gin.Context, rt *backend.RequestTracker, prefix, key 
 }
 
 func (f *Frontend) rt(c *gin.Context, locks ...string) *backend.RequestTracker {
-	return f.dt.Request(f.l(c), locks...)
+	if c != nil {
+		return f.dt.Request(f.l(c), locks...)
+	}
+	return f.dt.Request(f.Logger, locks...)
 }
 
 type AuthSource interface {

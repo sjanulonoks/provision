@@ -156,7 +156,11 @@ func (t *Tenant) OnLoad() error {
 	defer func() { t.rt = nil }()
 	t.Fill()
 	t.userAdd = t.Users
-	return t.BeforeSave()
+	if err := t.BeforeSave(); err != nil {
+		return err
+	}
+	t.AfterSave()
+	return nil
 }
 
 func (t *Tenant) OnCreate() error {
