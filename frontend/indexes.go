@@ -70,8 +70,7 @@ func (f *Frontend) InitIndexApi() {
 			for _, m := range models.All() {
 				bm := backend.ModelToBackend(m)
 				idxer, ok := bm.(Indexer)
-				if !ok ||
-					!f.getAuth(c).matchClaim(models.MakeRole("", m.Prefix(), "list", "").Compile()) {
+				if !ok {
 					continue
 				}
 				res[m.Prefix()] = idxer.Indexes()
@@ -93,9 +92,6 @@ func (f *Frontend) InitIndexApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/indexes/:prefix",
 		func(c *gin.Context) {
-			if !f.assureSimpleAuth(c, c.Param("prefix"), "list", "") {
-				return
-			}
 			m, err := models.New(c.Param("prefix"))
 			if err != nil {
 				c.JSON(http.StatusNotFound,
@@ -136,9 +132,6 @@ func (f *Frontend) InitIndexApi() {
 	//       500: ErrorResponse
 	f.ApiGroup.GET("/indexes/:prefix/:param",
 		func(c *gin.Context) {
-			if !f.assureSimpleAuth(c, c.Param("prefix"), "list", "") {
-				return
-			}
 			prefix := c.Param("prefix")
 			paramName := c.Param("param")
 			m, err := models.New(prefix)
