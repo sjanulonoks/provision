@@ -77,13 +77,13 @@ func (a *authBlob) tenantSelect(scope string) index.Filter {
 		case *backend.Job:
 			return a.tenantOK("machines", o.Machine.String())
 		case *models.Lease:
-			return a.tenantOK("machines", a.f.rt(nil).MacToMachineUUID(o.Token))
+			return a.tenantOK("machines", a.f.dt.MacToMachineUUID(o.Token))
 		case *backend.Lease:
-			return a.tenantOK("machines", a.f.rt(nil).MacToMachineUUID(o.Token))
+			return a.tenantOK("machines", a.f.dt.MacToMachineUUID(o.Token))
 		case *models.Reservation:
-			return a.tenantOK("machines", a.f.rt(nil).MacToMachineUUID(o.Token))
+			return a.tenantOK("machines", a.f.dt.MacToMachineUUID(o.Token))
 		case *backend.Reservation:
-			return a.tenantOK("machines", a.f.rt(nil).MacToMachineUUID(o.Token))
+			return a.tenantOK("machines", a.f.dt.MacToMachineUUID(o.Token))
 		}
 		return false
 	}
@@ -106,12 +106,12 @@ func (a *authBlob) Find(rt *backend.RequestTracker, prefix, key string) models.M
 		}
 	case "leases":
 		l := backend.AsLease(res)
-		if a.tenantOK("machines", rt.MacToMachineUUID(l.Token)) {
+		if a.tenantOK("machines", a.f.dt.MacToMachineUUID(l.Token)) {
 			return res
 		}
 	case "reservations":
 		r := backend.AsReservation(res)
-		if a.tenantOK("machines", rt.MacToMachineUUID(r.Token)) {
+		if a.tenantOK("machines", a.f.dt.MacToMachineUUID(r.Token)) {
 			return res
 		}
 	}

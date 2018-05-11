@@ -467,14 +467,8 @@ func (rt *RequestTracker) SealClaims(claims *DrpCustomClaims) (string, error) {
 	return rt.dt.SealClaims(claims)
 }
 
-func (rt *RequestTracker) MacToMachineUUID(mac string) string {
-	rt.dt.macAddrMux.RLock()
-	defer rt.dt.macAddrMux.RUnlock()
-	return rt.dt.macAddrMap[mac]
-}
-
 func (rt *RequestTracker) MachineForMac(mac string) *Machine {
-	m := rt.Find("machines", rt.MacToMachineUUID(mac))
+	m := rt.Find("machines", rt.dt.MacToMachineUUID(mac))
 	if m != nil {
 		return AsMachine(m)
 	}

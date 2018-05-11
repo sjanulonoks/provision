@@ -1154,3 +1154,13 @@ func (p *DataTracker) ReplaceBackend(rt *RequestTracker, st store.Store) (hard, 
 	p.Backend = st
 	return p.rebuildCache(rt)
 }
+
+func (p *DataTracker) MacToMachineUUID(mac string) string {
+	p.macAddrMux.RLock()
+	defer p.macAddrMux.RUnlock()
+	res, ok := p.macAddrMap[mac]
+	if ok {
+		return res
+	}
+	return ""
+}
