@@ -29,6 +29,9 @@ import:
 - package: gopkg.in/olahol/melody.v1
 - package: github.com/fsnotify/fsnotify
 - package: github.com/vishvananda/netlink
+- package: golang.org/x/crypto/nacl
+  subpackages:
+  - sign
 - package: golang.org/x/tools
   subpackages:
   - cover
