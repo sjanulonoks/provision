@@ -28,7 +28,7 @@ func makeHandler(dt *backend.DataTracker, proxy bool) *DhcpHandler {
 		ifs:      []string{},
 		port:     port,
 		bk:       dt,
-		strats:   []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
+		strats:   []*Strategy{{Name: "MAC", GenToken: MacStrategy}},
 		pinger:   pinger.Fake(true),
 		binlOnly: proxy,
 	}
@@ -68,7 +68,7 @@ func TestMain(m *testing.M) {
 	rt.Do(func(d backend.Stores) {
 		subs := []*models.Subnet{
 			// Normal DHCP network.
-			&models.Subnet{
+			{
 				Name:              "sub1",
 				Enabled:           true,
 				Subnet:            "192.168.124.1/24",
@@ -84,7 +84,7 @@ func TestMain(m *testing.M) {
 				},
 			},
 			// DHCP via a gateway
-			&models.Subnet{
+			{
 				Name:              "sub2",
 				Enabled:           true,
 				Subnet:            "172.17.0.8/24",
@@ -100,7 +100,7 @@ func TestMain(m *testing.M) {
 				},
 			},
 			// ProxyDHCP network.
-			&models.Subnet{
+			{
 				Name:              "sub3",
 				Enabled:           true,
 				Proxy:             true,

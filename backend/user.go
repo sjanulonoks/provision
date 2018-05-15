@@ -188,12 +188,12 @@ func (u *User) AfterDelete() {
 }
 
 var userLockMap = map[string][]string{
-	"get":     []string{"users", "roles"},
-	"create":  []string{"users", "roles"},
-	"update":  []string{"users", "roles"},
-	"patch":   []string{"users", "roles"},
-	"delete":  []string{"users", "tenants"},
-	"actions": []string{"users", "roles", "profiles", "params"},
+	"get":     {"users", "roles"},
+	"create":  {"users", "roles"},
+	"update":  {"users", "roles"},
+	"patch":   {"users", "roles"},
+	"delete":  {"users", "tenants"},
+	"actions": {"users", "roles", "profiles", "params"},
 }
 
 func (u *User) Locks(action string) []string {

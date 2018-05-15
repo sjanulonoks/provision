@@ -222,12 +222,12 @@ func (r *Reservation) OnLoad() error {
 }
 
 var reservationLockMap = map[string][]string{
-	"get":     []string{"reservations"},
-	"create":  []string{"reservations", "subnets"},
-	"update":  []string{"reservations"},
-	"patch":   []string{"reservations"},
-	"delete":  []string{"reservations"},
-	"actions": []string{"reservations", "profiles", "params"},
+	"get":     {"reservations"},
+	"create":  {"reservations", "subnets"},
+	"update":  {"reservations"},
+	"patch":   {"reservations"},
+	"delete":  {"reservations"},
+	"actions": {"reservations", "profiles", "params"},
 }
 
 func (r *Reservation) Locks(action string) []string {

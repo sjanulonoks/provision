@@ -119,12 +119,12 @@ func (p *Profile) OnLoad() error {
 }
 
 var profileLockMap = map[string][]string{
-	"get":     []string{"profiles", "params"},
-	"create":  []string{"profiles", "tasks", "params"},
-	"update":  []string{"profiles", "tasks", "params"},
-	"patch":   []string{"profiles", "tasks", "params"},
-	"delete":  []string{"stages", "profiles", "machines"},
-	"actions": []string{"profiles", "params"},
+	"get":     {"profiles", "params"},
+	"create":  {"profiles", "tasks", "params"},
+	"update":  {"profiles", "tasks", "params"},
+	"patch":   {"profiles", "tasks", "params"},
+	"delete":  {"stages", "profiles", "machines"},
+	"actions": {"profiles", "params"},
 }
 
 func (p *Profile) Locks(action string) []string {

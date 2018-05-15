@@ -1138,7 +1138,7 @@ func StartDhcpHandler(dhcpInfo *backend.DataTracker,
 		ifs:        ifs,
 		bk:         dhcpInfo,
 		port:       dhcpPort,
-		strats:     []*Strategy{&Strategy{Name: "MAC", GenToken: MacStrategy}},
+		strats:     []*Strategy{{Name: "MAC", GenToken: MacStrategy}},
 		publishers: pubs,
 		binlOnly:   proxyOnly,
 	}

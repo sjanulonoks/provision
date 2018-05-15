@@ -318,12 +318,12 @@ func (s *Stage) AfterSave() {
 }
 
 var stageLockMap = map[string][]string{
-	"get":     []string{"stages"},
-	"create":  []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "workflows"},
-	"update":  []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "workflows"},
-	"patch":   []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "workflows"},
-	"delete":  []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "workflows"},
-	"actions": []string{"stages", "profiles", "params"},
+	"get":     {"stages"},
+	"create":  {"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "workflows"},
+	"update":  {"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "workflows"},
+	"patch":   {"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "workflows"},
+	"delete":  {"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "workflows"},
+	"actions": {"stages", "profiles", "params"},
 }
 
 func (s *Stage) Locks(action string) []string {

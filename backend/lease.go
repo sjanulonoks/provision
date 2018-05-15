@@ -250,12 +250,12 @@ func (l *Lease) OnLoad() error {
 }
 
 var leaseLockMap = map[string][]string{
-	"get":     []string{"leases"},
-	"create":  []string{"leases", "subnets", "reservations"},
-	"update":  []string{"leases"},
-	"patch":   []string{"leases"},
-	"delete":  []string{"leases"},
-	"actions": []string{"leases", "profiles", "params"},
+	"get":     {"leases"},
+	"create":  {"leases", "subnets", "reservations"},
+	"update":  {"leases"},
+	"patch":   {"leases"},
+	"delete":  {"leases"},
+	"actions": {"leases", "profiles", "params"},
 }
 
 func (l *Lease) Locks(action string) []string {

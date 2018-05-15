@@ -25,12 +25,12 @@ func AsPref(v models.Model) *Pref {
 }
 
 var prefLockMap = map[string][]string{
-	"get":     []string{"preferences"},
-	"create":  []string{"preferences", "bootenvs", "stages", "workflows"},
-	"update":  []string{"preferences", "bootenvs", "stages", "workflows"},
-	"patch":   []string{"preferences", "bootenvs", "stages", "workflows"},
-	"delete":  []string{"preferences", "bootenvs", "stages", "workflows"},
-	"actions": []string{"preferences", "profiles", "params", "bootenvs", "stages", "workflows"},
+	"get":     {"preferences"},
+	"create":  {"preferences", "bootenvs", "stages", "workflows"},
+	"update":  {"preferences", "bootenvs", "stages", "workflows"},
+	"patch":   {"preferences", "bootenvs", "stages", "workflows"},
+	"delete":  {"preferences", "bootenvs", "stages", "workflows"},
+	"actions": {"preferences", "profiles", "params", "bootenvs", "stages", "workflows"},
 }
 
 func (p *Pref) Locks(action string) []string {
