@@ -51,9 +51,9 @@ func rt(t *testing.T) *DhcpRequest {
 	return &DhcpRequest{
 		Logger: logger.New(nil).Log("dhcp").SetLevel(logger.Info),
 		idxMap: map[int][]*net.IPNet{
-			1: []*net.IPNet{&net.IPNet{IP: net.IPv4(127, 0, 0, 1), Mask: net.IPv4Mask(255, 0, 0, 0)}},
-			2: []*net.IPNet{&net.IPNet{IP: net.IPv4(192, 168, 124, 1), Mask: net.IPv4Mask(255, 255, 255, 0)}},
-			3: []*net.IPNet{&net.IPNet{IP: net.IPv4(10, 0, 0, 10), Mask: net.IPv4Mask(255, 0, 0, 0)}},
+			1: {{IP: net.IPv4(127, 0, 0, 1), Mask: net.IPv4Mask(255, 0, 0, 0)}},
+			2: {{IP: net.IPv4(192, 168, 124, 1), Mask: net.IPv4Mask(255, 255, 255, 0)}},
+			3: {{IP: net.IPv4(10, 0, 0, 10), Mask: net.IPv4Mask(255, 0, 0, 0)}},
 		},
 		nameMap: map[int]string{1: "lo", 2: "eno1", 3: "eno2"},
 		pinger:  pinger.Fake(false),

@@ -199,7 +199,7 @@ func (d *DataStack) buildStack(fixup FixerUpper, newStore store.Store) error {
 
 	// Sort Names
 	saas := make([]string, 0, len(d.saasContents))
-	for k, _ := range d.saasContents {
+	for k := range d.saasContents {
 		saas = append(saas, k)
 	}
 	sort.Strings(saas)
@@ -217,7 +217,7 @@ func (d *DataStack) buildStack(fixup FixerUpper, newStore store.Store) error {
 	}
 
 	plugins := make([]string, 0, len(d.pluginContents))
-	for k, _ := range d.pluginContents {
+	for k := range d.pluginContents {
 		plugins = append(plugins, k)
 	}
 	sort.Strings(plugins)

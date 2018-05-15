@@ -25,11 +25,11 @@ fi
 i=0
 for d in $(go list ./... 2>/dev/null | grep -v cmds) ; do
     echo "----------- TESTING $d -----------"
-    time go test -race -covermode=atomic -coverpkg=$packages -coverprofile="profile$i.out" "$d" || FAILED=true
+    time go test -race -covermode=atomic -coverpkg=$packages -coverprofile="profile${i}.txt" "$d" || FAILED=true
     i=$((i+1))
 done
-go run tools/mergeProfiles.go profile*.out >coverage.txt
-rm profile*.out
+go run tools/mergeProfiles.go profile*.txt >coverage.txt
+rm profile*.txt
 if [[ $FAILED ]]; then
     echo "FAILED"
     exit 1

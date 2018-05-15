@@ -573,12 +573,12 @@ func (b *BootEnv) AfterSave() {
 }
 
 var bootEnvLockMap = map[string][]string{
-	"get":     []string{"bootenvs"},
-	"create":  []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params", "workflows"},
-	"update":  []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params", "workflows"},
-	"patch":   []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params", "workflows"},
-	"delete":  []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params", "workflows"},
-	"actions": []string{"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params"},
+	"get":     {"bootenvs"},
+	"create":  {"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params", "workflows"},
+	"update":  {"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params", "workflows"},
+	"patch":   {"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params", "workflows"},
+	"delete":  {"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params", "workflows"},
+	"actions": {"stages", "bootenvs", "machines", "tasks", "templates", "profiles", "params"},
 }
 
 func (b *BootEnv) Locks(action string) []string {

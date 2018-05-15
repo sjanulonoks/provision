@@ -71,12 +71,12 @@ func (r *Role) Indexes() map[string]index.Maker {
 }
 
 var roleLockMap = map[string][]string{
-	"get":     []string{"roles"},
-	"create":  []string{"roles"},
-	"update":  []string{"roles"},
-	"patch":   []string{"roles"},
-	"delete":  []string{"users", "roles"},
-	"actions": []string{"roles"},
+	"get":     {"roles"},
+	"create":  {"roles"},
+	"update":  {"roles"},
+	"patch":   {"roles"},
+	"delete":  {"users", "roles"},
+	"actions": {"roles"},
 }
 
 func (r *Role) Locks(action string) []string {

@@ -79,11 +79,11 @@ func (t *Tenant) Indexes() map[string]index.Maker {
 }
 
 var tenantLockMap = map[string][]string{
-	"get":     []string{"tenants"},
-	"create":  []string{"tenants", "users"},
-	"update":  []string{"tenants", "users"},
-	"delete":  []string{"users", "tenants"},
-	"actions": []string{"tenants"},
+	"get":     {"tenants"},
+	"create":  {"tenants", "users"},
+	"update":  {"tenants", "users"},
+	"delete":  {"users", "tenants"},
+	"actions": {"tenants"},
 }
 
 func (t *Tenant) Locks(action string) []string {
@@ -107,7 +107,7 @@ func (t *Tenant) BeforeSave() error {
 	if t.userAdd != nil && len(t.userAdd) > 0 {
 		for _, name := range t.Users {
 			if t.rt.find("users", name) == nil {
-				t.Errorf("User %s does not exist")
+				t.Errorf("User %s does not exist", name)
 			}
 		}
 		uMap := map[string]string{}
@@ -121,7 +121,8 @@ func (t *Tenant) BeforeSave() error {
 			tm := AsTenant(t2)
 			for _, u2 := range tm.Users {
 				if _, ok := uMap[u2]; ok {
-					t.Errorf("User %s already in tenant %s, and users can only be in one tenant at a time")
+					t.Errorf("User %s already in tenant %s, and users can only be in one tenant at a time",
+						u2, tm.Name)
 				}
 			}
 		}

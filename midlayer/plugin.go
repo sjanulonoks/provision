@@ -409,7 +409,7 @@ func (pc *PluginController) configPlugin(mp models.Model) {
 	if r.Provider.HasPublish {
 		pc.publishers.Add(r.Client)
 	}
-	for i, _ := range r.Provider.AvailableActions {
+	for i := range r.Provider.AvailableActions {
 		r.Provider.AvailableActions[i].Fill()
 		r.Provider.AvailableActions[i].Provider = r.Provider.Name
 		pc.Actions.Add(r.Provider.AvailableActions[i], r)
