@@ -229,6 +229,7 @@ type Repo struct {
 	InstallSource  bool     `json:"installSource"`
 	SecuritySource bool     `json:"securitySource"`
 	Distribution   string   `json:"distribution"`
+	BootLoc        string   `json:"bootloc"`
 	Components     []string `json:"components"`
 	r              *RenderData
 	targetOS       string
