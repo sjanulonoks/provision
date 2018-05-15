@@ -577,11 +577,12 @@ func (j *Job) Log(rt *RequestTracker, src io.Reader) error {
 		fmt.Printf("Umm err: %v\n", err)
 		return err
 	}
-	_, err = io.Copy(f, src)
+	cnt, err := io.Copy(f, src)
 	if err != nil {
-		fmt.Printf("Umm write err: %v\n", err)
+		j.rt.Errorf("Job %s: error writing log: %v", j.UUID(), err)
 		return err
 	}
+	j.rt.Debugf("Job %s: %d bytes appended to log", j.UUID(), cnt)
 	return nil
 }
 
