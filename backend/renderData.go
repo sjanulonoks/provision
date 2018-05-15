@@ -229,6 +229,7 @@ type Repo struct {
 	InstallSource  bool     `json:"installSource"`
 	SecuritySource bool     `json:"securitySource"`
 	Distribution   string   `json:"distribution"`
+	BootLoc        string   `json:"bootloc"`
 	Components     []string `json:"components"`
 	r              *RenderData
 	targetOS       string
@@ -406,8 +407,45 @@ func (r *RenderData) Repos(tags ...string) []*Repo {
 	})
 }
 
+func (r *RenderData) localInstallRepo() *Repo {
+	for _, obj := range r.rt.d("bootenvs").Items() {
+		env := obj.(*BootEnv)
+		if env.OS.Name == r.Machine.OS {
+			fi, err := os.Stat(path.Join(r.rt.dt.FileRoot, r.Machine.OS, "install", env.Kernel))
+			if err == nil && fi.Mode().IsRegular() {
+				res := &Repo{
+					Tag:           env.Name,
+					InstallSource: true,
+					OS:            []string{r.Machine.OS},
+					URL:           r.rt.FileURL(r.remoteIP) + "/" + path.Join(r.Machine.OS, "install"),
+					r:             r,
+					targetOS:      r.Machine.OS,
+				}
+
+				switch res.renderStyle() {
+				case "apt":
+					if _, err := os.Stat(path.Join(r.rt.dt.FileRoot, r.Machine.OS, "install", "dists", "stable", "Release")); err == nil {
+						res.Distribution = "stable"
+						res.Components = []string{"main", "restricted"}
+					} else {
+						continue
+					}
+				}
+				return res
+			}
+		}
+	}
+	return nil
+}
+
 func (r *RenderData) MachineRepos() []*Repo {
-	found := r.fetchRepos(func(rd *Repo) bool {
+	found := []*Repo{}
+	// Sigh, current ubuntus do not have metadata good enough for things besides
+	// OS installation.
+	if li := r.localInstallRepo(); li != nil && li.renderStyle() != "apt" {
+		found = append(found, li)
+	}
+	found = append(found, r.fetchRepos(func(rd *Repo) bool {
 		for _, os := range rd.OS {
 			if os == r.Machine.OS {
 				rd.targetOS = r.Machine.OS
@@ -415,33 +453,15 @@ func (r *RenderData) MachineRepos() []*Repo {
 			}
 		}
 		return false
-	})
-	if len(found) == 0 {
-		// See if we have something locally available
-		for _, obj := range r.rt.d("bootenvs").Items() {
-			env := obj.(*BootEnv)
-			if env.OS.Name == r.Machine.OS {
-				fi, err := os.Stat(path.Join(r.rt.dt.FileRoot, r.Machine.OS, "install", env.Kernel))
-				if err == nil && fi.Mode().IsRegular() {
-					found = append(found, &Repo{
-						Tag:           env.Name,
-						InstallSource: true,
-						OS:            []string{r.Machine.OS},
-						URL:           r.rt.FileURL(r.remoteIP) + "/" + path.Join(r.Machine.OS, "install"),
-						r:             r,
-						targetOS:      r.Machine.OS,
-					})
-					break
-				}
-			}
-		}
-	}
+	})...)
+
 	return found
 }
 
 func (r *RenderData) InstallRepos() []*Repo {
+	installRepo := r.localInstallRepo()
 	found := r.MachineRepos()
-	var installRepo, updateRepo *Repo
+	var updateRepo *Repo
 	res := []*Repo{}
 	for _, repo := range found {
 		if installRepo == nil && repo.InstallSource {

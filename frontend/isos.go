@@ -200,11 +200,10 @@ func reloadBootenvsForIso(rt *backend.RequestTracker, name string) {
 	rt.Do(func(d backend.Stores) {
 		for _, blob := range d("bootenvs").Items() {
 			env := backend.AsBootEnv(blob)
-			if env.Available || env.OS.IsoFile != name {
+			if env.OS.IsoFile != name {
 				continue
 			}
-			env.Available = true
-			rt.Update(env)
+			rt.Save(env)
 		}
 	})
 }

@@ -186,6 +186,18 @@ func (b *BootEnv) fillInstallRepo() {
 				return nil, nil
 			}
 			tgtUri := strings.TrimSuffix(b.installRepo.URL, "/") + strings.TrimPrefix(p, pf)
+			if b.installRepo.BootLoc != "" {
+				if strings.HasSuffix(p, b.Kernel) {
+					tgtUri = strings.TrimSuffix(b.installRepo.BootLoc, "/") + "/" + path.Base(b.Kernel)
+				} else {
+					for _, i := range b.Initrds {
+						if strings.HasSuffix(p, i) {
+							tgtUri = strings.TrimSuffix(b.installRepo.BootLoc, "/") + "/" + path.Base(i)
+							break
+						}
+					}
+				}
+			}
 			l.Debugf("Proxying %s to %s", p, tgtUri)
 			resp, err := http.Get(tgtUri)
 			if err != nil {
@@ -346,7 +358,6 @@ func (b *BootEnv) Validate() {
 	if b.NetBoot() && b.OS.Name == "" {
 		b.Errorf("bootenv: Missing OS.Name")
 	}
-	b.fillInstallRepo()
 	// OK, we are sane, if not useable.  Check to see if we are useable
 	seenPxeLinux := false
 	seenIPXE := false
@@ -363,6 +374,7 @@ func (b *BootEnv) Validate() {
 	}
 	// Make sure the ISO for this bootenv has been exploded locally so that
 	// the boot env can use its contents.
+	b.fillInstallRepo()
 	b.explodeIso()
 	if !b.kernelVerified {
 		// If we have a non-empty Kernel, make sure it points at something kernel-ish.
