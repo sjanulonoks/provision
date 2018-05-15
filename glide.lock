@@ -1,50 +1,50 @@
-hash: 8e35b400bfbd2bb7ac39cc8da3634efefb9303bbc9aa5c466e9c61fa3b8d0191
-updated: 2018-05-01T14:59:55.808393722-05:00
+hash: 7fe5fd87bd3315ef5c797daa6d5977e7b9f3387c1208ca039b0187d226bf5b47
+updated: 2018-05-14T08:15:50.498261892-05:00
 imports:
 - name: github.com/armon/go-metrics
-  version: 7aa49fde808223f8dadfdbfd3a20ff6c19e5f9ec
+  version: 783273d703149aaeb9897cf58613d5af48861c25
 - name: github.com/boltdb/bolt
-  version: 9da31745363232bc1e27dbab3569e77383a51585
+  version: fd01fc79c553a8e99d512a07e8e0c63d4a3ccfc5
 - name: github.com/cpuguy83/go-md2man
   version: 48d8747a2ca13185e7cc8efe6e9fc196a83f71a5
   subpackages:
   - md2man
 - name: github.com/dgrijalva/jwt-go
-  version: dbeaa9332f19a944acb5736b4456cfcc02140e29
+  version: 06ea1031745cb8b3dab3f6a236daf2b0aa468b7e
 - name: github.com/digitalrebar/logger
   version: b457bcdb411872e1b719c8d9e1bf3cd669e480ee
 - name: github.com/digitalrebar/pinger
   version: 4b06d02345cad02a772ff21f13e1ef3551c943d4
 - name: github.com/digitalrebar/store
-  version: 2c250af948738fedc26bf17345ad9938e3acec93
+  version: 80eefdd38a7d940279ed02613e4593d8bd9e949c
 - name: github.com/elazarl/go-bindata-assetfs
-  version: 30f82fa23fd844bd5bb1e5f216db87fd77b5eb43
+  version: 38087fe4dafb822e541b3f7955075cc1c30bd294
 - name: github.com/elithrar/simple-scrypt
-  version: 2325946f714c95de4a6088202c402fbdfa64163b
+  version: d150773194090feb6c897805a7bcea8d49544e2c
 - name: github.com/fsnotify/fsnotify
   version: c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9
 - name: github.com/ghodss/yaml
-  version: 0ca9ea5df5451ffdf184b4428c902747c2c11cd7
+  version: e9ed3c6dfb39bb1a32197cb10d527906fe4da4b6
 - name: github.com/gin-contrib/cors
-  version: 51f0ef8b07e973afb8b6c192bf90d5c3e575c01a
+  version: df6cfb7ff4a38d694dfebd0868ecb3e956171366
 - name: github.com/gin-contrib/location
-  version: 5220ebf8be6c350431168cbd884f2c0ace0e3f4c
+  version: 911ef8299476b8a48e11ec0c26f2a0810345b690
 - name: github.com/gin-contrib/sse
   version: 22d885f9ecc78bf4ee5d72b937e4bbcdc58e8cae
 - name: github.com/gin-gonic/gin
-  version: 783c7ee9c14eac0e65b501664b4f553291556b43
+  version: bf7803815b0baa22ff7a10457932882dfbf09925
   subpackages:
   - binding
   - json
   - render
 - name: github.com/golang/protobuf
-  version: bbd03ef6da3a115852eaf24c8a1c46aeb39aa175
+  version: 927b65914520a8b7d44f5c9057611cfec6b2e2d0
   subpackages:
   - proto
 - name: github.com/gorilla/websocket
-  version: f37d1588608ec036fa9b0b7b8afbde47dc06aea9
+  version: 21ab95fa12b9bdd8fecf5fa3586aad941cc98785
 - name: github.com/hashicorp/consul
-  version: 4c90fbfd90b62889daf8c178ff5eb1a04c996a5c
+  version: 6151f6353a214a70c2f9acea036c9322f5813610
   subpackages:
   - api
 - name: github.com/hashicorp/go-cleanhttp
@@ -58,15 +58,15 @@ imports:
   subpackages:
   - simplelru
 - name: github.com/hashicorp/serf
-  version: d4f33d5b6a0b7b252b122dc80d559e9e5280d2d4
+  version: 80ab48778deee28e4ea2dc4ef1ebb2c5f4063996
   subpackages:
   - coordinate
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/jessevdk/go-flags
-  version: f88afde2fa19a30cf50ba4b05b3d13bc6bae3079
+  version: 1c38ed7ad0cc3d9e66649ac398c30e45f395c4eb
 - name: github.com/json-iterator/go
-  version: e7c7f3b33712573affdcc7a107218e7926b9a05b
+  version: 2ddf6d758266fcb080a4f9e054b9f292c85e6798
 - name: github.com/krolaw/dhcp4
   version: 4abfceffa76a675ea43d133e49aad64c821d32bf
   subpackages:
@@ -75,6 +75,10 @@ imports:
   version: 6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c
 - name: github.com/mitchellh/go-homedir
   version: b8bc1bf767474819792c23f32d8286a45736f1c6
+- name: github.com/modern-go/concurrent
+  version: bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94
+- name: github.com/modern-go/reflect2
+  version: 58118c1ea9161250907268a484af4dd6ed314280
 - name: github.com/pborman/uuid
   version: c65b2f87fee37d1c7854c9164a450713c28d50cd
 - name: github.com/pin/tftp
@@ -89,17 +93,17 @@ imports:
   - plugins/storage
   - plugins/system
 - name: github.com/russross/blackfriday
-  version: 55d61fa8aa702f59229e6cff85793c22e580eaf5
+  version: 11635eb403ff09dbc3a6b5a007ab5ab09151c229
 - name: github.com/spf13/cobra
-  version: be77323fc05148ef091e83b3866c0d47c8e74a8b
+  version: ef82de70bb3f60c65fb8eebacbb2d122ef517385
   subpackages:
   - doc
 - name: github.com/spf13/pflag
-  version: ee5fd03fd6acfd43e44aea0b4135958546ed8e73
+  version: 583c0c0531f06d5278b7d917446061adc344b5cd
 - name: github.com/tylerb/graceful
   version: d72b0151351a13d0421b763b88f791469c4f5dc7
 - name: github.com/ugorji/go
-  version: b5b949564861e43a03568a0b134c135cf318e5c8
+  version: f3cacc17c85ecb7f1b6a9e373ee85d1480919868
   subpackages:
   - codec
 - name: github.com/VictorLowther/godmi
@@ -109,7 +113,7 @@ imports:
   subpackages:
   - utils
 - name: github.com/vishvananda/netlink
-  version: 25d2c79295b361cac34eb41cfae90d5c69078b2a
+  version: 769bb84935352fee05c1390d5301ed39b95208d2
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
@@ -119,14 +123,19 @@ imports:
 - name: github.com/xeipuuv/gojsonreference
   version: bd5ef7bd5415a7ac448318e64f11a24cd21e594b
 - name: github.com/xeipuuv/gojsonschema
-  version: 8bcffc811467a5f691810420385be6e66b35a317
+  version: 2c8e4be869c17540b336bab0ea18b8d73e6a28b7
 - name: golang.org/x/crypto
-  version: 432090b8f568c018896cd8a0fb0345872bbac6ce
+  version: 034e5325b6ab92faa14d15c30e86919e911cf8e0
   subpackages:
+  - ed25519
+  - ed25519/internal/edwards25519
+  - nacl
+  - nacl/sign
   - pbkdf2
   - scrypt
+  - sign
 - name: golang.org/x/net
-  version: cbe0f9307d0156177f9dd5dc85da1a31abc5f2fb
+  version: 2491c5de3490fced2f6cff376127c667efeed857
   subpackages:
   - bpf
   - context
@@ -137,11 +146,11 @@ imports:
   - ipv6
   - route
 - name: golang.org/x/sys
-  version: 37707fdb30a5b38865cfb95e5aab41707daec7fd
+  version: d0faeb539838e250bd0a9db4182d48d4a1915181
   subpackages:
   - unix
 - name: golang.org/x/tools
-  version: 5c8013c5617234a9515f1b1379aba7e03e846479
+  version: 48418e5732e1b1e2a10207c8007a5f959e422f20
   subpackages:
   - cover
 - name: gopkg.in/go-playground/validator.v8
