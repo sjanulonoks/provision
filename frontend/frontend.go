@@ -641,7 +641,6 @@ func convertValueToFilter(v string) (index.Filter, error) {
 	default:
 		return index.Eq(v), nil
 	}
-	return nil, fmt.Errorf("Should never get here")
 }
 
 type dynParameter interface {

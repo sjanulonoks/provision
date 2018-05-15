@@ -107,7 +107,7 @@ func (t *Tenant) BeforeSave() error {
 	if t.userAdd != nil && len(t.userAdd) > 0 {
 		for _, name := range t.Users {
 			if t.rt.find("users", name) == nil {
-				t.Errorf("User %s does not exist")
+				t.Errorf("User %s does not exist", name)
 			}
 		}
 		uMap := map[string]string{}
@@ -121,7 +121,8 @@ func (t *Tenant) BeforeSave() error {
 			tm := AsTenant(t2)
 			for _, u2 := range tm.Users {
 				if _, ok := uMap[u2]; ok {
-					t.Errorf("User %s already in tenant %s, and users can only be in one tenant at a time")
+					t.Errorf("User %s already in tenant %s, and users can only be in one tenant at a time",
+						u2, tm.Name)
 				}
 			}
 		}
