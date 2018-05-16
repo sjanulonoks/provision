@@ -620,7 +620,7 @@ func assureDecode(c *gin.Context, val interface{}) bool {
 	return false
 }
 
-// This processes the value into a function, if function not specifed, assume Eq.
+// This processes the value into a function, if function not specified, assume Eq.
 // Supported Forms:
 //
 //   Eq(value)
