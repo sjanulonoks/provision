@@ -528,7 +528,8 @@ func (rt *RequestTracker) SetParam(obj models.Paramer, key string, val interface
 // Assumes that locks are held as appropriate.
 func (rt *RequestTracker) DelParam(obj models.Paramer, key string) (interface{}, error) {
 	p := obj.GetParams()
-	if val, ok := p[key]; !ok {
+	val, ok := p[key]
+	if !ok {
 		return nil, &models.Error{
 			Code:  http.StatusNotFound,
 			Type:  "DELETE",
@@ -536,7 +537,6 @@ func (rt *RequestTracker) DelParam(obj models.Paramer, key string) (interface{},
 			Key:   key,
 		}
 	}
-
 	delete(p, key)
 	return val, rt.SetParams(obj, p)
 }
