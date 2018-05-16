@@ -14,7 +14,7 @@ func (dt *DataTracker) GetInterfaces() ([]*models.Interface, error) {
 	}
 	dnsConf := dnsReadConfig("/etc/resolv.conf")
 	ifs := make([]*models.Interface, 0, 0)
-	iface, gw, err := defaultIPByRoute()
+	iface, gw, _ := defaultIPByRoute()
 	for _, intf := range intfs {
 		if (intf.Flags & net.FlagLoopback) == net.FlagLoopback {
 			continue

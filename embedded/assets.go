@@ -37,7 +37,7 @@ func Easf(mgmtApi *gin.Engine, logger logger.Logger) error {
 		logger.Fatalf("Failed to load swagger.json asset")
 	}
 	var f interface{}
-	err = json.Unmarshal(buf, &f)
+	json.Unmarshal(buf, &f)
 	mgmtApi.GET("/swagger.json", func(c *gin.Context) {
 		c.JSON(http.StatusOK, f)
 	})
