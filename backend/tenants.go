@@ -6,6 +6,8 @@ import (
 	"github.com/digitalrebar/store"
 )
 
+// Tenant contains the runtime parameters for user manipulation
+// around the models.Tenant object.
 type Tenant struct {
 	*models.Tenant
 	validate
@@ -13,6 +15,8 @@ type Tenant struct {
 	userAdd, userRm []string
 }
 
+// ExpandedMembers builds a cached map of members
+// of this tenant by prefix.
 func (t *Tenant) ExpandedMembers() map[string]map[string]struct{} {
 	if t.cachedExpansion == nil {
 		res := map[string]map[string]struct{}{}
@@ -27,16 +31,20 @@ func (t *Tenant) ExpandedMembers() map[string]map[string]struct{} {
 	return t.cachedExpansion
 }
 
+// SaveClean clears validation fields and returns a KeySaver
+// object for use by the backing store.
 func (t *Tenant) SaveClean() store.KeySaver {
 	mod := *t.Tenant
 	mod.ClearValidation()
 	return ModelToBackend(&mod)
 }
 
+// AsTenant converts a models.Model into a *Tenant.
 func AsTenant(t models.Model) *Tenant {
 	return t.(*Tenant)
 }
 
+// AsTenants converts a list of models.Model into a list of *Tenant.
 func AsTenants(o []models.Model) []*Tenant {
 	res := make([]*Tenant, len(o))
 	for i := range o {
@@ -45,6 +53,7 @@ func AsTenants(o []models.Model) []*Tenant {
 	return res
 }
 
+// New returns a new empty Tenant with the RT field from the caller.
 func (t *Tenant) New() store.KeySaver {
 	res := &Tenant{Tenant: &models.Tenant{}}
 	res.Fill()
@@ -52,6 +61,7 @@ func (t *Tenant) New() store.KeySaver {
 	return res
 }
 
+// Indexes returns the valid Indexes on Tenant.
 func (t *Tenant) Indexes() map[string]index.Maker {
 	fix := AsTenant
 	res := index.MakeBaseIndexes(t)
@@ -86,10 +96,12 @@ var tenantLockMap = map[string][]string{
 	"actions": {"tenants"},
 }
 
+// Locks returns a list of prefixes to lock for the specified action.
 func (t *Tenant) Locks(action string) []string {
 	return tenantLockMap[action]
 }
 
+// Validate makes sure the tenant is valid and available.
 func (t *Tenant) Validate() {
 	t.Tenant.Validate()
 	t.AddError(index.CheckUnique(t, t.rt.stores("tenants").Items()))
@@ -97,6 +109,8 @@ func (t *Tenant) Validate() {
 	t.SetAvailable()
 }
 
+// BeforeSave returns an error if the tenant is not Valid.  It is
+// also responsible for validating User membership is valid.
 // todo: Actually validate that all the items the Tenant references still exist.
 func (t *Tenant) BeforeSave() error {
 	t.Validate()
@@ -134,6 +148,8 @@ func (t *Tenant) BeforeSave() error {
 	return nil
 }
 
+// AfterSave cleans up or sets the internal activeTenant fields
+// on users.
 func (t *Tenant) AfterSave() {
 	t.cachedExpansion = nil
 	if t.userRm != nil && len(t.userRm) > 0 {
@@ -153,6 +169,7 @@ func (t *Tenant) AfterSave() {
 	t.userAdd, t.userRm = nil, nil
 }
 
+// OnLoad initializes the Tenant when loaded from the backing store.
 func (t *Tenant) OnLoad() error {
 	defer func() { t.rt = nil }()
 	t.Fill()
@@ -164,11 +181,15 @@ func (t *Tenant) OnLoad() error {
 	return nil
 }
 
+// OnCreate sets the internal add fields when a new object is created
+// by the user.
 func (t *Tenant) OnCreate() error {
 	t.userAdd = t.Users
 	return nil
 }
 
+// OnChange figures out which users need to be updates based
+// upon being added or removed from this Tenant.
 func (t *Tenant) OnChange(t2 store.KeySaver) error {
 	t.userAdd, t.userRm = []string{}, []string{}
 	oldT := AsTenant(t2)
@@ -190,6 +211,7 @@ func (t *Tenant) OnChange(t2 store.KeySaver) error {
 	return nil
 }
 
+// BeforeDelete makes sure that the Tenant is empty of users before deleting the tenant.
 func (t *Tenant) BeforeDelete() error {
 	e := models.Error{Code: 409, Type: StillInUseError, Model: t.Prefix(), Key: t.Key()}
 	if len(t.Users) != 0 {

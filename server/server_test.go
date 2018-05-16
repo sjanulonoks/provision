@@ -44,7 +44,7 @@ func badArgTest(t *testing.T, errString string, args ...string) {
 }
 
 func TestServerArgs(t *testing.T) {
-	badArgTest(t, fmt.Sprintf("Version: %s", provision.RS_VERSION), "--version")
+	badArgTest(t, fmt.Sprintf("Version: %s", provision.RSVersion), "--version")
 
 	certFile := fmt.Sprintf("/%s/certfile.pem", tmpDir)
 	existingFile := fmt.Sprintf("/%s/placeholder.txt", tmpDir)

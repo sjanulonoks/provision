@@ -20,19 +20,23 @@ type Template struct {
 	toUpdate *tmplUpdater
 }
 
-func (obj *Template) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+// SetReadOnly helper function to set ReadOnly
+func (t *Template) SetReadOnly(b bool) {
+	t.ReadOnly = b
 }
 
-func (obj *Template) SaveClean() store.KeySaver {
-	mod := *obj.Template
+// SaveClean clears the validation fields and returns the
+// object as a KeySaver for use in the backing stores.
+func (t *Template) SaveClean() store.KeySaver {
+	mod := *t.Template
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, t.rt)
 }
 
-func (p *Template) Indexes() map[string]index.Maker {
+// Indexes returns a map of valid indexes for Template
+func (t *Template) Indexes() map[string]index.Maker {
 	fix := AsTemplate
-	res := index.MakeBaseIndexes(p)
+	res := index.MakeBaseIndexes(t)
 	res["ID"] = index.Make(
 		true,
 		"string",
@@ -47,13 +51,15 @@ func (p *Template) Indexes() map[string]index.Maker {
 				}
 		},
 		func(s string) (models.Model, error) {
-			tmpl := fix(p.New())
+			tmpl := fix(t.New())
 			tmpl.ID = s
 			return tmpl, nil
 		})
 	return res
 }
 
+// New returns a new empty Template with the ForceChange
+// RT fields initialized from the calling object.
 func (t *Template) New() store.KeySaver {
 	res := &Template{Template: &models.Template{}}
 	if t.Template != nil && t.ChangeForced() {
@@ -101,6 +107,8 @@ func (t *Template) checkSubs(root *template.Template, e models.ErrorAdder) {
 	}
 }
 
+// Validate makes sure that the template is valid.
+// It sets the valid and available fields.
 func (t *Template) Validate() {
 	t.Template.Validate()
 	var err error
@@ -129,6 +137,8 @@ func (t *Template) Validate() {
 	t.SetAvailable()
 }
 
+// BeforeSave makes sure that the template is valid and returns
+// an error otherwise.
 func (t *Template) BeforeSave() error {
 	t.Validate()
 	if !t.Useable() {
@@ -137,6 +147,7 @@ func (t *Template) BeforeSave() error {
 	return nil
 }
 
+// OnLoad initializes the Template when loading from backing store.
 func (t *Template) OnLoad() error {
 	defer func() { t.rt = nil }()
 	t.Fill()
@@ -162,10 +173,15 @@ func (t *Template) updateOthers() {
 	t.toUpdate = nil
 }
 
+// AfterSave updates referencing objects after a save to the
+// backing store.
 func (t *Template) AfterSave() {
 	t.updateOthers()
 }
 
+// BeforeDelete returns an error if this template is still
+// referenced before a delete is done.  No error implies
+// can be deleted.
 func (t *Template) BeforeDelete() error {
 	e := &models.Error{Code: 409, Type: StillInUseError, Model: t.Prefix(), Key: t.Key()}
 	buf := &bytes.Buffer{}
@@ -189,10 +205,12 @@ func (t *Template) BeforeDelete() error {
 	return nil
 }
 
+// AsTemplate converts a models.Model into a *Template
 func AsTemplate(o models.Model) *Template {
 	return o.(*Template)
 }
 
+// AsTemplates converts a list of models.Model into a list of *Template
 func AsTemplates(o []models.Model) []*Template {
 	res := make([]*Template, len(o))
 	for i := range o {
@@ -210,6 +228,7 @@ var templateLockMap = map[string][]string{
 	"actions": {"templates", "profiles", "params"},
 }
 
+// Locks returns the list of objects that need to be locked for the specified action.
 func (t *Template) Locks(action string) []string {
 	return templateLockMap[action]
 }

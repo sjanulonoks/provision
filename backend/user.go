@@ -18,23 +18,28 @@ type User struct {
 	activeTenant string
 }
 
-func (obj *User) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+// SetReadOnly sets the ReadOnly flag (helper functino)
+func (u *User) SetReadOnly(b bool) {
+	u.ReadOnly = b
 }
 
+// Tenant returns the owning tenant for this user.
 func (u *User) Tenant() string {
 	return u.activeTenant
 }
 
-func (obj *User) SaveClean() store.KeySaver {
-	mod := *obj.User
+// SaveClean clears all validation information
+// and returns the user as a KeySaver object
+func (u *User) SaveClean() store.KeySaver {
+	mod := *u.User
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, u.rt)
 }
 
-func (p *User) Indexes() map[string]index.Maker {
+// Indexes returns a map of indexes for the User model
+func (u *User) Indexes() map[string]index.Maker {
 	fix := AsUser
-	res := index.MakeBaseIndexes(p)
+	res := index.MakeBaseIndexes(u)
 	res["Name"] = index.Make(
 		true,
 		"string",
@@ -49,13 +54,16 @@ func (p *User) Indexes() map[string]index.Maker {
 				}
 		},
 		func(s string) (models.Model, error) {
-			u := fix(p.New())
+			u := fix(u.New())
 			u.Name = s
 			return u, nil
 		})
 	return res
 }
 
+// New returns a new User object with
+// the RT and forceChange flags from the
+// calling object.
 func (u *User) New() store.KeySaver {
 	res := &User{User: &models.User{}}
 	if u.User != nil && u.ChangeForced() {
@@ -65,10 +73,13 @@ func (u *User) New() store.KeySaver {
 	return res
 }
 
+// AsUser converts a models.Model to a User.
 func AsUser(o models.Model) *User {
 	return o.(*User)
 }
 
+// AsUsers converts a list of models.Model to
+// a list of *User
 func AsUsers(o []models.Model) []*User {
 	res := make([]*User, len(o))
 	for i := range o {
@@ -77,6 +88,8 @@ func AsUsers(o []models.Model) []*User {
 	return res
 }
 
+// ChangePassword takes a clear text password, generates a hash,
+// clears the previous secret, and saves the object in the store.
 func (u *User) ChangePassword(rt *RequestTracker, newPass string) error {
 	ph, err := sc.GenerateFromPassword([]byte(newPass), sc.DefaultParams)
 	if err != nil {
@@ -89,6 +102,7 @@ func (u *User) ChangePassword(rt *RequestTracker, newPass string) error {
 	return err
 }
 
+// Validate makes sure that User is valid and available.
 func (u *User) Validate() {
 	u.User.Validate()
 	u.AddError(index.CheckUnique(u, u.rt.stores("users").Items()))
@@ -107,6 +121,8 @@ func (u *User) Validate() {
 	u.SetAvailable()
 }
 
+// GenClaim generates a *DrpCustomClaims structure from a grantor for a
+// limited time with the desired roles.
 func (u *User) GenClaim(grantor string, ttl time.Duration, wantedRoles ...string) *DrpCustomClaims {
 	claim := NewClaim(u.Name, grantor, ttl)
 	// Users always have the right to get a token and change their password.
@@ -139,6 +155,8 @@ func (u *User) GenClaim(grantor string, ttl time.Duration, wantedRoles ...string
 	return claim
 }
 
+// BeforeSave validates and sets required fields
+// on the User object before savining.
 func (u *User) BeforeSave() error {
 	if u.Secret == "" {
 		u.Secret = randString(16)
@@ -150,6 +168,13 @@ func (u *User) BeforeSave() error {
 	return nil
 }
 
+// OnLoad initializes and validates the user when loaded from
+// the data store.
+//
+// The mustSave part was added to handle data migration from
+// pre-Secret days to post-Secret days.  This could be removed
+// once we feel that all deploys are past 3.6.0.
+//
 func (u *User) OnLoad() error {
 	defer func() { u.rt = nil }()
 	u.Fill()
@@ -169,6 +194,8 @@ func (u *User) OnLoad() error {
 	return err
 }
 
+// AfterDelete cleans up other objects after the data store
+// has removed the User.
 func (u *User) AfterDelete() {
 	if u.activeTenant == "" {
 		return
@@ -196,6 +223,7 @@ var userLockMap = map[string][]string{
 	"actions": {"users", "roles", "profiles", "params"},
 }
 
+// Locks returns the object lock list for a given action for the User object
 func (u *User) Locks(action string) []string {
 	return userLockMap[action]
 }
