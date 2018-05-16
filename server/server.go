@@ -81,7 +81,7 @@ type ProgOpts struct {
 
 	LocalUI        string `long:"local-ui" description:"Root of Local UI Pages" default:"ux"`
 	UIUrl          string `long:"ui-url" description:"URL to redirect to UI" default:"https://portal.rackn.io"`
-	DhcpInterfaces string `long:"dhcp-ifs" description:"Comma-seperated list of interfaces to listen for DHCP packets" default:""`
+	DhcpInterfaces string `long:"dhcp-ifs" description:"Comma-separated list of interfaces to listen for DHCP packets" default:""`
 	DefaultStage   string `long:"default-stage" description:"The default stage for the nodes" default:"none"`
 	DefaultBootEnv string `long:"default-boot-env" description:"The default bootenv for the nodes" default:"local"`
 	UnknownBootEnv string `long:"unknown-boot-env" description:"The unknown bootenv for the system.  Should be \"ignore\" or \"discovery\"" default:"ignore"`

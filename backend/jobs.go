@@ -28,7 +28,7 @@ import (
 //   CurrentTask. If the current job is "finished", the machine
 //   CurrentTask is incremented.  If that causes CurrentTask to go
 //   past the end of the Tasks list for the machine, no job is created
-//   and the API returns a 204. If the current job is in the imcomplete
+//   and the API returns a 204. If the current job is in the incomplete
 //   state, that job is returned with a 202.  Otherwise a new job is
 //   created and is returned with a 201. If there is a current job that is neither
 //   "incomplete", "failed", nor "finished", the POST fails.  The new job will be

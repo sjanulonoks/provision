@@ -247,7 +247,7 @@ func (f *Frontend) InitFileApi() {
 					os.Remove(fileName)
 					os.Remove(fileTmpName)
 					err.Code = http.StatusBadRequest
-					err.Errorf("%d bytes expected, but only %d bytes recieved",
+					err.Errorf("%d bytes expected, but only %d bytes received",
 						c.Request.ContentLength,
 						copied)
 					c.JSON(err.Code, err)
