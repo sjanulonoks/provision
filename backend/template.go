@@ -12,8 +12,6 @@ import (
 
 // Template represents a template that will be associated with a boot
 // environment.
-//
-// swagger:model
 type Template struct {
 	*models.Template
 	validate

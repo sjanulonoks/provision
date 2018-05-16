@@ -26,8 +26,6 @@ var explodeMux = &sync.Mutex{}
 
 // BootEnv encapsulates the machine-agnostic information needed by the
 // provisioner to set up a boot environment.
-//
-// swagger:model
 type BootEnv struct {
 	*models.BootEnv
 	validate

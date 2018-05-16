@@ -13,7 +13,6 @@ import (
 // as a global set of parameters for the system.
 //
 // These can be assigned to a machine's profile list.
-// swagger:model
 type Profile struct {
 	*models.Profile
 	validate

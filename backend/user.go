@@ -11,7 +11,6 @@ import (
 )
 
 // User is an API user of DigitalRebar Provision
-// swagger:model
 type User struct {
 	*models.User
 	validate

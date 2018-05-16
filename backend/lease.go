@@ -13,7 +13,6 @@ import (
 )
 
 // Lease models a DHCP Lease
-// swagger:model
 type Lease struct {
 	*models.Lease
 	validate

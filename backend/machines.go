@@ -19,7 +19,6 @@ import (
 
 // Machine represents a single bare-metal system that the provisioner
 // should manage the boot environment for.
-// swagger:model
 type Machine struct {
 	*models.Machine
 	validate

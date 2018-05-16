@@ -11,26 +11,24 @@ import (
 )
 
 // Reservation tracks persistent DHCP IP address reservations.
-//
-// swagger:model
 type Reservation struct {
 	*models.Reservation
 	validate
 }
 
-func (obj *Reservation) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (r *Reservation) SetReadOnly(b bool) {
+	r.ReadOnly = b
 }
 
-func (obj *Reservation) SaveClean() store.KeySaver {
-	mod := *obj.Reservation
+func (r *Reservation) SaveClean() store.KeySaver {
+	mod := *r.Reservation
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, r.rt)
 }
 
-func (l *Reservation) Indexes() map[string]index.Maker {
+func (r *Reservation) Indexes() map[string]index.Maker {
 	fix := AsReservation
-	res := index.MakeBaseIndexes(l)
+	res := index.MakeBaseIndexes(r)
 	res["Addr"] = index.Make(
 		false,
 		"IP Address",
@@ -59,7 +57,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 			if addr == nil {
 				return nil, fmt.Errorf("Invalid Address: %s", s)
 			}
-			res := fix(l.New())
+			res := fix(r.New())
 			res.Addr = addr
 			return res, nil
 		})
@@ -77,7 +75,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 				}
 		},
 		func(s string) (models.Model, error) {
-			res := fix(l.New())
+			res := fix(r.New())
 			res.Token = s
 			return res, nil
 		})
@@ -95,7 +93,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 				}
 		},
 		func(s string) (models.Model, error) {
-			res := fix(l.New())
+			res := fix(r.New())
 			res.Strategy = s
 			return res, nil
 		})
@@ -127,7 +125,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 			if addr == nil {
 				return nil, fmt.Errorf("Invalid Address: %s", s)
 			}
-			res := fix(l.New())
+			res := fix(r.New())
 			res.NextServer = addr
 			return res, nil
 		})

@@ -52,7 +52,6 @@ import (
 //
 // * On provisioner startup, all machine CurrentJobs are set to "failed" if they are not "finished"
 //
-// swagger:model
 type Job struct {
 	*models.Job
 	validate

@@ -8,7 +8,6 @@ import (
 
 // Plugin represents a single instance of a running plugin.
 // This contains the configuration need to start this plugin instance.
-// swagger:model
 type Plugin struct {
 	*models.Plugin
 	// If there are any errors in the start-up process, they will be

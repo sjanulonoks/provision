@@ -19,7 +19,6 @@ type Paramer interface {
 // Specifically, it contains a description of what the information
 // is for, detailed documentation about the param, and a JSON schema that
 // the param must match to be considered valid.
-// swagger:model
 type Param struct {
 	*models.Param
 	validate
