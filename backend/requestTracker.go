@@ -16,6 +16,9 @@ import (
 	"github.com/digitalrebar/store"
 )
 
+// RequestTracker tracks a single request
+// to the DataTracker.  It represents the
+// closest thing to a transaction that we have.
 type RequestTracker struct {
 	*sync.Mutex
 	logger.Logger
@@ -36,10 +39,16 @@ func (rt *RequestTracker) unlocker(u func()) {
 	rt.Unlock()
 }
 
+// Request initializes a RequestTracker from the specified DataTracker.
 func (p *DataTracker) Request(l logger.Logger, locks ...string) *RequestTracker {
 	return &RequestTracker{Mutex: &sync.Mutex{}, dt: p, Logger: l, locks: locks, toPublish: []func(){}}
 }
 
+// PublishEvent records the Event to publish to all publish listeners
+// at after the RequestTracker locks have been released.  This
+// allows for Events to be published within a locked transaction
+// without deadlocking the system.  If the call is made without
+// locks, the publishers are notified in this call path.
 func (rt *RequestTracker) PublishEvent(e *models.Event) error {
 	rt.Lock()
 	defer rt.Unlock()
@@ -53,6 +62,9 @@ func (rt *RequestTracker) PublishEvent(e *models.Event) error {
 	return nil
 }
 
+// Publish takes the components of an Event and notifies the publishers
+// immediately if not locks are in place.  Otherwise, the action is delayed
+// until the locks are released.
 func (rt *RequestTracker) Publish(prefix, action, key string, ref interface{}) error {
 	rt.Lock()
 	defer rt.Unlock()
@@ -74,6 +86,11 @@ func (rt *RequestTracker) Publish(prefix, action, key string, ref interface{}) e
 	return nil
 }
 
+// find is a helper function to lookup objects in the data tracker.
+// It handles the index splitting for the front end.  If the key has
+// a colon in the string, the system assumes the first part is the
+// index to search under and the rest is the actual key in that index.
+// The Index should be unique.
 func (rt *RequestTracker) find(prefix, key string) models.Model {
 	s := rt.d(prefix)
 	if s == nil {
@@ -97,10 +114,14 @@ func (rt *RequestTracker) find(prefix, key string) models.Model {
 	return s.Find(key)
 }
 
+// RawFind uses the find helper routine and returns the in-memory
+// data store cached object.
 func (rt *RequestTracker) RawFind(prefix, key string) models.Model {
 	return rt.find(prefix, key)
 }
 
+// Find uses the find helper routine and returns a clone of the
+// in-memory data store cached object.
 func (rt *RequestTracker) Find(prefix, key string) models.Model {
 	res := rt.find(prefix, key)
 	if res != nil {
@@ -109,6 +130,8 @@ func (rt *RequestTracker) Find(prefix, key string) models.Model {
 	return nil
 }
 
+// FindByIndex uses the provided index and key (for that index) to return
+// the object.  The object returned is a clone.
 func (rt *RequestTracker) FindByIndex(prefix string, idx index.Maker, key string) models.Model {
 	items, err := index.Sort(idx)(rt.Index(prefix))
 	if err != nil {
@@ -118,10 +141,16 @@ func (rt *RequestTracker) FindByIndex(prefix string, idx index.Maker, key string
 	return items.Find(key)
 }
 
+// Index returns the index specified by that name.
+// No validation is done on the name.
 func (rt *RequestTracker) Index(name string) *index.Index {
 	return &rt.d(name).Index
 }
 
+// Do takes a function that takes the lock stores specified
+// when the RequestTracker was created and executes it
+// with the locks taken and then unlocks the locks when complete.
+// It is assumed that is as lamdba function.
 func (rt *RequestTracker) Do(thunk func(Stores)) {
 	rt.Lock()
 	if rt.d != nil {
@@ -135,6 +164,10 @@ func (rt *RequestTracker) Do(thunk func(Stores)) {
 	thunk(d)
 }
 
+// AllLocked takes a function that takes the lock stores.
+// In this case, all stores are locked and sent the function.
+// Upon completion, the locks are released.
+// It is assumed that is as lamdba function.
 func (rt *RequestTracker) AllLocked(thunk func(Stores)) {
 	rt.Lock()
 	d, unlocker := rt.dt.lockAll()
@@ -152,6 +185,20 @@ func (rt *RequestTracker) stores(s string) *Store {
 	return rt.d(s)
 }
 
+// spkibrt is a helper function that takes a model and
+// explodes it into a bunch of components.
+//   s = stores for this RequestTracker instance
+//   p = the prefix of the request object.
+//   k = the key of the requested object.
+//   i = the current idx for finding those objects.
+//   b = the backing store for that index.
+//   r = refenence to the input object.
+//   t = target - cloned version of the looked up object.
+//
+// Some of these values are empty/blank if the object is not found.
+//
+// A common use is to use this function to take a partially specified
+// object to return a clone of the populated object.
 func (rt *RequestTracker) spkibrt(obj models.Model) (
 	s Stores,
 	prefix, key string,
@@ -177,6 +224,12 @@ func (rt *RequestTracker) spkibrt(obj models.Model) (
 	return
 }
 
+// Create takes an object and attempts to save it.  saved is
+// true if the object is actually saved.  error indicates the
+// actual error including validation errors. A "create" event
+// is generated from this call.
+//
+// Assumes locks are held if appropriate.
 func (rt *RequestTracker) Create(obj models.Model) (saved bool, err error) {
 	if ms, ok := obj.(models.Filler); ok {
 		ms.Fill()
@@ -215,6 +268,12 @@ func (rt *RequestTracker) Create(obj models.Model) (saved bool, err error) {
 	return saved, err
 }
 
+// Remove takes a complete or partial object and removes
+// the object from the system.  removed is true if the object
+// is removed.  error indicates the error that caused the remove
+// to fail.  A "delete" event is generated from this routine.
+//
+// Assumes locks are held if appropriate.
 func (rt *RequestTracker) Remove(obj models.Model) (removed bool, err error) {
 	_, prefix, key, idx, backend, _, item := rt.spkibrt(obj)
 	if item == nil {
@@ -235,6 +294,12 @@ func (rt *RequestTracker) Remove(obj models.Model) (removed bool, err error) {
 	return removed, err
 }
 
+// Patch takes a partially specified object to define the key space,
+// a key to find the object, and a JSON patch object to apply to
+// the found object.  Upon success, the new object is returned. Failure
+// returned in the error field.  This will generate an "update" event.
+//
+// Assumes locks are held as appropriate.
 func (rt *RequestTracker) Patch(obj models.Model, key string, patch jsonpatch2.Patch) (models.Model, error) {
 	_, prefix, _, idx, backend, _, _ := rt.spkibrt(obj)
 	ref := idx.Find(key)
@@ -307,6 +372,12 @@ func (rt *RequestTracker) Patch(obj models.Model, key string, patch jsonpatch2.P
 	return toSave, err
 }
 
+// Update takes a fully specified object and replaces an existing
+// object in the data store assuming the new object is valid.  saved
+// is true if the object is saved.  error indicates failure.  An
+// "update" event is generated from this call.
+//
+// Assumes locks are held as appropriate.
 func (rt *RequestTracker) Update(obj models.Model) (saved bool, err error) {
 	_, prefix, key, idx, backend, ref, target := rt.spkibrt(obj)
 	if target == nil {
@@ -335,6 +406,13 @@ func (rt *RequestTracker) Update(obj models.Model) (saved bool, err error) {
 	return saved, err
 }
 
+// Save takes a fully specified object and saves it to the data store
+// and backing index. This will generate a "save" event.
+// The difference between Update and Save is that Update will go
+// through the OnChange callback system.  Save will NOT.  Both calls
+// will call BeforeSave and AfterSave.
+//
+// Assumes that locks are held as appropriate.
 func (rt *RequestTracker) Save(obj models.Model) (saved bool, err error) {
 	_, prefix, key, idx, backend, ref, _ := rt.spkibrt(obj)
 	if ms, ok := ref.(models.Filler); ok {
@@ -354,6 +432,13 @@ func (rt *RequestTracker) Save(obj models.Model) (saved bool, err error) {
 	return saved, err
 }
 
+// GetParams will return the parameters associated with the
+// provided object.  If aggregate is false, then the parameters
+// will be the directly associated Parameters.  If aggregate is
+// true, the parameters will be aggregated from the the parent
+// objects and global Profile.
+//
+// Assumes that locks are held as appropriate.
 func (rt *RequestTracker) GetParams(obj models.Paramer, aggregate bool) map[string]interface{} {
 	res := obj.GetParams()
 	if !aggregate {
@@ -398,6 +483,10 @@ func (rt *RequestTracker) GetParams(obj models.Paramer, aggregate bool) map[stri
 	return res
 }
 
+// SetParams completes replaces the current Parameter map on the object
+// with the new one.
+//
+// Assumes that locks are held as appropriate.
 func (rt *RequestTracker) SetParams(obj models.Paramer, values map[string]interface{}) error {
 	obj.SetParams(values)
 	e := &models.Error{Code: 422, Type: ValidationError, Model: obj.Prefix(), Key: obj.Key()}
@@ -406,6 +495,11 @@ func (rt *RequestTracker) SetParams(obj models.Paramer, values map[string]interf
 	return e.HasError()
 }
 
+// GetParam will retrieve the value of the specific parameter.  If
+// aggregate is true, the parent objects and the global profile is searched.
+// The bool will be true if the parameter exists.
+//
+// Assumes that locks are held as appropriate.
 func (rt *RequestTracker) GetParam(obj models.Paramer, key string, aggregate bool) (interface{}, bool) {
 	v, ok := rt.GetParams(obj, aggregate)[key]
 	if ok || !aggregate {
@@ -418,26 +512,38 @@ func (rt *RequestTracker) GetParam(obj models.Paramer, key string, aggregate boo
 	return nil, false
 }
 
+// SetParam will set specified parameter within the object's parameter
+// map.
+//
+// Assumes that locks are held as appropriate.
 func (rt *RequestTracker) SetParam(obj models.Paramer, key string, val interface{}) error {
 	p := obj.GetParams()
 	p[key] = val
 	return rt.SetParams(obj, p)
 }
 
+// DelParam will remove the specified parameter from the object's parameter
+// map.  If not present, an error is returned.
+//
+// Assumes that locks are held as appropriate.
 func (rt *RequestTracker) DelParam(obj models.Paramer, key string) (interface{}, error) {
 	p := obj.GetParams()
-	if val, ok := p[key]; !ok {
+	val, ok := p[key]
+	if !ok {
 		return nil, &models.Error{
 			Code:  http.StatusNotFound,
 			Type:  "DELETE",
 			Model: "params",
 			Key:   key,
 		}
-	} else {
-		delete(p, key)
-		return val, rt.SetParams(obj, p)
 	}
+	delete(p, key)
+	return val, rt.SetParams(obj, p)
 }
+
+// AddParam will add a parameter to the map only if it is not present.
+//
+// Assumes that locks are held as appropriate.
 func (rt *RequestTracker) AddParam(obj models.Paramer, key string, val interface{}) error {
 	p := obj.GetParams()
 	if _, ok := p[key]; !ok {
@@ -455,18 +561,25 @@ func (rt *RequestTracker) urlFor(scheme string, remoteIP net.IP, port int) strin
 	return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(rt.dt.LocalIP(remoteIP), strconv.Itoa(port)))
 }
 
+// ApiURL is a helper function to return the appropriate
+// URL to access the API based upon the remote IP.
 func (rt *RequestTracker) ApiURL(remoteIP net.IP) string {
 	return rt.urlFor("https", remoteIP, rt.dt.ApiPort)
 }
 
+// FileURL is a helper function to return the appropriate
+// URL to access the FileServer based upon the remote IP.
 func (rt *RequestTracker) FileURL(remoteIP net.IP) string {
 	return rt.urlFor("http", remoteIP, rt.dt.StaticPort)
 }
 
+// SealClaims takes a set of auth claims and signs them to
+// make an Token for authentication purposes.
 func (rt *RequestTracker) SealClaims(claims *DrpCustomClaims) (string, error) {
 	return rt.dt.SealClaims(claims)
 }
 
+// MachineForMac looks up a Machine by the specified MAC address.
 func (rt *RequestTracker) MachineForMac(mac string) *Machine {
 	m := rt.Find("machines", rt.dt.MacToMachineUUID(mac))
 	if m != nil {
@@ -475,6 +588,7 @@ func (rt *RequestTracker) MachineForMac(mac string) *Machine {
 	return nil
 }
 
+// Prefs returns the current Prefs in the data tracker.
 func (rt *RequestTracker) Prefs() map[string]string {
 	return rt.dt.Prefs()
 }

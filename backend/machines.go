@@ -19,7 +19,6 @@ import (
 
 // Machine represents a single bare-metal system that the provisioner
 // should manage the boot environment for.
-// swagger:model
 type Machine struct {
 	*models.Machine
 	validate
@@ -30,22 +29,22 @@ type Machine struct {
 	toDeRegister, toRegister renderers
 }
 
-func (obj *Machine) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (n *Machine) SetReadOnly(b bool) {
+	n.ReadOnly = b
 }
 
-func (obj *Machine) InRunner() {
-	obj.inRunner = true
+func (n *Machine) InRunner() {
+	n.inRunner = true
 }
 
 func (n *Machine) AllowStageChange() {
 	n.changeStageAllowed = true
 }
 
-func (obj *Machine) SaveClean() store.KeySaver {
-	mod := *obj.Machine
+func (n *Machine) SaveClean() store.KeySaver {
+	mod := *n.Machine
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, n.rt)
 }
 
 func (n *Machine) HasTask(s string) bool {
@@ -532,9 +531,9 @@ func (n *Machine) Validate() {
 			}
 			if obFound := stages.Find(n.oldStage); obFound != nil && n.oldStage != n.Stage {
 				oldStage := AsStage(obFound)
-				n.toDeRegister = append(n.toDeRegister, oldStage.Render(n.rt, n, n)...)
+				n.toDeRegister = append(n.toDeRegister, oldStage.render(n.rt, n, n)...)
 			}
-			n.toRegister = append(n.toRegister, stage.Render(n.rt, n, n)...)
+			n.toRegister = append(n.toRegister, stage.render(n.rt, n, n)...)
 		}
 	}
 	bootenvs := n.rt.stores("bootenvs")
@@ -556,9 +555,9 @@ func (n *Machine) Validate() {
 			}
 			if obFound := bootenvs.Find(n.oldBootEnv); obFound != nil {
 				oldEnv := AsBootEnv(obFound)
-				n.toDeRegister = append(n.toDeRegister, oldEnv.Render(n.rt, n, n)...)
+				n.toDeRegister = append(n.toDeRegister, oldEnv.render(n.rt, n, n)...)
 			}
-			n.toRegister = append(n.toRegister, env.Render(n.rt, n, n)...)
+			n.toRegister = append(n.toRegister, env.render(n.rt, n, n)...)
 		}
 	}
 	tasks := n.rt.stores("tasks")
@@ -938,10 +937,10 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 func (n *Machine) AfterDelete() {
 	e := &models.Error{}
 	if b := n.rt.stores("bootenvs").Find(n.BootEnv); b != nil {
-		AsBootEnv(b).Render(n.rt, n, e).deregister(n.rt.dt.FS)
+		AsBootEnv(b).render(n.rt, n, e).deregister(n.rt.dt.FS)
 	}
 	if s := n.rt.stores("stages").Find(n.Stage); s != nil {
-		AsStage(s).Render(n.rt, n, e).deregister(n.rt.dt.FS)
+		AsStage(s).render(n.rt, n, e).deregister(n.rt.dt.FS)
 	}
 	if j := n.rt.stores("jobs").Find(n.CurrentJob.String()); j != nil {
 		job := AsJob(j)
@@ -979,6 +978,6 @@ var machineLockMap = map[string][]string{
 	"actions": {"stages", "bootenvs", "machines", "profiles", "params"},
 }
 
-func (m *Machine) Locks(action string) []string {
+func (n *Machine) Locks(action string) []string {
 	return machineLockMap[action]
 }

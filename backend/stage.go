@@ -11,8 +11,6 @@ import (
 )
 
 // Stage encapsulates tasks we want to run a machine
-//
-// swagger:model
 type Stage struct {
 	*models.Stage
 	validate
@@ -22,16 +20,20 @@ type Stage struct {
 	tmplMux         sync.Mutex
 }
 
-func (obj *Stage) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+// SetReadOnly interface function to set the ReadOnly flag.
+func (s *Stage) SetReadOnly(b bool) {
+	s.ReadOnly = b
 }
 
-func (obj *Stage) SaveClean() store.KeySaver {
-	mod := *obj.Stage
+// SaveClean interface function to clear validation fields
+// and return a store.KeySaver for use in data stores.
+func (s *Stage) SaveClean() store.KeySaver {
+	mod := *s.Stage
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, s.rt)
 }
 
+// HasTask returns true if the task name is in the Tasks list.
 func (s *Stage) HasTask(ts string) bool {
 	for _, p := range s.Tasks {
 		if p == ts {
@@ -41,6 +43,7 @@ func (s *Stage) HasTask(ts string) bool {
 	return false
 }
 
+// HasProfile returns true if the profile name is in the Profiles list.
 func (s *Stage) HasProfile(name string) bool {
 	for _, e := range s.Profiles {
 		if e == name {
@@ -50,6 +53,7 @@ func (s *Stage) HasProfile(name string) bool {
 	return false
 }
 
+// Indexes returns a map of valid indexes for Stage.
 func (s *Stage) Indexes() map[string]index.Maker {
 	fix := AsStage
 	res := index.MakeBaseIndexes(s)
@@ -137,6 +141,10 @@ func (s *Stage) genRoot(commonRoot *template.Template, e models.ErrorAdder) *tem
 	return res
 }
 
+// Validate ensures that the Stage is valid and available.
+// Setting those flags as appropriate.  Profiles, Tasks,
+// and BootEnv are validate for presence.  Renderers are
+// updated as appropriate.
 func (s *Stage) Validate() {
 	s.Stage.Validate()
 	for idx, ti := range s.Templates {
@@ -199,7 +207,7 @@ func (s *Stage) Validate() {
 			if machine.Stage != s.Name {
 				continue
 			}
-			s.renderers = append(s.renderers, s.Render(s.rt, machine, s)...)
+			s.renderers = append(s.renderers, s.render(s.rt, machine, s)...)
 		}
 	}
 	s.SetAvailable()
@@ -223,34 +231,30 @@ func (s *Stage) Validate() {
 	}
 }
 
+// OnLoad initializes the Stage when loaded by the data store.
 func (s *Stage) OnLoad() error {
 	defer func() { s.rt = nil }()
 	s.Fill()
 	return s.BeforeSave()
 }
 
+// New returns a new empty Stage with the ForceChange
+// and RT fields of the calling Stage as store.KeySaver
+// for the data store.
 func (s *Stage) New() store.KeySaver {
 	res := &Stage{Stage: &models.Stage{}}
 	if s.Stage != nil && s.ChangeForced() {
 		res.ForceChange()
 	}
 	res.rt = s.rt
-	res.Profiles = []string{}
-	res.Tasks = []string{}
-	res.Templates = []models.TemplateInfo{}
+	res.Fill()
 	return res
 }
 
+// BeforeSave returns an error if the Stage
+// is not valid to abort the Save.
 func (s *Stage) BeforeSave() error {
-	if s.Profiles == nil {
-		s.Profiles = []string{}
-	}
-	if s.Tasks == nil {
-		s.Tasks = []string{}
-	}
-	if s.Templates == nil {
-		s.Templates = []models.TemplateInfo{}
-	}
+	s.Fill()
 	s.Validate()
 	if !s.Validated {
 		return s.MakeError(422, ValidationError, s)
@@ -258,6 +262,9 @@ func (s *Stage) BeforeSave() error {
 	return nil
 }
 
+// BeforeDelete returns an error if the Stage is
+// in use by a workflow or machine to abort the
+// delete.
 func (s *Stage) BeforeDelete() error {
 	e := &models.Error{Code: 409, Type: StillInUseError, Model: s.Prefix(), Key: s.Key()}
 	machines := s.rt.stores("machines")
@@ -281,10 +288,12 @@ func (s *Stage) BeforeDelete() error {
 	return e.HasError()
 }
 
+// AsStage converts the models.Model into a *Stage.
 func AsStage(o models.Model) *Stage {
 	return o.(*Stage)
 }
 
+// AsStages converts the list of models.Model into a list of *Stage.
 func AsStages(o []models.Model) []*Stage {
 	res := make([]*Stage, len(o))
 	for i := range o {
@@ -301,7 +310,7 @@ func (s *Stage) templates() *template.Template {
 	return s.rootTemplate
 }
 
-func (s *Stage) Render(rt *RequestTracker, m *Machine, e models.ErrorAdder) renderers {
+func (s *Stage) render(rt *RequestTracker, m *Machine, e models.ErrorAdder) renderers {
 	if len(s.RequiredParams) > 0 && m == nil {
 		e.Errorf("Machine is nil or does not have params")
 		return nil
@@ -310,6 +319,7 @@ func (s *Stage) Render(rt *RequestTracker, m *Machine, e models.ErrorAdder) rend
 	return r.makeRenderers(e)
 }
 
+// AfterSave registers new renderers after successful save.
 func (s *Stage) AfterSave() {
 	if s.Available && s.renderers != nil {
 		s.renderers.register(s.rt.dt.FS)
@@ -326,6 +336,7 @@ var stageLockMap = map[string][]string{
 	"actions": {"stages", "profiles", "params"},
 }
 
+// Locks returns a list of prefixes that need to be locked for the specific action.
 func (s *Stage) Locks(action string) []string {
 	return stageLockMap[action]
 }

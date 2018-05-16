@@ -19,21 +19,20 @@ type Paramer interface {
 // Specifically, it contains a description of what the information
 // is for, detailed documentation about the param, and a JSON schema that
 // the param must match to be considered valid.
-// swagger:model
 type Param struct {
 	*models.Param
 	validate
 	validator *gojsonschema.Schema
 }
 
-func (obj *Param) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (p *Param) SetReadOnly(b bool) {
+	p.ReadOnly = b
 }
 
-func (obj *Param) SaveClean() store.KeySaver {
-	mod := *obj.Param
+func (p *Param) SaveClean() store.KeySaver {
+	mod := *p.Param
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, p.rt)
 }
 
 func AsParam(o models.Model) *Param {

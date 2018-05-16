@@ -20,7 +20,7 @@ type InfoResponse struct {
 
 func (f *Frontend) GetInfo(c *gin.Context, drpid string) (*models.Info, *models.Error) {
 	i := &models.Info{
-		Version:            provision.RS_VERSION,
+		Version:            provision.RSVersion,
 		Id:                 drpid,
 		ApiPort:            f.ApiPort,
 		FilePort:           f.ProvPort,

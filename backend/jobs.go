@@ -52,15 +52,14 @@ import (
 //
 // * On provisioner startup, all machine CurrentJobs are set to "failed" if they are not "finished"
 //
-// swagger:model
 type Job struct {
 	*models.Job
 	validate
 	oldState string
 }
 
-func (obj *Job) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (j *Job) SetReadOnly(b bool) {
+	j.ReadOnly = b
 }
 
 func (j *Job) LogPath(rt *RequestTracker) string {
@@ -71,10 +70,10 @@ func (j *Job) LogPath(rt *RequestTracker) string {
 	return filepath.Join(j.rt.dt.LogRoot, j.Uuid.String())
 }
 
-func (obj *Job) SaveClean() store.KeySaver {
-	mod := *obj.Job
+func (j *Job) SaveClean() store.KeySaver {
+	mod := *j.Job
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, j.rt)
 }
 func AsJob(o models.Model) *Job {
 	return o.(*Job)
@@ -538,7 +537,7 @@ func (j *Job) RenderActions(rt *RequestTracker) ([]*models.JobAction, error) {
 		m := AsMachine(mo)
 
 		err = &models.Error{Code: http.StatusUnprocessableEntity, Type: ValidationError}
-		renderers := t.Render(rt, m, err)
+		renderers := t.render(rt, m, err)
 		if err.HasError() != nil {
 			return
 		}

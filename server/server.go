@@ -116,9 +116,9 @@ func server(localLogger *log.Logger, c_opts *ProgOpts) string {
 	var err error
 
 	if c_opts.VersionFlag {
-		return fmt.Sprintf("Version: %s", provision.RS_VERSION)
+		return fmt.Sprintf("Version: %s", provision.RSVersion)
 	}
-	localLogger.Printf("Version: %s\n", provision.RS_VERSION)
+	localLogger.Printf("Version: %s\n", provision.RSVersion)
 
 	// Make base root dir
 	if err = mkdir(c_opts.BaseRoot); err != nil {

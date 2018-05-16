@@ -11,26 +11,28 @@ import (
 )
 
 // Reservation tracks persistent DHCP IP address reservations.
-//
-// swagger:model
 type Reservation struct {
 	*models.Reservation
 	validate
 }
 
-func (obj *Reservation) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+// SetReadOnly interface function to set the ReadOnly flag.
+func (r *Reservation) SetReadOnly(b bool) {
+	r.ReadOnly = b
 }
 
-func (obj *Reservation) SaveClean() store.KeySaver {
-	mod := *obj.Reservation
+// SaveClean interface function to clear validation fields
+// and return object as a store.KeySaver for the data stores.
+func (r *Reservation) SaveClean() store.KeySaver {
+	mod := *r.Reservation
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, r.rt)
 }
 
-func (l *Reservation) Indexes() map[string]index.Maker {
+// Indexes returns a map of indexes for Reservation.
+func (r *Reservation) Indexes() map[string]index.Maker {
 	fix := AsReservation
-	res := index.MakeBaseIndexes(l)
+	res := index.MakeBaseIndexes(r)
 	res["Addr"] = index.Make(
 		false,
 		"IP Address",
@@ -59,7 +61,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 			if addr == nil {
 				return nil, fmt.Errorf("Invalid Address: %s", s)
 			}
-			res := fix(l.New())
+			res := fix(r.New())
 			res.Addr = addr
 			return res, nil
 		})
@@ -77,7 +79,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 				}
 		},
 		func(s string) (models.Model, error) {
-			res := fix(l.New())
+			res := fix(r.New())
 			res.Token = s
 			return res, nil
 		})
@@ -95,7 +97,7 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 				}
 		},
 		func(s string) (models.Model, error) {
-			res := fix(l.New())
+			res := fix(r.New())
 			res.Strategy = s
 			return res, nil
 		})
@@ -127,13 +129,16 @@ func (l *Reservation) Indexes() map[string]index.Maker {
 			if addr == nil {
 				return nil, fmt.Errorf("Invalid Address: %s", s)
 			}
-			res := fix(l.New())
+			res := fix(r.New())
 			res.NextServer = addr
 			return res, nil
 		})
 	return res
 }
 
+// New returns an empty Reservation object with the
+// forceChange and RT fields from the calling object
+// as store.KeySaver for use by the data stores.
 func (r *Reservation) New() store.KeySaver {
 	res := &Reservation{Reservation: &models.Reservation{}}
 	if r.Reservation != nil && r.ChangeForced() {
@@ -143,10 +148,12 @@ func (r *Reservation) New() store.KeySaver {
 	return res
 }
 
+// AsReservation converts a models.Model to a *Reservation.
 func AsReservation(o models.Model) *Reservation {
 	return o.(*Reservation)
 }
 
+// AsReservations converts a list of models.Model to a list of *Reservation.
 func AsReservations(o []models.Model) []*Reservation {
 	res := make([]*Reservation, len(o))
 	for i := range o {
@@ -155,6 +162,8 @@ func AsReservations(o []models.Model) []*Reservation {
 	return res
 }
 
+// OnChange is called by the data stores when a value changes to
+// ensure the change is valid.  Errors abort the change.
 func (r *Reservation) OnChange(oldThing store.KeySaver) error {
 	old := AsReservation(oldThing)
 	if r.Token != old.Token {
@@ -166,6 +175,9 @@ func (r *Reservation) OnChange(oldThing store.KeySaver) error {
 	return r.MakeError(422, ValidationError, r)
 }
 
+// OnCreate is called by the data stores when creating a value.
+// It validates the object relative to others and upon error
+// aborts the create.
 func (r *Reservation) OnCreate() error {
 	subnets := AsSubnets(r.rt.stores("subnets").Items())
 	for i := range subnets {
@@ -180,6 +192,8 @@ func (r *Reservation) OnCreate() error {
 	return r.MakeError(422, ValidationError, r)
 }
 
+// Validate ensures the object is valid.  Setting the
+// available and valid flags as appropriate.
 func (r *Reservation) Validate() {
 	validateIP4(r, r.Addr)
 	if r.NextServer != nil {
@@ -207,6 +221,8 @@ func (r *Reservation) Validate() {
 	r.SetAvailable()
 }
 
+// BeforeSave validates the object and returns an error
+// if the operation should be aborted.
 func (r *Reservation) BeforeSave() error {
 	r.Validate()
 	if !r.Useable() {
@@ -215,6 +231,8 @@ func (r *Reservation) BeforeSave() error {
 	return nil
 }
 
+// OnLoad is call by the data store initialize and
+// validate a loaded Reservation.
 func (r *Reservation) OnLoad() error {
 	defer func() { r.rt = nil }()
 	r.Fill()
@@ -230,6 +248,7 @@ var reservationLockMap = map[string][]string{
 	"actions": {"reservations", "profiles", "params"},
 }
 
+// Locks returns a list of prefixes to lock for a specific action.
 func (r *Reservation) Locks(action string) []string {
 	return reservationLockMap[action]
 }

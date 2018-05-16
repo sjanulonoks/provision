@@ -26,8 +26,6 @@ var explodeMux = &sync.Mutex{}
 
 // BootEnv encapsulates the machine-agnostic information needed by the
 // provisioner to set up a boot environment.
-//
-// swagger:model
 type BootEnv struct {
 	*models.BootEnv
 	validate
@@ -44,12 +42,12 @@ func (b *BootEnv) NetBoot() bool {
 	return b.OnlyUnknown || b.Kernel != ""
 }
 
-func (obj *BootEnv) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (b *BootEnv) SetReadOnly(nb bool) {
+	b.ReadOnly = nb
 }
 
-func (obj *BootEnv) SaveClean() store.KeySaver {
-	mod := *obj.BootEnv
+func (b *BootEnv) SaveClean() store.KeySaver {
+	mod := *b.BootEnv
 	mod.ClearValidation()
 	return ModelToBackend(&mod)
 }
@@ -415,7 +413,7 @@ func (b *BootEnv) Validate() {
 		}
 	}
 	if b.OnlyUnknown {
-		b.renderers = append(b.renderers, b.Render(b.rt, nil, b)...)
+		b.renderers = append(b.renderers, b.render(b.rt, nil, b)...)
 	} else {
 		machines := b.rt.stores("machines")
 		if machines != nil {
@@ -424,7 +422,7 @@ func (b *BootEnv) Validate() {
 				if machine.BootEnv != b.Name {
 					continue
 				}
-				b.renderers = append(b.renderers, b.Render(b.rt, machine, b)...)
+				b.renderers = append(b.renderers, b.render(b.rt, machine, b)...)
 			}
 		}
 	}
@@ -504,7 +502,7 @@ func (b *BootEnv) BeforeDelete() error {
 func (b *BootEnv) AfterDelete() {
 	if b.OnlyUnknown {
 		err := &models.Error{Object: b}
-		rts := b.Render(b.rt, nil, err)
+		rts := b.render(b.rt, nil, err)
 		if err.ContainsError() {
 			b.Errors = err.Messages
 		} else {
@@ -539,7 +537,7 @@ func (b *BootEnv) templates() *template.Template {
 	return b.rootTemplate
 }
 
-func (b *BootEnv) Render(rt *RequestTracker, m *Machine, e models.ErrorAdder) renderers {
+func (b *BootEnv) render(rt *RequestTracker, m *Machine, e models.ErrorAdder) renderers {
 	if len(b.RequiredParams) > 0 && m == nil {
 		e.Errorf("Machine is nil or does not have params")
 		return nil

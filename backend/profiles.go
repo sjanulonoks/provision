@@ -13,20 +13,19 @@ import (
 // as a global set of parameters for the system.
 //
 // These can be assigned to a machine's profile list.
-// swagger:model
 type Profile struct {
 	*models.Profile
 	validate
 }
 
-func (obj *Profile) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (p *Profile) SetReadOnly(b bool) {
+	p.ReadOnly = b
 }
 
-func (obj *Profile) SaveClean() store.KeySaver {
-	mod := *obj.Profile
+func (p *Profile) SaveClean() store.KeySaver {
+	mod := *p.Profile
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, p.rt)
 }
 
 func (p *Profile) Indexes() map[string]index.Maker {

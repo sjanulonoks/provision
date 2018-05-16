@@ -52,11 +52,11 @@ set -e
 echo "Version = $Prepart$MajorV.$MinorV.$PatchV$Extra-$GITHASH"
 
 export VERFLAGS="-s -w \
-          -X github.com/digitalrebar/provision.RS_MAJOR_VERSION=$MajorV \
-          -X github.com/digitalrebar/provision.RS_MINOR_VERSION=$MinorV \
-          -X github.com/digitalrebar/provision.RS_PATCH_VERSION=$PatchV \
-          -X github.com/digitalrebar/provision.RS_EXTRA=$Extra \
-          -X github.com/digitalrebar/provision.RS_PREPART=$Prepart \
+          -X github.com/digitalrebar/provision.RSMajorVersion=$MajorV \
+          -X github.com/digitalrebar/provision.RSMinorVersion=$MinorV \
+          -X github.com/digitalrebar/provision.RSPatchVersion=$PatchV \
+          -X github.com/digitalrebar/provision.RSExtra=$Extra \
+          -X github.com/digitalrebar/provision.RSPrePart=$Prepart \
           -X github.com/digitalrebar/provision.BuildStamp=`date -u '+%Y-%m-%d_%I:%M:%S%p'` \
           -X github.com/digitalrebar/provision.GitHash=$GITHASH"
 

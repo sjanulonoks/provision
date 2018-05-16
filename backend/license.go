@@ -10,10 +10,10 @@ import (
 
 // Contains license validation code.
 
-var publicKeysBase64 []string = []string{
-	"iTeYR10TfD+dHBCl/+2u2T6WfVoGzLIyOk5850jQqQM=",
-}
+var publicKeysBase64 = []string{"iTeYR10TfD+dHBCl/+2u2T6WfVoGzLIyOk5850jQqQM="}
 
+// AllLicenses returns the current expiry state of the current
+// licenses and caches that result.
 func (dt *DataTracker) AllLicenses() models.LicenseBundle {
 	res := dt.licenses
 	if res.Licenses == nil {
@@ -28,6 +28,7 @@ func (dt *DataTracker) AllLicenses() models.LicenseBundle {
 	return res
 }
 
+// LicenseFor returns the expiry state of the specified component.
 func (dt *DataTracker) LicenseFor(component string) *models.License {
 	if dt.licenses.Licenses == nil {
 		return nil
@@ -42,15 +43,14 @@ func (dt *DataTracker) LicenseFor(component string) *models.License {
 }
 
 func (dt *DataTracker) loadLicense(rt *RequestTracker) {
-	licenseProfile := &Profile{}
 	dt.licenses = models.LicenseBundle{Licenses: []models.License{}}
-	if p := rt.find("profiles", "rackn-license"); p == nil {
+	p := rt.find("profiles", "rackn-license")
+	if p == nil {
 		rt.Infof("Missing rackn-license profile, no enterprise functionality will be enabled")
 		rt.Infof("Contact support@rackn.com to enable enterprise functionality.")
 		return
-	} else {
-		licenseProfile = AsProfile(p)
 	}
+	licenseProfile := AsProfile(p)
 
 	d, ok := licenseProfile.Params["rackn/license"].(string)
 	if !ok {

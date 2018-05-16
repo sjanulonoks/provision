@@ -130,8 +130,6 @@ func init() {
 }
 
 // Subnet represents a DHCP Subnet
-//
-// swagger:model
 type Subnet struct {
 	*models.Subnet
 	validate
@@ -139,16 +137,20 @@ type Subnet struct {
 	sn             *net.IPNet
 }
 
-func (obj *Subnet) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+// SetReadOnly is an interface function to set the ReadOnly flag.
+func (s *Subnet) SetReadOnly(b bool) {
+	s.ReadOnly = b
 }
 
-func (obj *Subnet) SaveClean() store.KeySaver {
-	mod := *obj.Subnet
+// SaveClean clears the validation fields and returns the object
+// as a store.KeySaver for use by the backing store.
+func (s *Subnet) SaveClean() store.KeySaver {
+	mod := *s.Subnet
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, s.rt)
 }
 
+// Indexes returns a map of the valid indexes for Subnet.
 func (s *Subnet) Indexes() map[string]index.Maker {
 	fix := AsSubnet
 	res := index.MakeBaseIndexes(s)
@@ -413,6 +415,8 @@ func (s *Subnet) subnet() *net.IPNet {
 	return res
 }
 
+// New returns a new Subnet with the forceChange and RT
+// fields copied from the calling Subnet.
 func (s *Subnet) New() store.KeySaver {
 	res := &Subnet{Subnet: &models.Subnet{}}
 	if s.Subnet != nil && s.ChangeForced() {
@@ -465,18 +469,25 @@ func (s *Subnet) idxABounds() (index.Test, index.Test) {
 		}
 }
 
+// InSubnetRange returns true if the IP is inside the
+// subnet CIDR.
 func (s *Subnet) InSubnetRange(ip net.IP) bool {
 	lower, upper := s.sBounds()
 	hex := models.Hexaddr(ip)
 	return lower(hex) && !upper(hex)
 }
 
+// InActiveRange returns true if the IP is inside the
+// subnet's active range, inclusively.
 func (s *Subnet) InActiveRange(ip net.IP) bool {
 	lower, upper := s.aBounds()
 	hex := models.Hexaddr(ip)
 	return lower(hex) && !upper(hex)
 }
 
+// LeaseTimeFor returns the lease time for the IP in question.
+// The value reflects if the IP in the active range,
+// inside the subnet, or if the subnet is in proxy mode.
 func (s *Subnet) LeaseTimeFor(ip net.IP) time.Duration {
 	if s.Proxy {
 		return 0
@@ -489,10 +500,12 @@ func (s *Subnet) LeaseTimeFor(ip net.IP) time.Duration {
 	}
 }
 
+// AsSubnet converts a models.Model into a *Subnet.
 func AsSubnet(o models.Model) *Subnet {
 	return o.(*Subnet)
 }
 
+// AsSubnets converts a list of models.Model into a list of *Subnet.
 func AsSubnets(o []models.Model) []*Subnet {
 	res := make([]*Subnet, len(o))
 	for i := range o {
@@ -501,6 +514,9 @@ func AsSubnets(o []models.Model) []*Subnet {
 	return res
 }
 
+// Validate ensures that the Subnet has valid values and
+// do NOT overlap with out subnets.  This sets the available
+// and valid flags.
 func (s *Subnet) Validate() {
 	s.Subnet.Fill()
 	s.Subnet.Validate()
@@ -508,9 +524,9 @@ func (s *Subnet) Validate() {
 	if err != nil {
 		s.Errorf("Invalid subnet %s: %v", s.Subnet.Subnet, err)
 		return
-	} else {
-		validateIP4(s, subnet.IP)
 	}
+	validateIP4(s, subnet.IP)
+
 	// Build mask and broadcast for always
 	mask := net.IP([]byte(net.IP(subnet.Mask).To4()))
 	bcastBits := binary.BigEndian.Uint32(subnet.IP) | ^binary.BigEndian.Uint32(mask)
@@ -559,6 +575,8 @@ func (s *Subnet) Validate() {
 	s.SetAvailable()
 }
 
+// BeforeSave returns an error if the subnet is not valid.  This
+// is used by the store system to avoid saving bad Subnets.
 func (s *Subnet) BeforeSave() error {
 	s.Validate()
 	if !s.Useable() {
@@ -567,6 +585,8 @@ func (s *Subnet) BeforeSave() error {
 	return nil
 }
 
+// OnLoad initializes and validates the Subnet when loading
+// from a data store.
 func (s *Subnet) OnLoad() error {
 	defer func() { s.rt = nil }()
 	s.Fill()
@@ -592,6 +612,7 @@ var subnetLockMap = map[string][]string{
 	"actions": {"subnets", "profiles", "params"},
 }
 
+// Locks will return a list of prefixes needed to lock for a specific action.
 func (s *Subnet) Locks(action string) []string {
 	return subnetLockMap[action]
 }
