@@ -25,14 +25,14 @@ type Param struct {
 	validator *gojsonschema.Schema
 }
 
-func (obj *Param) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (p *Param) SetReadOnly(b bool) {
+	p.ReadOnly = b
 }
 
-func (obj *Param) SaveClean() store.KeySaver {
-	mod := *obj.Param
+func (p *Param) SaveClean() store.KeySaver {
+	mod := *p.Param
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, p.rt)
 }
 
 func AsParam(o models.Model) *Param {

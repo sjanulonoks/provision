@@ -42,12 +42,12 @@ func (b *BootEnv) NetBoot() bool {
 	return b.OnlyUnknown || b.Kernel != ""
 }
 
-func (obj *BootEnv) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (b *BootEnv) SetReadOnly(nb bool) {
+	b.ReadOnly = nb
 }
 
-func (obj *BootEnv) SaveClean() store.KeySaver {
-	mod := *obj.BootEnv
+func (b *BootEnv) SaveClean() store.KeySaver {
+	mod := *b.BootEnv
 	mod.ClearValidation()
 	return ModelToBackend(&mod)
 }

@@ -18,14 +18,14 @@ type Lease struct {
 	validate
 }
 
-func (obj *Lease) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (l *Lease) SetReadOnly(b bool) {
+	l.ReadOnly = b
 }
 
-func (obj *Lease) SaveClean() store.KeySaver {
-	mod := *obj.Lease
+func (l *Lease) SaveClean() store.KeySaver {
+	mod := *l.Lease
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, l.rt)
 }
 
 func (l *Lease) Indexes() map[string]index.Maker {

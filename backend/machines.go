@@ -29,22 +29,22 @@ type Machine struct {
 	toDeRegister, toRegister renderers
 }
 
-func (obj *Machine) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (n *Machine) SetReadOnly(b bool) {
+	n.ReadOnly = b
 }
 
-func (obj *Machine) InRunner() {
-	obj.inRunner = true
+func (n *Machine) InRunner() {
+	n.inRunner = true
 }
 
 func (n *Machine) AllowStageChange() {
 	n.changeStageAllowed = true
 }
 
-func (obj *Machine) SaveClean() store.KeySaver {
-	mod := *obj.Machine
+func (n *Machine) SaveClean() store.KeySaver {
+	mod := *n.Machine
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, n.rt)
 }
 
 func (n *Machine) HasTask(s string) bool {
@@ -978,6 +978,6 @@ var machineLockMap = map[string][]string{
 	"actions": {"stages", "bootenvs", "machines", "profiles", "params"},
 }
 
-func (m *Machine) Locks(action string) []string {
+func (n *Machine) Locks(action string) []string {
 	return machineLockMap[action]
 }

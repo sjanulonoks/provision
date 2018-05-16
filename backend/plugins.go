@@ -16,14 +16,14 @@ type Plugin struct {
 	validate
 }
 
-func (obj *Plugin) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+func (n *Plugin) SetReadOnly(b bool) {
+	n.ReadOnly = b
 }
 
-func (obj *Plugin) SaveClean() store.KeySaver {
-	mod := *obj.Plugin
+func (n *Plugin) SaveClean() store.KeySaver {
+	mod := *n.Plugin
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, n.rt)
 }
 
 func (n *Plugin) Indexes() map[string]index.Maker {
@@ -128,6 +128,6 @@ var pluginLockMap = map[string][]string{
 	"actions": {"plugins", "profiles", "params"},
 }
 
-func (m *Plugin) Locks(action string) []string {
+func (n *Plugin) Locks(action string) []string {
 	return pluginLockMap[action]
 }
