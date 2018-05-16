@@ -532,9 +532,9 @@ func (n *Machine) Validate() {
 			}
 			if obFound := stages.Find(n.oldStage); obFound != nil && n.oldStage != n.Stage {
 				oldStage := AsStage(obFound)
-				n.toDeRegister = append(n.toDeRegister, oldStage.Render(n.rt, n, n)...)
+				n.toDeRegister = append(n.toDeRegister, oldStage.render(n.rt, n, n)...)
 			}
-			n.toRegister = append(n.toRegister, stage.Render(n.rt, n, n)...)
+			n.toRegister = append(n.toRegister, stage.render(n.rt, n, n)...)
 		}
 	}
 	bootenvs := n.rt.stores("bootenvs")
@@ -556,9 +556,9 @@ func (n *Machine) Validate() {
 			}
 			if obFound := bootenvs.Find(n.oldBootEnv); obFound != nil {
 				oldEnv := AsBootEnv(obFound)
-				n.toDeRegister = append(n.toDeRegister, oldEnv.Render(n.rt, n, n)...)
+				n.toDeRegister = append(n.toDeRegister, oldEnv.render(n.rt, n, n)...)
 			}
-			n.toRegister = append(n.toRegister, env.Render(n.rt, n, n)...)
+			n.toRegister = append(n.toRegister, env.render(n.rt, n, n)...)
 		}
 	}
 	tasks := n.rt.stores("tasks")
@@ -938,10 +938,10 @@ func (n *Machine) OnChange(oldThing store.KeySaver) error {
 func (n *Machine) AfterDelete() {
 	e := &models.Error{}
 	if b := n.rt.stores("bootenvs").Find(n.BootEnv); b != nil {
-		AsBootEnv(b).Render(n.rt, n, e).deregister(n.rt.dt.FS)
+		AsBootEnv(b).render(n.rt, n, e).deregister(n.rt.dt.FS)
 	}
 	if s := n.rt.stores("stages").Find(n.Stage); s != nil {
-		AsStage(s).Render(n.rt, n, e).deregister(n.rt.dt.FS)
+		AsStage(s).render(n.rt, n, e).deregister(n.rt.dt.FS)
 	}
 	if j := n.rt.stores("jobs").Find(n.CurrentJob.String()); j != nil {
 		job := AsJob(j)

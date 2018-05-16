@@ -199,7 +199,7 @@ func (s *Stage) Validate() {
 			if machine.Stage != s.Name {
 				continue
 			}
-			s.renderers = append(s.renderers, s.Render(s.rt, machine, s)...)
+			s.renderers = append(s.renderers, s.render(s.rt, machine, s)...)
 		}
 	}
 	s.SetAvailable()
@@ -301,7 +301,7 @@ func (s *Stage) templates() *template.Template {
 	return s.rootTemplate
 }
 
-func (s *Stage) Render(rt *RequestTracker, m *Machine, e models.ErrorAdder) renderers {
+func (s *Stage) render(rt *RequestTracker, m *Machine, e models.ErrorAdder) renderers {
 	if len(s.RequiredParams) > 0 && m == nil {
 		e.Errorf("Machine is nil or does not have params")
 		return nil

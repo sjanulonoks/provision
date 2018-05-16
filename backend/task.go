@@ -10,8 +10,6 @@ import (
 )
 
 // Task is a thing that can run on a Machine.
-//
-// swagger:model
 type Task struct {
 	*models.Task
 	validate
@@ -19,20 +17,24 @@ type Task struct {
 	tmplMux      sync.Mutex
 }
 
-func (obj *Task) SetReadOnly(b bool) {
-	obj.ReadOnly = b
+// SetReadOnly sets the ReadOnly flag.
+func (t *Task) SetReadOnly(b bool) {
+	t.ReadOnly = b
 }
 
-func (obj *Task) SaveClean() store.KeySaver {
-	mod := *obj.Task
+// SaveClean clears validation and returns the object as a KeySaver.
+func (t *Task) SaveClean() store.KeySaver {
+	mod := *t.Task
 	mod.ClearValidation()
-	return toBackend(&mod, obj.rt)
+	return toBackend(&mod, t.rt)
 }
 
+// AsTask converts a models.Model to a *Task.
 func AsTask(o models.Model) *Task {
 	return o.(*Task)
 }
 
+// AsTasks converts a list of models.Model to a list of *Task.
 func AsTasks(o []models.Model) []*Task {
 	res := make([]*Task, len(o))
 	for i := range o {
@@ -41,6 +43,8 @@ func AsTasks(o []models.Model) []*Task {
 	return res
 }
 
+// New returns an empty new Task with the forceChange
+// and RT fields inherited from the caller.
 func (t *Task) New() store.KeySaver {
 	res := &Task{Task: &models.Task{}}
 	if t.Task != nil && t.ChangeForced() {
@@ -50,6 +54,7 @@ func (t *Task) New() store.KeySaver {
 	return res
 }
 
+// Indexes returns the valid indexes for a Task.
 func (t *Task) Indexes() map[string]index.Maker {
 	fix := AsTask
 	res := index.MakeBaseIndexes(t)
@@ -82,6 +87,8 @@ func (t *Task) genRoot(common *template.Template, e models.ErrorAdder) *template
 	return res
 }
 
+// Validate tests the validity of Task.  Including revalidating
+// referencing stages.
 func (t *Task) Validate() {
 	t.Task.Validate()
 
@@ -119,12 +126,15 @@ func (t *Task) Validate() {
 	return
 }
 
+// OnLoad initializes the task when loaded from the backing store.
 func (t *Task) OnLoad() error {
 	defer func() { t.rt = nil }()
 	t.Fill()
 	return t.BeforeSave()
 }
 
+// BeforeSave makes sure the Task is valid and returns an error if not.
+// This is used to abort saving invalid objects.
 func (t *Task) BeforeSave() error {
 	t.Validate()
 	if !t.HasFeature("sane-exit-codes") {
@@ -141,6 +151,7 @@ type taskHaver interface {
 	HasTask(string) bool
 }
 
+// BeforeDelete makes sure that the task is not referenced before deleteing.
 func (t *Task) BeforeDelete() error {
 	e := &models.Error{Code: 409, Type: StillInUseError, Model: t.Prefix(), Key: t.Key()}
 	for _, objPrefix := range []string{"machines", "stages"} {
@@ -162,7 +173,9 @@ func (t *Task) templates() *template.Template {
 	return t.rootTemplate
 }
 
-func (t *Task) Render(rt *RequestTracker, m *Machine, e *models.Error) renderers {
+// render builds list of renderers that can be used to render all the templates
+// associated with this task.
+func (t *Task) render(rt *RequestTracker, m *Machine, e *models.Error) renderers {
 	if m == nil {
 		e.Errorf("No machine to render against")
 		return nil
@@ -180,6 +193,7 @@ var taskLockMap = map[string][]string{
 	"actions": {"tasks", "profiles", "params"},
 }
 
+// Locks returns a list of prefixes to lock for a specific action.
 func (t *Task) Locks(action string) []string {
 	return taskLockMap[action]
 }
