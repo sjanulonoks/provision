@@ -169,9 +169,8 @@ func TestRenderData(t *testing.T) {
 		if !created {
 			t.Errorf("Failed to create new test machine: %v", err)
 			return
-		} else {
-			t.Logf("Created new test machine")
 		}
+		t.Logf("Created new test machine")
 		rt.SetParam(machine, "foo", "bar")
 	})
 	genLocs := []string{

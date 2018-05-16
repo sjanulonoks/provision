@@ -19,10 +19,13 @@ import (
 	yaml "github.com/ghodss/yaml"
 )
 
+// Sizer is an interface for things that have Size.
 type Sizer interface {
 	Size() int64
 }
 
+// ReadSizer is an interface that has both a reader
+// and can generate the size of that data.
 type ReadSizer interface {
 	io.Reader
 	Sizer
@@ -220,6 +223,9 @@ type rStage struct {
 	renderData *RenderData
 }
 
+// Repo defines the repository structure used for
+// the package-repositories parameter with additional
+// fields to help rendering.
 type Repo struct {
 	Tag            string   `json:"tag"`
 	OS             []string `json:"os"`
@@ -235,14 +241,18 @@ type Repo struct {
 	targetOS       string
 }
 
+// JoinedComponents returns the Components array as
+// a single string joined with spaces.
 func (rd *Repo) JoinedComponents() string {
 	return strings.Join(rd.Components, " ")
 }
 
+// R returns the RenderData for this repo.
 func (rd *Repo) R() *RenderData {
 	return rd.r
 }
 
+// Target returns the target os for this Repo.
 func (rd *Repo) Target() string {
 	return rd.targetOS
 }
@@ -272,6 +282,7 @@ func (rd *Repo) renderStyle() string {
 	}
 }
 
+// UrlFor returns a Url for the requested component part of the repo.
 func (rd *Repo) UrlFor(component string) string {
 	if rd.InstallSource || rd.Distribution == "" {
 		return rd.URL
@@ -287,6 +298,10 @@ func (rd *Repo) UrlFor(component string) string {
 	}
 }
 
+// Install returns a string or the encountered error that
+// represents the package repo type specific file snippets
+// for either preseed/kickstarts with parts for either
+// the core install part or updates/additional repos.
 func (rd *Repo) Install() (string, error) {
 	tmpl := template.New("installLines").Option("missingkey=error")
 	var err error
@@ -325,6 +340,9 @@ d-i apt-setup/security_path string {{.R.ParseUrl "path" .URL}}
 	return buf.String(), err
 }
 
+// Lines returns an error or the string for inclusion in a
+// configuration file in the package manager specific format
+// based upon the repo definitions.
 func (rd *Repo) Lines() (string, error) {
 	tmpl := template.New("installLines").Option("missingkey=error")
 	var err error
@@ -355,6 +373,8 @@ gpgcheck=0
 	return buf.String(), err
 }
 
+// InstallUrl for returns an error or the string representing how
+// to access the install parts of this specified BootEnv.
 func (b *rBootEnv) InstallUrl() (string, error) {
 	repos := b.renderData.InstallRepos()
 	if len(repos) == 0 {
@@ -396,6 +416,8 @@ func (r *RenderData) fetchRepos(test func(*Repo) bool) (res []*Repo) {
 	return
 }
 
+// Repos is a template helper function that returns an array
+// of all the approprate repos based upon the tag list.
 func (r *RenderData) Repos(tags ...string) []*Repo {
 	return r.fetchRepos(func(rd *Repo) bool {
 		for _, t := range tags {
@@ -438,6 +460,8 @@ func (r *RenderData) localInstallRepo() *Repo {
 	return nil
 }
 
+// MachineRepos returns a list of the repos for the specific machine's
+// current state.
 func (r *RenderData) MachineRepos() []*Repo {
 	found := []*Repo{}
 	// Sigh, current ubuntus do not have metadata good enough for things besides
@@ -458,6 +482,10 @@ func (r *RenderData) MachineRepos() []*Repo {
 	return found
 }
 
+// InstallRepos returns a list of repos for the base
+// install of the current machine bootenv combo.  The
+// first repo is the install source.  The second repo
+// is the security update repo.
 func (r *RenderData) InstallRepos() []*Repo {
 	installRepo := r.localInstallRepo()
 	found := r.MachineRepos()
@@ -509,18 +537,35 @@ func newRenderData(rt *RequestTracker, m *Machine, r renderable) *RenderData {
 	return res
 }
 
+// ProvisionerAddress returns the IP address to access
+// the Provisioner based upon the requesting IP address.
 func (r *RenderData) ProvisionerAddress() string {
 	return r.rt.dt.LocalIP(r.remoteIP)
 }
 
+// ProvisionerURL returns a URL to access the
+// file server part of the server using the
+// requesting IP address as a basis.
 func (r *RenderData) ProvisionerURL() string {
 	return r.rt.FileURL(r.remoteIP)
 }
 
+// ApiURL returns a URL to access the
+// api server part of the server using the
+// requesting IP address as a basis.
 func (r *RenderData) ApiURL() string {
 	return r.rt.ApiURL(r.remoteIP)
 }
 
+// GenerateToken will generate a token for a machine
+// within a template.  If the machine is not known, a
+// token will be generate with create machine access only
+// with a time limited by the unknownTokenTimeout preference.
+// If the machine is known, a token will be generated with
+// machine update access for the specific machine with a time
+// limited by the knownTokenTimeout preference.  The token
+// is granted by the system with and signed with the system
+// grantor secret.
 func (r *RenderData) GenerateToken() string {
 	var t string
 
@@ -567,6 +612,9 @@ func (r *RenderData) GenerateToken() string {
 	return t
 }
 
+// GenerateInfiniteToken generates a token for a specific machine
+// that has a three year timeout.  It has the same permissions
+// as the token generated by GenerateToken for a known machine.
 func (r *RenderData) GenerateInfiniteToken() string {
 	if r.Machine == nil {
 		// Don't allow infinite tokens.
@@ -599,6 +647,10 @@ func (r *RenderData) GenerateInfiniteToken() string {
 	return t
 }
 
+// GenerateProfileToken will generate a token that has access to
+// read and update the specified token for a set duration.  If
+// duration is 0, then duration is 2000000000 seconds.
+// This is used for atomic profile operations for cluster management.
 func (r *RenderData) GenerateProfileToken(profile string, duration int) string {
 	if r.Machine == nil {
 		// Don't allow profile tokens.
@@ -657,6 +709,8 @@ func (r *RenderData) BootParams() (string, error) {
 	return str, nil
 }
 
+// ParseUrl is a template function that return the section
+// of the specified URL as a string.
 func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 	parsedUrl, err := url.Parse(rawUrl)
 	if err != nil {
@@ -690,6 +744,8 @@ func (r *RenderData) Param(key string) (interface{}, error) {
 	return nil, fmt.Errorf("No such machine parameter %s", key)
 }
 
+// ParamAsJSON will return the specified parameter as a JSON
+// string or an error.
 func (r *RenderData) ParamAsJSON(key string) (string, error) {
 	v, err := r.Param(key)
 	if err != nil {
@@ -701,6 +757,8 @@ func (r *RenderData) ParamAsJSON(key string) (string, error) {
 	return buf.String(), err
 }
 
+// ParamAsYAML will return the specified parameter as a YAML
+// string or an error.
 func (r *RenderData) ParamAsYAML(key string) (string, error) {
 	v, err := r.Param(key)
 	if err != nil {
@@ -719,6 +777,9 @@ func (r *RenderData) ParamExists(key string) bool {
 	return err == nil
 }
 
+// CallTemplate allows for sub-templating like the template function, but
+// allows for function expansion of the arguments unlike the built-in
+// template function.
 func (r *RenderData) CallTemplate(name string, data interface{}) (ret interface{}, err error) {
 	buf := bytes.NewBuffer([]byte{})
 	tmpl := r.target.templates().Lookup(name)
