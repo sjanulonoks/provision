@@ -20,9 +20,9 @@ var (
 )
 
 func generateArgs(args []string) *ProgOpts {
-	var c_opts ProgOpts
+	var cOpts ProgOpts
 
-	parser := flags.NewParser(&c_opts, flags.Default)
+	parser := flags.NewParser(&cOpts, flags.Default)
 	if _, err := parser.ParseArgs(args); err != nil {
 		if flagsErr, ok := err.(*flags.Error); ok && flagsErr.Type == flags.ErrHelp {
 			os.Exit(0)
@@ -31,14 +31,14 @@ func generateArgs(args []string) *ProgOpts {
 		}
 	}
 
-	return &c_opts
+	return &cOpts
 }
 
 func badArgTest(t *testing.T, errString string, args ...string) {
 	t.Helper()
-	c_opts := generateArgs(args)
+	cOpts := generateArgs(args)
 	localLogger := log.New(os.Stderr, "dr-provision", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-	if answer := server(localLogger, c_opts); !strings.HasPrefix(answer, errString) {
+	if answer := server(localLogger, cOpts); !strings.HasPrefix(answer, errString) {
 		t.Errorf("Failed to get error string: %s: Got: %s\n", errString, answer)
 	}
 }
@@ -100,8 +100,8 @@ func TestServer(t *testing.T) {
 		"--default-content", "file:../test-data/usr/share/dr-provision/default.yaml?codec=yaml",
 	}
 
-	c_opts := generateArgs(testArgs)
-	go Server(c_opts)
+	cOpts := generateArgs(testArgs)
+	go Server(cOpts)
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -120,26 +120,26 @@ func TestServer(t *testing.T) {
 	}
 
 	// test presences of all the above
-	if _, err := os.Stat(c_opts.TlsCertFile); os.IsNotExist(err) {
-		t.Errorf("Failed to create cert file: %s", c_opts.TlsCertFile)
+	if _, err := os.Stat(cOpts.TlsCertFile); os.IsNotExist(err) {
+		t.Errorf("Failed to create cert file: %s", cOpts.TlsCertFile)
 	} else {
 		t.Logf("Cert file correctly created")
 	}
 
-	if _, err := os.Stat(c_opts.TlsKeyFile); os.IsNotExist(err) {
-		t.Errorf("Failed to create cert file: %s", c_opts.TlsKeyFile)
+	if _, err := os.Stat(cOpts.TlsKeyFile); os.IsNotExist(err) {
+		t.Errorf("Failed to create cert file: %s", cOpts.TlsKeyFile)
 	} else {
 		t.Logf("Key file correctly created")
 	}
 
-	if _, err := os.Stat(c_opts.DataRoot); os.IsNotExist(err) {
-		t.Errorf("Failed to create data dir: %s", c_opts.DataRoot)
+	if _, err := os.Stat(cOpts.DataRoot); os.IsNotExist(err) {
+		t.Errorf("Failed to create data dir: %s", cOpts.DataRoot)
 	} else {
 		t.Logf("DataRoot directory correctly created")
 	}
 
-	if _, err := os.Stat(c_opts.FileRoot); os.IsNotExist(err) {
-		t.Errorf("Failed to create data dir: %s", c_opts.FileRoot)
+	if _, err := os.Stat(cOpts.FileRoot); os.IsNotExist(err) {
+		t.Errorf("Failed to create data dir: %s", cOpts.FileRoot)
 	} else {
 		t.Logf("FileRoot directory correctly created")
 	}

@@ -417,7 +417,7 @@ func (r *RenderData) fetchRepos(test func(*Repo) bool) (res []*Repo) {
 }
 
 // Repos is a template helper function that returns an array
-// of all the approprate repos based upon the tag list.
+// of all the appropriate repos based upon the tag list.
 func (r *RenderData) Repos(tags ...string) []*Repo {
 	return r.fetchRepos(func(rd *Repo) bool {
 		for _, t := range tags {
