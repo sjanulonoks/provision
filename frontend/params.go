@@ -78,7 +78,7 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 				return
 			}
 			rt.Do(func(_ backend.Stores) {
-				params = rt.GetParams(ob.(models.Paramer), aggregator(c))
+				params = rt.GetParams(ob.(models.Paramer), aggregator(c), false)
 			})
 			c.JSON(http.StatusOK, params)
 		},
@@ -93,7 +93,7 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 			}
 			var val interface{}
 			rt.Do(func(d backend.Stores) {
-				val, _ = rt.GetParam(ob.(models.Paramer), key, aggregator(c))
+				val, _ = rt.GetParam(ob.(models.Paramer), key, aggregator(c), false)
 			})
 			c.JSON(http.StatusOK, val)
 		},

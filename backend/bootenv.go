@@ -162,7 +162,7 @@ func (b *BootEnv) fillInstallRepo() {
 	}
 	p := AsProfile(o)
 	repos := []*Repo{}
-	r, ok := b.rt.GetParam(p, "package-repositories", true)
+	r, ok := b.rt.GetParam(p, "package-repositories", true, false)
 	if !ok || utils.Remarshal(r, &repos) != nil {
 		b.rt.Infof("BootEnv %s: No package repositories to use", b.Name)
 		return

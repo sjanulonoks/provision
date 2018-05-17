@@ -228,8 +228,8 @@ func (n *Machine) ParameterMaker(rt *RequestTracker, parameter string) (index.Ma
 		false,
 		"parameter",
 		func(i, j models.Model) bool {
-			ip, _ := rt.GetParam(fix(i), parameter, true)
-			jp, _ := rt.GetParam(fix(j), parameter, true)
+			ip, _ := rt.GetParam(fix(i), parameter, true, false)
+			jp, _ := rt.GetParam(fix(j), parameter, true, false)
 
 			// If both are nil, the Less is i < j == false
 			if ip == nil && jp == nil {
@@ -260,9 +260,9 @@ func (n *Machine) ParameterMaker(rt *RequestTracker, parameter string) (index.Ma
 			return false
 		},
 		func(ref models.Model) (gte, gt index.Test) {
-			jp, _ := rt.GetParam(fix(ref), parameter, true)
+			jp, _ := rt.GetParam(fix(ref), parameter, true, false)
 			return func(s models.Model) bool {
-					ip, _ := rt.GetParam(fix(s), parameter, true)
+					ip, _ := rt.GetParam(fix(s), parameter, true, false)
 
 					// If both are nil, the Less is i >= j == true
 					if ip == nil && jp == nil {
@@ -292,7 +292,7 @@ func (n *Machine) ParameterMaker(rt *RequestTracker, parameter string) (index.Ma
 					return false
 				},
 				func(s models.Model) bool {
-					ip, _ := rt.GetParam(fix(s), parameter, true)
+					ip, _ := rt.GetParam(fix(s), parameter, true, false)
 
 					// If both are nil, the Less is i > j == false
 					if ip == nil && jp == nil {

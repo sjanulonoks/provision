@@ -433,17 +433,38 @@ func (rt *RequestTracker) Save(obj models.Model) (saved bool, err error) {
 	return saved, err
 }
 
-// GetParams will return the parameters associated with the
-// provided object.  If aggregate is false, then the parameters
-// will be the directly associated Parameters.  If aggregate is
-// true, the parameters will be aggregated from the the parent
-// objects and global Profile.
-//
-// Assumes that locks are held as appropriate.
-func (rt *RequestTracker) GetParams(obj models.Paramer, aggregate bool) map[string]interface{} {
-	res := obj.GetParams()
+func (rt *RequestTracker) decryptParam(
+	obj models.Model,
+	name string, val interface{},
+	decrypt bool) interface{} {
+	if !decrypt {
+		return val
+	}
+	pobj := rt.find("params", name)
+	if pobj == nil {
+		return val
+	}
+	param := AsParam(pobj)
+	if !param.Secure {
+		return val
+	}
+	sd := &models.SecureData{}
+	models.Remarshal(val, sd)
+	var ret interface{}
+	if err := sd.Unmarshal(rt.PrivateKeyFor(obj), &ret); err != nil {
+		return val
+	}
+	return ret
+}
+
+func (rt *RequestTracker) getAggParams(obj models.Paramer,
+	params map[string]interface{}, aggregate bool) (sources map[string]models.Paramer) {
+	sources = map[string]models.Paramer{}
+	for k := range params {
+		sources[k] = obj
+	}
 	if !aggregate {
-		return res
+		return
 	}
 	subObjs := []models.Paramer{}
 	var profiles []string
@@ -474,88 +495,40 @@ func (rt *RequestTracker) GetParams(obj models.Paramer, aggregate bool) map[stri
 		subObjs = append(subObjs, pobj.(models.Paramer))
 	}
 	for _, sub := range subObjs {
-		subp := sub.GetParams()
-		for k, v := range subp {
-			if _, ok := res[k]; !ok {
-				res[k] = v
+		for k, v := range sub.GetParams() {
+			if _, ok := params[k]; !ok {
+				params[k] = v
+				sources[k] = sub
 			}
+		}
+	}
+	return
+}
+
+func (rt *RequestTracker) GetParams(obj models.Paramer, aggregate bool, decrypt bool) map[string]interface{} {
+	res := obj.GetParams()
+	sources := rt.getAggParams(obj, res, aggregate)
+	if decrypt {
+		for k, src := range sources {
+			res[k] = rt.decryptParam(src, k, res[k], decrypt)
 		}
 	}
 	return res
 }
 
-// SetParams completes replaces the current Parameter map on the object
-// with the new one.
-//
-// Assumes that locks are held as appropriate.
-func (rt *RequestTracker) SetParams(obj models.Paramer, values map[string]interface{}) error {
-	obj.SetParams(values)
-	e := &models.Error{Code: 422, Type: ValidationError, Model: obj.Prefix(), Key: obj.Key()}
-	_, e2 := rt.Save(obj)
-	e.AddError(e2)
-	return e.HasError()
-}
-
-// GetParam will retrieve the value of the specific parameter.  If
-// aggregate is true, the parent objects and the global profile is searched.
-// The bool will be true if the parameter exists.
-//
-// Assumes that locks are held as appropriate.
-func (rt *RequestTracker) GetParam(obj models.Paramer, key string, aggregate bool) (interface{}, bool) {
-	v, ok := rt.GetParams(obj, aggregate)[key]
-	if ok || !aggregate {
-		return v, ok
+func (rt *RequestTracker) GetParam(obj models.Paramer, key string, aggregate bool, decrypt bool) (interface{}, bool) {
+	res := obj.GetParams()
+	sources := rt.getAggParams(obj, res, aggregate)
+	if v, ok := res[key]; ok {
+		return rt.decryptParam(sources[key], key, v, decrypt), true
 	}
-	if pobj := rt.Find("params", key); pobj != nil {
-		rt.Tracef("Param %s not defined, falling back to default value", key)
-		return AsParam(pobj).DefaultValue()
-	}
-	return nil, false
-}
-
-// SetParam will set specified parameter within the object's parameter
-// map.
-//
-// Assumes that locks are held as appropriate.
-func (rt *RequestTracker) SetParam(obj models.Paramer, key string, val interface{}) error {
-	p := obj.GetParams()
-	p[key] = val
-	return rt.SetParams(obj, p)
-}
-
-// DelParam will remove the specified parameter from the object's parameter
-// map.  If not present, an error is returned.
-//
-// Assumes that locks are held as appropriate.
-func (rt *RequestTracker) DelParam(obj models.Paramer, key string) (interface{}, error) {
-	p := obj.GetParams()
-	val, ok := p[key]
-	if !ok {
-		return nil, &models.Error{
-			Code:  http.StatusNotFound,
-			Type:  "DELETE",
-			Model: "params",
-			Key:   key,
+	if aggregate {
+		if pobj := rt.Find("params", key); pobj != nil {
+			rt.Tracef("Param %s not defined, falling back to default value", key)
+			return AsParam(pobj).DefaultValue()
 		}
 	}
-	delete(p, key)
-	return val, rt.SetParams(obj, p)
-}
-
-// AddParam will add a parameter to the map only if it is not present.
-//
-// Assumes that locks are held as appropriate.
-func (rt *RequestTracker) AddParam(obj models.Paramer, key string, val interface{}) error {
-	p := obj.GetParams()
-	if _, ok := p[key]; !ok {
-		p[key] = val
-		return rt.SetParams(obj, p)
-	}
-	return &models.Error{
-		Code:  http.StatusConflict,
-		Model: "params",
-		Key:   key,
-	}
+	return nil, false
 }
 
 func (rt *RequestTracker) urlFor(scheme string, remoteIP net.IP, port int) string {

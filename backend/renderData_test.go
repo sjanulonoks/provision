@@ -171,7 +171,8 @@ func TestRenderData(t *testing.T) {
 			return
 		}
 		t.Logf("Created new test machine")
-		rt.SetParam(machine, "foo", "bar")
+		machine.Params["foo"] = "bar"
+		rt.Save(machine)
 	})
 	genLocs := []string{
 		path.Join("/", "machines", machine.UUID(), "file"),
@@ -201,8 +202,9 @@ func TestRenderData(t *testing.T) {
 			"title",
 			40,
 		}
-		rt.SetParam(machine, "obj", obj)
-		rt.SetParam(machine, "fred", "fred = fred")
+		machine.Params["obj"] = obj
+		machine.Params["fred"] = "fred = fred"
+		rt.Save(machine)
 	})
 	genLoc := path.Join("/", "machines", machine.UUID(), "file")
 	out, err := dt.FS.Open(genLoc, nil)
