@@ -54,6 +54,8 @@ type ProfilePatchBodyParameter struct {
 // ProfilePathParameter used to name a Profile in the path
 // swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile getProfileParams patchProfileParams headProfile postProfileParams
 type ProfilePathParameter struct {
+	// in: query
+	Decode string `json:"decode"`
 	// in: path
 	// required: true
 	Name string `json:"name"`
@@ -62,6 +64,8 @@ type ProfilePathParameter struct {
 // ProfileParamsPathParameter used to get or set a single Parameter in a Profile
 // swagger:parameters getProfileParam postProfileParam
 type ProfileParamsPathParameter struct {
+	// in: query
+	Decode string `json:"decode"`
 	// in: path
 	// required: true
 	Name string `json:"name"`

@@ -56,6 +56,8 @@ type PluginPatchBodyParameter struct {
 // PluginPathParameter used to find a Plugin in the path
 // swagger:parameters putPlugins getPlugin putPlugin patchPlugin deletePlugin getPluginParams postPluginParams headPlugin patchPluginParams
 type PluginPathParameter struct {
+	// in: query
+	Decode string `json:"decode"`
 	// in: path
 	// required: true
 	Name string `json:"name"`
@@ -64,6 +66,8 @@ type PluginPathParameter struct {
 // PluginParamsPathParameter used to find a Plugin in the path
 // swagger:parameters getPluginParam postPluginParam
 type PluginParamsPathParameter struct {
+	// in: query
+	Decode string `json:"decode"`
 	// in: path
 	// required: true
 	Name string `json:"name"`

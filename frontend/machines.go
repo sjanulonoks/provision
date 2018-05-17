@@ -106,6 +106,8 @@ type MachinePostParamPathParemeter struct {
 type MachineGetParamsPathParameter struct {
 	// in: query
 	Aggregate string `json:"aggregate"`
+	// in: query
+	Decode string `json:"decode"`
 	// in: path
 	// required: true
 	// swagger:strfmt uuid
@@ -117,6 +119,8 @@ type MachineGetParamsPathParameter struct {
 type MachineGetParamPathParemeter struct {
 	// in: query
 	Aggregate string `json:"aggregate"`
+	// in: query
+	Decode string `json:"decode"`
 	// in: path
 	// required: true
 	// swagger:strfmt uuid
