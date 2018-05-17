@@ -341,7 +341,7 @@ func (n *Machine) ParameterMaker(rt *RequestTracker, parameter string) (index.Ma
 					return nil, err
 				}
 			}
-			if err := param.ValidateValue(obj); err != nil {
+			if err := param.ValidateValue(obj, nil); err != nil {
 				return nil, err
 			}
 			res.Params[parameter] = obj
@@ -463,7 +463,7 @@ func (n *Machine) Validate() {
 			}
 		}
 	}
-	ValidateParams(n.rt, n, n.Params)
+	ValidateParams(n.rt, n, n.Params, n.rt.PrivateKeyFor(n))
 	n.SetValid()
 	if n.Address != nil && !n.Address.IsUnspecified() {
 		others, err := index.All(

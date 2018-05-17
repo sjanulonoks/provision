@@ -194,7 +194,7 @@ func validateActionParameters(f *Frontend,
 			if pobj != nil {
 				rp := backend.AsParam(pobj)
 
-				if ev := rp.ValidateValue(obj); ev != nil {
+				if ev := rp.ValidateValue(obj, nil); ev != nil {
 					err.Errorf("Action %s: Invalid Parameter: %s: %s", name, param, ev.Error())
 				}
 			}
@@ -226,7 +226,7 @@ func validateActionParameters(f *Frontend,
 			if pobj != nil {
 				rp := backend.AsParam(pobj)
 
-				if ev := rp.ValidateValue(obj); ev != nil {
+				if ev := rp.ValidateValue(obj, nil); ev != nil {
 					err.Errorf("Action %s: Invalid Parameter: %s: %s", name, param, ev.Error())
 				}
 			}

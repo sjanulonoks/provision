@@ -14,6 +14,7 @@ import (
 	"github.com/digitalrebar/provision/backend/index"
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
+	"golang.org/x/crypto/curve25519"
 )
 
 // RequestTracker tracks a single request
@@ -591,4 +592,19 @@ func (rt *RequestTracker) MachineForMac(mac string) *Machine {
 // Prefs returns the current Prefs in the data tracker.
 func (rt *RequestTracker) Prefs() map[string]string {
 	return rt.dt.Prefs()
+}
+
+func (rt *RequestTracker) PrivateKeyFor(m models.Model) []byte {
+	return nil
+}
+
+func (rt *RequestTracker) PublicKeyFor(m models.Model) []byte {
+	privateKey := rt.PrivateKeyFor(m)
+	if privateKey == nil || len(privateKey) != 32 {
+		return nil
+	}
+	res, pk := [32]byte{}, [32]byte{}
+	copy(pk[:], privateKey)
+	curve25519.ScalarBaseMult(&res, &pk)
+	return res[:]
 }

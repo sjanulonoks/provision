@@ -165,7 +165,7 @@ func validateParameters(rt *backend.RequestTracker, pp *models.PluginProvider, p
 			if pobj != nil {
 				rp := pobj.(*backend.Param)
 
-				if ev := rp.ValidateValue(obj); ev != nil {
+				if ev := rp.ValidateValue(obj, rt.PrivateKeyFor(plugin)); ev != nil {
 					errors = append(errors, ev.Error())
 				}
 			}
@@ -178,7 +178,7 @@ func validateParameters(rt *backend.RequestTracker, pp *models.PluginProvider, p
 			if pobj != nil {
 				rp := pobj.(*backend.Param)
 
-				if ev := rp.ValidateValue(obj); ev != nil {
+				if ev := rp.ValidateValue(obj, rt.PrivateKeyFor(plugin)); ev != nil {
 					errors = append(errors, ev.Error())
 				}
 			}

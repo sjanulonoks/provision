@@ -88,7 +88,7 @@ func (n *Plugin) New() store.KeySaver {
 func (n *Plugin) Validate() {
 	n.Plugin.Validate()
 	n.AddError(index.CheckUnique(n, n.rt.stores("plugins").Items()))
-	ValidateParams(n.rt, n, n.Params)
+	ValidateParams(n.rt, n, n.Params, n.rt.PrivateKeyFor(n))
 	n.SetValid()
 	n.SetAvailable()
 }

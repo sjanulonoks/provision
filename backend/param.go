@@ -104,17 +104,8 @@ func (p *Param) OnLoad() error {
 	return p.BeforeSave()
 }
 
-func (p *Param) ValidateValue(val interface{}) error {
-	if !p.Useable() {
-		return p.MakeError(422, ValidationError, p)
-	}
-	if p.Schema == nil {
-		return nil
-	}
-	if p.validator == nil {
-		p.validator, _ = gojsonschema.NewSchema(gojsonschema.NewGoLoader(p.Schema))
-	}
-	res, err := p.validator.Validate(gojsonschema.NewGoLoader(val))
+func validateAgainstSchema(val interface{}, schema *gojsonschema.Schema) error {
+	res, err := schema.Validate(gojsonschema.NewGoLoader(val))
 	if err != nil {
 		return err
 	}
@@ -128,11 +119,50 @@ func (p *Param) ValidateValue(val interface{}) error {
 	return e
 }
 
-func ValidateParams(rt *RequestTracker, e models.ErrorAdder, params map[string]interface{}) {
+func (p *Param) ValidateValue(val interface{}, key []byte) error {
+	if !p.Useable() {
+		return p.MakeError(422, ValidationError, p)
+	}
+	rv := val
+	if p.Secure {
+		sd := &models.SecureData{}
+		if err := models.Remarshal(val, sd); err != nil {
+			return err
+		}
+		if err := sd.Validate(); err != nil {
+			return err
+		}
+		var realVal interface{}
+		if err := sd.Unmarshal(key, &realVal); err != nil {
+			return err
+		}
+		rv = realVal
+	}
+	if p.Schema == nil {
+		return nil
+	}
+	if p.validator == nil {
+		p.validator, _ = gojsonschema.NewSchema(gojsonschema.NewGoLoader(p.Schema))
+	}
+	res, err := p.validator.Validate(gojsonschema.NewGoLoader(rv))
+	if err != nil {
+		return err
+	}
+	if res.Valid() {
+		return nil
+	}
+	e := &models.Error{}
+	for _, i := range res.Errors() {
+		e.Errorf(i.String())
+	}
+	return e
+}
+
+func ValidateParams(rt *RequestTracker, e models.ErrorAdder, params map[string]interface{}, key []byte) {
 	for k, v := range params {
 		if pIdx := rt.find("params", k); pIdx != nil {
 			param := AsParam(pIdx)
-			if err := param.ValidateValue(v); err != nil {
+			if err := param.ValidateValue(v, key); err != nil {
 				e.Errorf("Key '%s': invalid val '%v': %v", k, v, err)
 			}
 		}

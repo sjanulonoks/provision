@@ -98,7 +98,7 @@ func AsProfiles(o []models.Model) []*Profile {
 func (p *Profile) Validate() {
 	p.Profile.Validate()
 	p.AddError(index.CheckUnique(p, p.rt.stores("profiles").Items()))
-	ValidateParams(p.rt, p, p.Params)
+	ValidateParams(p.rt, p, p.Params, p.rt.PrivateKeyFor(p))
 	p.SetValid()
 	p.SetAvailable()
 }
