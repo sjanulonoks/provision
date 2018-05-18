@@ -8,6 +8,13 @@ import (
 	"github.com/pborman/uuid"
 )
 
+// PubKeyResponse is returned on a successful GET of a Paramer public key for secure params.
+// swagger:response
+type PubKeyResponse struct {
+	// in: body
+	Body string
+}
+
 // MachineResponse return on a successful GET, PUT, PATCH or POST of a single Machine
 // swagger:response
 type MachineResponse struct {
@@ -81,7 +88,7 @@ type MachinePostParamsParameter struct {
 }
 
 // MachinePathParameter used to find a Machine in the path
-// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine headMachine patchMachineParams postMachineParams
+// swagger:parameters putMachines getMachine putMachine patchMachine deleteMachine headMachine patchMachineParams postMachineParams getMachinePubKey
 type MachinePathParameter struct {
 	// in: path
 	// required: true
@@ -414,7 +421,21 @@ func (f *Frontend) InitMachineApi() {
 			f.Remove(c, &backend.Machine{}, c.Param(`uuid`))
 		})
 
-	pGetAll, pGetOne, pPatch, pSetThem, pSetOne, pDeleteOne := f.makeParamEndpoints(&backend.Machine{}, "uuid")
+	pGetAll, pGetOne, pPatch, pSetThem, pSetOne, pDeleteOne, pGetPubKey := f.makeParamEndpoints(&backend.Machine{}, "uuid")
+
+	// swagger:route GET /machines/{uuid}/pubkey Machines getMachinePubKey
+	//
+	// Get the public key for secure params on a machine
+	//
+	// Get the public key for a Machine specified by {uuid}
+	//
+	//     Responses:
+	//       200: PubKeyResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       500: ErrorResponse
+	f.ApiGroup.GET("/machines/:uuid/pubkey", pGetPubKey)
 
 	// swagger:route GET /machines/{uuid}/params Machines getMachineParams
 	//
@@ -542,4 +563,5 @@ func (f *Frontend) InitMachineApi() {
 	//       404: ErrorResponse
 	//       409: ErrorResponse
 	f.ApiGroup.POST("/machines/:uuid/actions/:cmd", pRun)
+
 }

@@ -12,7 +12,7 @@ import (
 )
 
 func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
-	getAll, getOne, patchThem, setThem, setOne, deleteOne func(c *gin.Context)) {
+	getAll, getOne, patchThem, setThem, setOne, deleteOne, getPubKey func(c *gin.Context)) {
 	trimmer := func(s string) string {
 		return strings.TrimLeft(s, `/`)
 	}
@@ -197,6 +197,29 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 					return params, nil
 				}) != nil && found {
 				c.JSON(http.StatusOK, val)
+			}
+		},
+		/* getPubKey */ func(c *gin.Context) {
+			id, rt, _ := idrtkey(c, "get")
+			if !f.assureSimpleAuth(c, obj.Prefix(), "updateSecure", id) {
+				return
+			}
+			ob := f.Find(c, rt, obj.Prefix(), id)
+			if ob == nil {
+				return
+			}
+			pk, err := rt.PublicKeyFor(ob)
+			if err != nil {
+				ret := &models.Error{
+					Code:  500,
+					Model: ob.Prefix(),
+					Key:   ob.Key(),
+					Type:  "Bad Secret",
+				}
+				ret.AddError(err)
+				c.JSON(ret.Code, ret)
+			} else {
+				c.JSON(http.StatusOK, pk)
 			}
 		}
 }
