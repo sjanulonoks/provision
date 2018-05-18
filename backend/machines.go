@@ -463,7 +463,11 @@ func (n *Machine) Validate() {
 			}
 		}
 	}
-	ValidateParams(n.rt, n, n.Params, n.rt.PrivateKeyFor(n))
+	if pk, err := n.rt.PrivateKeyFor(n); err == nil {
+		ValidateParams(n.rt, n, n.Params, pk)
+	} else {
+		n.Errorf("Unable to get key: %v", err)
+	}
 	n.SetValid()
 	if n.Address != nil && !n.Address.IsUnspecified() {
 		others, err := index.All(
@@ -953,6 +957,7 @@ func (n *Machine) AfterDelete() {
 			delete(n.rt.dt.macAddrMap, mac)
 		}
 	}
+	n.rt.DeleteKeyFor(n)
 	n.rt.dt.macAddrMux.Unlock()
 
 }

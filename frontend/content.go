@@ -237,7 +237,7 @@ func (f *Frontend) InitContentApi() {
 				}
 				cs = buildSummary(newStore)
 				ds := f.dt.Backend.(*midlayer.DataStack)
-				nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger, nil)
+				nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.dt.Secrets, f.Logger, nil)
 				if hard != nil {
 					midlayer.CleanUpStore(newStore)
 					res = hard.(*models.Error)
@@ -312,7 +312,7 @@ func (f *Frontend) InitContentApi() {
 				}
 				cs = buildSummary(newStore)
 				ds := f.dt.Backend.(*midlayer.DataStack)
-				nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.Logger, nil)
+				nbs, hard, soft := ds.AddReplaceSAAS(name, newStore, f.dt.Secrets, f.Logger, nil)
 				if hard != nil {
 					midlayer.CleanUpStore(newStore)
 					res.Code = http.StatusInternalServerError
@@ -367,7 +367,7 @@ func (f *Frontend) InitContentApi() {
 					return
 				}
 				ds := f.dt.Backend.(*midlayer.DataStack)
-				nbs, hard, _ := ds.RemoveSAAS(name, f.Logger)
+				nbs, hard, _ := ds.RemoveSAAS(name, f.Logger, f.dt.Secrets)
 				if hard != nil {
 					res.AddError(hard)
 					return

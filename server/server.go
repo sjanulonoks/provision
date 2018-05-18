@@ -32,6 +32,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -46,6 +47,7 @@ import (
 	"github.com/digitalrebar/provision/backend"
 	"github.com/digitalrebar/provision/frontend"
 	"github.com/digitalrebar/provision/midlayer"
+	"github.com/digitalrebar/store"
 )
 
 // EmbeddedAssetsExtractFunc is a function pointer that can set at initialization
@@ -71,11 +73,13 @@ type ProgOpts struct {
 	ForceStatic         bool   `long:"force-static" description:"Force the system to always use the static IP."`
 
 	BackEndType    string `long:"backend" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI" default:"directory"`
+	SecretsType    string `long:"secrets" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI" default:"directory"`
 	LocalContent   string `long:"local-content" description:"Storage to use for local overrides." default:"directory:///etc/dr-provision?codec=yaml"`
 	DefaultContent string `long:"default-content" description:"Store URL for local content" default:"file:///usr/share/dr-provision/default.yaml?codec=yaml"`
 
 	BaseRoot        string `long:"base-root" description:"Base directory for other root dirs." default:"/var/lib/dr-provision"`
 	DataRoot        string `long:"data-root" description:"Location we should store runtime information in" default:"digitalrebar"`
+	SecretsRoot     string `long:"secrets-root" description:"Location we should store encrypted parameter private keys in" default:"secrets"`
 	PluginRoot      string `long:"plugin-root" description:"Directory for plugins" default:"plugins"`
 	PluginCommRoot  string `long:"plugin-comm-root" description:"Directory for the communications for plugins" default:"/var/run"`
 	LogRoot         string `long:"log-root" description:"Directory for job logs" default:"job-logs"`
@@ -135,6 +139,9 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 	if strings.IndexRune(cOpts.FileRoot, filepath.Separator) != 0 {
 		cOpts.FileRoot = filepath.Join(cOpts.BaseRoot, cOpts.FileRoot)
 	}
+	if strings.IndexRune(cOpts.SecretsRoot, filepath.Separator) != 0 {
+		cOpts.SecretsRoot = filepath.Join(cOpts.BaseRoot, cOpts.SecretsRoot)
+	}
 	if strings.IndexRune(cOpts.PluginRoot, filepath.Separator) != 0 {
 		cOpts.PluginRoot = filepath.Join(cOpts.BaseRoot, cOpts.PluginRoot)
 	}
@@ -186,6 +193,9 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 	if err = mkdir(cOpts.SaasContentRoot); err != nil {
 		return fmt.Sprintf("Error creating required directory %s: %v", cOpts.SaasContentRoot, err)
 	}
+	if err = mkdir(cOpts.SecretsRoot); err != nil {
+		return fmt.Sprintf("Error creating required directory %s: %v", cOpts.SecretsRoot, err)
+	}
 	localLogger.Printf("Extracting Default Assets\n")
 	if EmbeddedAssetsExtractFunc != nil {
 		localLogger.Printf("Extracting Default Assets\n")
@@ -200,6 +210,15 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 	if err != nil {
 		return fmt.Sprintf("Unable to create DataStack: %v", err)
 	}
+	var secretStore store.Store
+	if u, err := url.Parse(cOpts.SecretsType); err == nil && u.Scheme != "" {
+		secretStore, err = store.Open(cOpts.SecretsType)
+	} else {
+		secretStore, err = store.Open(fmt.Sprintf("%s://%s", cOpts.SecretsType, cOpts.SecretsRoot))
+	}
+	if err != nil {
+		return fmt.Sprintf("Unable to open secrets store: %v", err)
+	}
 	logLevel, err := logger.ParseLevel(cOpts.DefaultLogLevel)
 	if err != nil {
 		localLogger.Printf("Invalid log level %s", cOpts.DefaultLogLevel)
@@ -212,6 +231,7 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 	publishers := backend.NewPublishers(localLogger)
 
 	dt := backend.NewDataTracker(dtStore,
+		secretStore,
 		cOpts.FileRoot,
 		cOpts.LogRoot,
 		cOpts.OurAddress,

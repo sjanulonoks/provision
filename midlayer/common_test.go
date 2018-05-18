@@ -42,6 +42,7 @@ func TestMain(m *testing.M) {
 		log.Printf("Creating temp dir for file root failed: %v", err)
 		os.Exit(1)
 	}
+	ss, _ := store.Open("memory:///")
 	s, _ := store.Open("stack:///")
 	bs := &store.Directory{Path: tmpDir}
 	if err := bs.Open(nil); err != nil {
@@ -53,6 +54,7 @@ func TestMain(m *testing.M) {
 	locallogger := log.New(os.Stdout, "dt", 0)
 	l := logger.New(locallogger).Log("dhcp")
 	dataTracker = backend.NewDataTracker(s,
+		ss,
 		tmpDir,
 		tmpDir,
 		"127.0.0.1",

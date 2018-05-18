@@ -98,7 +98,11 @@ func AsProfiles(o []models.Model) []*Profile {
 func (p *Profile) Validate() {
 	p.Profile.Validate()
 	p.AddError(index.CheckUnique(p, p.rt.stores("profiles").Items()))
-	ValidateParams(p.rt, p, p.Params, p.rt.PrivateKeyFor(p))
+	if pk, err := p.rt.PrivateKeyFor(p); err == nil {
+		ValidateParams(p.rt, p, p.Params, pk)
+	} else {
+		p.Errorf("Unable to get key: %v", err)
+	}
 	p.SetValid()
 	p.SetAvailable()
 }
@@ -115,6 +119,10 @@ func (p *Profile) OnLoad() error {
 	defer func() { p.rt = nil }()
 	p.Fill()
 	return p.BeforeSave()
+}
+
+func (p *Profile) AfterDelete() {
+	p.rt.DeleteKeyFor(p)
 }
 
 var profileLockMap = map[string][]string{

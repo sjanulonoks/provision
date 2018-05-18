@@ -558,7 +558,8 @@ type DataTracker struct {
 	ForceOurAddress     bool
 	StaticPort, ApiPort int
 	FS                  *FileSystem
-	Backend             store.Store
+	Backend, Secrets    store.Store
+	secretsMux          *sync.Mutex
 	objs                map[string]*Store
 	defaultPrefs        map[string]string
 	runningPrefs        map[string]string
@@ -768,9 +769,10 @@ func (p *DataTracker) rebuildCache(loadRT *RequestTracker) (hard, soft *models.E
 }
 
 // This must be locked with ALL locks on the source datatracker from the caller.
-func ValidateDataTrackerStore(fileRoot string, backend store.Store, logger logger.Logger) (hard, soft error) {
+func ValidateDataTrackerStore(fileRoot string, backend, secrets store.Store, logger logger.Logger) (hard, soft error) {
 	res := &DataTracker{
 		Backend:           backend,
+		Secrets:           secrets,
 		FileRoot:          fileRoot,
 		LogRoot:           "baddir",
 		StaticPort:        1,
@@ -789,6 +791,7 @@ func ValidateDataTrackerStore(fileRoot string, backend store.Store, logger logge
 		publishers:        &Publishers{},
 		macAddrMap:        map[string]string{},
 		macAddrMux:        &sync.RWMutex{},
+		secretsMux:        &sync.Mutex{},
 	}
 
 	// Load stores.
@@ -801,7 +804,7 @@ func ValidateDataTrackerStore(fileRoot string, backend store.Store, logger logge
 }
 
 // Create a new DataTracker that will use passed store to save all operational data
-func NewDataTracker(backend store.Store,
+func NewDataTracker(backend, secrets store.Store,
 	fileRoot, logRoot, addr string, forceAddr bool,
 	staticPort, apiPort int,
 	logger logger.Logger,
@@ -809,6 +812,7 @@ func NewDataTracker(backend store.Store,
 	publishers *Publishers) *DataTracker {
 	res := &DataTracker{
 		Backend:           backend,
+		Secrets:           secrets,
 		FileRoot:          fileRoot,
 		LogRoot:           logRoot,
 		StaticPort:        staticPort,
@@ -829,6 +833,7 @@ func NewDataTracker(backend store.Store,
 		publishers:        publishers,
 		macAddrMap:        map[string]string{},
 		macAddrMux:        &sync.RWMutex{},
+		secretsMux:        &sync.Mutex{},
 	}
 
 	// Make sure incoming writable backend has all stores created

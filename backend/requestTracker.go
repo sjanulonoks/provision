@@ -1,10 +1,12 @@
 package backend
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +17,7 @@ import (
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 	"golang.org/x/crypto/curve25519"
+	"golang.org/x/crypto/nacl/box"
 )
 
 // RequestTracker tracks a single request
@@ -451,7 +454,11 @@ func (rt *RequestTracker) decryptParam(
 	sd := &models.SecureData{}
 	models.Remarshal(val, sd)
 	var ret interface{}
-	if err := sd.Unmarshal(rt.PrivateKeyFor(obj), &ret); err != nil {
+	pk, err := rt.PrivateKeyFor(obj)
+	if err != nil {
+		panic(err.Error())
+	}
+	if err := sd.Unmarshal(pk, &ret); err != nil {
 		return val
 	}
 	return ret
@@ -567,17 +574,41 @@ func (rt *RequestTracker) Prefs() map[string]string {
 	return rt.dt.Prefs()
 }
 
-func (rt *RequestTracker) PrivateKeyFor(m models.Model) []byte {
-	return nil
+func (rt *RequestTracker) rotateKeyFor(m models.Model) ([]byte, error) {
+	_, pk, err := box.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	key := pk[:]
+	return key, rt.dt.Secrets.Save(m.Prefix()+"-"+m.Key(), key)
 }
 
-func (rt *RequestTracker) PublicKeyFor(m models.Model) []byte {
-	privateKey := rt.PrivateKeyFor(m)
-	if privateKey == nil || len(privateKey) != 32 {
-		return nil
+func (rt *RequestTracker) DeleteKeyFor(m models.Model) error {
+	rt.dt.secretsMux.Lock()
+	defer rt.dt.secretsMux.Unlock()
+	return rt.dt.Secrets.Remove(m.Prefix() + "-" + m.Key())
+}
+
+func (rt *RequestTracker) PrivateKeyFor(m models.Model) ([]byte, error) {
+	rt.dt.secretsMux.Lock()
+	defer rt.dt.secretsMux.Unlock()
+	var res []byte
+	if err := rt.dt.Secrets.Load(m.Prefix()+"-"+m.Key(), &res); err != nil {
+		if os.IsNotExist(err) {
+			return rt.rotateKeyFor(m)
+		}
+		return nil, err
+	}
+	return res, nil
+}
+
+func (rt *RequestTracker) PublicKeyFor(m models.Model) ([]byte, error) {
+	privateKey, err := rt.PrivateKeyFor(m)
+	if err != nil || privateKey == nil || len(privateKey) != 32 {
+		return nil, err
 	}
 	res, pk := [32]byte{}, [32]byte{}
 	copy(pk[:], privateKey)
 	curve25519.ScalarBaseMult(&res, &pk)
-	return res[:]
+	return res[:], nil
 }
