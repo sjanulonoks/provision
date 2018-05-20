@@ -29,13 +29,13 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 			trimmer(c.Param("key"))
 	}
 	viewAuth := func(c *gin.Context, key string) bool {
-		claims := []string{obj.Prefix(), "get", key}
-		if decoder(c) {
-			claims = append(claims, obj.Prefix(), "getSecure", key)
+		if !f.assureSimpleAuth(c, obj.Prefix(), "get", key) {
+			return false
 		}
-		return f.assureAuth(c,
-			models.MakeRole("", claims...).Compile(),
-			obj.Prefix(), "get", key)
+		if !decoder(c) {
+			return true
+		}
+		return f.assureSimpleAuth(c, obj.Prefix(), "getSecure", key)
 	}
 	mutator := func(c *gin.Context,
 		rt *backend.RequestTracker,
