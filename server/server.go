@@ -140,8 +140,14 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 	if strings.IndexRune(cOpts.FileRoot, filepath.Separator) != 0 {
 		cOpts.FileRoot = filepath.Join(cOpts.BaseRoot, cOpts.FileRoot)
 	}
-	if strings.IndexRune(cOpts.SecretsRoot, filepath.Separator) != 0 {
+	if cOpts.SecretsType == "" {
+		cOpts.SecretsType = cOpts.BackEndType
+	}
+	if cOpts.SecretsType == "directory" && strings.IndexRune(cOpts.SecretsRoot, filepath.Separator) != 0 {
 		cOpts.SecretsRoot = filepath.Join(cOpts.BaseRoot, cOpts.SecretsRoot)
+	}
+	if cOpts.SecretsType == "consul" && strings.IndexRune(cOpts.SecretsRoot, filepath.Separator) != 0 {
+		cOpts.SecretsRoot = fmt.Sprintf("/%s", cOpts.SecretsRoot)
 	}
 	if strings.IndexRune(cOpts.PluginRoot, filepath.Separator) != 0 {
 		cOpts.PluginRoot = filepath.Join(cOpts.BaseRoot, cOpts.PluginRoot)
@@ -152,8 +158,11 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 	if len(cOpts.PluginCommRoot) > 70 {
 		return fmt.Sprintf("PluginCommRoot Must be less than 70 characters")
 	}
-	if strings.IndexRune(cOpts.DataRoot, filepath.Separator) != 0 {
+	if cOpts.BackEndType == "directory" && strings.IndexRune(cOpts.DataRoot, filepath.Separator) != 0 {
 		cOpts.DataRoot = filepath.Join(cOpts.BaseRoot, cOpts.DataRoot)
+	}
+	if cOpts.BackEndType == "consul" && strings.IndexRune(cOpts.DataRoot, filepath.Separator) != 0 {
+		cOpts.DataRoot = fmt.Sprintf("/%s", cOpts.DataRoot)
 	}
 	if strings.IndexRune(cOpts.LogRoot, filepath.Separator) != 0 {
 		cOpts.LogRoot = filepath.Join(cOpts.BaseRoot, cOpts.LogRoot)
@@ -182,8 +191,10 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 	if err = mkdir(cOpts.PluginCommRoot); err != nil {
 		return fmt.Sprintf("Error creating required directory %s: %v", cOpts.PluginCommRoot, err)
 	}
-	if err = mkdir(cOpts.DataRoot); err != nil {
-		return fmt.Sprintf("Error creating required directory %s: %v", cOpts.DataRoot, err)
+	if cOpts.BackEndType == "directory" {
+		if err = mkdir(cOpts.DataRoot); err != nil {
+			return fmt.Sprintf("Error creating required directory %s: %v", cOpts.DataRoot, err)
+		}
 	}
 	if err = mkdir(cOpts.LogRoot); err != nil {
 		return fmt.Sprintf("Error creating required directory %s: %v", cOpts.LogRoot, err)
@@ -194,8 +205,10 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 	if err = mkdir(cOpts.SaasContentRoot); err != nil {
 		return fmt.Sprintf("Error creating required directory %s: %v", cOpts.SaasContentRoot, err)
 	}
-	if err = mkdir(cOpts.SecretsRoot); err != nil {
-		return fmt.Sprintf("Error creating required directory %s: %v", cOpts.SecretsRoot, err)
+	if cOpts.SecretsType == "directory" {
+		if err = mkdir(cOpts.SecretsRoot); err != nil {
+			return fmt.Sprintf("Error creating required directory %s: %v", cOpts.SecretsRoot, err)
+		}
 	}
 	localLogger.Printf("Extracting Default Assets\n")
 	if EmbeddedAssetsExtractFunc != nil {
@@ -212,9 +225,6 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 		return fmt.Sprintf("Unable to create DataStack: %v", err)
 	}
 	var secretStore store.Store
-	if cOpts.SecretsType == "" {
-		cOpts.SecretsType = cOpts.BackEndType
-	}
 	if u, err := url.Parse(cOpts.SecretsType); err == nil && u.Scheme != "" {
 		secretStore, err = store.Open(cOpts.SecretsType)
 	} else {
