@@ -566,6 +566,10 @@ func (j *Job) RenderActions(rt *RequestTracker) ([]*models.JobAction, error) {
 	return actions, err.HasError()
 }
 
+func (j *Job) AfterDelete() {
+	os.Remove(j.LogPath(j.rt))
+}
+
 func (j *Job) Log(rt *RequestTracker, src io.Reader) error {
 	if j.rt == nil {
 		j.setRT(rt)
