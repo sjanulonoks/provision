@@ -1,10 +1,19 @@
 hash: 7fe5fd87bd3315ef5c797daa6d5977e7b9f3387c1208ca039b0187d226bf5b47
-updated: 2018-05-14T08:15:50.498261892-05:00
+updated: 2018-05-19T23:58:05.679513-05:00
 imports:
 - name: github.com/armon/go-metrics
   version: 783273d703149aaeb9897cf58613d5af48861c25
 - name: github.com/boltdb/bolt
   version: fd01fc79c553a8e99d512a07e8e0c63d4a3ccfc5
+- name: github.com/cloudflare/cfssl
+  version: 1e95aeec7a46dc043d099d6fb887a31cdb0a5999
+  subpackages:
+  - crypto/pkcs7
+  - csr
+  - errors
+  - helpers
+  - helpers/derhelpers
+  - log
 - name: github.com/cpuguy83/go-md2man
   version: 48d8747a2ca13185e7cc8efe6e9fc196a83f71a5
   subpackages:
@@ -41,6 +50,13 @@ imports:
   version: 927b65914520a8b7d44f5c9057611cfec6b2e2d0
   subpackages:
   - proto
+- name: github.com/google/certificate-transparency-go
+  version: 7c2badeed51ed57d7316a12fb96b2aa372ad9242
+  subpackages:
+  - asn1
+  - tls
+  - x509
+  - x509/pkix
 - name: github.com/gorilla/websocket
   version: 21ab95fa12b9bdd8fecf5fa3586aad941cc98785
 - name: github.com/hashicorp/consul
@@ -127,11 +143,16 @@ imports:
 - name: golang.org/x/crypto
   version: 034e5325b6ab92faa14d15c30e86919e911cf8e0
   subpackages:
+  - cryptobyte
+  - cryptobyte/asn1
   - ed25519
   - ed25519/internal/edwards25519
   - nacl
   - nacl/sign
+  - ocsp
   - pbkdf2
+  - pkcs12
+  - pkcs12/internal/rc2
   - scrypt
   - sign
 - name: golang.org/x/net
