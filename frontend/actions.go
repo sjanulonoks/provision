@@ -163,74 +163,33 @@ func validateActionParameters(f *Frontend,
 	val := ma.Params
 
 	m, _ := ma.Model.(models.Paramer)
-
-	for _, param := range aa.RequiredParams {
-		var obj interface{} = nil
-		obj, ok := val[param]
-		if !ok {
-			if m != nil {
-				obj, ok = rt.GetParam(m, param, true)
-			}
-			if !ok {
-				if o := rt.Find("profiles", f.dt.GlobalProfileName); o != nil {
-					p := backend.AsProfile(o)
-					if tobj, ok := p.Params[param]; ok {
-						obj = tobj
-					}
-				}
-			}
-
-			// GREG: Default?
-
-			// Put into place
-			if obj != nil {
-				val[param] = obj
-			}
+	for k, v := range val {
+		pobj := rt.Find("params", k)
+		if pobj == nil {
+			continue
 		}
-		if obj == nil {
-			err.Errorf("Action %s Missing Parameter %s", name, param)
-		} else {
-			pobj := rt.Find("params", param)
-			if pobj != nil {
-				rp := backend.AsParam(pobj)
-
-				if ev := rp.ValidateValue(obj); ev != nil {
-					err.Errorf("Action %s: Invalid Parameter: %s: %s", name, param, ev.Error())
-				}
-			}
+		param := backend.AsParam(pobj)
+		if param.Secure {
+			err.Errorf("Action %s cannot be passed secure parameter %s via the API", name, k)
+		}
+		if verr := param.ValidateValue(v, nil); verr != nil {
+			err.Errorf("Action %s: Invalid Parameter: %s: %s", name, k, verr.Error())
 		}
 	}
-	for _, param := range aa.OptionalParams {
-		var obj interface{} = nil
-		obj, ok := val[param]
-		if !ok {
-			if m != nil {
-				obj, ok = rt.GetParam(m, param, true)
-			}
-			if !ok {
-				if o := rt.Find("profiles", f.dt.GlobalProfileName); o != nil {
-					p := backend.AsProfile(o)
-					if tobj, ok := p.Params[param]; ok {
-						obj = tobj
-					}
-				}
-			}
 
-			// Put into place
-			if obj != nil {
+	missingOK := false
+	for _, pList := range [][]string{aa.RequiredParams, aa.OptionalParams} {
+		for _, param := range pList {
+			if _, ok := val[param]; ok {
+				continue
+			}
+			if obj, ok := rt.GetParam(m, param, true, len(ma.Params) != 0); ok {
 				val[param] = obj
+			} else if !missingOK {
+				err.Errorf("Action %s Missing Parameter %s", name, param)
 			}
 		}
-		if obj != nil {
-			pobj := rt.Find("params", param)
-			if pobj != nil {
-				rp := backend.AsParam(pobj)
-
-				if ev := rp.ValidateValue(obj); ev != nil {
-					err.Errorf("Action %s: Invalid Parameter: %s: %s", name, param, ev.Error())
-				}
-			}
-		}
+		missingOK = true
 	}
 }
 

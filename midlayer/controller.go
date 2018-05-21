@@ -340,7 +340,7 @@ func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, pro
 		defer rt.Logger.SetLevel(l)
 
 		ds := pc.dt.Backend.(*DataStack)
-		nbs, hard, _ := ds.AddReplacePluginLayer(cName, ns, pc.dt.Logger, forceParamRemoval)
+		nbs, hard, _ := ds.AddReplacePluginLayer(cName, ns, pc.dt.Secrets, pc.dt.Logger, forceParamRemoval)
 		if hard != nil {
 			rt.Errorf("Skipping %s because of bad store errors: %v\n", pp.Name, hard)
 			err = hard
@@ -393,7 +393,7 @@ func (pc *PluginController) removePluginProvider(rt *backend.RequestTracker, pro
 		// Remove the plugin content
 		rt.AllLocked(func(d backend.Stores) {
 			ds := pc.dt.Backend.(*DataStack)
-			nbs, hard, _ := ds.RemovePluginLayer(name, pc.dt.Logger)
+			nbs, hard, _ := ds.RemovePluginLayer(name, pc.dt.Logger, pc.dt.Secrets)
 			if hard != nil {
 				rt.Errorf("Skipping removal of plugin content layer %s because of bad store errors: %v\n", name, hard)
 			} else {

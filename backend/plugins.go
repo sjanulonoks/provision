@@ -88,7 +88,11 @@ func (n *Plugin) New() store.KeySaver {
 func (n *Plugin) Validate() {
 	n.Plugin.Validate()
 	n.AddError(index.CheckUnique(n, n.rt.stores("plugins").Items()))
-	ValidateParams(n.rt, n, n.Params)
+	if pk, err := n.rt.PrivateKeyFor(n); err == nil {
+		ValidateParams(n.rt, n, n.Params, pk)
+	} else {
+		n.Errorf("Unable to get key: %v", err)
+	}
 	n.SetValid()
 	n.SetAvailable()
 }
@@ -105,6 +109,10 @@ func (n *Plugin) OnLoad() error {
 	defer func() { n.rt = nil }()
 	n.Fill()
 	return n.BeforeSave()
+}
+
+func (n *Plugin) AfterDelete() {
+	n.rt.DeleteKeyFor(n)
 }
 
 func AsPlugin(o models.Model) *Plugin {

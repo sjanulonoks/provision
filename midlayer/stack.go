@@ -79,14 +79,17 @@ func (d *DataStack) Clone() *DataStack {
 // undo after FixerUpper returns.
 type FixerUpper func(*DataStack, store.Store) error
 
-func (d *DataStack) rebuild(oldStore store.Store, logger logger.Logger, fixup FixerUpper, newStore store.Store) (*DataStack, error, error) {
+func (d *DataStack) rebuild(oldStore, secrets store.Store,
+	logger logger.Logger,
+	fixup FixerUpper,
+	newStore store.Store) (*DataStack, error, error) {
 	if err := d.buildStack(fixup, newStore); err != nil {
 		if m, ok := err.(*models.Error); ok {
 			return nil, m, nil
 		}
 		return nil, models.NewError("ValidationError", 422, err.Error()), nil
 	}
-	hard, soft := backend.ValidateDataTrackerStore(d.fileRoot, d, logger)
+	hard, soft := backend.ValidateDataTrackerStore(d.fileRoot, d, secrets, logger)
 	if hard == nil && oldStore != nil {
 		CleanUpStore(oldStore)
 	}
@@ -95,40 +98,40 @@ func (d *DataStack) rebuild(oldStore store.Store, logger logger.Logger, fixup Fi
 	return d, hard, soft
 }
 
-func (d *DataStack) RemoveSAAS(name string, logger logger.Logger) (*DataStack, error, error) {
+func (d *DataStack) RemoveSAAS(name string, logger logger.Logger, secrets store.Store) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	delete(dtStore.saasContents, name)
-	return dtStore.rebuild(oldStore, logger, nil, nil)
+	return dtStore.rebuild(oldStore, secrets, logger, nil, nil)
 }
 
 func (d *DataStack) AddReplaceSAAS(
 	name string,
-	newStore store.Store,
+	newStore, secrets store.Store,
 	logger logger.Logger,
 	fixup FixerUpper) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.saasContents[name]
 	dtStore.saasContents[name] = newStore
-	return dtStore.rebuild(oldStore, logger, fixup, newStore)
+	return dtStore.rebuild(oldStore, secrets, logger, fixup, newStore)
 }
 
-func (d *DataStack) RemovePluginLayer(name string, logger logger.Logger) (*DataStack, error, error) {
+func (d *DataStack) RemovePluginLayer(name string, logger logger.Logger, secrets store.Store) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.pluginContents[name]
 	delete(dtStore.pluginContents, name)
-	return dtStore.rebuild(oldStore, logger, nil, nil)
+	return dtStore.rebuild(oldStore, secrets, logger, nil, nil)
 }
 
 func (d *DataStack) AddReplacePluginLayer(
 	name string,
-	newStore store.Store,
+	newStore, secrets store.Store,
 	logger logger.Logger,
 	fixup FixerUpper) (*DataStack, error, error) {
 	dtStore := d.Clone()
 	oldStore, _ := dtStore.pluginContents[name]
 	dtStore.pluginContents[name] = newStore
-	return dtStore.rebuild(oldStore, logger, fixup, newStore)
+	return dtStore.rebuild(oldStore, secrets, logger, fixup, newStore)
 }
 
 func fixBasic(d *DataStack, l store.Store) error {

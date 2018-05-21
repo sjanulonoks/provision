@@ -730,14 +730,14 @@ func (r *RenderData) ParseUrl(segment, rawUrl string) (string, error) {
 // Param is a helper function for extracting a parameter from Machine.Params
 func (r *RenderData) Param(key string) (interface{}, error) {
 	if r.Machine != nil {
-		v, ok := r.rt.GetParam(r.Machine, key, true)
+		v, ok := r.rt.GetParam(r.Machine, key, true, r.Task != nil)
 		if ok {
 			return v, nil
 		}
 	}
 	if o := r.rt.find("profiles", r.rt.dt.GlobalProfileName); o != nil {
 		p := AsProfile(o)
-		if v, ok := r.rt.GetParam(p, key, true); ok {
+		if v, ok := r.rt.GetParam(p, key, true, r.Task != nil); ok {
 			return v, nil
 		}
 	}

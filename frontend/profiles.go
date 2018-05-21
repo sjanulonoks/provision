@@ -52,8 +52,10 @@ type ProfilePatchBodyParameter struct {
 }
 
 // ProfilePathParameter used to name a Profile in the path
-// swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile getProfileParams patchProfileParams headProfile postProfileParams
+// swagger:parameters putProfiles getProfile putProfile patchProfile deleteProfile getProfileParams patchProfileParams headProfile postProfileParams getProfilePubKey
 type ProfilePathParameter struct {
+	// in: query
+	Decode string `json:"decode"`
 	// in: path
 	// required: true
 	Name string `json:"name"`
@@ -62,6 +64,8 @@ type ProfilePathParameter struct {
 // ProfileParamsPathParameter used to get or set a single Parameter in a Profile
 // swagger:parameters getProfileParam postProfileParam
 type ProfileParamsPathParameter struct {
+	// in: query
+	Decode string `json:"decode"`
 	// in: path
 	// required: true
 	Name string `json:"name"`
@@ -327,7 +331,21 @@ func (f *Frontend) InitProfileApi() {
 			f.Remove(c, &backend.Profile{}, c.Param(`name`))
 		})
 
-	pGetAll, pGetOne, pPatch, pSetThem, pSetOne, pDeleteOne := f.makeParamEndpoints(&backend.Profile{}, "name")
+	pGetAll, pGetOne, pPatch, pSetThem, pSetOne, pDeleteOne, pGetPubKey := f.makeParamEndpoints(&backend.Profile{}, "name")
+
+	// swagger:route GET /profiles/{name}/pubkey Profiles getProfilePubKey
+	//
+	// Get the public key for secure params on a profile
+	//
+	// Get the public key for a Profile specified by {name}
+	//
+	//     Responses:
+	//       200: PubKeyResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       500: ErrorResponse
+	f.ApiGroup.GET("/profiles/:name/pubkey", pGetPubKey)
 
 	// swagger:route GET /profiles/{name}/params Profiles getProfileParams
 	//

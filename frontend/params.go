@@ -12,18 +12,30 @@ import (
 )
 
 func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
-	getAll, getOne, patchThem, setThem, setOne, deleteOne func(c *gin.Context)) {
+	getAll, getOne, patchThem, setThem, setOne, deleteOne, getPubKey func(c *gin.Context)) {
 	trimmer := func(s string) string {
 		return strings.TrimLeft(s, `/`)
 	}
 	aggregator := func(c *gin.Context) bool {
 		return c.Query("aggregate") == "true"
 	}
+	decoder := func(c *gin.Context) bool {
+		return c.Query("decode") == "true"
+	}
 	idrtkey := func(c *gin.Context, op string) (string, *backend.RequestTracker, string) {
 		id := c.Param(idKey)
 		return id,
 			f.rt(c, obj.(Lockable).Locks(op)...),
 			trimmer(c.Param("key"))
+	}
+	viewAuth := func(c *gin.Context, key string) bool {
+		if !f.assureSimpleAuth(c, obj.Prefix(), "get", key) {
+			return false
+		}
+		if !decoder(c) {
+			return true
+		}
+		return f.assureSimpleAuth(c, obj.Prefix(), "getSecure", key)
 	}
 	mutator := func(c *gin.Context,
 		rt *backend.RequestTracker,
@@ -55,6 +67,8 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 		patch, err := models.GenPatch(orig, changed, false)
 		if err != nil {
 			patchErr.AddError(err)
+		} else if !f.assureAuthUpdate(c, obj.Prefix(), "update", id, patch) {
+			return nil
 		} else {
 			rt.Do(func(_ backend.Stores) {
 				_, err := rt.Patch(changed, changed.Key(), patch)
@@ -69,7 +83,7 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 	}
 	return /* getAll */ func(c *gin.Context) {
 			id, rt, _ := idrtkey(c, "get")
-			if !f.assureSimpleAuth(c, obj.Prefix(), "get", id) {
+			if !viewAuth(c, id) {
 				return
 			}
 			var params map[string]interface{}
@@ -78,13 +92,13 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 				return
 			}
 			rt.Do(func(_ backend.Stores) {
-				params = rt.GetParams(ob.(models.Paramer), aggregator(c))
+				params = rt.GetParams(ob.(models.Paramer), aggregator(c), decoder(c))
 			})
 			c.JSON(http.StatusOK, params)
 		},
 		/* getOne */ func(c *gin.Context) {
 			id, rt, key := idrtkey(c, "get")
-			if !f.assureSimpleAuth(c, obj.Prefix(), "get", id) {
+			if !viewAuth(c, id) {
 				return
 			}
 			ob := f.Find(c, rt, obj.Prefix(), id)
@@ -93,7 +107,7 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 			}
 			var val interface{}
 			rt.Do(func(d backend.Stores) {
-				val, _ = rt.GetParam(ob.(models.Paramer), key, aggregator(c))
+				val, _ = rt.GetParam(ob.(models.Paramer), key, aggregator(c), decoder(c))
 			})
 			c.JSON(http.StatusOK, val)
 		},
@@ -166,7 +180,7 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 			id, rt, key := idrtkey(c, "update")
 			var found bool
 			var val interface{}
-			mutator(c, rt, id,
+			if mutator(c, rt, id,
 				func(params map[string]interface{}) (map[string]interface{}, *models.Error) {
 					val, found = params[key]
 					if !found {
@@ -181,9 +195,31 @@ func (f *Frontend) makeParamEndpoints(obj models.Paramer, idKey string) (
 					}
 					delete(params, key)
 					return params, nil
-				})
-			if found {
+				}) != nil && found {
 				c.JSON(http.StatusOK, val)
+			}
+		},
+		/* getPubKey */ func(c *gin.Context) {
+			id, rt, _ := idrtkey(c, "get")
+			if !f.assureSimpleAuth(c, obj.Prefix(), "updateSecure", id) {
+				return
+			}
+			ob := f.Find(c, rt, obj.Prefix(), id)
+			if ob == nil {
+				return
+			}
+			pk, err := rt.PublicKeyFor(ob)
+			if err != nil {
+				ret := &models.Error{
+					Code:  500,
+					Model: ob.Prefix(),
+					Key:   ob.Key(),
+					Type:  "Bad Secret",
+				}
+				ret.AddError(err)
+				c.JSON(ret.Code, ret)
+			} else {
+				c.JSON(http.StatusOK, pk)
 			}
 		}
 }

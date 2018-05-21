@@ -54,8 +54,10 @@ type PluginPatchBodyParameter struct {
 }
 
 // PluginPathParameter used to find a Plugin in the path
-// swagger:parameters putPlugins getPlugin putPlugin patchPlugin deletePlugin getPluginParams postPluginParams headPlugin patchPluginParams
+// swagger:parameters putPlugins getPlugin putPlugin patchPlugin deletePlugin getPluginParams postPluginParams headPlugin patchPluginParams getPluginPubKey
 type PluginPathParameter struct {
+	// in: query
+	Decode string `json:"decode"`
 	// in: path
 	// required: true
 	Name string `json:"name"`
@@ -64,6 +66,8 @@ type PluginPathParameter struct {
 // PluginParamsPathParameter used to find a Plugin in the path
 // swagger:parameters getPluginParam postPluginParam
 type PluginParamsPathParameter struct {
+	// in: query
+	Decode string `json:"decode"`
 	// in: path
 	// required: true
 	Name string `json:"name"`
@@ -368,7 +372,21 @@ func (f *Frontend) InitPluginApi() {
 			f.Remove(c, &backend.Plugin{}, c.Param(`name`))
 		})
 
-	pGetAll, pGetOne, pPatch, pSetThem, pSetOne, pDeleteOne := f.makeParamEndpoints(&backend.Plugin{}, "name")
+	pGetAll, pGetOne, pPatch, pSetThem, pSetOne, pDeleteOne, pGetPubKey := f.makeParamEndpoints(&backend.Plugin{}, "name")
+
+	// swagger:route GET /plugins/{name}/pubkey Plugins getPluginPubKey
+	//
+	// Get the public key for secure params on a plugin
+	//
+	// Get the public key for a Plugin specified by {name}
+	//
+	//     Responses:
+	//       200: PubKeyResponse
+	//       401: NoContentResponse
+	//       403: NoContentResponse
+	//       404: ErrorResponse
+	//       500: ErrorResponse
+	f.ApiGroup.GET("/plugins/:name/pubkey", pGetPubKey)
 
 	// swagger:route GET /plugins/{name}/params Plugins getPluginParams
 	//

@@ -71,11 +71,13 @@ func mkDT(bs store.Store) *DataTracker {
 	if bs == nil {
 		bs, _ = store.Open("memory:///")
 	}
+	ss, _ := store.Open("memory:///")
 	s.(*store.StackedStore).Push(bs, false, true)
 	s.(*store.StackedStore).Push(BasicContent(), false, false)
 	baseLog := log.New(os.Stdout, "dt", 0)
 	l := logger.New(baseLog).Log("backend")
 	dt := NewDataTracker(s,
+		ss,
 		tmpDir,
 		tmpDir,
 		"127.0.0.1",
