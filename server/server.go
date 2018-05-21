@@ -123,6 +123,7 @@ func Server(cOpts *ProgOpts) {
 }
 
 func server(localLogger *log.Logger, cOpts *ProgOpts) string {
+	onlyICanReadThings()
 	var err error
 
 	if cOpts.VersionFlag {
