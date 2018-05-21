@@ -73,7 +73,7 @@ type ProgOpts struct {
 	ForceStatic         bool   `long:"force-static" description:"Force the system to always use the static IP."`
 
 	BackEndType    string `long:"backend" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI" default:"directory"`
-	SecretsType    string `long:"secrets" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI" default:"directory"`
+	SecretsType    string `long:"secrets" description:"Storage to use for persistent data. Can be either 'consul', 'directory', or a store URI.  Will default to being the same as 'backend'" default:""`
 	LocalContent   string `long:"local-content" description:"Storage to use for local overrides." default:"directory:///etc/dr-provision?codec=yaml"`
 	DefaultContent string `long:"default-content" description:"Store URL for local content" default:"file:///usr/share/dr-provision/default.yaml?codec=yaml"`
 
@@ -211,6 +211,9 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 		return fmt.Sprintf("Unable to create DataStack: %v", err)
 	}
 	var secretStore store.Store
+	if cOpts.SecretsType == "" {
+		cOpts.SecretsType = cOpts.BackEndType
+	}
 	if u, err := url.Parse(cOpts.SecretsType); err == nil && u.Scheme != "" {
 		secretStore, err = store.Open(cOpts.SecretsType)
 	} else {
