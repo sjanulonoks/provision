@@ -180,7 +180,7 @@ func (b *BootEnv) fillInstallRepo() {
 		l := b.rt.Logger
 		b.pathLookaside = func(p string) (io.Reader, error) {
 			// Always use local copy if available
-			if _, err := os.Stat(path.Join(fileRoot, p)); err == nil || b.installRepo == nil {
+			if _, err := os.Stat(path.Join(fileRoot, b.pathFor(""))); err == nil || b.installRepo == nil {
 				return nil, nil
 			}
 			tgtUri := strings.TrimSuffix(b.installRepo.URL, "/") + strings.TrimPrefix(p, pf)
