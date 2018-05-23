@@ -102,7 +102,7 @@ imports:
   subpackages:
   - netascii
 - name: github.com/rackn/gohai
-  version: 3be1ccd6fbfb7477dacadfe06f4a18cafb08c42c
+  version: a9259c11c14713928aaa20c7b68f7d8ce770e145
   subpackages:
   - plugins/dmi
   - plugins/net
