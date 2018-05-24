@@ -79,7 +79,7 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 		}
 		_, err = rf.ReadFrom(source)
 		if err != nil {
-			l.Errorf("TFTP: %s: transfer error: %v", filename, err)
+			l.Infof("TFTP: %s: transfer error: %v", filename, err)
 			return err
 		}
 		return nil
