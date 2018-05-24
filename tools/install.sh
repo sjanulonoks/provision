@@ -29,6 +29,7 @@ Options:
     --fast-downloader       # (experimental) Use Fast Downloader (uses 'aria2')
 
     install                 # Sets up an isolated or system 'production' enabled install.
+    upgrade                 # Sets the installer to upgrade an existing 'dr-provision'
     remove                  # Removes the system enabled install.  Requires no other flags
 
 Defaults are:
@@ -360,7 +361,15 @@ if [[ $COMMIT != "" ]] ; then
     set -e
 fi
 
-case $1 in
+MODE=$1
+if [[ "$MODE" == "upgrade" ]]
+then
+    MODE=install
+    UPGRADE=true
+    force=true 
+fi
+
+case $MODE in
      install)
              if [[ "$ISOLATED" == "false" || "$SKIP_RUN_CHECK" == "false" ]]; then
                  if pgrep dr-provision; then
