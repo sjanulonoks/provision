@@ -56,6 +56,11 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 			l.Errorf("TFTP: Failed to get remote and local IP address information")
 		}
 		l.Debugf("TFTP: attempting to send %s", filename)
+		defer func() {
+			if r := recover(); r != nil {
+				l.Errorf("TFTP: Recovered from panic:\n%v", r)
+			}
+		}()
 		source, err := responder(filename, remote.IP)
 		if err != nil {
 			return err
@@ -79,7 +84,7 @@ func ServeTftp(listen string, responder func(string, net.IP) (io.Reader, error),
 		}
 		_, err = rf.ReadFrom(source)
 		if err != nil {
-			l.Errorf("TFTP: %s: transfer error: %v", filename, err)
+			l.Infof("TFTP: %s: transfer error: %v", filename, err)
 			return err
 		}
 		return nil
