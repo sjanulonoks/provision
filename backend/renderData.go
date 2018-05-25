@@ -683,6 +683,7 @@ func (r *RenderData) GenerateProfileToken(profile string, duration int) string {
 	t, _ := NewClaim(r.Machine.Key(), grantor, ttl).
 		AddRawClaim("profiles", "get", profile).
 		AddRawClaim("profiles", "update", profile).
+		AddRawClaim("params", "get", "*").
 		AddMachine(r.Machine.Key()).
 		AddSecrets("", grantorSecret, r.Machine.Secret).
 		Seal(r.rt.dt.tokenManager)
