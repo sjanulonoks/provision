@@ -70,7 +70,8 @@ func (a *authBlob) tenantSelect(scope string) index.Filter {
 		return nil
 	}
 	test := func(m models.Model) bool {
-		if a.tenantOK(m.Prefix(), m.Key()) {
+		prefix, key := m.Prefix(), m.Key()
+		if a.tenantOK(prefix, key) {
 			return true
 		}
 		switch o := m.(type) {
@@ -87,7 +88,7 @@ func (a *authBlob) tenantSelect(scope string) index.Filter {
 		case *backend.Reservation:
 			return a.tenantOK("machines", a.f.dt.MacToMachineUUID(o.Token))
 		}
-		a.f.Logger.Tracef("tenantSelect: %s: default denied")
+		a.f.Logger.Tracef("tenantSelect: %s:%s: default denied", prefix, key)
 		return false
 	}
 	return index.Select(test)
