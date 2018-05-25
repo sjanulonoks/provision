@@ -56,19 +56,22 @@ type authBlob struct {
 }
 
 func (a *authBlob) tenantOK(prefix, key string) bool {
-	if a.tenantMembers == nil || a.tenantMembers[prefix] == nil {
-		return true
+	res := true
+	if a.tenantMembers != nil && a.tenantMembers[prefix] != nil {
+		_, res = a.tenantMembers[prefix][key]
 	}
-	_, res := a.tenantMembers[prefix][key]
+	a.f.Logger.Tracef("tenantOK: %s:%s: %v", prefix, key, res)
 	return res
 }
 
 func (a *authBlob) tenantSelect(scope string) index.Filter {
 	if a.tenantMembers == nil {
+		a.f.Logger.Tracef("tenantSelect: %s: not scoped, allowed", scope)
 		return nil
 	}
 	test := func(m models.Model) bool {
-		if a.tenantOK(m.Prefix(), m.Key()) {
+		prefix, key := m.Prefix(), m.Key()
+		if a.tenantOK(prefix, key) {
 			return true
 		}
 		switch o := m.(type) {
@@ -85,6 +88,7 @@ func (a *authBlob) tenantSelect(scope string) index.Filter {
 		case *backend.Reservation:
 			return a.tenantOK("machines", a.f.dt.MacToMachineUUID(o.Token))
 		}
+		a.f.Logger.Tracef("tenantSelect: %s:%s: default denied", prefix, key)
 		return false
 	}
 	return index.Select(test)
@@ -545,6 +549,7 @@ func (f *Frontend) assureAuth(c *gin.Context,
 	scope, action, specific string) bool {
 	auth := f.getAuth(c)
 	if auth.matchClaim(wantsClaims) && auth.isLicensed(scope, action) {
+		f.Logger.Tracef("assureAuth: claims '%s:%s:%s' granted", scope, action, specific)
 		return true
 	}
 	f.rt(c).Auditf("Failed auth '%s' '%s' '%s' - %s",
