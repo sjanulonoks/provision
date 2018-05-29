@@ -249,6 +249,7 @@ func (f *Frontend) InitContentApi() {
 					}
 				}
 				f.dt.ReplaceBackend(rt, nbs)
+				rt.Publish("contents", "create", name, cs)
 			})
 			if res.ContainsError() {
 				c.JSON(res.Code, res)
@@ -326,6 +327,7 @@ func (f *Frontend) InitContentApi() {
 					}
 				}
 				f.dt.ReplaceBackend(rt, nbs)
+				rt.Publish("contents", "update", name, cs)
 			})
 			if res.ContainsError() {
 				c.JSON(res.Code, res)
@@ -366,12 +368,14 @@ func (f *Frontend) InitContentApi() {
 					res.Errorf("No such content store")
 					return
 				}
+				cs := buildSummary(cst)
 				ds := f.dt.Backend.(*midlayer.DataStack)
 				nbs, hard, _ := ds.RemoveSAAS(name, f.Logger, f.dt.Secrets)
 				if hard != nil {
 					res.AddError(hard)
 					return
 				}
+				rt.Publish("contents", "delete", name, cs)
 				f.dt.ReplaceBackend(rt, nbs)
 			})
 			if res.ContainsError() {
