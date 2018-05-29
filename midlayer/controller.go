@@ -368,7 +368,7 @@ func (pc *PluginController) importPluginProvider(rt *backend.RequestTracker, pro
 			pc.Errorf("Unpack for %s failed: %v", pp.Name, err)
 			pc.Errorf("%s", out)
 		}
-		rt.Publish("plugin_provider", "create", pp.Name, pp)
+		rt.Publish("plugin_providers", "create", pp.Name, pp)
 		return nil
 	} else {
 		pc.Infof("Already exists plugin provider: %s\n", pp.Name)
@@ -388,7 +388,7 @@ func (pc *PluginController) removePluginProvider(rt *backend.RequestTracker, pro
 	}
 	if name != "" {
 		pc.Infof("Removing plugin provider: %s\n", name)
-		rt.Publish("plugin_provider", "delete", name, pc.AvailableProviders[name])
+		rt.Publish("plugin_providers", "delete", name, pc.AvailableProviders[name])
 
 		// Remove the plugin content
 		rt.AllLocked(func(d backend.Stores) {
