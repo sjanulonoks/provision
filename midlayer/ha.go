@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"runtime"
 	"time"
@@ -131,7 +132,20 @@ func (le *LeaderElection) ElectLeader(wakeme chan bool) {
 			if !le.IsLeader() {
 				if imleader {
 					// I've lost leader ship - bail!!!
+					// Send myself a SIGINT so that the clean-up handlers do their things.
+					p, e := os.FindProcess(os.Getpid())
+					if e == nil {
+						e = p.Signal(os.Interrupt)
+						if e != nil {
+							le.l.Printf("NO LONGER LEADER, BUT I THINK I AM.  I FAILED TO SIGNAL MYSELF.  DIE!! %v\n", e)
+							os.Exit(1)
 
+						}
+					} else {
+						le.l.Printf("NO LONGER LEADER, BUT I THINK I AM.  I CAN NOT FIND MYSELF.  DIE!! %v\n", e)
+						os.Exit(1)
+					}
+					return
 				}
 				session := le.GetSession(le.LeaderKey)
 				aquired, err := client.AquireSessionKey(le.LeaderKey, session)
