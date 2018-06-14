@@ -139,7 +139,7 @@ func (rt *RequestTracker) Find(prefix, key string) models.Model {
 func (rt *RequestTracker) FindByIndex(prefix string, idx index.Maker, key string) models.Model {
 	items, err := index.Sort(idx)(rt.Index(prefix))
 	if err != nil {
-		rt.Errorf("Error sorting %s: %c", prefix, err)
+		rt.Errorf("Error sorting %s: %v", prefix, err)
 		return nil
 	}
 	return items.Find(key)

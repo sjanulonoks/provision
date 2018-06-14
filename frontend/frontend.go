@@ -463,9 +463,9 @@ func NewFrontend(
 	apiGroup.Use(me.userAuth())
 	me.ApiGroup = apiGroup
 
+	me.InitWebSocket()
 	me.InitIndexApi()
 	me.InitRoleApi()
-	me.InitWebSocket()
 	me.InitBootEnvApi()
 	me.InitStageApi()
 	me.InitIsoApi()

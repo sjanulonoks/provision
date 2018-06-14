@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -158,7 +159,23 @@ func (a *MachineAgent) Init() {
 			}
 		}
 	}
-	a.events, a.err = a.client.Events()
+	a.events, a.err = a.client.Events("machines", a.machine.Key())
+	if a.err == nil {
+		os.Setenv("RS_AGENT_EXCLUSIVE", "true")
+		if gen := os.Getenv("RS_AGENT_GEN"); gen == "" {
+			os.Setenv("RS_AGENT_GEN", "0")
+		} else {
+			genVal, err := strconv.ParseInt(gen, 0, 64)
+			if err == nil {
+				os.Setenv("RS_AGENT_GEN", fmt.Sprintf("%d", genVal+1))
+			} else {
+				os.Setenv("RS_AGENT_GEN", "0")
+			}
+		}
+		// log.Printf("%s:%s, %s:%s", "RS_AGENT_EXCLUSIVE", os.Getenv("RS_AGENT_EXCLUSIVE"), "RS_AGENT_GEN", os.Getenv("RS_AGENT_GEN"))
+	} else {
+		a.events, a.err = a.client.Events()
+	}
 	if a.err != nil {
 		a.Logf("MachineAgent: error attaching to event stream: %v", err)
 		a.exitOrSleep()

@@ -77,8 +77,13 @@ func EqualItem(field string, value interface{}) TestFunc {
 	}
 }
 
-func (c *Client) ws() (*websocket.Conn, error) {
-	ep, err := c.UrlFor("ws")
+func (c *Client) ws(parts ...string) (*websocket.Conn, error) {
+	if len(parts) == 0 {
+		parts = []string{"ws"}
+	} else {
+		parts = append(parts, "ws")
+	}
+	ep, err := c.UrlFor(parts...)
 	if err != nil {
 		return nil, err
 	}
@@ -163,8 +168,8 @@ func (es *EventStream) processEvents(running chan struct{}) {
 }
 
 // Events creates a new EventStream from the client.
-func (c *Client) Events() (*EventStream, error) {
-	conn, err := c.ws()
+func (c *Client) Events(parts ...string) (*EventStream, error) {
+	conn, err := c.ws(parts...)
 	if err != nil {
 		return nil, err
 	}

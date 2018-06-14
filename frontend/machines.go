@@ -355,6 +355,25 @@ func (f *Frontend) InitMachineApi() {
 			f.Exists(c, &backend.Machine{}, c.Param(`uuid`))
 		})
 
+	f.ApiGroup.GET("/machines/:uuid/ws",
+		func(c *gin.Context) {
+			ref := &backend.Machine{}
+			backend.Fill(ref)
+			rt := f.rt(c, ref.Locks("get")...)
+			machine := f.Find(c, rt, "machines", c.Param(`uuid`))
+			if machine == nil {
+				return
+			}
+			auth, _ := c.Get("DRP-AUTH")
+			l, _ := c.Get("logger")
+			keys := map[string]interface{}{
+				"DRP-AUTH": auth,
+				"logger":   l,
+				"takeover": machine.Prefix() + ":" + machine.Key(),
+			}
+			f.melody.HandleRequestWithKeys(c.Writer, c.Request, keys)
+		})
+
 	// swagger:route PATCH /machines/{uuid} Machines patchMachine
 	//
 	// Patch a Machine

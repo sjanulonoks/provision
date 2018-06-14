@@ -14,6 +14,54 @@ import (
 )
 
 var wsLock = &sync.Mutex{}
+var exclusiveSessions map[string][]*melody.Session
+
+func wsExclusiveSessionGrab(s *melody.Session) {
+	wsLock.Lock()
+	defer wsLock.Unlock()
+	k, ok := s.Get("takeover")
+	if !ok {
+		return
+	}
+	sessionKey := k.(string)
+	if exclusiveSessions == nil {
+		exclusiveSessions = map[string][]*melody.Session{}
+	}
+	sessionList := exclusiveSessions[sessionKey]
+	if sessionList == nil {
+		sessionList = []*melody.Session{}
+	}
+	for _, session := range sessionList {
+		if session.IsClosed() {
+			continue
+		}
+		session.Set("Overtaken", true)
+	}
+	sessionList = append(sessionList, s)
+	exclusiveSessions[sessionKey] = sessionList
+}
+
+func wsExclusiveSessionRelease(s *melody.Session) {
+	wsLock.Lock()
+	defer wsLock.Unlock()
+	k, ok := s.Get("takeover")
+	if !ok {
+		return
+	}
+	sessionKey := k.(string)
+	sessionList := []*melody.Session{}
+	for _, v := range exclusiveSessions[sessionKey] {
+		if v.IsClosed() {
+			continue
+		}
+		if v == s {
+			continue
+		}
+		sessionList = append(sessionList, v)
+	}
+	sessionList[len(sessionList)-1].Set("Overtaken", false)
+	exclusiveSessions[sessionKey] = sessionList
+}
 
 func (fe *Frontend) InitWebSocket() {
 	fe.melody = melody.New()
@@ -27,7 +75,8 @@ func (fe *Frontend) InitWebSocket() {
 		}
 		fe.melody.HandleRequestWithKeys(c.Writer, c.Request, keys)
 	})
-
+	fe.melody.HandleConnect(wsExclusiveSessionGrab)
+	fe.melody.HandleDisconnect(wsExclusiveSessionRelease)
 	fe.melody.HandleMessage(websocketHandler)
 }
 
@@ -75,16 +124,19 @@ func (f *Frontend) Publish(e *models.Event) error {
 				if c := s.MustGet("DRP-AUTH"); c != nil {
 					auth = c.(*authBlob)
 				}
-				if val, ok := s.Get("EventMap"); !ok {
+				val, ok := s.Get("EventMap")
+				if !ok {
 					return false
-				} else {
-					tmap := val.([]string)
-					emap = make([]string, len(tmap), len(tmap))
-					for i, v := range tmap {
-						emap[i] = v
-					}
-					return true
 				}
+				if blocked, ok := s.Get("Overtaken"); ok && blocked.(bool) {
+					return false
+				}
+				tmap := val.([]string)
+				emap = make([]string, len(tmap), len(tmap))
+				for i, v := range tmap {
+					emap[i] = v
+				}
+				return true
 			}()
 			if !hasMap {
 				return false
