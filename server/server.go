@@ -109,6 +109,10 @@ type ProgOpts struct {
 	SystemGrantorSecret string `long:"system-grantor-secret" description:"Auth Token secret to allow revocation of all Machine tokens" default:""`
 	FakePinger          bool   `hidden:"true" long:"fake-pinger"`
 	DefaultLogLevel     string `long:"log-level" description:"Level to log messages at" default:"warn"`
+
+	HaEnabled   bool   `long:"ha-enabled" description:"Enable HA"`
+	HaAddress   string `long:"ha-address" description:"IP address to advertise as our HA address" default:""`
+	HaInterface string `long:"ha-interface" description:"Interface to put the VIP on for HA" default:""`
 }
 
 func mkdir(d string) error {
@@ -210,11 +214,57 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 			return fmt.Sprintf("Error creating required directory %s: %v", cOpts.SecretsRoot, err)
 		}
 	}
+	// Validate HA args - Assumes a local consul server running talking to the "cluster"
+	if cOpts.HaEnabled {
+		if cOpts.SecretsType != "consul" || cOpts.BackEndType != "consul" {
+			return fmt.Sprintf("Error: HA must be run on consul backends: %s, %s", cOpts.SecretsType, cOpts.BackEndType)
+		}
+
+		if cOpts.HaAddress == "" {
+			return "Error: HA must specify a VIP that DRP will move around"
+		}
+
+		if cOpts.HaInterface == "" {
+			return "Error: HA must specify an interface for the VIP that DRP will move around"
+		}
+
+		ip := net.ParseIP(cOpts.HaAddress)
+		if ip == nil {
+			return fmt.Sprintf("Error: HA must be an IP address: %s", cOpts.HaAddress)
+		}
+
+		if cOpts.OurAddress != "" {
+			oip := net.ParseIP(cOpts.OurAddress)
+			if oip == nil {
+				return fmt.Sprintf("Error: OurAddress must be an IP address: %s", cOpts.OurAddress)
+			}
+			if !oip.Equal(ip) {
+				return fmt.Sprintf("Error: HA Address must match OurAddress. %s != %s", cOpts.HaAddress, cOpts.OurAddress)
+			}
+		} else {
+			cOpts.OurAddress = cOpts.HaAddress
+		}
+	}
+
 	localLogger.Printf("Extracting Default Assets\n")
 	if EmbeddedAssetsExtractFunc != nil {
 		localLogger.Printf("Extracting Default Assets\n")
 		if err := EmbeddedAssetsExtractFunc(cOpts.ReplaceRoot, cOpts.FileRoot); err != nil {
 			return fmt.Sprintf("Unable to extract assets: %v", err)
+		}
+	}
+
+	services := make([]midlayer.Service, 0, 0)
+
+	// HA waits here.
+	if cOpts.HaEnabled {
+		midlayer.RemoveIP(cOpts.HaAddress, cOpts.HaInterface)
+
+		leader := midlayer.BecomeLeader(localLogger)
+		services = append(services, leader)
+
+		if err := midlayer.AddIP(cOpts.HaAddress, cOpts.HaInterface); err != nil {
+			return fmt.Sprintf("Unable to add address: %v", err)
 		}
 	}
 
@@ -241,7 +291,6 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 
 	// We have a backend, now get default assets
 	buf := logger.New(localLogger).SetDefaultLevel(logLevel)
-	services := make([]midlayer.Service, 0, 0)
 	publishers := backend.NewPublishers(localLogger)
 
 	dt := backend.NewDataTracker(dtStore,
@@ -431,6 +480,10 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 
 			switch s {
 			case syscall.SIGABRT:
+				if cOpts.HaEnabled {
+					localLogger.Printf("Removing VIP: %s:%s\n", cOpts.HaInterface, cOpts.HaAddress)
+					midlayer.RemoveIP(cOpts.HaAddress, cOpts.HaInterface)
+				}
 				localLogger.Printf("Dumping all goroutine stacks")
 				pprof.Lookup("goroutine").WriteTo(os.Stderr, 2)
 				localLogger.Printf("Dumping stacks of contested mutexes")
@@ -452,6 +505,10 @@ func server(localLogger *log.Logger, cOpts *ProgOpts) string {
 					localLogger.Println("Reload Complete")
 				}
 			case syscall.SIGTERM, syscall.SIGINT:
+				if cOpts.HaEnabled {
+					localLogger.Printf("Removing VIP: %s:%s\n", cOpts.HaInterface, cOpts.HaAddress)
+					midlayer.RemoveIP(cOpts.HaAddress, cOpts.HaInterface)
+				}
 				// Stop the service gracefully.
 				for _, svc := range services {
 					localLogger.Println("Shutting down server...")
