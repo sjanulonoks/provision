@@ -1,5 +1,5 @@
-hash: 7fe5fd87bd3315ef5c797daa6d5977e7b9f3387c1208ca039b0187d226bf5b47
-updated: 2018-05-19T23:58:05.679513-05:00
+hash: f3195920dda50db60b2a852dbe1b0da583a74ccfceecafa8569817f3a3cceb87
+updated: 2018-06-15T15:49:08.001142533-05:00
 imports:
 - name: github.com/armon/go-metrics
   version: 783273d703149aaeb9897cf58613d5af48861c25
@@ -36,6 +36,8 @@ imports:
   version: e9ed3c6dfb39bb1a32197cb10d527906fe4da4b6
 - name: github.com/gin-contrib/cors
   version: df6cfb7ff4a38d694dfebd0868ecb3e956171366
+- name: github.com/gin-contrib/gzip
+  version: 4fbfcc6122759afed2efbc762c4c41164a403951
 - name: github.com/gin-contrib/location
   version: 911ef8299476b8a48e11ec0c26f2a0810345b690
 - name: github.com/gin-contrib/sse
@@ -145,14 +147,19 @@ imports:
   subpackages:
   - cryptobyte
   - cryptobyte/asn1
+  - curve25519
   - ed25519
   - ed25519/internal/edwards25519
   - nacl
+  - nacl/box
+  - nacl/secretbox
   - nacl/sign
   - ocsp
   - pbkdf2
   - pkcs12
   - pkcs12/internal/rc2
+  - poly1305
+  - salsa20/salsa
   - scrypt
   - sign
 - name: golang.org/x/net
