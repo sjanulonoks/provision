@@ -19,6 +19,7 @@ import (
 	"github.com/digitalrebar/provision/models"
 	"github.com/digitalrebar/store"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/location"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -373,6 +374,7 @@ func NewFrontend(
 	}
 
 	mgmtApi := gin.New()
+	mgmtApi.Use(gzip.Gzip(gzip.BestSpeed))
 	mgmtApi.Use(func(c *gin.Context) {
 		l := me.Logger.Fork()
 		if logLevel := c.GetHeader("X-Log-Request"); logLevel != "" {
@@ -424,8 +426,12 @@ func NewFrontend(
 			"X-Log-Level",
 			"X-Log-Token",
 			"Range",
+			"Vary",
+			"Accept-Encoding",
 		},
 		ExposeHeaders: []string{
+			"Vary",
+			"Content-Encoding",
 			"Content-Length",
 			"WWW-Authenticate",
 			"Set-Cookie",
