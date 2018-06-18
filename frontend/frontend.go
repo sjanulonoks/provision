@@ -468,7 +468,7 @@ func NewFrontend(
 	apiGroup := mgmtApi.Group("/api/v3")
 	apiGroup.Use(me.userAuth())
 	me.ApiGroup = apiGroup
-
+	me.InitMetaApi()
 	me.InitIndexApi()
 	me.InitRoleApi()
 	me.InitWebSocket()
