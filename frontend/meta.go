@@ -121,7 +121,7 @@ func (f *Frontend) InitMetaApi() {
 			if !assureDecode(c, &metaPatch) {
 				return
 			}
-			meta := changed.GetMeta
+			meta := changed.GetMeta()
 			patchErr := &models.Error{
 				Code:  http.StatusConflict,
 				Type:  c.Request.Method,
