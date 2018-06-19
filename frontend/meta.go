@@ -3,6 +3,7 @@ package frontend
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/VictorLowther/jsonpatch2"
 	"github.com/digitalrebar/provision/backend"
@@ -66,7 +67,7 @@ func (f *Frontend) InitMetaApi() {
 	//       403: NoContentRespons
 	f.ApiGroup.GET("/meta/:type/*id",
 		func(c *gin.Context) {
-			prefix, id := c.Param(`type`), c.Param(`id`)
+			prefix, id := c.Param(`type`), strings.TrimPrefix(c.Param(`id`), "/")
 			if !f.assureSimpleAuth(c, prefix, "get", id) {
 				return
 			}
@@ -100,7 +101,7 @@ func (f *Frontend) InitMetaApi() {
 	//       422: ErrorResponse
 	f.ApiGroup.PATCH("/meta/:type/:id",
 		func(c *gin.Context) {
-			prefix, id := c.Param(`type`), c.Param(`id`)
+			prefix, id := c.Param(`type`), strings.TrimPrefix(c.Param(`id`), "/")
 			ref := getMetaFor(c, prefix)
 			if ref == nil {
 				return
