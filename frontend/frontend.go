@@ -782,13 +782,19 @@ func (f *Frontend) emptyList(c *gin.Context, statsOnly bool) {
 	}
 }
 
-func processItem(obj models.Model, slim bool) models.Model {
-	if slim {
-		if o, ok := obj.(models.MetaHaver); ok {
-			o.SetMeta(models.Meta{})
-		}
-		if o, ok := obj.(models.Paramer); ok {
-			o.SetParams(map[string]interface{}{})
+func processItem(obj models.Model, slim string) models.Model {
+	for _, elide := range strings.Split(strings.ToLower(slim), ",") {
+		switch strings.TrimSpace(elide) {
+		case "meta":
+			if o, ok := obj.(models.MetaHaver); ok {
+				o.SetMeta(models.Meta{})
+			}
+		case "params":
+			if o, ok := obj.(models.Paramer); ok {
+				o.SetParams(map[string]interface{}{})
+			}
+		default:
+			// ignore for now -- will add more later, maybe
 		}
 	}
 	if f, ok := obj.(models.Filler); ok {
@@ -814,7 +820,7 @@ func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 		Model: ref.Prefix(),
 	}
 	var err error
-	slim := c.Query("slim") == "true"
+	slim := c.Query("slim")
 
 	rt := f.rt(c, ref.(Lockable).Locks("get")...)
 	rt.Do(func(d backend.Stores) {
@@ -891,7 +897,7 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	if !f.assureSimpleAuth(c, prefix, "get", aref.AuthKey()) {
 		return
 	}
-	res = processItem(res, c.Query("slim") == "true")
+	res = processItem(res, c.Query("slim"))
 	c.JSON(http.StatusOK, res)
 }
 
