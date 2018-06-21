@@ -468,7 +468,7 @@ func NewFrontend(
 	apiGroup := mgmtApi.Group("/api/v3")
 	apiGroup.Use(me.userAuth())
 	me.ApiGroup = apiGroup
-
+	me.InitMetaApi()
 	me.InitIndexApi()
 	me.InitRoleApi()
 	me.InitWebSocket()
@@ -692,7 +692,7 @@ func (f *Frontend) processFilters(rt *backend.RequestTracker, d backend.Stores, 
 	}
 
 	for k, vs := range params {
-		if k == "offset" || k == "limit" || k == "sort" || k == "reverse" {
+		if k == "offset" || k == "limit" || k == "sort" || k == "reverse" || k == "slim" {
 			continue
 		}
 		maker, ok := indexes[k]
@@ -782,6 +782,30 @@ func (f *Frontend) emptyList(c *gin.Context, statsOnly bool) {
 	}
 }
 
+func processItem(obj models.Model, slim string) models.Model {
+	for _, elide := range strings.Split(strings.ToLower(slim), ",") {
+		switch strings.TrimSpace(elide) {
+		case "meta":
+			if o, ok := obj.(models.MetaHaver); ok {
+				o.SetMeta(models.Meta{})
+			}
+		case "params":
+			if o, ok := obj.(models.Paramer); ok {
+				o.SetParams(map[string]interface{}{})
+			}
+		default:
+			// ignore for now -- will add more later, maybe
+		}
+	}
+	if f, ok := obj.(models.Filler); ok {
+		f.Fill()
+	}
+	if s, ok := obj.(Sanitizable); ok {
+		obj = s.Sanitize()
+	}
+	return obj
+}
+
 func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 	backend.Fill(ref)
 	arr := []models.Model{}
@@ -796,6 +820,7 @@ func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 		Model: ref.Prefix(),
 	}
 	var err error
+	slim := c.Query("slim")
 
 	rt := f.rt(c, ref.(Lockable).Locks("get")...)
 	rt.Do(func(d backend.Stores) {
@@ -823,16 +848,8 @@ func (f *Frontend) list(c *gin.Context, ref store.KeySaver, statsOnly bool) {
 		}
 
 		items := idx.Items()
-		for i, item := range items {
-			arr = append(arr, models.Clone(item))
-			f, ok := arr[i].(models.Filler)
-			if ok {
-				f.Fill()
-			}
-			s, ok := arr[i].(Sanitizable)
-			if ok {
-				arr[i] = s.Sanitize()
-			}
+		for _, item := range items {
+			arr = append(arr, processItem(models.Clone(item), slim))
 		}
 	})
 
@@ -880,10 +897,7 @@ func (f *Frontend) Fetch(c *gin.Context, ref store.KeySaver, key string) {
 	if !f.assureSimpleAuth(c, prefix, "get", aref.AuthKey()) {
 		return
 	}
-	s, ok := res.(Sanitizable)
-	if ok {
-		res = s.Sanitize()
-	}
+	res = processItem(res, c.Query("slim"))
 	c.JSON(http.StatusOK, res)
 }
 
